@@ -25,11 +25,10 @@
 **/*.pem
 **/*.key
 
-# Outside the pnpm workspace: the uni-app (built into the edge image), the
-# deploy scripts, the docs and the repository's own metadata.
+# Outside the pnpm workspace: the deploy scripts, the docs and the
+# repository's own metadata.
 .git
 .github
-apps/uni-app
 deploy
 docs
 load

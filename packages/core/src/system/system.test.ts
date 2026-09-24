@@ -209,8 +209,7 @@ describe('describeGroup', () => {
     // admin can open, and nobody finds out until a 客服 account tries. A verb
     // other than `:read` is allowed and means "the same atom guards the save":
     // a group holding a merchant private key (`payment`) gates reading behind
-    // `:write`, and the 装修版式 switch (`diy`) behind `:publish` because
-    // flipping it changes what every shopper sees. `writePermissionFor` returns
+    // `:write`. `writePermissionFor` returns
     // such an atom unchanged rather than inventing one, so the only derived
     // atom is `:read` → `:write`, and that one must exist too.
     for (const group of allConfigGroups()) {

@@ -12,10 +12,9 @@
  *
  * ## No ports
  *
- * Unlike `shipping`, importing this file registers nothing. The CMS is read by
- * the DIY editor (an article picker and a link target), but that runs in the
- * browser against the published routes — `apps/web/src/admin/cms/link-targets.ts`
- * — so there is no server-side port to install and no import cycle with `diy`.
+ * Unlike `shipping`, importing this file registers nothing. The decoration
+ * editor's article picker runs in the browser against the published routes,
+ * so there is no server-side port to install.
  *
  * `sanitizeHtml` is exported because it is the only allow-list sanitiser in the
  * workspace: any other domain that ever stores rich text authored by an

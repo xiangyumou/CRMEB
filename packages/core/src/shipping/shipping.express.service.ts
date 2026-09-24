@@ -3,6 +3,7 @@ import type {
   ExpressCompany,
   ExpressCompanyForm,
   ExpressCompanyListQuery,
+  ExpressCompanyOptionsQuery,
   ExpressCompanyRow,
 } from '@shop/contracts/shipping/schemas';
 import type { Ctx } from '../kernel/context';
@@ -15,9 +16,9 @@ import * as repo from './shipping.repo';
  *
  * Two surfaces over one table:
  *
- *  - `pickerList` answers the 发货 form and the mobile staff console on the
- *    order paths those clients already call — enabled rows only, most used
- *    first — and costs only the order permission they already hold.
+ *  - `pickerList` answers the 发货 form on the order path it already calls —
+ *    enabled rows only, most used first — and costs only the order permission
+ *    it already holds.
  *  - the `admin*` functions are the management screen, which sees disabled rows
  *    too and costs `shipping:express:*`.
  *
@@ -31,6 +32,22 @@ import * as repo from './shipping.repo';
 
 export async function pickerList(ctx: Ctx): Promise<{ items: ExpressCompany[] }> {
   const rows = await repo.listEnabledExpressCompanies(ctx.db);
+  return { items: rows.map(toPicker) };
+}
+
+/**
+ * The shopper's 退货物流 picker (`GET /api/v1/express-companies`, SHIP-003): searched and
+ * capped on the server, a WeChat courier code first. The two pickers above stay whole — an
+ * operator's form lists every enabled carrier.
+ */
+export async function shopperOptions(
+  ctx: Ctx,
+  query: ExpressCompanyOptionsQuery,
+): Promise<{ items: ExpressCompany[] }> {
+  const rows = await repo.searchEnabledExpressCompanies(ctx.db, {
+    keyword: query.keyword,
+    limit: query.limit,
+  });
   return { items: rows.map(toPicker) };
 }
 
@@ -129,6 +146,7 @@ function toRow(row: repo.ExpressCompanyRow): ExpressCompanyRow {
   return {
     ...toPicker(row),
     isEnabled: row.isEnabled,
+    wechatDeliveryId: row.wechatDeliveryId,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

@@ -1,4 +1,4 @@
-import { orderGiftCouponList } from '@shop/contracts/coupon/coupon.staff.contract';
+import { orderGiftCouponList } from '@shop/contracts/coupon/coupon.gift.contract';
 import * as order from '@shop/core/order';
 import { handle } from '../../../../../../src/server';
 

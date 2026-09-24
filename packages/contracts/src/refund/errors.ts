@@ -32,6 +32,12 @@ export const refundErrors = defineErrors({
   REFUND_AMOUNT_ZERO: { status: 422, message: '退款金额必须大于 0' },
   /** Freight was asked for after the order shipped. */
   REFUND_FREIGHT_NOT_REFUNDABLE: { status: 409, message: '订单已发货，运费不可退' },
+  /**
+   * An evidence photo that is not an image our own storage holds — what
+   * `POST /api/v1/uploads` returned (REFUND-014), as for a review picture
+   * (CAT-018).
+   */
+  REFUND_IMAGE_NOT_ALLOWED: { status: 422, message: '请上传凭证图片后再提交' },
 
   /** The refund does not exist, is soft-deleted, or belongs to somebody else. */
   REFUND_NOT_FOUND: { status: 404, message: '售后单不存在' },

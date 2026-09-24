@@ -179,24 +179,6 @@ export const cartUpdateBody = z
   );
 export type CartUpdateBody = z.infer<typeof cartUpdateBody>;
 
-/**
- * 减少数量, by variant rather than by row.
- *
- * The product detail page's stepper knows the SKU it is looking at, not whether
- * a cart row exists for it, so the alternative is listing the whole cart to
- * find a row id before every tap of the minus button — on the hottest screen in
- * the app. A negative quantity on `POST /cart/items` would make "add" mean two
- * things, so it is its own sub-resource.
- *
- * Reaching zero removes the row, and `item` in the answer is then `null`.
- */
-export const cartDecrementBody = z.object({
-  skuId: id,
-  /** Units to take off. Positive: the direction is in the route name. */
-  quantity: z.number().int().min(1).max(9999).default(1),
-});
-export type CartDecrementBody = z.infer<typeof cartDecrementBody>;
-
 export const cartRemoveBody = z
   .object({
     /** Rows to remove. Ignored when `unavailableOnly` is true. */

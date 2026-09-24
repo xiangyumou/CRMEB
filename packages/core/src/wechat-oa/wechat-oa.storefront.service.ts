@@ -155,14 +155,37 @@ export async function subscribeTemplatesFor(
           ? runtime.subscribeOrderShip
           : runtime.subscribeRefund;
 
+  return { templateIds: templateIdsOf(raw) };
+}
+
+/**
+ * Every scene at once, for `GET /api/v1/app/config` (registered from
+ * `registerWechatOaDomain()`). Same parsing as `subscribeTemplatesFor`, so the
+ * launch payload and the per-scene route always agree.
+ */
+export async function allSubscribeTemplates(ctx: Ctx): Promise<{
+  orderCreate: string[];
+  orderPay: string[];
+  orderShip: string[];
+  refund: string[];
+}> {
+  const runtime = await ctx.config.get(wechatOaRuntimeConfig);
   return {
-    templateIds: [
-      ...new Set(
-        raw
-          .split(',')
-          .map((id) => id.trim())
-          .filter((id) => id !== ''),
-      ),
-    ],
+    orderCreate: templateIdsOf(runtime.subscribeOrderCreate),
+    orderPay: templateIdsOf(runtime.subscribeOrderPay),
+    orderShip: templateIdsOf(runtime.subscribeOrderShip),
+    refund: templateIdsOf(runtime.subscribeRefund),
   };
+}
+
+/** Comma-separated as the operator typed it → trimmed, non-empty, first occurrence kept. */
+function templateIdsOf(raw: string): string[] {
+  return [
+    ...new Set(
+      raw
+        .split(',')
+        .map((id) => id.trim())
+        .filter((id) => id !== ''),
+    ),
+  ];
 }

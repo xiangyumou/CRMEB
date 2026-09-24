@@ -270,7 +270,7 @@ export const groupbuyAdminGroupComplete = defineRoute({
   path: '/admin-api/groupbuy-groups/:id/completion',
   auth: 'admin',
   permission: 'groupbuy:group:complete',
-  summary: '立即成团（虚拟补齐人数）',
+  summary: '立即成团（仅限已满员的团，不虚拟补齐）',
   tags: ['groupbuy'],
   params: groupParams,
   body: groupbuyCompleteBody,

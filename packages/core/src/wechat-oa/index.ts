@@ -17,6 +17,10 @@
  * shared thing is `wechatOaPermissions`, which the role editor needs.
  */
 
+import { registerAppConfigSource } from '../system';
+import { wechatOaRuntimeConfig } from './wechat-oa.config';
+import { allSubscribeTemplates } from './wechat-oa.storefront.service';
+
 export { wechatOaPermissions } from './permissions';
 export { wechatOaRuntimeConfig, type WechatOaRuntimeConfig } from './wechat-oa.config';
 export { oaCredentials, type OaCredentials } from './wechat-oa.credentials';
@@ -36,12 +40,24 @@ export * as wechatOaQrcode from './wechat-oa.qrcode.service';
 export * as wechatOaStorefront from './wechat-oa.storefront.service';
 
 /**
- * There is no `registerWechatOaDomain()`, on purpose.
+ * Wires the domain into the platform; called once per process from the gen'd
+ * bootstrap.
  *
- * The domain registers no effect handler and no order hook: it answers requests
- * and it answers WeChat, and importing this module is all the registration it
- * has (the config group and the permission atoms register as a side effect of
- * their own modules loading). Either form is allowed, and a registrar with
- * nothing to register would only be one more thing for `domains.gen.ts` to
- * call.
+ * The one thing it registers is the subscribe-message template ids for
+ * `GET /api/v1/app/config`: they are this domain's setting
+ * (`wechat-oa-runtime`), and `system` may not import this domain, so the
+ * answer crosses the seam as a reader — the same one
+ * `GET /api/v1/wechat/subscribe-templates` uses, so the two can never disagree.
+ * Not run at import, for the reason `registerWechatDomain()` gives: this module
+ * can be reached while `system` is still evaluating.
+ *
+ * Everything else here answers requests and answers WeChat; the config group
+ * and the permission atoms register as a side effect of their own modules
+ * loading.
  */
+export function registerWechatOaDomain(): void {
+  registerAppConfigSource('subscribeTemplates', {
+    groups: [wechatOaRuntimeConfig.group],
+    read: allSubscribeTemplates,
+  });
+}

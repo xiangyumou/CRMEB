@@ -10,8 +10,6 @@ import {
 } from '../_conventions/common';
 import {
   orderFulfillmentStatus,
-  orderItem,
-  orderItemExample,
   orderKind,
   orderListItem,
   orderListItemExample,
@@ -22,7 +20,7 @@ import {
 } from './schemas';
 
 /**
- * Fulfilment, the admin order console, invoices and the mobile staff console.
+ * Fulfilment, the admin order console and invoices.
  *
  * `schemas.ts` is the shopper's view of an order; this file only ever *extends*
  * those shapes, never rewrites them — `adminOrderListItem` is `orderListItem`
@@ -119,7 +117,7 @@ export const shipmentExample = {
 } satisfies Shipment;
 
 /**
- * What an operator (or a staff member) fills in on 发货.
+ * What an operator fills in on 发货.
  *
  * `lines` empty means "everything still outstanding on this order", which is
  * what the 一键发货 button sends. A partial shipment names the lines and the
@@ -375,7 +373,7 @@ export const adminOrderDetail = adminOrderListItem.extend({
   customForm: z.record(z.string(), z.unknown()).nullable(),
   userCouponId: id.nullable(),
   cancelReason: z.string().nullable(),
-  /** Operator cost total, for the margin column. Never sent to the staff surface. */
+  /** Operator cost total, for the margin column. Never sent to a storefront surface. */
   costAmount: money.nullable(),
   transactionNo: z.string().nullable(),
   /** Deadline for `shipped -> received`; the auto-receive job reads it. */
@@ -656,13 +654,14 @@ export const orderInvoiceExample = {
 } satisfies OrderInvoice;
 
 /**
- * 申请开票.
+ * The 发票抬头 fields, shared by the request below and by the saved titles of
+ * `/api/v1/invoice-titles` (`user/schemas.ts` `invoiceTitleForm`).
  *
- * A 增值税专用发票 needs a duty number and the four bank/registration fields;
- * a personal 普通发票 needs none of them. The rule is written here so the form
- * can enforce it, and again in the service.
+ * One definition on purpose: a saved title is copied field by field into
+ * `POST /orders/:id/invoice`, so any title the book accepted has to be a body
+ * the request accepts too (USER-017).
  */
-const invoiceRequestInput = z.object({
+export const invoiceHeaderInput = z.object({
   headerType: invoiceHeaderType,
   invoiceType: invoiceType.default('plain'),
   name: z.string().min(1).max(100),
@@ -673,23 +672,48 @@ const invoiceRequestInput = z.object({
   registeredAddress: z.string().max(255).optional(),
   bankName: z.string().max(100).optional(),
   bankAccount: z.string().max(50).optional(),
+});
+export type InvoiceHeaderInput = z.infer<typeof invoiceHeaderInput>;
+
+type InvoiceHeaderRuleInput = Pick<
+  InvoiceHeaderInput,
+  | 'headerType'
+  | 'invoiceType'
+  | 'dutyNumber'
+  | 'registeredAddress'
+  | 'registeredTel'
+  | 'bankName'
+  | 'bankAccount'
+>;
+
+/**
+ * A 增值税专用发票 needs a duty number and the four bank/registration fields;
+ * a personal 普通发票 needs none of them. The rule is written here so the form
+ * can enforce it, and again in the service.
+ */
+export function withInvoiceHeaderRules<T extends z.ZodType<InvoiceHeaderRuleInput>>(schema: T) {
+  return schema
+    .refine((b) => b.headerType !== 'company' || (b.dutyNumber ?? '').length > 0, {
+      message: '企业抬头需要填写税号',
+      path: ['dutyNumber'],
+    })
+    .refine(
+      (b) =>
+        b.invoiceType !== 'special' ||
+        ((b.registeredAddress ?? '').length > 0 &&
+          (b.registeredTel ?? '').length > 0 &&
+          (b.bankName ?? '').length > 0 &&
+          (b.bankAccount ?? '').length > 0),
+      { message: '专用发票需要填写注册地址、电话、开户行和账号', path: ['registeredAddress'] },
+    );
+}
+
+/** 申请开票. The header fields plus a remark for the operator. */
+const invoiceRequestInput = invoiceHeaderInput.extend({
   remark: z.string().max(255).optional(),
 });
 
-export const invoiceRequestBody = invoiceRequestInput
-  .refine((b) => b.headerType !== 'company' || (b.dutyNumber ?? '').length > 0, {
-    message: '企业抬头需要填写税号',
-    path: ['dutyNumber'],
-  })
-  .refine(
-    (b) =>
-      b.invoiceType !== 'special' ||
-      ((b.registeredAddress ?? '').length > 0 &&
-        (b.registeredTel ?? '').length > 0 &&
-        (b.bankName ?? '').length > 0 &&
-        (b.bankAccount ?? '').length > 0),
-    { message: '专用发票需要填写注册地址、电话、开户行和账号', path: ['registeredAddress'] },
-  );
+export const invoiceRequestBody = withInvoiceHeaderRules(invoiceRequestInput);
 export type InvoiceRequestBody = z.infer<typeof invoiceRequestBody>;
 
 export const invoiceIssueBody = z.object({
@@ -724,162 +748,3 @@ export const adminInvoiceListQuery = pageQuery
 export type AdminInvoiceListQuery = z.infer<typeof adminInvoiceListQuery>;
 
 export const pagedInvoices = paged(orderInvoice);
-
-// ---------------------------------------------------------------------------
-// the mobile staff console
-// ---------------------------------------------------------------------------
-
-/**
- * Who may open the mobile console.
- *
- * Not a role: staff are a list of user ids in the `orderStaff` config group,
- * and `auth: 'staff'` in the contract is what `handle()` checks it with.
- */
-export const staffIdentity = z.object({
-  isStaff: z.boolean(),
-  userId: id.nullable(),
-  nickname: z.string().nullable(),
-  /**
-   * What this staff member may do from the phone. It follows the `order-staff`
-   * group, so the phone can hide the buttons the shop has not switched on. All
-   * false for someone who is not staff.
-   */
-  abilities: z.object({
-    /** `order-staff.allowStaffRefundReview` — 退款审核 / 确认收货. */
-    refundReview: z.boolean(),
-    /** `order-staff.allowStaffRepricing` — 改价. */
-    adjustPrice: z.boolean(),
-  }),
-});
-export type StaffIdentity = z.infer<typeof staffIdentity>;
-
-/** The staff console's own header. No cost, no margin — those stay in the web console. */
-export const staffStatistics = z.object({
-  pendingShipment: z.number().int().min(0),
-  pendingReceipt: z.number().int().min(0),
-  refunding: z.number().int().min(0),
-  today: z.object({ orderCount: z.number().int().min(0), paidAmount: money }),
-  yesterday: z.object({ orderCount: z.number().int().min(0), paidAmount: money }),
-  month: z.object({ orderCount: z.number().int().min(0), paidAmount: money }),
-});
-export type StaffStatistics = z.infer<typeof staffStatistics>;
-
-export const staffStatisticsExample = {
-  pendingShipment: 12,
-  pendingReceipt: 30,
-  refunding: 2,
-  today: { orderCount: 48, paidAmount: '5320.00' },
-  yesterday: { orderCount: 51, paidAmount: '6180.00' },
-  month: { orderCount: 902, paidAmount: '108400.00' },
-} satisfies StaffStatistics;
-
-/**
- * The per-day breakdown behind 统计明细.
- *
- * A **day** here is a calendar day in Asia/Shanghai, not a UTC day and not the
- * host's day: the shop is single-tenant and its operators read 今天 as the day
- * they are living in. Both ends are inclusive, because an operator who picks
- * 1 日 to 7 日 means seven days, and the window is capped so a client cannot
- * ask for the shop's whole history in one query.
- */
-export const shopDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD');
-
-/** The widest window the series answers, in days — a quarter, with a day to spare. */
-export const STAFF_STATISTICS_MAX_DAYS = 92;
-
-export const staffStatisticsDay = z.object({
-  date: shopDay,
-  orderCount: z.number().int().min(0),
-  paidOrderCount: z.number().int().min(0),
-  paidAmount: money,
-});
-export type StaffStatisticsDay = z.infer<typeof staffStatisticsDay>;
-
-export const staffStatisticsSeries = z.object({
-  granularity: z.literal('day'),
-  /** The resolved window, echoed back: the client may have sent neither end. */
-  from: shopDay,
-  to: shopDay,
-  /**
-   * Every day in the window, including the ones nothing happened on. A chart
-   * that silently skips empty days draws a rising line across a dead week and
-   * lies about it, so the gaps are filled here instead of in each client.
-   */
-  items: z.array(staffStatisticsDay),
-});
-export type StaffStatisticsSeries = z.infer<typeof staffStatisticsSeries>;
-
-export const staffStatisticsSeriesQuery = z.object({
-  from: shopDay.optional(),
-  to: shopDay.optional(),
-  /** Days only for now; the key exists so a week rollup needs no second route. */
-  granularity: z.literal('day').default('day'),
-});
-export type StaffStatisticsSeriesQuery = z.infer<typeof staffStatisticsSeriesQuery>;
-
-export const staffStatisticsSeriesExample = {
-  granularity: 'day',
-  from: '2026-02-01',
-  to: '2026-02-03',
-  items: [
-    { date: '2026-02-01', orderCount: 48, paidOrderCount: 41, paidAmount: '5320.00' },
-    { date: '2026-02-02', orderCount: 0, paidOrderCount: 0, paidAmount: '0.00' },
-    { date: '2026-02-03', orderCount: 51, paidOrderCount: 50, paidAmount: '6180.00' },
-  ],
-} satisfies StaffStatisticsSeries;
-
-/** The staff list row is the console row without the soft-delete column. */
-export const staffOrderListItem = adminOrderListItem.omit({ deletedAt: true });
-export type StaffOrderListItem = z.infer<typeof staffOrderListItem>;
-
-export const staffOrderDetail = adminOrderDetail.omit({ deletedAt: true, costAmount: true });
-export type StaffOrderDetail = z.infer<typeof staffOrderDetail>;
-
-export const staffOrderListItemExample: StaffOrderListItem = (() => {
-  const { deletedAt: _deletedAt, ...rest } = adminOrderListItemExample;
-  return rest;
-})();
-
-export const staffOrderDetailExample: StaffOrderDetail = (() => {
-  const { deletedAt: _deletedAt, costAmount: _costAmount, ...rest } = adminOrderDetailExample;
-  return rest;
-})();
-
-export const staffOrderListQuery = adminOrderListQuery.omit({ deleted: true });
-export type StaffOrderListQuery = z.infer<typeof staffOrderListQuery>;
-
-export const pagedStaffOrders = paged(staffOrderListItem);
-
-/**
- * 同意/拒绝退款, from the phone.
- *
- * The staff console never refunds money itself: it forwards to the refund
- * domain's `approve` / `reject`, which is the only code allowed to talk to the
- * gateway. The response is the refund domain's `refundDetail`, unchanged.
- */
-export const staffRefundReviewBody = z.object({
-  decision: z.enum(['approve', 'reject']),
-  /** Required when rejecting (`refunds_rejected_needs_reason`). */
-  reason: z.string().max(255).optional(),
-});
-export type StaffRefundReviewBody = z.infer<typeof staffRefundReviewBody>;
-
-/**
- * 售后备注, from the phone.
- *
- * The field is `remark`, not the console's `adminRemark`, and the difference is
- * not cosmetic: `refunds.admin_remark` is a single column the web console
- * overwrites, and a staff member is not an admin — there is no
- * `refunds.staff_remark` column to write. A staff note is therefore **appended
- * to the refund's log** instead of replacing anything, so two people remarking
- * on the same refund cannot silently erase each other and the note comes back
- * in `logs` on the detail, in order, attributed.
- */
-export const staffRefundRemarkBody = z.object({
-  remark: z.string().min(1).max(255),
-});
-export type StaffRefundRemarkBody = z.infer<typeof staffRefundRemarkBody>;
-
-/** Item-level export of one order's items, for the 打印/核对 sheet on the phone. */
-export const orderItemsResult = z.object({ items: z.array(orderItem) });
-export const orderItemsResultExample = { items: [orderItemExample] };

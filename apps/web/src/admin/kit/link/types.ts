@@ -46,8 +46,7 @@ export interface LinkTargetResult {
  * Everything `<LinkPicker>` needs.
  *
  * The kit ships the UI only. Whatever renders a picker installs the source
- * with `<LinkSourceProvider source={…}>` — the DIY editor mounts
- * `createDiyLinkSource()`, which asks the catalog and the CMS for their halves.
+ * with `<LinkSourceProvider source={…}>`.
  */
 export interface LinkSource {
   listPages(): Promise<LinkPageGroup[]>;

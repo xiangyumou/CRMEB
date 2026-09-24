@@ -262,6 +262,12 @@ services:
       NEXT_EDGE_TRUSTED_PROXIES: ${NEXT_EDGE_TRUSTED_PROXIES:-}
     volumes:
       - uploads:/data/uploads:ro
+      # The WeChat domain-verification files (`/<name>.txt`, README.md,
+      # "Domain verification files"): a host directory the operator fills by
+      # hand, read-only here. Relative to this file's directory, so on the
+      # host it is `data/domain-verification/` beside `shop`, which no release
+      # touches. `shop upgrade` creates it, so Docker never does (as root).
+      - ${NEXT_DOMAIN_VERIFICATION_DIR:-./data/domain-verification}:/srv/domain-verification:ro
     depends_on:
       web: { condition: service_healthy }
     healthcheck:

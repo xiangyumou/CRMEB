@@ -1,5 +1,6 @@
 import type {
   CheckoutCreateBody,
+  CheckoutKind,
   CheckoutLine,
   CheckoutPreview,
   CheckoutPreviewBody,
@@ -281,6 +282,24 @@ function customFormFieldsOf(lines: readonly DraftLine[]): CustomFormField[] {
   return [...seen.values()];
 }
 
+/**
+ * `kindMeta` as the kind handler and the pricing contributors read it: the
+ * declared keys of the kind's own payload, and nothing else.
+ *
+ * The contract already strips undeclared keys; spelling the keys out here
+ * keeps it true for a caller that reaches the service without the contract.
+ */
+function kindSelections(input: CheckoutKind): Record<string, string | undefined> {
+  switch (input.kind) {
+    case 'groupbuy':
+      return { activityId: input.kindMeta.activityId, groupId: input.kindMeta.groupId };
+    case 'presale':
+      return { activityId: input.kindMeta.activityId };
+    default:
+      return {};
+  }
+}
+
 async function buildDraft(
   ctx: Ctx,
   db: DbOrTx,
@@ -322,12 +341,11 @@ async function buildDraft(
 
   // A marketing contributor learns which activity the shopper picked from the
   // same `kindMeta` the kind handler gets, plus `kind` so it can refuse to fire
-  // on an ordinary order. `kindMeta` goes first: nothing in it may overrule
-  // `kind` or the coupon, or an ordinary order carrying
-  // `kindMeta: {kind: 'groupbuy', activityId}` is priced at the group price.
+  // on an ordinary order. `kind` goes last: nothing in `kindMeta` may overrule
+  // it (ORDER-009).
   const adjustments = await gatherAdjustments(ctx, db, userId, lines, userCouponId, {
-    ...(input.kindMeta as Record<string, string | undefined> | undefined),
     couponId: input.userCouponId ?? undefined,
+    ...kindSelections(input),
     kind: input.kind,
   });
   const discount = splitAdjustments(lines, adjustments);
@@ -396,7 +414,7 @@ function checkoutLineOf(line: DraftLine, index: number, discount: DiscountSplit)
   };
 }
 
-function toPreview(draft: Draft): CheckoutPreview {
+function toPreview(draft: Draft): Omit<CheckoutPreview, 'shipAfterDays'> {
   return {
     lines: draft.lines.map((line, index) => checkoutLineOf(line, index, draft.discount)),
     receiver: receiverOf(draft.address),
@@ -427,7 +445,10 @@ function toPreview(draft: Draft): CheckoutPreview {
 /** 确认订单. Writes nothing, so the client may call it on every change. */
 export async function preview(ctx: Ctx, body: CheckoutPreviewBody): Promise<CheckoutPreview> {
   const userId = requireUserId(ctx);
-  return toPreview(await buildDraft(ctx, ctx.db, userId, body));
+  const draft = await buildDraft(ctx, ctx.db, userId, body);
+  const terms =
+    (await getOrderKindHandler(body.kind)?.previewTerms?.(ctx.db, kindSelections(body))) ?? {};
+  return { ...toPreview(draft), shipAfterDays: terms.shipAfterDays ?? null };
 }
 
 // ---------------------------------------------------------------------------
@@ -541,7 +562,7 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
             userId,
             lines: draft.lines.map(pricingLineOf),
             goodsTotal: draft.itemsAmount,
-            selections: { ...(body.kindMeta as Record<string, string | undefined>) },
+            selections: kindSelections(body),
             // The handler needs to know its own adjustment reached the order,
             // and `create` is holding the answer at this very moment. Without
             // it a kind handler has to re-run its own contributor inside this

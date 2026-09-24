@@ -1,25 +1,29 @@
-import Link from 'next/link';
+import type { Metadata } from 'next';
+import { cache } from 'react';
+
+import { LandingPage } from '@/landing/landing-page';
+import { loadLanding } from '@/server/landing';
 
 /**
- * The H5 storefront is served by the edge container, not by Next, so `/` is
- * only ever hit by someone poking at the origin directly.
+ * `/` — the landing page: the shop's name, the 小程序码, "open it in WeChat".
+ *
+ * The edge proxies exactly `/` here and redirects every path it does not know
+ * to it (docker/edge/nginx.conf, docs/mini/cutover.md §2.10). It inherits the
+ * root layout's `robots: noindex`.
  */
-export default function RootPage() {
-  return (
-    <main
-      style={{
-        minHeight: '100vh',
-        display: 'grid',
-        placeItems: 'center',
-        fontFamily: 'system-ui, sans-serif',
-      }}
-    >
-      <div style={{ textAlign: 'center' }}>
-        <h1 style={{ fontSize: 20, fontWeight: 600 }}>商城服务</h1>
-        <p style={{ color: '#888' }}>
-          管理后台在 <Link href="/admin">/admin</Link>
-        </p>
-      </div>
-    </main>
-  );
+export const dynamic = 'force-dynamic';
+
+/** Once per request: the metadata and the page read the same settings. */
+const load = cache(loadLanding);
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { shopName } = await load();
+  return {
+    title: { absolute: shopName ?? '商城' },
+    description: '请使用微信扫码打开小程序',
+  };
+}
+
+export default async function RootPage() {
+  return <LandingPage data={await load()} />;
 }

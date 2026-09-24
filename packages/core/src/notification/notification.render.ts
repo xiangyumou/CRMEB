@@ -7,6 +7,8 @@
  * whole message.
  */
 
+import { storefrontRoute, type StorefrontRoute } from '@shop/contracts/system/storefront-routes';
+
 /** `{{ orderNo }}` and `{{orderNo}}` are the same placeholder. */
 const PLACEHOLDER = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
 
@@ -120,4 +122,22 @@ const shopClock = new Intl.DateTimeFormat('en-GB', {
 export function formatShopTime(at: Date, precision: 'day' | 'minute'): string {
   const day = shopDay.format(at);
   return precision === 'day' ? day : `${day} ${shopClock.format(at)}`;
+}
+
+/**
+ * An event's route template, filled in from `data` and then validated against
+ * the key's params — in that order, because `{{orderId}}` is not an id until it
+ * is substituted. `null` when the result is not a valid route (a variable the
+ * payload did not carry renders empty, which no id accepts): the caller sends
+ * the message without a destination rather than with a wrong one.
+ */
+export function renderRoute(
+  template: { route: string; params: Readonly<Record<string, string>> },
+  data: Readonly<Record<string, string>>,
+): StorefrontRoute | null {
+  const params = Object.fromEntries(
+    Object.entries(template.params).map(([name, value]) => [name, render(value, data)]),
+  );
+  const parsed = storefrontRoute.safeParse({ route: template.route, params });
+  return parsed.success ? parsed.data : null;
 }

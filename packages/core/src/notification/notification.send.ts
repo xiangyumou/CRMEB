@@ -1,4 +1,5 @@
 import type { NotificationChannel } from '@shop/contracts/notification/schemas';
+import { toMiniPath } from '@shop/contracts/system/storefront-routes';
 import type { Ctx } from '../kernel/context';
 import { publicOrigin } from '../system';
 import { findOpenid, getWechatClient } from '../wechat';
@@ -6,7 +7,7 @@ import { notificationConfig } from './notification.config';
 import { resolveSmsPort } from './notification.ports';
 import type { NotificationChannels } from './notification.repo';
 import type { NotificationEvent } from './notification.registry';
-import { render, renderFields, toTemplateData } from './notification.render';
+import { render, renderFields, renderRoute, toTemplateData } from './notification.render';
 
 /**
  * The outbound half of a fan-out: one function per channel, each returning an
@@ -112,7 +113,7 @@ export async function sendWechatMini(ctx: Ctx, input: SendContext): Promise<Chan
   const fields = renderFields(config.fields, input.data);
   if (Object.keys(fields).length === 0) return { kind: 'skipped', reason: 'no rendered fields' };
 
-  const page = render(config.page ?? '', input.data);
+  const page = subscribePage(input);
   const result = await getWechatClient(ctx).sendSubscribeMessage({
     touser: openid,
     templateId,
@@ -121,6 +122,18 @@ export async function sendWechatMini(ctx: Ctx, input: SendContext): Promise<Chan
     data: fields,
   });
   return classify(result, 'wechatMini');
+}
+
+/**
+ * The subscribe message's `page`: the event's catalogue route through
+ * `toMiniPath` (docs/mini/pages.md §3.4). An event without a route, or a route
+ * that does not render (a missing variable), sends the message without a page
+ * — WeChat then opens the home page — rather than guessing.
+ */
+function subscribePage(input: SendContext): string {
+  if (!input.event.route) return '';
+  const route = renderRoute(input.event.route, input.data);
+  return route ? toMiniPath(route) : '';
 }
 
 // ---------------------------------------------------------------------------

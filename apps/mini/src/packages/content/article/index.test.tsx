@@ -1,0 +1,54 @@
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { articleFixture } from '@/test/article-fixture';
+import { serveApi } from '@/test/fake-api';
+import { renderPage } from '@/test/render';
+import { taroFake } from '@/test/taro-fake/taro';
+import ArticlePage from './index';
+
+describe('资讯详情', () => {
+  beforeEach(() => {
+    taroFake.routerParams = { id: '61' };
+    serveApi({ 'GET /api/v1/articles/61': () => ({ body: articleFixture }) });
+  });
+
+  it('shows the article, its product, and shares its own title', async () => {
+    await renderPage(<ArticlePage />);
+    expect(await screen.findByText('第一步，温水清洗。')).toBeTruthy();
+    expect(screen.getByText('护理知识 · 小编 · 2026.09.20 · 120 阅读')).toBeTruthy();
+
+    expect(taroFake.shareHandlers.timeline?.()).toMatchObject({
+      title: '日常清洁小贴士',
+      query: 'id=61',
+    });
+
+    fireEvent.click(screen.getByRole('link', { name: '纯棉毛巾' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'navigateTo',
+        args: { url: '/pages/product/index?id=11' },
+      }),
+    );
+  });
+
+  it('opens 阅读原文 in the web-view and copies a link WeChat would refuse', async () => {
+    await renderPage(<ArticlePage />);
+    fireEvent.click(await screen.findByRole('link', { name: '阅读原文' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'navigateTo',
+        args: {
+          url: `/packages/content/webview/index?url=${encodeURIComponent('https://mp.weixin.qq.com/s/abc')}`,
+        },
+      }),
+    );
+
+    fireEvent.click(screen.getByRole('link', { name: '打开链接：使用指南' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'setClipboardData',
+        args: { data: 'https://other.example.com/guide' },
+      }),
+    );
+  });
+});

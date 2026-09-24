@@ -1,4 +1,6 @@
+import { IMAGE_VARIANT_WIDTHS, imageVariantKey } from '@shop/contracts/storage/image-variants';
 import type { Ctx } from '../kernel/context';
+import type { Storage } from '../kernel/storage';
 import * as repo from './storage.repo';
 import { resolveStorage } from './storage.service';
 import { storageConfig } from './storage.config';
@@ -53,6 +55,7 @@ export async function cleanOrphanAttachments(
     if (candidate.driver !== resolved.driver) continue;
     try {
       await resolved.storage.delete(candidate.storageKey);
+      await deleteVariants(ctx, resolved.storage, candidate.storageKey);
       purgeable.push(candidate.id);
     } catch (error) {
       // A driver that is briefly unavailable must not lose the record of what
@@ -67,4 +70,19 @@ export async function cleanOrphanAttachments(
 
   const removed = await repo.purgeAttachments(ctx.db, purgeable);
   return { examined: candidates.length, removed, failed };
+}
+
+/**
+ * The thumbnails go with their original. Best effort: a leftover thumbnail is
+ * a few kilobytes nobody links to, not a reason to keep the row (and so retry
+ * the original's delete) forever.
+ */
+async function deleteVariants(ctx: Ctx, storage: Storage, key: string): Promise<void> {
+  for (const width of IMAGE_VARIANT_WIDTHS) {
+    const variant = imageVariantKey(key, width);
+    if (!variant) return;
+    await storage.delete(variant).catch((error: unknown) => {
+      ctx.logger.warn({ requestId: ctx.requestId, err: error }, 'storage: 删除缩略图失败，已忽略');
+    });
+  }
 }

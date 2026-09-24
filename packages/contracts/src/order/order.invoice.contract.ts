@@ -25,9 +25,10 @@ import {
  * order, which is why `invoiceRequest` can be a plain insert and learn "already
  * asked" from the unique violation rather than from a prior SELECT.
  *
- * There is no separate 发票抬头 address book: the header fields are frozen onto
- * the request at the moment it is made, which is the only thing that matters,
- * and the storefront can remember the last one locally.
+ * The header fields are frozen onto the request at the moment it is made. The
+ * shopper's saved 发票抬头 (`/api/v1/invoice-titles`, user domain) only
+ * prefill the form: the client copies a title's fields into this body, and
+ * editing the title afterwards never touches an invoice already asked for.
  */
 
 export const invoiceRequest = defineRoute({
@@ -41,7 +42,12 @@ export const invoiceRequest = defineRoute({
   body: invoiceRequestBody,
   response: orderInvoice,
   status: 201,
-  errors: ['ORDER_NOT_FOUND', 'ORDER_INVOICE_ALREADY_OPEN', 'ORDER_INVOICE_NOT_REQUESTABLE'],
+  errors: [
+    'ORDER_NOT_FOUND',
+    'ORDER_INVOICE_ALREADY_OPEN',
+    'ORDER_INVOICE_NOT_REQUESTABLE',
+    'ORDER_INVOICE_TITLE_REJECTED',
+  ],
   examples: [
     {
       name: 'company-plain',

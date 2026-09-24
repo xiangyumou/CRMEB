@@ -2,7 +2,9 @@ name: ci
 
 # The merge gate: typecheck, lint with the import boundaries, the guards, unit
 # tests, integration tests on a real PostgreSQL 17 and Redis 7, the contract
-# example check, formatting, both Playwright suites and the build.
+# example check, formatting, the Playwright suites (admin, and the storefront:
+# the mini-program's "模拟小程序" build) and the build, which includes the
+# WeChat mini-program package and its size gate.
 #
 # It also builds and publishes the three container images and rehearses a
 # deploy against them. The deploy directory is in the paths filter for that
@@ -72,6 +74,8 @@ jobs:
       - name: Generate aggregates
         run: corepack pnpm gen
 
+      # Every workspace package through turbo — apps/mini, @shop/api-client and
+      # @shop/storefront-blocks included (each has typecheck, lint and test:unit).
       - name: Typecheck
         run: corepack pnpm typecheck
 
@@ -198,12 +202,18 @@ jobs:
           name: playwright-report
           path: e2e/admin/playwright-report
 
+  # The storefront's journeys: the mini-program's "模拟小程序" H5 build of
+  # `apps/mini`, served by the suite's own Node edge in front of a real `web`,
+  # PostgreSQL and Redis, plus a fake api.weixin.qq.com. It runs every spec in
+  # `e2e/storefront/specs-mini/` (docs/mini/e2e-coverage.md maps them). The
+  # WeChat package itself (weapp build, size gate, test-only scan) is the build
+  # job's.
   storefront-e2e:
-    name: storefront e2e (playwright, H5)
+    name: storefront e2e (playwright, mini-program emulation)
     runs-on: ubuntu-latest
-    # Cold: image pulls, `npm ci`, the H5 build, `next build`, then the
-    # journeys (~45-50 s locally, stack ready in ~5 s). Room for the one retry.
-    timeout-minutes: 40
+    # Cold: image pulls, the emulation build (~10 s), `next build` unless the
+    # cache has it, then the journeys (a few minutes, one worker).
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -219,32 +229,22 @@ jobs:
       - name: Install
         run: corepack pnpm install --frozen-lockfile
 
-      # The routes, error codes and config groups are generated, not committed;
-      # the web server the suite starts imports them.
+      # The web server and the emulation build both import generated files.
       - name: Generate aggregates
         run: corepack pnpm gen
 
-      # The H5 bundle the edge serves is built from the real uni-app tree by
-      # the suite's own webServer (`src/h5.ts` runs `npm run build:h5`); it
-      # needs that tree's own dependencies, which are npm, not pnpm.
-      - uses: actions/setup-node@v5
+      # `scripts/serve.ts` runs `next build` only when `apps/web/.next` has no
+      # BUILD_ID, so a restored build saves each storefront job several minutes.
+      # The key is every source `next build` compiles; a stale `.next` would
+      # silently serve the old server (docs/mini/spikes/S4-e2e.md).
+      - name: Cache the web build
+        uses: actions/cache@v4
         with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: apps/uni-app/package-lock.json
+          path: |
+            apps/web/.next
+            !apps/web/.next/cache
+          key: next-build-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'apps/web/app/**', 'apps/web/src/**', 'apps/web/public/**', 'apps/web/*.ts', 'apps/web/*.mjs', 'apps/web/*.json', 'packages/*/src/**', 'packages/*/package.json', 'packages/storefront-blocks/scripts/**') }}
 
-      - name: Install the uni-app dependencies
-        working-directory: apps/uni-app
-        run: npm ci
-
-      # The uni-app's API layer, mappers, store and utils. Its vitest is the
-      # workspace's, from packages/contracts, which the install above provides.
-      - name: uni-app unit tests
-        working-directory: apps/uni-app
-        run: npm test
-
-      # Chromium only, mobile emulation: the journeys assert what a shopper on
-      # a phone browser sees, not cross-browser rendering.
       - name: Install the browser
         run: corepack pnpm --filter @shop/e2e-storefront exec playwright install --with-deps chromium
 
@@ -253,8 +253,8 @@ jobs:
           docker pull postgres:17-alpine
           docker pull redis:7-alpine
 
-      # `CI` is set by Actions, so the config forbids `.only`, retries once,
-      # and never reuses a running server.
+      # `serve.ts` builds `apps/mini/dist/h5-mp-emulation` itself. `CI` is set,
+      # so `.only` is forbidden, one retry, no reuse of a running server.
       - name: Storefront e2e
         run: corepack pnpm --filter @shop/e2e-storefront test
 
@@ -416,6 +416,11 @@ jobs:
       - name: Generate aggregates
         run: corepack pnpm gen
 
+      # Every package's `build`, through turbo. For apps/mini that is the WeChat
+      # package (`build:weapp`), the H5 preview and `scripts/size-report.mjs`:
+      # the main / sub-package / total budgets, no eval or new Function, ES2018
+      # syntax, every app.json page present, one React, no zod, and none of
+      # the e2e emulation in `dist/weapp` (docs/mini/spikes/S1-taro.md, S4).
       - name: Build
         run: corepack pnpm build
 
@@ -485,50 +490,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # The storefront. The edge image defaults to a placeholder page, which is
-      # right for a stack that only serves /admin and the APIs and **wrong for a
-      # release** — so a release builds the real H5 bundle, and a checkout where
-      # that build fails says so loudly instead of shipping the placeholder
-      # quietly.
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: apps/uni-app/package-lock.json
-
-      - name: Build the H5 storefront
-        id: h5
-        continue-on-error: true
-        working-directory: apps/uni-app
-        run: |
-          set -euo pipefail
-          npm ci
-          npm run build:h5
-
-      # `dist/<NODE_ENV>/h5` — the uni-app CLI names the directory after the
-      # mode it built in, so the job finds the bundle rather than assuming one
-      # of the two names and silently falling back to the placeholder.
-      - name: Resolve the H5 bundle
-        id: bundle
-        run: |
-          set -euo pipefail
-          dist=''
-          for candidate in apps/uni-app/dist/build/h5 apps/uni-app/dist/dev/h5; do
-            if [ -f "$candidate/index.html" ]; then
-              dist="$candidate"
-              break
-            fi
-          done
-          if [ -n "$dist" ]; then
-            storefront=real
-          else
-            storefront=placeholder
-            dist=docker/edge/h5-placeholder
-            echo "::warning title=Edge image has no storefront::The H5 build produced no bundle; the edge image falls back to the placeholder page and this release must not be deployed to a site that serves shoppers."
-          fi
-          printf 'dist=%s\n' "$dist" >> "$GITHUB_OUTPUT"
-          printf 'storefront=%s\n' "$storefront" >> "$GITHUB_OUTPUT"
-
       # One architecture. The production host is a single amd64 box, so a
       # second one would double the build for an image nothing will run.
       #
@@ -555,15 +516,15 @@ jobs:
           cache-from: type=gha,scope=next-worker
           cache-to: type=gha,scope=next-worker,mode=max
 
-      # Context is the repository root: the edge image copies the nginx config
-      # from `docker/edge/` and the storefront from `apps/uni-app/`.
+      # Context is the repository root, like the other two; the edge image is
+      # nginx and its config from `docker/edge/`, with no front-end files. The
+      # landing page at `/` is `web`'s (docs/mini/cutover.md §2.10).
       - name: edge
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/edge/Dockerfile
           push: true
-          build-args: H5_DIST=${{ steps.bundle.outputs.dist }}
           tags: ${{ env.EDGE_IMAGE }}:ci-${{ github.sha }}-amd64
           cache-from: type=gha,scope=next-edge
           cache-to: type=gha,scope=next-edge,mode=max
@@ -595,7 +556,6 @@ jobs:
         run: |
           {
             printf '## crmeb-next images\n\n'
-            printf 'storefront in the edge image: **%s**\n\n' '${{ steps.bundle.outputs.storefront }}'
             printf '```sh\ndeploy/ship.sh %s\n```\n\n' "$GITHUB_SHA"
             printf -- '- web: `%s`\n'    '${{ steps.publish.outputs.web }}'
             printf -- '- worker: `%s`\n' '${{ steps.publish.outputs.worker }}'

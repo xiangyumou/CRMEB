@@ -15,14 +15,8 @@ import type {
   CouponTemplateListQuery,
   CouponTemplateStatusBody,
   MyCouponListQuery,
-  StaffCoupon,
-  StaffCouponGrantBody,
-  StaffCouponListQuery,
-  StaffUserCouponListQuery,
-  StaffUserCoupons,
   UserCoupon,
 } from '@shop/contracts/coupon/schemas';
-import { STAFF_USER_COUPON_LIMIT } from '@shop/contracts/coupon/schemas';
 import type { PageQuery } from '@shop/contracts/conventions';
 import type { Tx } from '@shop/db';
 import { DomainError } from '../kernel/errors';
@@ -208,27 +202,17 @@ export async function adminGrant(
   input: { id: string },
   body: CouponGrantBody,
 ): Promise<CouponGrantResult> {
-  return grant(ctx, Number(input.id), body.userIds.map(Number), { activeOnly: false });
+  return grant(ctx, Number(input.id), body.userIds.map(Number));
 }
 
 /**
- * The one grant path behind both consoles. `activeOnly` is the staff console's:
- * the web console may hand a draft to a test account, a 店员 may only hand out
- * what marketing has released. The status is read inside the grant's
- * transaction, so the answer is the one the grant used.
+ * The grant path. The console may hand any template, a draft included, to a
+ * test account, so the template's status is not checked here.
  */
-async function grant(
-  ctx: Ctx,
-  templateId: number,
-  userIds: number[],
-  options: { activeOnly: boolean },
-): Promise<CouponGrantResult> {
+async function grant(ctx: Ctx, templateId: number, userIds: number[]): Promise<CouponGrantResult> {
   return ctx.withTx(async (tx) => {
     const template = await repo.findTemplate(tx, templateId);
     if (!template) throw new DomainError('COUPON_TEMPLATE_NOT_FOUND');
-    if (options.activeOnly && template.status !== 'active') {
-      throw new DomainError('COUPON_TEMPLATE_NOT_FOUND');
-    }
 
     const known = await repo.existingUserIds(tx, userIds);
     const unknown = userIds.filter((userId) => !known.has(userId));
@@ -284,94 +268,6 @@ export async function adminListUserCoupons(
 }
 
 // ---------------------------------------------------------------------------
-// 移动端店员发券
-// ---------------------------------------------------------------------------
-
-/**
- * The coupons a staff member may hand out: the `active` templates, newest
- * first, optionally filtered by name.
- *
- * `draft` and `disabled` are excluded rather than greyed out. The web console
- * lists them because an operator edits them there; on the phone the only
- * action is 发放, and a row that can never be tapped is a support call.
- *
- * A sold-out template *is* listed, with `remainingCount: 0`. The staff member
- * has to be able to see why the coupon they were told to give out is not
- * working.
- */
-export async function staffListCoupons(
-  ctx: Ctx,
-  query: StaffCouponListQuery,
-): Promise<{ items: StaffCoupon[]; total: number; page: number; pageSize: number }> {
-  const { rows, total } = await repo.listTemplates(ctx.db, {
-    keyword: query.keyword,
-    status: ['active'],
-    ...pageBounds(query),
-  });
-  return {
-    items: rows.map(toStaffCoupon),
-    total,
-    page: query.page,
-    pageSize: query.pageSize,
-  };
-}
-
-/**
- * One coupon to one customer, from the phone.
- *
- * Delegates to `adminGrant` rather than reimplementing it. Everything that
- * makes a grant correct under load — the supply decrement that can lose,
- * `issueOne`'s insert-before-decrement ordering, the per-user limit reported as
- * a skip rather than an error — lives in exactly one place, so the two consoles
- * cannot drift apart on the questions that cost money.
- */
-export async function staffGrant(ctx: Ctx, body: StaffCouponGrantBody): Promise<CouponGrantResult> {
-  // `handle()` has checked the roster; a route wired without it fails closed.
-  if (ctx.actor.kind !== 'staff') throw new DomainError('FORBIDDEN');
-  const userId = Number(body.userId);
-  // A 店员 is a storefront account too: granting to it is granting to oneself.
-  if (userId === Number(ctx.actor.id)) throw new DomainError('COUPON_GRANT_SELF');
-  // Only what marketing has released — the same set the staff coupon list
-  // offers. A draft or withdrawn template answers as if it did not exist.
-  return grant(ctx, Number(body.couponId), [userId], { activeOnly: true });
-}
-
-/**
- * One customer's coupons, for 「查看优惠券」 in the staff console.
- *
- * `auth: 'staff'` has already been checked by `handle()`; this checks the
- * actor kind again so that a route wired without the guard fails closed with
- * `FORBIDDEN` instead of handing any signed-in shopper somebody else's wallet.
- *
- * The rows are read by `uid` from the route, never from the actor — the
- * caller is the 店员, not the customer — and the mapping is `toUserCoupon`, the
- * storefront wallet's, so the staff view cannot show a field the customer's
- * own wallet does not.
- */
-export async function staffListUserCoupons(
-  ctx: Ctx,
-  params: { uid: string },
-  query: StaffUserCouponListQuery,
-): Promise<StaffUserCoupons> {
-  if (ctx.actor.kind !== 'staff') throw new DomainError('FORBIDDEN');
-  const userId = Number(params.uid);
-  if (!(await repo.existingUserIds(ctx.db, [userId])).has(userId)) {
-    throw new DomainError('USER_NOT_FOUND');
-  }
-  const rows = await repo.listUserCouponsForStaff(ctx.db, {
-    userId,
-    state: query.state,
-    now: ctx.clock.now(),
-    limit: STAFF_USER_COUPON_LIMIT,
-  });
-  const terms = await repo.templateTermsFor(
-    ctx.db,
-    rows.map((row) => row.templateId),
-  );
-  return { items: rows.map((row) => toUserCoupon(row, termsOf(terms, row.templateId))) };
-}
-
-// ---------------------------------------------------------------------------
 // storefront
 // ---------------------------------------------------------------------------
 
@@ -411,10 +307,38 @@ export async function listClaimable(
   const { rows, total } = await repo.listClaimable(ctx.db, {
     now,
     ids: query.ids?.map(Number),
+    productId: query.productId === undefined ? undefined : Number(query.productId),
     ...pageBounds(query),
   });
   const items = await withCallerState(ctx, rows);
   return { items, total, page: query.page, pageSize: query.pageSize };
+}
+
+/** Which products a coupon template covers: `eligibleLineIndexes`'s input, without the amounts. */
+export interface CouponProductScope {
+  scope: 'all_products' | 'categories' | 'products';
+  /** Non-empty only for `scope = 'products'`. */
+  productIds: number[];
+  /** Non-empty only for `scope = 'categories'`, matched against a product's direct categories. */
+  categoryIds: number[];
+}
+
+/**
+ * The product scope of template `templateId`, for the 商品列表's `couponId` filter
+ * (我的优惠券「去使用」) — the same terms `quote` applies at checkout.
+ *
+ * Null for an unknown template and for a draft, which was never issued, so no
+ * shopper holds one and its scope is not the storefront's to show. A disabled or
+ * deleted template still answers: coupons already in wallets stay spendable.
+ */
+export async function productScope(
+  ctx: Ctx,
+  templateId: number,
+): Promise<CouponProductScope | null> {
+  const status = await repo.templateStatus(ctx.db, templateId);
+  if (status === null || status === 'draft') return null;
+  const terms = await repo.templateTerms(ctx.db, templateId);
+  return { scope: terms.scope, productIds: terms.productIds, categoryIds: terms.categoryIds };
 }
 
 /**
@@ -487,6 +411,26 @@ export async function listMine(
     page: query.page,
     pageSize: query.pageSize,
   };
+}
+
+/**
+ * The 新人券 the signed-in shopper still holds unused, soonest to expire
+ * first, at most `limit`. What the DIY 新人券 block shows a shopper who has
+ * registered (DECOR-015: per shopper, never cached). Read-only.
+ */
+export async function listHeldNewUser(ctx: Ctx, limit: number): Promise<UserCoupon[]> {
+  const userId = requireUserId(ctx);
+  const rows = await repo.listUnusedBySource(ctx.db, {
+    userId,
+    sourceKind: 'gift_new_user',
+    now: ctx.clock.now(),
+    limit,
+  });
+  const terms = await repo.templateTermsFor(
+    ctx.db,
+    rows.map((r) => r.templateId),
+  );
+  return rows.map((row) => toUserCoupon(row, termsOf(terms, row.templateId)));
 }
 
 /** How many coupons the checkout picker will consider. Beyond this nobody scrolls. */
@@ -874,7 +818,7 @@ async function withCallerState(
   ctx: Ctx,
   rows: readonly repo.TemplateRow[],
 ): Promise<ClaimableCoupon[]> {
-  const userId = ctx.actor.kind === 'user' || ctx.actor.kind === 'staff' ? ctx.actor.id : null;
+  const userId = ctx.actor.kind === 'user' ? ctx.actor.id : null;
   const held = new Map<number, number>();
   if (userId !== null) {
     for (const row of rows) {
@@ -938,24 +882,6 @@ function toListItem(row: repo.TemplateRow, issuedCount: number): CouponTemplateL
     giftMinOrderAmount: row.giftMinOrderAmount,
     sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString(),
-  };
-}
-
-/** The phone's slimmer row. See `staffCoupon` in the contract for what is left out and why. */
-function toStaffCoupon(row: repo.TemplateRow): StaffCoupon {
-  return {
-    id: String(row.id),
-    name: row.name,
-    discountAmount: row.discountAmount,
-    minSpend: row.minSpend,
-    scope: row.scope,
-    validityMode: row.validityMode,
-    validFrom: iso(row.validFrom),
-    validTo: iso(row.validTo),
-    validDays: row.validDays,
-    isUnlimitedSupply: row.isUnlimitedSupply,
-    remainingCount: row.remainingCount,
-    perUserLimit: row.perUserLimit,
   };
 }
 

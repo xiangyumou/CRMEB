@@ -10,6 +10,8 @@ import type {
 import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId, toIdOrNull } from '../kernel/ids';
+import { isStoredImageUrl } from '../storage';
+import { checkText, requestMediaCheck } from '../wechat';
 import { storefrontAuthConfig } from './storefront-auth.config';
 import { pageBounds, shouldForceDefault } from './user.rules';
 import * as repo from './user.repo';
@@ -38,11 +40,35 @@ export async function getProfile(ctx: Ctx): Promise<UserProfile> {
 
 export async function updateProfile(ctx: Ctx, body: UserProfileForm): Promise<UserProfile> {
   const userId = requireUserId(ctx);
+  const nickname = body.nickname === undefined ? undefined : body.nickname.trim();
+  if (nickname === '') {
+    throw new DomainError('VALIDATION_FAILED', {
+      details: [{ field: 'body.nickname', message: '昵称不能为空' }],
+    });
+  }
+  const before = await repo.findById(ctx.db, userId);
+  if (!before || before.deletedAt !== null) throw new DomainError('USER_NOT_FOUND');
+  // 内容安全 (C09, CONTENT-002): a changed nickname goes to WeChat first. Only
+  // `risky` refuses it; WeChat being unreachable lets it through (fail-open).
+  if (nickname !== undefined && nickname !== before.nickname) {
+    const verdict = await checkText(ctx, { userId, content: nickname, scene: 1, what: 'nickname' });
+    if (verdict === 'risky') throw new DomainError('USER_NICKNAME_REJECTED');
+  }
+  const avatarUrl =
+    body.avatarUrl === undefined ? undefined : await acceptedAvatar(ctx, userId, body.avatarUrl);
+  const { defaultAvatar } = await ctx.config.get(storefrontAuthConfig);
+  const avatarToCheck =
+    avatarUrl !== undefined &&
+    avatarUrl !== null &&
+    avatarUrl !== before.avatarUrl &&
+    avatarUrl !== defaultAvatar.trim()
+      ? avatarUrl
+      : null;
   await ctx.withTx(async (tx) => {
     const result = await repo.updateProfile(tx, {
       id: userId,
-      ...(body.nickname === undefined ? {} : { nickname: body.nickname }),
-      ...(body.avatarUrl === undefined ? {} : { avatarUrl: body.avatarUrl }),
+      ...(nickname === undefined ? {} : { nickname }),
+      ...(avatarUrl === undefined ? {} : { avatarUrl }),
       ...(body.realName === undefined ? {} : { realName: body.realName }),
       // `nullish` in the form: `null` clears the birthday, absent leaves it.
       ...(body.birthday === undefined
@@ -51,8 +77,45 @@ export async function updateProfile(ctx: Ctx, body: UserProfileForm): Promise<Us
       now: ctx.clock.now(),
     });
     if (!result.won) throw new DomainError('USER_NOT_FOUND');
+    // A new picture is checked after the fact, by push (CONTENT-004).
+    if (avatarToCheck !== null) {
+      await requestMediaCheck(tx, ctx, {
+        subject: 'avatar',
+        subjectId: userId,
+        userId,
+        mediaUrl: avatarToCheck,
+        scene: 1,
+      });
+    }
   });
   return getProfile(ctx);
+}
+
+/**
+ * The avatar to store, or `USER_AVATAR_NOT_ALLOWED` (USER-019).
+ *
+ * An avatar is shown next to every review and in the admin console, so it has
+ * to be a picture we hold, not a link to somebody else's server — which could
+ * change what it shows after the fact, or log who looked. Three things pass:
+ *
+ * 1. the current value — the legacy client re-sends the avatar on every save,
+ *    and an account that came in through the 公众号 carries WeChat's URL;
+ * 2. the shop's configured default avatar;
+ * 3. a live image in our storage (what `POST /uploads` returned).
+ *
+ * `''` clears the avatar.
+ */
+async function acceptedAvatar(ctx: Ctx, userId: number, url: string): Promise<string | null> {
+  const wanted = url.trim();
+  if (wanted === '') return null;
+  const current = await repo.findById(ctx.db, userId);
+  if (!current || current.deletedAt !== null) throw new DomainError('USER_NOT_FOUND');
+  if (current.avatarUrl !== null && wanted === current.avatarUrl) return wanted;
+  const config = await ctx.config.get(storefrontAuthConfig);
+  const fallback = config.defaultAvatar.trim();
+  if (fallback !== '' && wanted === fallback) return wanted;
+  if (await isStoredImageUrl(ctx, wanted)) return wanted;
+  throw new DomainError('USER_AVATAR_NOT_ALLOWED');
 }
 
 /**

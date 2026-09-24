@@ -554,6 +554,45 @@ describe('快递公司', () => {
     expect(picker.items.map((item) => item.code)).toEqual(['SF', 'ZTO']);
   });
 
+  it('SHIP-003 — the shopper’s picker: enabled only, a WeChat courier code first, searched and capped', async () => {
+    await harness.ctx.db.insert(expressCompanies).values([
+      { code: 'shunfeng', name: '顺丰速运', sortOrder: 100, wechatDeliveryId: 'SF' },
+      { code: 'shunfengkuaiyun', name: '顺丰快运', sortOrder: 200 },
+      { code: 'zhongtong', name: '中通快递', sortOrder: 90, wechatDeliveryId: 'ZTO' },
+      { code: 'yuantong', name: '圆通速递', sortOrder: 300 },
+      { code: 'old_sf', name: '顺丰旧线', sortOrder: 999, isEnabled: false },
+      { code: 'pct_100', name: '百分之百快递', sortOrder: 1 },
+    ]);
+    const codes = async (query: { keyword?: string; limit?: number }) =>
+      (await express.shopperOptions(harness.ctx, { limit: 50, ...query })).items.map(
+        (item) => item.code,
+      );
+
+    // No parameters: every enabled carrier, those WeChat knows first, then the most used.
+    expect(await codes({})).toEqual([
+      'shunfeng',
+      'zhongtong',
+      'yuantong',
+      'shunfengkuaiyun',
+      'pct_100',
+    ]);
+    expect(await codes({ limit: 2 })).toEqual(['shunfeng', 'zhongtong']);
+    // By name or by code, case-insensitively; a disabled carrier is never offered.
+    expect(await codes({ keyword: '顺丰' })).toEqual(['shunfeng', 'shunfengkuaiyun']);
+    expect(await codes({ keyword: 'ZhongTong' })).toEqual(['zhongtong']);
+    // `%` and `_` are what the shopper typed, not wildcards.
+    expect(await codes({ keyword: '_' })).toEqual(['pct_100']);
+    expect(await codes({ keyword: '%' })).toEqual([]);
+    // The operators' pickers stay whole and in their own order.
+    expect((await express.pickerList(harness.ctx)).items.map((item) => item.code)).toEqual([
+      'yuantong',
+      'shunfengkuaiyun',
+      'shunfeng',
+      'zhongtong',
+      'pct_100',
+    ]);
+  });
+
   it('refuses a duplicate code', async () => {
     await express.adminCreate(harness.ctx, {
       code: 'SF',

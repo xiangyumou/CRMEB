@@ -10,6 +10,7 @@ import type {
   StorefrontSku,
 } from '@shop/contracts/catalog/schemas';
 
+import * as coupon from '../coupon';
 import { DomainError } from '../kernel/errors';
 import { requireUserId, type Ctx } from '../kernel/context';
 import { catalogConfig } from './catalog.config';
@@ -37,8 +38,8 @@ import { pageBounds, platformOf, toProductCard } from './catalog.service';
  * The storefront menu.
  *
  * `version` is derived from the newest update plus the row count, so any
- * insert, edit, hide or delete moves it. The uni-app caches the tree and
- * refetches only when it changes. A key bumped by hand would be forgotten, and
+ * insert, edit, hide or delete moves it. A client may cache the tree and
+ * refetch only when it changes. A key bumped by hand would be forgotten, and
  * shoppers would see last month's menu until the cache expired.
  */
 export async function categoryTree(ctx: Ctx): Promise<{
@@ -82,18 +83,6 @@ export async function categoryTree(ctx: Ctx): Promise<{
   };
 }
 
-/**
- * The version alone.
- *
- * One aggregate over `product_categories` instead of the whole tree, for the
- * revalidation the storefront does on every cold start. It is the same string
- * `categoryTree` returns, from the same repo function, so the two can never
- * disagree about whether the menu moved.
- */
-export async function categoryVersion(ctx: Ctx): Promise<{ version: string }> {
-  return { version: await repo.categoryVersion(ctx.db) };
-}
-
 // ---------------------------------------------------------------------------
 // products
 // ---------------------------------------------------------------------------
@@ -118,6 +107,18 @@ export async function productList(
 ): Promise<{ items: ProductCard[]; total: number; page: number; pageSize: number }> {
   const keyword = query.keyword ? normaliseKeyword(query.keyword) : undefined;
 
+  let couponScope: repo.StorefrontProductFilter['couponScope'];
+  if (query.couponId !== undefined) {
+    const scope = await coupon.productScope(ctx, Number(query.couponId));
+    if (scope === null) return { items: [], total: 0, page: query.page, pageSize: query.pageSize };
+    couponScope =
+      scope.scope === 'products'
+        ? { productIds: scope.productIds }
+        : scope.scope === 'categories'
+          ? { categoryIds: scope.categoryIds }
+          : undefined;
+  }
+
   const { rows, total } = await repo.listSellableProducts(ctx.db, {
     keyword: keyword || undefined,
     categoryId: query.categoryId === undefined ? undefined : Number(query.categoryId),
@@ -128,6 +129,7 @@ export async function productList(
     priceFrom: query.priceFrom,
     priceTo: query.priceTo,
     feature: query.feature,
+    couponScope,
     sortBy: query.sortBy,
     sortOrder: query.sortOrder,
     ...pageBounds(query),
@@ -136,7 +138,7 @@ export async function productList(
   if (keyword) {
     await ctx.withTx((tx) =>
       repo.recordSearch(tx, {
-        userId: ctx.actor.kind === 'user' || ctx.actor.kind === 'staff' ? ctx.actor.id : null,
+        userId: ctx.actor.kind === 'user' ? ctx.actor.id : null,
         keyword,
         resultCount: total,
         platform: platformOf(ctx),
@@ -174,7 +176,7 @@ export async function productDetail(ctx: Ctx, input: { id: string }): Promise<St
   const row = await repo.findSellableProduct(ctx.db, productId);
   if (!row) throw new DomainError('CATALOG_PRODUCT_NOT_FOUND');
 
-  const userId = ctx.actor.kind === 'user' || ctx.actor.kind === 'staff' ? ctx.actor.id : null;
+  const userId = ctx.actor.kind === 'user' ? ctx.actor.id : null;
 
   const [labels, specs, skus, params, protections, links, descriptionHtml, counts] =
     await Promise.all([
@@ -268,46 +270,6 @@ export async function productSkus(
       values: entry.values.map((value) => ({ value: value.value, imageUrl: value.imageUrl })),
     })),
     skus: skus.map(toStorefrontSku),
-  };
-}
-
-/**
- * Live price and stock for one variant, by its opaque code.
- *
- * The cart holds `skuCode`, not `skuId`, so this is the poll that keeps an
- * open cart page honest about a price change or a sell-out. It goes through
- * the on-shelf check like everything else: a variant of a product taken down
- * becomes a 404 here, and the cart shows it as unavailable.
- */
-export async function skuPrice(
-  ctx: Ctx,
-  input: { skuCode: string },
-): Promise<{
-  productId: string;
-  sku: {
-    id: string;
-    skuCode: string;
-    specText: string;
-    price: string;
-    originalPrice: string | null;
-    stock: number;
-  };
-}> {
-  const sku = await repo.findSkuByCode(ctx.db, input.skuCode);
-  if (!sku || !sku.isVisible) throw new DomainError('CATALOG_SKU_NOT_FOUND');
-  const product = await repo.findSellableProduct(ctx.db, sku.productId);
-  if (!product) throw new DomainError('CATALOG_SKU_NOT_FOUND');
-
-  return {
-    productId: String(sku.productId),
-    sku: {
-      id: String(sku.id),
-      skuCode: sku.skuCode,
-      specText: sku.specText,
-      price: sku.price,
-      originalPrice: sku.originalPrice,
-      stock: sku.stock,
-    },
   };
 }
 

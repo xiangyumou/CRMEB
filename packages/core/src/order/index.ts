@@ -1,12 +1,9 @@
-import { registerUserOrderStatsPort } from '../user';
 // Before `order.fulfil.effects`: both install a paid hook on import, and the
 // sale has to be committed first (see `order.stock.hooks.ts`).
 import { installStockCommitHook } from './order.stock.hooks';
 import { installFulfilmentHooks } from './order.fulfil.effects';
 import { orderFacts } from './order.facts.repo';
-import * as orderRepo from './order.repo';
 import { orderStateMachine } from './order.state-machine';
-import { installStaffCheck } from './order.staff.service';
 import { registerOrderFacts, registerOrderStateMachine } from './ports';
 
 /**
@@ -39,27 +36,15 @@ import { registerOrderFacts, registerOrderStateMachine } from './ports';
  * Everything the order domain registers, in one idempotent call (the shape
  * `@shop/core/domains` looks for): the state machine the payment, refund,
  * fulfilment and kind-handler code reach through `getOrderStateMachine()`; the
- * `OrderFactsPort` the catalog asks about purchases and reviewable lines; the
- * staff check `auth: 'staff'` fails closed without; the `UserOrderStatsPort`
- * the staff 用户 screen's 累计订单 / 累计消费 need; and the order-paid hooks —
+ * `OrderFactsPort` the catalog asks about purchases and reviewable lines; and
+ * the order-paid hooks —
  * the stock commit that turns the reservation into a sale, then auto-delivery —
  * that have to be installed before the first payment lands. Importing the
  * domain calls it once; a test that `resetOrderPorts()` calls it again.
- *
- * `UserOrderStatsPort` is declared by the *user* domain and implemented here
- * for the reason the port exists at all: "how many orders has this customer
- * placed" is not a `count(*)`, the rules about which orders count live in this
- * aggregate, and a join written from the user side would be a second, silently
- * diverging definition of 消费总额. The rule itself is written down once, on
- * `orderRepo.statsForUsers`.
  */
 export function registerOrderDomain(): void {
   registerOrderStateMachine(orderStateMachine);
   registerOrderFacts(orderFacts);
-  installStaffCheck();
-  registerUserOrderStatsPort({
-    statsFor: (db, userIds) => orderRepo.statsForUsers(db, userIds),
-  });
   installStockCommitHook();
   installFulfilmentHooks();
 }
@@ -106,11 +91,11 @@ export type {
 } from './catalog.port';
 
 // ---------------------------------------------------------------------------
-// fulfilment, the admin console, invoices, the staff console
+// fulfilment, the admin console, invoices
 // ---------------------------------------------------------------------------
 
 export { orderPermissions } from './permissions';
-export { orderFulfilConfig, orderStaffConfig } from './order.fulfil.config';
+export { orderFulfilConfig } from './order.fulfil.config';
 
 export {
   adminShip,
@@ -126,14 +111,20 @@ export {
   shipmentsOfOrder,
   sweepAutoReceive,
   sweepCompletions,
+  requireOwnOrder,
+  shipmentReportFacts,
   trackShipment,
   updateShipment,
 } from './order.fulfil.service';
-export type { ReceiptInput, ReceiptOutcome, ShipInput } from './order.fulfil.service';
+export type {
+  ReceiptInput,
+  ReceiptOutcome,
+  ShipInput,
+  ShipmentReportFacts,
+} from './order.fulfil.service';
 
 export * as orderConsole from './order.console.service';
 export * as orderInvoices from './order.invoice.service';
-export * as orderStaff from './order.staff.service';
 
 // `installFulfilmentHooks` is re-exported for the reason it exists at all: a
 // test in another domain that calls `resetOrderPorts()` clears the order-paid
@@ -141,21 +132,24 @@ export * as orderStaff from './order.staff.service';
 // reach it through this file.
 export { autoDeliver, installFulfilmentHooks } from './order.fulfil.effects';
 
-/** The seams fulfilment needs from other domains (logistics, refund, notification). */
+/** The seams fulfilment needs from other domains (logistics, notification). */
 export {
   registerFulfilmentNotifier,
   registerLogisticsPort,
-  registerStaffRefundPort,
+  registerWechatReceiptVerifier,
   resetFulfilmentPorts,
   resolveFulfilmentNotifier,
   resolveLogisticsPort,
-  resolveStaffRefundPort,
+  resolveWechatReceiptVerifier,
 } from './order.fulfil.ports';
 export type {
   FulfilmentNotice,
+  FulfilmentNoticeOrder,
+  FulfilmentNoticeShipment,
   FulfilmentNotifier,
   LogisticsPort,
-  StaffRefundPort,
   TrackingResult,
   TrackingTrace,
+  WechatReceiptVerdict,
+  WechatReceiptVerifier,
 } from './order.fulfil.ports';

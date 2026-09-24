@@ -21,6 +21,7 @@
 
 import { registerSiteAuthMethod, wechatMiniConfig, wechatOaConfig } from '../system';
 import { wechatConfig } from './wechat.config';
+import { registerContentSecurityEffects } from './wechat.sec-check';
 import { wechatMiniLoginUsable, wechatOaLoginUsable } from './wechat.site-auth';
 
 export {
@@ -45,8 +46,8 @@ export { wechatConfig, type WechatConfig } from './wechat.config';
 /** 公众号 / 小程序 sign-in availability, exported for tests. */
 export { wechatMiniLoginUsable, wechatOaLoginUsable } from './wechat.site-auth';
 
-/** `GET /api/v1/wechat/mini-qrcodes` — 小程序码, generated once and cached. */
-export { miniCodeUrl, SCENE_MAX_BYTES } from './wechat.mini-code.service';
+/** `GET /api/v1/share/mini-codes` — 小程序码, generated once and cached. */
+export { shareMiniCodeUrl } from './wechat.mini-code.service';
 
 /** Read-only; the writes belong to sign-in in the user domain. */
 export { findOpenid } from './wechat.repo';
@@ -64,6 +65,76 @@ export {
   type WechatPayCredentials,
   type WechatTradeState,
 } from './wechat.pay';
+
+/** 小程序发货信息管理: the port, the driver over `api.weixin.qq.com` and the wire mapping. */
+export {
+  describeItems,
+  isShunfeng,
+  maskPhone,
+  miniShippingPort,
+  registerMiniShippingPort,
+  resetMiniShippingPort,
+  rfc3339Shanghai,
+  SHIPPING_SETTLED_ERRCODES,
+  uploadShippingBody,
+  wechatMiniShippingDriver,
+  type MiniLogisticsType,
+  type MiniShippingAnswer,
+  type MiniShippingPackage,
+  type MiniShippingPort,
+  type MiniTradeKey,
+  type MiniTradeManagedAnswer,
+  type MiniTradeOrderAnswer,
+  type MiniUploadShipping,
+} from './wechat.shipping';
+
+/** `/api/v1/webhooks/wechat-mini`: the mini program's 消息推送, recorded into the effects ledger. */
+export {
+  checkText,
+  contentSecurityPort,
+  listMediaChecks,
+  MEDIA_CHECK_EVENT,
+  MEDIA_CHECK_SCOPE,
+  registerContentSecurityPort,
+  registerMediaRiskHandler,
+  registerMediaUncheckedHandler,
+  requestMediaCheck,
+  resetContentSecurityPort,
+  wechatContentSecurityDriver,
+  type ContentSecurityPort,
+  type MediaCheckAnswer,
+  type MediaRiskHandler,
+  type MediaUncheckedHandler,
+  type MediaSubject,
+  type MsgSecCheckAnswer,
+  type SecCheckScene,
+  type SecCheckSuggest,
+  type TextVerdict,
+} from './wechat.sec-check';
+export { contentSecurityConfig, type ContentSecurityConfig } from './wechat.sec-check.config';
+
+export {
+  handleMiniPush,
+  MINI_PUSH_EVENTS,
+  MINI_PUSH_FRESHNESS_SECONDS,
+  MINI_PUSH_SCOPE,
+  verifyMiniPushUrl,
+  type MiniPushEvent,
+  type MiniPushMessage,
+  type MiniPushResult,
+} from './wechat.mini-push';
+
+/** The message-callback envelope, shared by the OA callback and the mini program's push. */
+export {
+  aesKeyOf,
+  decryptMessage,
+  encryptMessage,
+  equalsSignature,
+  signatureOf,
+  verifyMessageSignature,
+  verifySignature,
+  WechatMessageCryptoError,
+} from './wechat.message-crypto';
 
 export {
   AeadDecryptError,
@@ -91,13 +162,15 @@ export {
  * Wires the domain into the platform; called once per process from the gen'd
  * bootstrap, like `registerPaymentDomain()`.
  *
- * `GET /api/v1/site/config` tells the app which WeChat sign-in to offer.
+ * `GET /api/v1/app/config` tells the app which WeChat sign-in to offer.
  * Announced from here, not read from there: `system` may not import `wechat`.
  * Not run at import, because this module is reached from inside `system`'s own
  * import graph (via `payment`) before `system` has finished evaluating. A
  * boolean crosses the seam, never a credential.
  */
 export function registerWechatDomain(): void {
+  // 内容安全 (C09): submit pictures to mediaCheckAsync, act on wxa_media_check.
+  registerContentSecurityEffects();
   registerSiteAuthMethod('wechatOa', {
     groups: [wechatOaConfig.group, wechatConfig.group],
     isEnabled: wechatOaLoginUsable,

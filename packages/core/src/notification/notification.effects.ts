@@ -1,12 +1,14 @@
 import { registerEffectHandler } from '../effects';
 import { onOrderCancelled, onOrderCompleted, onOrderPaid, onOrderRefunded } from '../order/ports';
-import { registerFulfilmentNotifier } from '../order';
+import { registerFulfilmentNotifier, type FulfilmentNoticeShipment } from '../order';
+import { AVATAR_REJECTED_EVENT, onAvatarRejected } from '../user';
 import {
   fanOut,
   notify,
   NOTIFICATION_EVENT_TYPE,
   NOTIFICATION_SCOPE,
 } from './notification.service';
+import { formatShopTime } from './notification.render';
 
 /**
  * Where notifications hook into the rest of the system.
@@ -35,11 +37,21 @@ registerEffectHandler(NOTIFICATION_SCOPE, NOTIFICATION_EVENT_TYPE, async (ctx, e
 });
 
 export function installNotificationHooks(): void {
+  onAvatarRejected(async (tx, ctx, event) => {
+    await notify(tx, ctx, {
+      event: AVATAR_REJECTED_EVENT,
+      subject: { scope: 'content-security-check', id: event.checkId },
+      userId: event.userId,
+      data: {},
+    });
+  });
+
   onOrderPaid.register('notification:order-paid', async (tx, ctx, event) => {
     const data = {
       orderId: event.orderId,
       orderNo: event.orderNo,
       amount: event.paidAmount.toString(),
+      paidAt: formatShopTime(event.at, 'minute'),
     };
     await notify(tx, ctx, {
       event: 'order_paid',
@@ -87,6 +99,7 @@ export function installNotificationHooks(): void {
       userId: event.userId,
       data: {
         refundId: event.refundId,
+        refundNo: event.refundNo ?? '',
         orderNo: event.orderNo,
         amount: event.refundedAmount.toString(),
       },
@@ -97,22 +110,66 @@ export function installNotificationHooks(): void {
     async notify(ctx, notice) {
       const event = FULFILMENT_EVENTS[notice.kind];
       if (event === undefined) return;
-      const payload = notice.payload as { orderNo?: string; company?: string; trackingNo?: string };
+      const { shipment } = notice;
       await ctx.withTx((tx) =>
         notify(tx, ctx, {
           event,
-          subject: { scope: 'order', id: notice.orderId },
+          // A dispatch is keyed on its parcel, not the order: an order shipped
+          // in parts is told about each parcel and each tracking number, and
+          // the same parcel retried is still told once (NOTIF-002).
+          subject:
+            shipment === null
+              ? { scope: 'order', id: notice.orderId }
+              : { scope: 'shipment', id: shipment.id },
           userId: notice.userId,
           data: {
             orderId: notice.orderId,
-            orderNo: payload.orderNo ?? '',
-            company: payload.company ?? '',
-            trackingNo: payload.trackingNo ?? '',
+            orderNo: notice.order?.orderNo ?? '',
+            amount: notice.order?.paidAmount ?? '',
+            ...(shipment === null ? {} : deliveryVariables(shipment)),
           },
         }),
       );
     },
   });
+}
+
+/**
+ * What `order_shipped` says about the parcel, for each way it can travel.
+ *
+ * `company` and `trackingNo` are a courier's, and only an express parcel has
+ * them; `deliveryInfo` is the one sentence that reads right for all three, and
+ * is what the default wording uses (NOTIF-007).
+ */
+export function deliveryVariables(shipment: FulfilmentNoticeShipment): Record<string, string> {
+  if (shipment.deliveryMode === 'express') {
+    const company = shipment.expressCompanyName ?? '';
+    const trackingNo = shipment.trackingNo ?? '';
+    return {
+      company,
+      trackingNo,
+      deliveryInfo: [company, trackingNo === '' ? '' : `运单号 ${trackingNo}`]
+        .filter((part) => part !== '')
+        .join(' '),
+    };
+  }
+  if (shipment.deliveryMode === 'merchant_delivery') {
+    const courier = [shipment.courierName ?? '', shipment.courierPhone ?? '']
+      .filter((part) => part !== '')
+      .join(' ');
+    return {
+      company: '商家配送',
+      trackingNo: '',
+      courierName: shipment.courierName ?? '',
+      courierPhone: shipment.courierPhone ?? '',
+      deliveryInfo: courier === '' ? '由商家配送' : `由商家配送，配送员 ${courier}`,
+    };
+  }
+  return {
+    company: '虚拟发货',
+    trackingNo: '',
+    deliveryInfo: '虚拟商品已发放，可在订单详情中查看',
+  };
 }
 
 /**

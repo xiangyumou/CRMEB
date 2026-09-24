@@ -24,6 +24,15 @@ import { Can } from '@/admin/session/can';
 
 import { BOOL_OPTIONS, REVIEW_RATING_OPTIONS, REVIEW_STATUS, reviewFields } from '../catalog-enums';
 
+/** Why 内容安全 held a review for a person to look at (C09). */
+const MODERATION_REASON: Record<string, string> = {
+  sec_check_risky: '微信内容安全：疑似违规',
+  sec_check_review: '微信内容安全：建议人工审核',
+  sec_check_unavailable: '内容安全检测暂不可用',
+  sec_check_unchecked: '非小程序账号，未经内容安全检测',
+  sec_check_image_unchecked: '图片未经内容安全检测',
+};
+
 /**
  * 商品评价.
  *
@@ -177,7 +186,14 @@ export function ProductReviewsPage() {
             key: 'status',
             width: 100,
             render: (_value: unknown, row: AdminProductReview) => (
-              <StatusTag value={row.status} map={REVIEW_STATUS} />
+              <Space direction="vertical" size={0}>
+                <StatusTag value={row.status} map={REVIEW_STATUS} />
+                {row.status === 'pending' && row.moderationReason ? (
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    {MODERATION_REASON[row.moderationReason] ?? row.moderationReason}
+                  </Typography.Text>
+                ) : null}
+              </Space>
             ),
           },
           instantColumn<AdminProductReview>({

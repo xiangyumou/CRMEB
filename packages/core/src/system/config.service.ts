@@ -16,7 +16,7 @@ import {
 } from '../kernel/config-registry';
 import { DomainError } from '../kernel/errors';
 import { hasPermission } from '../auth/rbac';
-import { invalidateSiteConfigCache } from './site.service';
+import { invalidateAppConfigCache } from './app-config.service';
 import * as repo from './system.repo';
 // The gen'd bucket: `defineConfigGroup` registers as a side effect of its
 // module being imported, so this is what makes a group exist. `pnpm gen`
@@ -248,10 +248,11 @@ export async function configSave(
   // `set` validates the *whole* merged group, so a patch that would leave the
   // group invalid is refused rather than half-written.
   await ctx.config.set(def, patch as never, { updatedBy: adminIdOrNull(ctx) });
-  // The storefront's `GET /api/v1/site/config` is a 60-second Redis cache over
-  // three of these groups; saving one of them drops it so the operator sees
-  // their change in the app now rather than within the minute.
-  await invalidateSiteConfigCache(ctx, def.group);
+  // The mini-program's `GET /api/v1/app/config` is a 60-second Redis cache over
+  // a few of these groups (`appConfigSourceGroups`); saving one of them drops
+  // it, so the operator sees their change in the app now rather than within
+  // the minute.
+  await invalidateAppConfigCache(ctx, def.group);
   ctx.logger.info(
     { group: def.group, keys: Object.keys(patch).filter((k) => !secrets.has(k)) },
     'config group saved',

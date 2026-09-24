@@ -185,6 +185,28 @@ describe('确认订单', () => {
     expect(preview.adjustments).toEqual([]);
   });
 
+  it('says when a presale order ships — the campaign’s days after payment — and nothing for an ordinary one', async () => {
+    const fixture = await seed();
+    const presale = await checkout.preview(asUser(fixture.userId), buyNow(fixture, 1));
+    expect(presale.shipAfterDays).toBe(15);
+
+    await harness.ctx.db
+      .update(presaleActivities)
+      .set({ shipAfterDays: 0 })
+      .where(eq(presaleActivities.id, fixture.activityId));
+    expect((await checkout.preview(asUser(fixture.userId), buyNow(fixture, 1))).shipAfterDays).toBe(
+      0,
+    );
+
+    const ordinary = await checkout.preview(asUser(fixture.userId), {
+      source: 'buy-now',
+      cartItemIds: [],
+      item: { skuId: String(fixture.skuId), quantity: 1 },
+      kind: 'normal',
+    });
+    expect(ordinary.shipAfterDays).toBeNull();
+  });
+
   it('quotes the catalogue price once the window has closed', async () => {
     const fixture = await seed();
     harness.clock.set('2026-08-01T00:00:00.000Z');
@@ -304,6 +326,64 @@ describe('提交订单', () => {
       checkout.create(asUser(fixture.userId), createBody(fixture, 1, LIST)),
     ).rejects.toMatchObject({ code: 'PRESALE_PRICE_NOT_APPLIED' });
     expect(await harness.ctx.db.select().from(orders)).toHaveLength(0);
+  });
+});
+
+describe('ORDER-009 — a presale kind smuggled into kindMeta', () => {
+  // The contract strips it (`checkout-kind.test.ts`); this is the service's own
+  // half, for a caller that reaches the checkout without the contract. `kind`
+  // is written after the kind's payload, so `{ kind: 'presale' }` inside an
+  // ordinary order's `kindMeta` cannot turn 预售价 on for an order that holds no
+  // campaign stock and makes no 发货承诺.
+  const smuggled = (fixture: Fixture, quantity: number) =>
+    ({
+      source: 'buy-now' as const,
+      cartItemIds: [],
+      item: { skuId: String(fixture.skuId), quantity },
+      kind: 'normal' as const,
+      kindMeta: { kind: 'presale', activityId: String(fixture.activityId) },
+    }) as unknown as Parameters<typeof checkout.preview>[1];
+
+  it('never quotes 预售价 on an ordinary order', async () => {
+    const fixture = await seed();
+    const preview = await checkout.preview(asUser(fixture.userId), smuggled(fixture, 2));
+    expect(preview.payableAmount).toBe('176.00');
+    expect(preview.adjustments).toEqual([]);
+    expect(preview.shipAfterDays).toBeNull();
+  });
+
+  it('places it as an ordinary order at the catalogue price, and leaves the campaign alone', async () => {
+    const fixture = await seed({ stock: 10 });
+    const order = await checkout.create(asUser(fixture.userId), {
+      ...smuggled(fixture, 1),
+      idempotencyKey: `smuggled-${fixture.activityId}`,
+    } as unknown as Parameters<typeof checkout.create>[1]);
+
+    expect(order.kind).toBe('normal');
+    expect(order.payableAmount).toBe(LIST);
+    expect(
+      await harness.ctx.db
+        .select()
+        .from(presaleOrders)
+        .where(eq(presaleOrders.orderId, Number(order.id))),
+    ).toHaveLength(0);
+    const [activity] = await harness.ctx.db
+      .select()
+      .from(presaleActivities)
+      .where(eq(presaleActivities.id, fixture.activityId));
+    expect(activity).toMatchObject({ stock: 10, sales: 0 });
+  });
+
+  it('keeps a real presale order at 预售价 whatever else its kindMeta carries', async () => {
+    const fixture = await seed();
+    const preview = await checkout.preview(asUser(fixture.userId), {
+      ...buyNow(fixture, 1),
+      kindMeta: { activityId: String(fixture.activityId), kind: 'groupbuy', groupId: '1' },
+    } as unknown as Parameters<typeof checkout.preview>[1]);
+    expect(preview.payableAmount).toBe(PRESALE);
+    expect(preview.adjustments).toEqual([
+      expect.objectContaining({ source: 'presale:activity-price', amount: '-29.00' }),
+    ]);
   });
 });
 

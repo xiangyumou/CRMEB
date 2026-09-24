@@ -10,7 +10,7 @@ it; [invariants.md](invariants.md) lists the business rules and the tests that p
                            │
                      edge (nginx)
         ┌──────────────────┼──────────────────────┐
-   / (H5 build)   /admin, /admin-api, /api    /uploads/ (read-only volume)
+   /, /admin, /admin-api, /api    /uploads/ (read-only volume)
                            │
                      web (Next.js)  ──────┐
                            │              │ enqueue, pub/sub
@@ -21,7 +21,7 @@ it; [invariants.md](invariants.md) lists the business rules and the tests that p
 
 | Process   | Source                      | Job                                                                                                  |
 | --------- | --------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `edge`    | `docker/edge/`              | Serves the H5 build and `/uploads/`, proxies the application paths to `web`, answers `/healthz`.     |
+| `edge`    | `docker/edge/`              | Serves `/uploads/`, proxies the landing page and the application paths to `web`, answers `/healthz`. |
 | `web`     | `apps/web`                  | Every HTTP endpoint and the admin UI. Holds no state of its own.                                     |
 | `worker`  | `apps/worker`               | Scheduled and on-demand jobs, and the dispatcher of the effects ledger.                              |
 | `migrate` | `packages/db`, worker image | A one-shot that `shop upgrade` runs to apply migrations (with the application stopped) and the seed. |
@@ -49,6 +49,11 @@ packages/contracts  ← packages/core ← apps/web, apps/worker
 - **`@shop/testing`**: the Testcontainers harness, factories, `runConcurrently`, the fake WeChat,
   WeChat Pay, SMS and logistics gateways, and the mock server that answers every route with its
   first example.
+- **`@shop/api-client`**: the typed `/api/v1` client the mini-program uses, over a transport each
+  build supplies, with TanStack Query hooks and the zod-free route catalogue (`/routes`, written by
+  `pnpm gen`). Imports contracts as types only.
+- **`@shop/storefront-blocks`**: the decoration blocks, rendered by the mini-program and by the
+  admin editor's canvas. Types-only contracts too.
 - **`apps/web`** and **`apps/worker`**: thin shells that build a `Ctx` and call `core`.
 
 ESLint enforces the arrows (see [conventions.md](conventions.md#import-boundaries-eslint-enforced)).
@@ -66,8 +71,8 @@ into `src/errors.gen.ts`, and writes `openapi.json` from them. Everything else r
 - the admin UI calls a route through `useRouteQuery(route, …)` and `useRouteMutation(route)`
   (`apps/web/src/admin/api/hooks.ts`), typed from the route's own schemas;
 - the mock server in `@shop/testing` answers each route with its first example;
-- the guards compare the route list with the App Router tree, the permission atoms and the
-  uni-app's `api/` calls.
+- the guards compare the route list with the App Router tree and the permission atoms, and the
+  storefront part of `openapi.json` with the last released mini-program's (`api-compat`).
 
 With `VALIDATE_RESPONSES=1` (on in development and in every test run) `handle()` checks each
 response against its contract, so a service that drifts from the contract fails loudly.
@@ -126,7 +131,8 @@ One directory per domain under `packages/core/src/`, each with its schema in
 | `shipping`            | Freight templates, cities, express companies, logistics tracking.                                |
 | `coupon`              | Coupon templates, claiming, user coupons, allocation at checkout.                                |
 | `groupbuy`, `presale` | The two promotion order kinds.                                                                   |
-| `diy`, `cms`          | Page designs and themes; articles and agreements.                                                |
+| `decor`               | Page decoration v2: documents, revisions, the page resolver, preview tokens.                     |
+| `cms`                 | Articles and agreements.                                                                         |
 | `notification`        | In-app notices, message templates, subscription messages, the live admin stream.                 |
 | `wechat`, `wechat-oa` | The WeChat client and WeChat Pay v3; the official account's menus, replies, QR codes, media.     |
 | `sms`                 | Verification codes and the SMS provider port.                                                    |
@@ -232,45 +238,143 @@ The admin is part of `apps/web`: pages under `app/admin/(shell)/<domain>/`, Ant 
 
 Data flows through `useRouteQuery` and `useRouteMutation`; `useCan()` from `src/admin/session`
 hides what the admin's atoms do not allow. `/admin/dev/kit` renders every kit component, and
-`apps/web/src/admin/kit/README.md` documents them. The page designer (`src/admin/diy`) edits DIY
-pages whose component schemas are declared in `@shop/contracts`, so the designer, the API and the
-mobile client agree on each component's shape. The notification bell listens on
+`apps/web/src/admin/kit/README.md` documents them. 店铺装修 (`src/admin/decor`) is the Puck
+editor of decor v2 (see [The mini-program](#the-mini-program)). It takes its block schemas from
+`@shop/contracts`, so the editor, the API and the client agree on each block's shape. The notification bell listens on
 `/admin-api/notifications/stream`, a server-sent event stream fed by Redis pub/sub.
 
-## The mobile client
+## The mini-program
 
-`apps/uni-app` is the shipping mobile client: uni-app on Vue 2, built as the H5 storefront (served
-by `edge` at `/`) and as the WeChat mini-program. It is an npm project outside the pnpm workspace.
+`apps/mini`, the WeChat mini-program, is the one client of `/api/v1`. [docs/mini/](mini/README.md)
+is its own documentation.
 
-Its pages read the field names they have always read. The modules in `api/` call `/api/v1`, and
-the pure functions in `api/mappers/` translate each response into those names, so a contract change
-is absorbed in one mapper rather than across pages. `utils/diyRegistry.js` lists the DIY components
-it can render; the `uniapp` guard checks it against the contracts' registry, and checks that every
-call in `api/` resolves to a route.
+`apps/mini` is Taro 4 on React 18, in the pnpm workspace. It is built from
+`@shop/api-client` (the typed `/api/v1` client over the build's transport, TanStack Query hooks,
+and the zod-free route catalogue `@shop/api-client/routes`) and `@shop/storefront-blocks` (the
+decoration blocks). Contracts reach it as types only; nothing in the package carries zod.
+
+```
+apps/mini/src/
+  app.tsx, app.config.ts, app.pages.ts   launch sequence; pages, sub-packages, tab bar
+  pages/            the main package: home, category, cart, me, product, login, agreement
+  packages/         sub-packages: goods, order, aftersale, promo, account, content, page
+  features/         page-sized pieces shared across pages (cart, checkout, decor, share…)
+  platform/         the only code that calls WeChat (Taro.*, wx.*)
+  session/          sign-in, renewal, sign-out
+  app-config/       the shop's app config, cached and revalidated
+  theme/            tokens derived from the config's appearance
+  data/             the api-client instance, query client, uploads
+  ui/               the component kit (our own; no third-party component library)
+```
+
+**The platform seam.** `src/platform/types.ts` declares one `MiniPlatform` interface
+(navigation, sign-in codes, payment, storage, clipboard, the tab bar, the phone-number button…),
+and the bundler picks its implementation per build, never at run time:
+
+| Build                                   | Module           | Implementation                                               |
+| --------------------------------------- | ---------------- | ------------------------------------------------------------ |
+| `build:weapp` (what ships)              | `runtime.tsx`    | `Taro.login`, `Taro.requestPayment`…                         |
+| `build:h5` (a browser preview)          | `runtime.h5.tsx` | `h5-preview.tsx`: no WeChat                                  |
+| `build:h5:mp-emulation` (the e2e suite) | `runtime.h5.tsx` | `h5-mp-emulation.tsx`: WeChat answered by the fakes' gateway |
+
+`scripts/size-report.mjs` fails the weapp build if an H5 implementation leaks into it, or if the
+package exceeds its size budget.
+
+**The session** (`src/session/`, [mini/auth.md](mini/auth.md)). At launch, a stored token is
+used as it is; without one, `wx.login` → `POST /api/v1/auth/sessions/wechat-mini` signs a known
+shopper in silently. A shopper the shop does not know yet (or one the shop requires a phone
+for) gets a short-lived bind token, and the login page finishes it with 手机号快速登录
+(`…/wechat-mini/phone`) or an SMS code (`…/wechat-oa/phone`), both of which bind the openid so the
+next launch is silent. Browsing never needs a session; an action that does calls
+`requireLogin()`. `renewing-transport.ts` wraps the build's transport: a 401 on a request that
+carried a token triggers one shared renewal (`wx.login` again) and one replay, reads and writes
+alike.
+
+**The app config** (`src/app-config/`). `GET /api/v1/app/config` carries the shop's name and
+logos, appearance, feature switches, the web-view allow-list and the server clock. The app paints
+from the stored copy at once and revalidates with `If-None-Match`; the server caches the answer in
+Redis (`app:config:v2`, 60 s), versions it with a weak ETag, answers `304` for the current
+version, and drops the cache whenever a config group it is built from is saved.
+`src/theme/` derives the page's colour tokens and the native tab bar's look from it.
+
+**Decoration (decor v2).** A page the merchant designs goes through five layers
+([mini/decor.md](mini/decor.md)):
+
+1. **Admin editor**: `apps/web/src/admin/decor`, a Puck editor whose fields are generated from the
+   block schemas (`zod-to-puck.ts`), with the blocks themselves as the canvas. It saves drafts,
+   publishes revisions, rolls back and mints preview tokens through `/admin-api/decor/**`.
+2. **Contracts**: `packages/contracts/src/decor`: the document (`schemaVersion`, root props,
+   `blocks: [{id, type, v, props}]`), each block's `defineBlock` (props, version migrations,
+   metadata, the data it needs), `LinkTarget`, data sources, and a lenient save / strict publish
+   validation (DECOR-003).
+3. **Resolver**: `packages/core/src/decor` resolves a published revision into a page: the public
+   layer (block data looked up and cached per revision), the request layer (visibility by audience
+   and platform) and the personal layer (the shopper's own counts and coupon states, never
+   cached). `GET /api/v1/pages/{home,user-center,:id}` serves it; a preview token opens a draft,
+   uncached (DECOR-012).
+4. **Blocks**: `@shop/storefront-blocks` renders each block type from its props and resolved data,
+   in the mini-program and in the editor canvas alike. `BlockList` skips a type it does not know,
+   so an older mini-program survives a newer admin.
+5. **Mini host**: `src/features/decor/decor-page.tsx` lays out a resolved page and answers the
+   blocks' intents (open a link, sign in, contact support), since blocks call no WeChat API.
+
+**The route catalogue.** `packages/contracts/src/system/storefront-routes.ts` names every page a
+stored link may open, as an append-only key with typed params and its share, code, link and
+notification capabilities. Decoration links, 小程序码, poster codes, subscription messages and
+share paths store `{route, params}`, never a path. `encodeScene`/`decodeScene` pack the params
+into a 小程序码's 32-byte scene; `GET /api/v1/share/mini-codes` asks WeChat for the code once and
+caches it in `wechat_mini_codes` (SHARE-001).
+
+**The WeChat compliance hooks** ([mini/wechat-compliance.md](mini/wechat-compliance.md), C01–C18),
+each in one place:
+
+- privacy (C04): `platform/privacy.ts` answers `onNeedPrivacyAuthorization` with the privacy
+  sheet; `requiredPrivateInfos` declares only `chooseAddress`.
+- sign-in (C05): no `getUserProfile`; the phone number only through the phone-number button.
+- 确认收货 (C07): only through WeChat's receipt component (`platform/receipt.ts`), and the server
+  uploads shipping information and handles the settlement push.
+- subscription messages (C08): `platform/subscribe.ts`, only from a tap, scenes from the contract.
+- content security (C09): reviews, nicknames and avatars pass `msgSecCheck`/`mediaCheckAsync` on
+  the server; held content waits for the merchant (CONTENT-001).
+- sharing (C10): each page's share menu comes from its catalogue entry (`platform/share.ts`), and
+  `platform/launch.ts` handles the 朋友圈 single-page mode.
+- web-view (C12): `platform/webview.ts` opens only a 业务域名 in the config's allow-list, and
+  copies any other link (CLIENT-002).
+
+**Checked by** the `mini` guard (pages ⇄ `app.config.ts` ⇄ route catalogue, the platform seam,
+privacy declarations, share exports, retired URLs, no AppSecret or upload key), its unit tests,
+and `pnpm --filter @shop/e2e-storefront test`; the rest only a real phone can show is in
+[mini/device-check.md](mini/device-check.md).
 
 ## Edge
 
 `docker/edge/nginx.conf`, in front of `web`:
 
 - `/healthz` answers from nginx; `/readyz` proxies to the application's `/api/v1/readyz`.
-- `^/(admin|admin-api|api)(/|$)` and `/_next/static/` go to `web`;
-  `/admin-api/notifications/stream` goes unbuffered, for SSE.
+- `= /` (the landing page, `apps/web/app/page.tsx`), `^/(admin|admin-api|api|scan-upload)(/|$)`
+  and `/_next/static/` go to `web`; `/admin-api/notifications/stream` goes unbuffered, for SSE.
+- `= /favicon.ico`, `= /icon.svg` and `= /robots.txt` go to `web`, which answers them from
+  `apps/web/app` (`favicon.ico`, `icon.svg`, `robots.ts`: `Disallow: /`). Exact matches, so
+  `/robots.txt` never reaches the verification-file rule below.
 - `^~ /uploads/` serves the uploads volume read-only; anything that could execute is refused.
-- Everything else is the H5 build, with long cache on hashed assets and an `index.html` fallback.
+- `^/[A-Za-z0-9_-]+\.txt$` serves the WeChat domain-verification files from a read-only mount
+  (`deploy/README.md`, "Domain verification files").
+- Everything else is a relative `302` to `/`. The edge image carries no front-end files; the
+  mini-program's H5 builds are never served in production.
 - The client address is taken from `X-Forwarded-For` only when the peer is in
   `NEXT_EDGE_TRUSTED_PROXIES`; the app reads `X-Real-IP` and nothing else.
 
 ## Tests and checks
 
-| Layer             | Where                        | Runs against                                                                                                                                         |
-| ----------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit              | `*.test.ts` next to the code | Nothing external.                                                                                                                                    |
-| Integration       | `*.int.test.ts`              | PostgreSQL and Redis in Testcontainers; `runConcurrently` for every conditional update.                                                              |
-| Contract examples | `packages/contracts`         | Every example parses against its route.                                                                                                              |
-| Guards            | `guards/`                    | The whole tree: contracts vs routes, permissions, retired features, secrets, migrations, the uni-app, the invariant catalogue, the release pipeline. |
-| Admin e2e         | `e2e/admin`                  | The production build of `apps/web`, Playwright, fakes for every third party.                                                                         |
-| Storefront e2e    | `e2e/storefront`             | The H5 build in mobile Chromium, through the edge, against the built app and worker.                                                                 |
-| Deploy drill      | `deploy/rehearsal/drill.sh`  | The production Compose stack, built locally: first deploy, upgrades that stop nothing or must roll back, rollback, backup, and `ship.sh`.            |
+| Layer             | Where                        | Runs against                                                                                                                                              |
+| ----------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit              | `*.test.ts` next to the code | Nothing external.                                                                                                                                         |
+| Integration       | `*.int.test.ts`              | PostgreSQL and Redis in Testcontainers; `runConcurrently` for every conditional update.                                                                   |
+| Contract examples | `packages/contracts`         | Every example parses against its route.                                                                                                                   |
+| Guards            | `guards/`                    | The whole tree: contracts vs routes, permissions, retired features, secrets, migrations, the mini-program, the invariant catalogue, the release pipeline. |
+| Admin e2e         | `e2e/admin`                  | The production build of `apps/web`, Playwright, fakes for every third party.                                                                              |
+| Storefront e2e    | `e2e/storefront`             | The mini-program's "模拟小程序" H5 build in mobile Chromium, through the edge, against the built app and worker.                                          |
+| Deploy drill      | `deploy/rehearsal/drill.sh`  | The production Compose stack, built locally: first deploy, upgrades that stop nothing or must roll back, rollback, backup, and `ship.sh`.                 |
 
 CI (`.github/workflows/ci.yml`) runs all of them, and a nightly soak repeats the concurrency
 suites 50 times with shuffled order.

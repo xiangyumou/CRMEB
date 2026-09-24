@@ -135,7 +135,7 @@ export const refundApplyBody = z.object({
   /** One of `GET /api/v1/refund-reasons`, or free text the operator will read. */
   reason: z.string().min(1).max(255),
   explanation: z.string().max(512).optional(),
-  /** Evidence photos, already uploaded through the storage domain. */
+  /** Evidence photos: each a URL `POST /api/v1/uploads` returned (REFUND-014). */
   images: z.array(z.string().max(512)).max(9).default([]),
   /** Ask for the shipping fee back too. Only honoured while nothing has shipped. */
   includeFreight: z.boolean().default(false),

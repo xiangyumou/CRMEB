@@ -4,11 +4,12 @@
  *   1. PostgreSQL 17 + Redis 7 (Testcontainers), through `@shop/testing`'s own
  *      global setup — the same code the integration suite uses;
  *   2. a database cloned from that template;
- *   3. the fake WeChat Pay gateway and the control-plane bridge to it
+ *   3. the fake `api.weixin.qq.com` the server's mini-program sign-in calls,
+ *      the fake WeChat Pay gateway and the control-plane bridge to both
  *      (`src/gateway-control.ts`) — before the seed, because the seed writes
- *      `paymentConfig` pointed at the gateway's URL;
+ *      `paymentConfig` and `wechatConfig` pointed at them;
  *   4. the seed (`src/seed.ts`);
- *   5. the H5 build, if `dist/dev/h5` is stale (`src/h5.ts`);
+ *   5. the mini-program's "模拟小程序" H5 build, if it is stale (`src/h5.ts`);
  *   6. `next build`, if `web` has not been built yet, then `next start`;
  *   7. the worker (`tsx src/main.ts` in `apps/worker`) — journeys 2–4 need a
  *      real job actually processed, unlike the admin suite, which never runs
@@ -26,8 +27,14 @@
  * checkout's path (`src/stack-file.ts`), so a warm stack in one worktree is
  * invisible to the suite in another.
  *
- * Nothing here talks to a real WeChat, SMS or Aliyun endpoint. The fake
- * gateway is the only thing `paymentConfig`/`wechatConfig` ever point at.
+ * Nothing here talks to a real WeChat, SMS or Aliyun endpoint. The fakes are
+ * the only thing `paymentConfig`/`wechatConfig` ever point at.
+ *
+ * `SHOP_E2E_WECHAT_DEVICE=1` (never in the suite) turns on the fake WeChat's
+ * fake's device mode, so a real phone's `wx.login()` code signs in against
+ * the fakes (docs/mini/device-check.md, backend B).
+ * `SHOP_E2E_WECHAT_DEVICE_OPENID` / `SHOP_E2E_WECHAT_DEVICE_PHONE` pin the
+ * shopper, so every cold start is the same account.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -35,7 +42,8 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { startFakeWechatGateway } from '@shop/testing';
+import { generateFakeWechatKeys, startFakeWechatGateway } from '@shop/testing';
+import { startFakeOaServer, type FakeDeviceMode } from '@shop/testing/wechat';
 import pg from 'pg';
 
 import { startEdge } from '../src/edge';
@@ -63,6 +71,15 @@ let stopTemplate: (() => Promise<void>) | undefined;
 let closeEdge: (() => Promise<void>) | undefined;
 let closeGatewayControl: (() => Promise<void>) | undefined;
 let closeGateway: (() => Promise<void>) | undefined;
+let closeWechat: (() => Promise<void>) | undefined;
+
+/** `SHOP_E2E_WECHAT_DEVICE=1` → the fake's device mode; anything else leaves it off. */
+function deviceModeFromEnv(): FakeDeviceMode {
+  if (process.env.SHOP_E2E_WECHAT_DEVICE !== '1') return false;
+  const openid = process.env.SHOP_E2E_WECHAT_DEVICE_OPENID?.trim() || undefined;
+  const phone = process.env.SHOP_E2E_WECHAT_DEVICE_PHONE?.trim() || undefined;
+  return openid || phone ? { openid, phone } : true;
+}
 
 function log(line: string): void {
   console.log(`[e2e] ${line}`);
@@ -138,15 +155,28 @@ async function main(): Promise<void> {
 
   const uploadsDir = await mkdtemp(path.join(tmpdir(), 'shop-e2e-storefront-uploads-'));
 
+  // The mini-program signs in through the fake `api.weixin.qq.com`, and pays
+  // with the mini-program's app id: WeChat Pay charges a `wechat_mini` payment
+  // to the mini app, and the fake gateway refuses any other appid.
+  log('starting fake api.weixin.qq.com …');
+  const wechat = await startFakeOaServer({ deviceMode: deviceModeFromEnv() });
+  if (wechat.deviceMode !== false) {
+    log('fake api.weixin.qq.com in DEVICE MODE: any well-formed wx.login() code signs in');
+  }
+  closeWechat = wechat.close;
+
   log('starting fake WeChat Pay gateway …');
-  const gateway = await startFakeWechatGateway({ port: GATEWAY_PORT });
+  const gateway = await startFakeWechatGateway({
+    port: GATEWAY_PORT,
+    keys: { ...generateFakeWechatKeys(), appId: wechat.miniAppId },
+  });
   closeGateway = gateway.close;
   // The gateway settles a refund synchronously once approved, so the refund
   // journey never has to wait on `reconcileStaleRefunds()`'s sweep interval —
   // a real gateway reports PROCESSING first, but nothing here tests that wait.
   gateway.behaviour.refundStatus = 'SUCCESS';
 
-  const control = await startGatewayControl({ gateway, baseUrl: BASE_URL });
+  const control = await startGatewayControl({ gateway, baseUrl: BASE_URL, wechat });
   closeGatewayControl = control.close;
 
   log('seeding …');
@@ -157,6 +187,7 @@ async function main(): Promise<void> {
     gateway,
     gatewayApiUrl: gateway.url,
     baseUrl: BASE_URL,
+    miniProgram: { appSecret: wechat.miniAppSecret, apiBaseUrl: wechat.url },
   });
 
   log('h5 build …');
@@ -219,6 +250,7 @@ async function main(): Promise<void> {
     root: H5_DIST_DIR,
     uploadsDir,
     upstream: WEB_URL,
+    controlUpstream: control.url,
   });
   closeEdge = edge.close;
 
@@ -226,6 +258,7 @@ async function main(): Promise<void> {
     databaseUrl,
     redisUrl,
     baseUrl: BASE_URL,
+    wechatMiniAppId: wechat.miniAppId,
     uploadsDir,
     gatewayUrl: gateway.url,
     gatewayControlUrl: control.url,
@@ -258,6 +291,7 @@ async function shutdown(code = 0): Promise<void> {
   await closeEdge?.().catch(() => {});
   await closeGatewayControl?.().catch(() => {});
   await closeGateway?.().catch(() => {});
+  await closeWechat?.().catch(() => {});
   await stopTemplate?.().catch(() => {});
   process.exit(code);
 }

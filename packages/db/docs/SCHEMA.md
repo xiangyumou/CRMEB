@@ -34,11 +34,10 @@ instead of comma-separated id columns, `NULL` instead of `''` or `0` for
 | `groupbuy`     |      4 | `groupbuy_activities`, `groupbuy_activity_skus`, `groupbuy_groups`, `groupbuy_members`                                                                                                                                                                                                                                                                                                                    |
 | `presale`      |      4 | `presale_activities`, `presale_activity_skus`, `presale_orders`, `presale_stock_ledger`                                                                                                                                                                                                                                                                                                                   |
 | `cms`          |      3 | `article_categories`, `articles`, `article_contents`                                                                                                                                                                                                                                                                                                                                                      |
-| `diy`          |      4 | `diy_pages`, `themes`, `page_link_categories`, `page_links`                                                                                                                                                                                                                                                                                                                                               |
 | `notification` |      3 | `notification_templates`, `notification_messages`, `sms_logs`                                                                                                                                                                                                                                                                                                                                             |
 | `wechat`       |      7 | `wechat_identities`, `wechat_oa_menus`, `wechat_auto_replies`, `wechat_qrcode_categories`, `wechat_qrcodes`, `wechat_qrcode_scans`, `wechat_media`                                                                                                                                                                                                                                                        |
 | `stats`        |      3 | `product_events`, `user_visits`, `search_logs`                                                                                                                                                                                                                                                                                                                                                            |
-| **Total**      | **86** |                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **Total**      | **82** |                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ### Required extension
 
@@ -227,8 +226,7 @@ Every one of these is exercised by `scripts/check-constraints.sql`.
 | 18  | Case-insensitive unique logins               | `users_account_lower_uq`, `users_phone_lower_uq`                                   |
 | 19  | One default address per user                 | `user_addresses_default_uq`                                                        |
 | 20  | A paid order has a payment time and amount   | `orders_paid_shape`                                                                |
-| 21  | One home DIY page                            | `diy_pages_home_uq`                                                                |
-| 22  | Never ship more units than bought            | `order_items_shipped_within_quantity`                                              |
+| 21  | Never ship more units than bought            | `order_items_shipped_within_quantity`                                              |
 
 ### 3.1 Why "one open refund per order **item**"
 
@@ -405,13 +403,7 @@ notifications are much easier to get right when a replayed notification
 collides on `(mch_id, provider_notify_id)` than when the handler has to reason
 about it alongside the attempt state machine.
 
-### 6.9 `page_links` / `page_link_categories`
-
-The routes `<LinkPicker>` offers. They are operator data, **not seeded**: the
-uni-app's route table changes on its own schedule. Reads hide links to retired
-pages.
-
-### 6.10 `wechat_auto_replies.trigger_kind`
+### 6.9 `wechat_auto_replies.trigger_kind`
 
 `trigger` is a reserved word in PostgreSQL and would break the raw predicate of
 the partial unique index, so the column is `trigger_kind`. The same reasoning

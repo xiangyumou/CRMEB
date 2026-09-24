@@ -2,7 +2,7 @@
 
 简体中文 | [English](./README.md)
 
-面向国内市场的单商户网上商城。顾客通过移动端商城购物：H5 可在任何手机浏览器（包括微信内置浏览器）中打开，另有微信小程序。商家在网页管理后台经营店铺。
+面向国内市场的单商户网上商城。顾客通过微信小程序购物，商家在网页管理后台经营店铺。
 
 功能：
 
@@ -10,24 +10,24 @@
 - **下单**：购物车；结算时计算运费模板与优惠券分摊；订单；按需开票；自动取消与自动收货。
 - **支付与售后**：微信支付 v3（JSAPI、小程序、H5）、超时支付对账、退款申请与审核。
 - **营销**：优惠券、拼团、预售。
-- **履约**：发货、拆单发货、物流查询，以及移动端的店员页面。
-- **内容**：拖拽式页面装修与主题、文章、协议。
+- **履约**：发货、拆单发货、物流查询。
+- **内容**：小程序的积木式店铺装修、文章、协议。
 - **用户**：短信、密码、小程序、公众号登录；地址、标签、分组。
 - **公众号**：菜单、自动回复、二维码、素材。
 - **运营**：由权限原子组成的角色、操作日志、通知（站内信、消息模板、订阅消息）、统计看板、本地或 S3 兼容存储。
 
 ## 技术栈
 
-| 组成           | 说明                                                                                                                                   |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web`     | Next.js 16（App Router，standalone）。管理后台在 `/admin`（React 19、Ant Design 6），其接口在 `/admin-api/*`，商城接口在 `/api/v1/*`。 |
-| `apps/worker`  | BullMQ worker：定时任务、按需任务，以及提交后副作用的派发器。                                                                          |
-| PostgreSQL 17  | 唯一的数据库。schema 与迁移由 Drizzle 管理。                                                                                           |
-| Redis 7        | 后台会话、配置缓存、限流、任务队列、后台实时通知的 pub/sub。                                                                           |
-| `apps/uni-app` | 移动端（uni-app，Vue 2）：H5 商城与微信小程序，同一套代码构建。                                                                        |
-| edge           | 最前面的 nginx：在 `/` 提供 H5 构建产物，把 `/admin`、`/admin-api`、`/api`、`/scan-upload` 转发给 `web`，并提供 `/uploads/`。          |
+| 组成          | 说明                                                                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`    | Next.js 16（App Router，standalone）。管理后台在 `/admin`（React 19、Ant Design 6），其接口在 `/admin-api/*`，商城接口在 `/api/v1/*`。 |
+| `apps/worker` | BullMQ worker：定时任务、按需任务，以及提交后副作用的派发器。                                                                          |
+| PostgreSQL 17 | 唯一的数据库。schema 与迁移由 Drizzle 管理。                                                                                           |
+| Redis 7       | 后台会话、配置缓存、限流、任务队列、后台实时通知的 pub/sub。                                                                           |
+| `apps/mini`   | 微信小程序商城（Taro 4、React 18）。它的「模拟小程序」H5 构建只用于 e2e 和装修预览。                                                   |
+| edge          | 最前面的 nginx：把 `/`（落地页）、`/admin`、`/admin-api`、`/api`、`/scan-upload` 转发给 `web`，并提供 `/uploads/`。                    |
 
-除 uni-app 外全部是严格模式的 TypeScript，运行在 Node 24 上，用 pnpm 管理。每个接口只声明一次，即 `packages/contracts` 里的 zod 契约；OpenAPI 文档、类型化的后台客户端、mock server 和守卫都由它派生。详见 [docs/architecture.md](docs/architecture.md)。
+全部是严格模式的 TypeScript，运行在 Node 24 上，用 pnpm 管理。每个接口只声明一次，即 `packages/contracts` 里的 zod 契约；OpenAPI 文档、类型化的后台客户端、mock server 和守卫都由它派生。详见 [docs/architecture.md](docs/architecture.md)。
 
 ## 目录结构
 
@@ -35,13 +35,15 @@
 apps/
   web/          Next.js：后台页面、/admin-api、/api/v1
   worker/       BullMQ worker 及其任务
-  uni-app/      移动端（独立的 npm 项目，不在 pnpm workspace 内）
+  mini/         微信小程序（Taro）
 packages/
   config/       共享的 ESLint、TypeScript、Vitest 预设
   contracts/    路由契约（zod）→ OpenAPI；接口的唯一事实来源
   core/         领域逻辑，每个领域一个目录，另有 kernel/
   db/           Drizzle schema、迁移、基础数据种子
   testing/      Testcontainers 测试基座、工厂、假微信与假短信网关、mock server
+  api-client/   小程序使用的类型化 /api/v1 客户端
+  storefront-blocks/  小程序与后台装修共用的装修块
 e2e/            Playwright 套件：admin/ 与 storefront/
 guards/         全仓静态检查（pnpm guards）
 load/           负载冒烟
@@ -93,19 +95,16 @@ SQL
 
 如果想要一个已经带有管理员、商品、优惠券和买家的环境，改用后台端到端套件的服务：`pnpm --filter @shop/e2e-admin exec tsx scripts/serve.ts`。它在 Testcontainers 里自带 PostgreSQL 与 Redis，登录账号 `e2e-super` / `e2e-Passw0rd!`。
 
-### 移动端
+### 小程序
 
-`apps/uni-app` 是独立的 npm 项目：
+`apps/mini` 和其他包一样在 pnpm workspace 里：
 
 ```sh
-cd apps/uni-app
-npm ci
-npm test                  # 接口层、mappers、store、utils
-npm run build:h5          # 产物在 dist/build/h5，edge 镜像提供的就是它
-npm run build:mp-weixin
+pnpm --filter @shop/mini dev:weapp     # 产物在 dist/weapp，用微信开发者工具导入
+pnpm --filter @shop/mini build         # 微信包、H5 预览和体积门禁
 ```
 
-H5 构建请求它所在的源；小程序构建从 `VUE_APP_CRMEB_API_ORIGIN` 读取接口源。`api/` 下的模块调用 `/api/v1` 路由，`api/mappers/` 把每个响应转换成页面读取的字段名。
+接口源来自 `TARO_APP_API_ORIGIN`；开发者自己的 AppID 和接口源放在 `apps/mini/.env.*.local`。设计见 [docs/mini/](docs/mini/README.md)，在开发者工具和真机上试用见 [docs/mini/device-check.md](docs/mini/device-check.md)。
 
 ## 检查
 
@@ -118,8 +117,7 @@ pnpm --filter @shop/contracts check:examples
 pnpm exec prettier --check .
 pnpm guards                                          # 0 failures
 pnpm --filter @shop/e2e-admin e2e                    # 使用 apps/web 的构建产物
-pnpm --filter @shop/e2e-storefront test
-(cd apps/uni-app && npm test && npm run build:h5)
+pnpm --filter @shop/e2e-storefront test            # 小程序的「模拟小程序」H5 构建
 ```
 
 CI（`.github/workflows/ci.yml`）跑上面的全部内容，另加 shellcheck、部署演练，以及在 push 时构建三个生产镜像。

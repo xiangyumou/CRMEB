@@ -72,7 +72,7 @@ export const orderErrors = defineErrors({
 export type OrderErrorCode = keyof typeof orderErrors;
 
 /**
- * Fulfilment, invoice and staff-console codes.
+ * Fulfilment, invoice and console-edit codes.
  *
  * A separate `defineErrors` call in the same file: `pnpm gen` collects one
  * `errors.ts` per domain and flattens every registry it exports, so the
@@ -114,14 +114,16 @@ export const orderFulfilErrors = defineErrors({
   // --- receipt ------------------------------------------------------------
   /** Not `shipped` — already received, still unshipped, cancelled or refunded. */
   ORDER_NOT_RECEIVABLE: { status: 409, message: '订单当前状态不可确认收货' },
-
-  // --- statistics ---------------------------------------------------------
   /**
-   * The 统计明细 window is wider than the cap. Refused rather than silently
-   * shortened, so a chart never claims to cover a range it does not.
-   * `details: { maximumDays }`.
+   * `{ via: 'wechat-component' }`, but WeChat's `get_order` does not (yet) say
+   * the buyer confirmed — or it could not be asked. `details.verdict`:
+   * `not-confirmed` | `unavailable`. The client may retry, or fall back to a
+   * plain 确认收货; the settlement push catches up either way.
    */
-  ORDER_STATISTICS_RANGE_TOO_WIDE: { status: 422, message: '统计时间跨度过大，请缩短查询范围' },
+  ORDER_WECHAT_RECEIPT_UNCONFIRMED: {
+    status: 409,
+    message: '微信尚未确认收货，请稍后重试',
+  },
 
   // --- console edits ------------------------------------------------------
   /** 改价 is only ever allowed while the order is still `pending_payment`. */
@@ -141,6 +143,8 @@ export const orderFulfilErrors = defineErrors({
   ORDER_INVOICE_NOT_REQUESTABLE: { status: 409, message: '该订单当前不可申请开票' },
   /** Already issued, rejected or cancelled. */
   ORDER_INVOICE_NOT_ACTIONABLE: { status: 409, message: '该开票申请当前状态无法执行此操作' },
+  /** WeChat's 内容安全 judged the 抬头 name `risky` (C09); fail-open when WeChat is unreachable. */
+  ORDER_INVOICE_TITLE_REJECTED: { status: 422, message: '发票抬头包含不当信息，请修改后再提交' },
 });
 
 export type OrderFulfilErrorCode = keyof typeof orderFulfilErrors;

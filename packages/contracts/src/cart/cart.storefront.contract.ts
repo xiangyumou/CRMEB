@@ -4,7 +4,6 @@ import { defineRoute } from '../_conventions/route';
 import {
   cartAddBody,
   cartCount,
-  cartDecrementBody,
   cartCountExample,
   cartItemExample,
   cartList,
@@ -194,41 +193,17 @@ export const cartUpdateItem = defineRoute({
 });
 
 /**
- * 减少数量 by variant — the minus button on the product detail page.
+ * The same operation as `cart.updateItem`, on `PUT`.
  *
- * A conditional update, so two taps that arrive together take one unit each and
- * the row disappears exactly once. Decrementing below the row's quantity
- * removes it; decrementing a variant the cart does not hold is
- * `CART_ITEM_NOT_FOUND`, the same answer as for a row id that never existed.
+ * `wx.request` has no `PATCH`, so the mini-program cannot call `cart.updateItem`.
+ * Same body, same service, same answers; `cart.updateItem` (`PATCH`) stays
+ * for a client that can send it.
  */
-export const cartDecrementItem = defineRoute({
-  id: 'cart.decrementItem',
-  method: 'POST',
-  path: '/api/v1/cart/items/decrements',
-  auth: 'user',
-  summary: '减少购物车商品数量',
-  tags: ['cart'],
-  body: cartDecrementBody,
-  response: cartMutationResult,
-  errors: ['CART_ITEM_NOT_FOUND'],
-  examples: [
-    {
-      name: 'one-off',
-      body: { skuId: '21', quantity: 1 },
-      response: {
-        item: { ...cartItemExample, quantity: 1, subtotal: '60.00' },
-        cart: { ...cartCountExample, quantity: 4 },
-      },
-    },
-    {
-      name: 'down-to-zero-removes-the-row',
-      body: { skuId: '21', quantity: 2 },
-      response: {
-        item: null,
-        cart: { items: 2, quantity: 3, availableCount: 1, unavailableCount: 1 },
-      },
-    },
-  ],
+export const cartUpdateItemPut = defineRoute({
+  ...cartUpdateItem,
+  id: 'cart.updateItemPut',
+  method: 'PUT',
+  summary: '修改购物车商品（PUT，小程序）',
 });
 
 export const cartRemoveItem = defineRoute({

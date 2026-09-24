@@ -5,31 +5,28 @@ import { DEVICE } from './src/device';
 import { BASE_URL, REUSE } from './src/stack-file';
 
 /**
- * Storefront end-to-end suite: the uni-app H5 build in a mobile browser.
+ * Storefront end-to-end suite: the mini-program's "模拟小程序" H5 build
+ * (`apps/mini`, `build:h5:mp-emulation`) in a mobile browser, with the fake
+ * `api.weixin.qq.com` answering `wx.login` / `getPhoneNumber` and the fake
+ * WeChat Pay gateway answering `requestPayment` (docs/mini/spikes/S4-e2e.md).
  *
  * One command, from the repository root:
  *
  *     pnpm --filter @shop/e2e-storefront test
  *
  * `webServer` is `scripts/serve.ts`, mirroring `@shop/e2e-admin`'s: the whole
- * stack — Postgres, Redis, the fake WeChat Pay gateway and its control-plane
- * bridge, the seed, the H5 build, `next start` and the worker — comes up
- * inside one script so `SIGINT` tears all of it down together, and so the
- * containers exist before Playwright's own `globalSetup` would have run.
+ * stack — Postgres, Redis, the fakes and their control-plane bridge, the seed,
+ * the H5 build, `next start` and the worker — comes up inside one script so
+ * `SIGINT` tears all of it down together, and so the containers exist before
+ * Playwright's own `globalSetup` would have run.
  *
  * `workers: 1`, for the same reason as the admin suite: every journey shares
  * one database and one Redis, so a group-buy team one spec opens must still
- * be there when the next spec's process reads it. The suite proves eight
- * user journeys work end to end, not that they can be run concurrently.
- *
- * The one project is a mobile Chromium emulation, not desktop: `manifest.json`
- * has no separate mobile-web build — the H5 bundle *is* what a phone browser
- * gets — and `config/app.js`'s `clientPlatform()` derives the platform from
- * `navigator.userAgent`, so the emulated device's UA is what makes the app
- * behave as H5 rather than assume a manual header would.
+ * be there when the next spec's process reads it. The suite proves the
+ * journeys work end to end, not that they can be run concurrently.
  */
 export default defineConfig({
-  testDir: './specs',
+  testDir: './specs-mini',
   outputDir: './test-results',
   fullyParallel: false,
   workers: 1,
@@ -52,9 +49,9 @@ export default defineConfig({
   },
   projects: [
     {
-      // Chromium only, mobile viewport: these journeys assert what a shopper
-      // on a phone browser sees, not cross-browser rendering.
-      name: 'mobile-chromium',
+      // A phone. The emulation build does not look at the UA: it says
+      // `wechat-mini` because it was built to.
+      name: 'mini-h5',
       use: { ...DEVICE },
     },
   ],
@@ -62,7 +59,7 @@ export default defineConfig({
     command: 'pnpm exec tsx scripts/serve.ts',
     url: `${BASE_URL}/api/v1/health`,
     // Containers pull on a cold machine, `next build` runs once, and the H5
-    // bundle builds once too when `dist/dev/h5` is stale.
+    // bundle builds once too when it is stale.
     timeout: 900_000,
     // Opt-in only (`SHOP_E2E_REUSE=1`): reusing by default let one worktree's
     // run silently drive another worktree's stack. See `src/stack-file.ts`.

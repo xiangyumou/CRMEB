@@ -1,9 +1,14 @@
-import type { MiniCodeQuery, MiniCodeResult } from '@shop/contracts/wechat/schemas';
+import {
+  encodeScene,
+  storefrontRoute,
+  storefrontRouteDef,
+} from '@shop/contracts/system/storefront-routes';
+import type { MiniCodeResult, ShareMiniCodeQuery } from '@shop/contracts/wechat/schemas';
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { enforce, fixedWindow } from '../kernel/rate-limit';
 import { isRejected, resolveStorage, sniffFileType } from '../storage';
-import { wechatMiniConfig } from '../system';
+import { wechatMiniConfig, type MiniCodeEnvVersion } from '../system';
 import { getWechatClient } from './wechat.client';
 import { wechatConfig } from './wechat.config';
 import * as repo from './wechat.mini-code.repo';
@@ -26,10 +31,18 @@ import * as repo from './wechat.mini-code.repo';
  *     assumed a file would cache a 43-byte "invalid page" as a PNG for ever.
  *     `callBytes` tells the two apart and this service turns the second into
  *     `WECHAT_MINI_CODE_FAILED` (502) carrying WeChat's number.
+ *
+ * **Which version a code opens** is `wechat-mini.codeEnvVersion` (`env_version`:
+ * `release`, the default, or `trial` / `develop` for a staging install that
+ * previews unreleased pages on 体验版). WeChat's answer depends on it, so it is
+ * part of the cache key: a code minted for `trial` is never served once the
+ * setting says `release`, and back. The table's unique key stays `(page,
+ * scene)` — the previous image, which a rollback runs, inserts with
+ * `ON CONFLICT (page, scene)` and needs exactly that index — so a non-release
+ * code is cached under the page `<env>:<page>` (`cachePage`). No real page
+ * contains a colon, so the two never collide, and a rolled-back image simply
+ * never looks those rows up.
  */
-
-/** WeChat's own limit on `scene`, in bytes. */
-export const SCENE_MAX_BYTES = 32;
 
 /** Where the generated PNGs live under the storage root. */
 const DIRECTORY = 'wechat-mini-code';
@@ -58,7 +71,7 @@ const HOUR_MS = 60 * 60 * 1000;
  */
 async function spendMint(ctx: Ctx): Promise<void> {
   const actor = ctx.actor;
-  if (actor.kind !== 'user' && actor.kind !== 'staff') return;
+  if (actor.kind !== 'user') return;
   await enforce(
     fixedWindow(ctx.redis, {
       key: `wechat:mini-code:mint:u:${actor.id}`,
@@ -67,6 +80,11 @@ async function spendMint(ctx: Ctx): Promise<void> {
       nowMs: ctx.clock.now().getTime(),
     }),
   );
+}
+
+/** The page column a code is cached under: the page itself for `release`, `<env>:<page>` otherwise. */
+export function cachePage(page: string, env: MiniCodeEnvVersion): string {
+  return env === 'release' ? page : `${env}:${page}`;
 }
 
 async function miniConfigured(ctx: Ctx): Promise<boolean> {
@@ -78,23 +96,48 @@ async function miniConfigured(ctx: Ctx): Promise<boolean> {
 }
 
 /**
- * The URL of the code for this page and scene, generating it if nobody has.
+ * The code for a route-catalogue key: `GET /api/v1/share/mini-codes`.
  *
- * The scene is re-checked here even though the contract's schema has already
- * refused an over-long one: the limit is WeChat's, in **bytes**, and a domain
- * that trusts its caller to have parsed the input is a domain that breaks the
- * first time somebody calls it from a job.
+ * The page is the catalogue's and the scene is `encodeScene`'s, so a caller
+ * names only what it shares. The params are validated against the key (the
+ * catalogue's params are strict) before anything is looked up or minted: a
+ * code for `home` that carries an `id` is refused, not generated with the
+ * `id` silently dropped.
  */
-export async function miniCodeUrl(ctx: Ctx, query: MiniCodeQuery): Promise<MiniCodeResult> {
-  const scene = query.scene.trim();
-  if (scene === '' || Buffer.byteLength(scene, 'utf8') > SCENE_MAX_BYTES) {
+export async function shareMiniCodeUrl(
+  ctx: Ctx,
+  query: ShareMiniCodeQuery,
+): Promise<MiniCodeResult> {
+  const params = query.id === undefined ? {} : { id: query.id };
+  const parsed = storefrontRoute.safeParse({ route: query.route, params });
+  if (!parsed.success || !storefrontRouteDef(query.route).miniCode) {
     throw new DomainError('VALIDATION_FAILED', {
-      details: [{ field: 'scene', message: `scene 最长 ${SCENE_MAX_BYTES} 字节` }],
+      details: [{ field: 'id', message: `${query.route} 页面的参数不正确` }],
     });
   }
-  const key = { page: query.page, scene };
+  let scene: string;
+  try {
+    scene = encodeScene(parsed.data);
+  } catch (error) {
+    // Every `miniCode` key's scene fits by construction (its test proves it);
+    // reaching this is a catalogue change that broke that, not a bad request.
+    ctx.logger.error({ err: error, route: query.route }, '小程序码 scene 无法编码');
+    throw new DomainError('VALIDATION_FAILED', {
+      details: [{ field: 'route', message: `${query.route} 无法生成小程序码` }],
+    });
+  }
+  return mintOrReuse(ctx, { page: storefrontRouteDef(query.route).path, scene });
+}
 
-  const cached = await repo.findByPageScene(ctx.db, key);
+/** The cached code for `(page, scene)`, or a new one minted and stored. */
+async function mintOrReuse(
+  ctx: Ctx,
+  key: { page: string; scene: string },
+): Promise<MiniCodeResult> {
+  const { scene } = key;
+  const env = (await ctx.config.get(wechatMiniConfig)).codeEnvVersion;
+  const cacheKey = { page: cachePage(key.page, env), scene };
+  const cached = await repo.findByPageScene(ctx.db, cacheKey);
   if (cached) return { url: cached.url };
 
   if (!(await miniConfigured(ctx))) throw new DomainError('AUTH_WECHAT_NOT_CONFIGURED');
@@ -103,10 +146,10 @@ export async function miniCodeUrl(ctx: Ctx, query: MiniCodeQuery): Promise<MiniC
   const result = await getWechatClient(ctx).callBytes('mini', {
     method: 'POST',
     path: '/wxa/getwxacodeunlimit',
-    // `check_path: false` — the page is on this system's own allow-list and a
+    // `check_path: false` — the page is the route catalogue's own and a
     // shop generating a poster before the version carrying that page is
     // published is a normal Tuesday, not an error worth failing the share on.
-    body: { page: key.page, scene, check_path: false, env_version: 'release' },
+    body: { page: key.page, scene, check_path: false, env_version: env },
   });
 
   if (!result.ok) {
@@ -138,7 +181,7 @@ export async function miniCodeUrl(ctx: Ctx, query: MiniCodeQuery): Promise<MiniC
   });
 
   const written = await repo.insertIgnoringConflict(ctx.db, {
-    ...key,
+    ...cacheKey,
     storageKey: stored.key,
     url: storage.url(stored.key),
   });

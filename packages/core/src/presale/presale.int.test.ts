@@ -1081,6 +1081,70 @@ describe('the storefront surface', () => {
     expect(byId.get(String(soldOut.activityId))?.canBuy).toBe(false);
   });
 
+  it('narrows the list to one product: its live campaigns only, none for a product with none', async () => {
+    const shown = await makeActivity();
+    await makeActivity();
+    const draft = await makeActivity({ status: 'draft' });
+    const ctx = asUser(await makeUser());
+
+    const forProduct = await service.list(ctx, {
+      page: 1,
+      pageSize: 20,
+      productId: String(shown.productId),
+    });
+    expect(forProduct.total).toBe(1);
+    expect(forProduct.items.map((item) => item.activityId)).toEqual([String(shown.activityId)]);
+
+    const hidden = await service.list(ctx, {
+      page: 1,
+      pageSize: 20,
+      productId: String(draft.productId),
+    });
+    expect(hidden).toMatchObject({ total: 0, items: [] });
+  });
+
+  it('answers a manual pick by id, in the given order, with only what the list would show', async () => {
+    const first = await makeActivity({ stock: 5 });
+    const second = await makeActivity({ stock: 0 });
+    const draft = await makeActivity({ status: 'draft' });
+    const later = await makeActivity({
+      startAt: new Date('2026-06-10T00:00:00.000Z'),
+      endAt: new Date('2026-06-20T00:00:00.000Z'),
+    });
+    const deleted = await makeActivity();
+    await harness.ctx.db
+      .update(presaleActivities)
+      .set({ deletedAt: harness.clock.now() })
+      .where(eq(presaleActivities.id, deleted.activityId));
+
+    const ids = [second, draft, later, deleted, first].map((f) => String(f.activityId));
+    const cards = await service.cardsFor(harness.ctx, [...ids, 'abc', ids[0]!]);
+
+    expect(cards.map((card) => card.activityId)).toEqual([
+      String(second.activityId),
+      String(first.activityId),
+    ]);
+    const listed = await service.list(harness.ctx, { page: 1, pageSize: 20 } as never);
+    for (const card of cards) {
+      expect(card).toEqual(listed.items.find((item) => item.activityId === card.activityId));
+    }
+    expect(await service.cardsFor(harness.ctx, [])).toEqual([]);
+  });
+
+  it('finds a picked campaign however many campaigns come before it in the list', async () => {
+    const picked = await makeActivity();
+    await harness.ctx.db
+      .update(presaleActivities)
+      .set({ sortOrder: -1 })
+      .where(eq(presaleActivities.id, picked.activityId));
+    for (let index = 0; index < 3; index += 1) await makeActivity();
+
+    const firstPage = await service.list(harness.ctx, { page: 1, pageSize: 3 } as never);
+    expect(firstPage.items.map((card) => card.activityId)).not.toContain(String(picked.activityId));
+    const cards = await service.cardsFor(harness.ctx, [String(picked.activityId)]);
+    expect(cards.map((card) => card.activityId)).toEqual([String(picked.activityId)]);
+  });
+
   it('serves the detail with enabled SKUs only and the catalogue price struck through', async () => {
     const fixture = await makeActivity({ stock: 5 });
     const ctx = asUser(await makeUser());
@@ -1356,7 +1420,7 @@ describe('shopper notifications', () => {
       `您预订的「${title}」已付款 ¥59.00，将于 2026-06-17 起发货。`,
     );
     expect(messages[0]?.data).toMatchObject({
-      link: `/pages/goods/order_details/index?order_id=${orderNo}`,
+      route: { route: 'order', params: { id: String(orderId) } },
     });
 
     const sends = oa.callsTo('/cgi-bin/message/template/send');
@@ -1364,7 +1428,6 @@ describe('shopper notifications', () => {
     expect(sends[0]?.body).toEqual({
       touser: 'oa-presale-1',
       template_id: 'TPL_OA_PRESALE',
-      url: `https://shop.example.test/pages/goods/order_details/index?order_id=${orderNo}`,
       data: { keyword1: { value: orderNo }, keyword2: { value: '2026-06-17' } },
     });
     expect(sms.calls).toEqual([

@@ -1,4 +1,9 @@
 import type { NotificationChannel } from '@shop/contracts/notification/schemas';
+import {
+  storefrontRouteDef,
+  storefrontRouteKey,
+  type StorefrontRouteKey,
+} from '@shop/contracts/system/storefront-routes';
 
 /**
  * The registry of business events that produce a notification.
@@ -49,8 +54,27 @@ export interface NotificationEvent {
   permission?: string;
   /** Default in-app wording, used to seed the row the first time it is read. */
   defaults: { title: string; body: string };
-  /** Where tapping the message goes. `{{…}}` is substituted like the body. */
+  /**
+   * Admin events only: the admin path the bell opens, `{{…}}` substituted like
+   * the body. A customer event opens its `route` instead; the old H5 `link` on
+   * customer events was deleted at the cutover, so a 公众号 template message
+   * links only to the `linkUrl` an operator configured.
+   */
   link?: string;
+  /**
+   * Where tapping the message goes in the mini program: a route-catalogue key
+   * (one marked `notify`) and its params, each a `{{…}}` template
+   * (docs/mini/pages.md §3.4). Rendered, then validated against the key's
+   * params (`renderRoute`): the subscribe message's `page` is its `toMiniPath`,
+   * and an in-app message stores it as `data.route`.
+   */
+  route?: NotificationRouteTemplate;
+}
+
+/** `{ route, params }` with `{{…}}` placeholders in the param values. */
+export interface NotificationRouteTemplate {
+  route: StorefrontRouteKey;
+  params: Readonly<Record<string, string>>;
 }
 
 const USER_CHANNELS = ['inApp', 'wechatOa', 'wechatMini', 'sms'] as const;
@@ -78,6 +102,15 @@ export function registerNotificationEvents(events: readonly NotificationEvent[])
     if (event.audience === 'admin' && !event.permission) {
       throw new Error(`notification event "${event.code}" 是后台通知，必须声明 permission`);
     }
+    if (event.audience === 'user' && event.link !== undefined) {
+      throw new Error(`notification event "${event.code}" 是用户通知，用 route 而不是 link`);
+    }
+    if (event.route) {
+      const key = storefrontRouteKey.safeParse(event.route.route);
+      if (event.audience !== 'user' || !key.success || !storefrontRouteDef(key.data).notify) {
+        throw new Error(`notification event "${event.code}" 的路由必须是可通知的商城路由`);
+      }
+    }
     registry.set(event.code, event);
   }
 }
@@ -101,6 +134,16 @@ export function resetNotificationRegistry(): void {
 
 const ORDER_VARS = ['orderId', 'orderNo', 'amount', 'nickname'] as const;
 
+/** The mini-program pages customer events open (docs/mini/pages.md §3.4). */
+export const ORDER_ROUTE: NotificationRouteTemplate = {
+  route: 'order',
+  params: { id: '{{orderId}}' },
+};
+export const REFUND_ROUTE: NotificationRouteTemplate = {
+  route: 'refund',
+  params: { id: '{{refundId}}' },
+};
+
 /**
  * Registered from `notification/index.ts`, which the generated
  * `@shop/core/domains` bucket imports once per app. Safe to call twice.
@@ -116,7 +159,7 @@ export function registerBuiltInNotificationEvents(): void {
       variables: [...ORDER_VARS],
       channels: [...USER_CHANNELS],
       defaults: { title: '订单提交成功', body: '订单 {{orderNo}} 已提交，应付 ¥{{amount}}。' },
-      link: '/orders/{{orderId}}',
+      route: ORDER_ROUTE,
     },
     {
       code: 'order_paid',
@@ -129,20 +172,29 @@ export function registerBuiltInNotificationEvents(): void {
         title: '支付成功',
         body: '订单 {{orderNo}} 已支付 ¥{{amount}}，我们会尽快发货。',
       },
-      link: '/orders/{{orderId}}',
+      route: ORDER_ROUTE,
     },
     {
       code: 'order_shipped',
       name: '订单发货通知',
-      description: '订单发货后通知买家。虚拟商品自动发货也走这里',
+      description: '订单发货后通知买家，分批发货时每个包裹一条。虚拟商品自动发货也走这里',
       audience: 'user',
-      variables: [...ORDER_VARS, 'company', 'trackingNo'],
+      // `company` / `trackingNo` are a courier's; `deliveryInfo` reads right for
+      // 快递, 商家配送 and 虚拟发货 alike, so the default wording uses it.
+      variables: [
+        ...ORDER_VARS,
+        'company',
+        'trackingNo',
+        'courierName',
+        'courierPhone',
+        'deliveryInfo',
+      ],
       channels: [...USER_CHANNELS],
       defaults: {
         title: '您的订单已发货',
-        body: '订单 {{orderNo}} 已由 {{company}} 发出，运单号 {{trackingNo}}。',
+        body: '订单 {{orderNo}} 已发货，{{deliveryInfo}}。',
       },
-      link: '/orders/{{orderId}}',
+      route: ORDER_ROUTE,
     },
     {
       code: 'order_received',
@@ -152,7 +204,7 @@ export function registerBuiltInNotificationEvents(): void {
       variables: [...ORDER_VARS],
       channels: [...USER_CHANNELS],
       defaults: { title: '确认收货成功', body: '订单 {{orderNo}} 已确认收货，感谢您的购买。' },
-      link: '/orders/{{orderId}}',
+      route: ORDER_ROUTE,
     },
     {
       code: 'order_completed',
@@ -162,7 +214,7 @@ export function registerBuiltInNotificationEvents(): void {
       variables: [...ORDER_VARS],
       channels: [...USER_CHANNELS],
       defaults: { title: '订单已完成', body: '订单 {{orderNo}} 已完成，期待再次为您服务。' },
-      link: '/orders/{{orderId}}',
+      route: ORDER_ROUTE,
     },
     {
       code: 'order_cancelled',
@@ -172,7 +224,7 @@ export function registerBuiltInNotificationEvents(): void {
       variables: [...ORDER_VARS, 'reason'],
       channels: [...USER_CHANNELS],
       defaults: { title: '订单已取消', body: '订单 {{orderNo}} 已取消。' },
-      link: '/orders/{{orderId}}',
+      route: ORDER_ROUTE,
     },
     {
       code: 'order_price_changed',
@@ -185,7 +237,7 @@ export function registerBuiltInNotificationEvents(): void {
         title: '订单金额已修改',
         body: '订单 {{orderNo}} 的金额由 ¥{{oldAmount}} 改为 ¥{{amount}}，请重新支付。',
       },
-      link: '/orders/{{orderId}}',
+      route: ORDER_ROUTE,
     },
     {
       code: 'order_unpaid_reminder',
@@ -195,7 +247,7 @@ export function registerBuiltInNotificationEvents(): void {
       variables: [...ORDER_VARS, 'expiresAt'],
       channels: [...USER_CHANNELS],
       defaults: { title: '订单待付款', body: '订单 {{orderNo}} 还未付款，请尽快完成支付。' },
-      link: '/orders/{{orderId}}',
+      route: ORDER_ROUTE,
     },
     {
       code: 'refund_applied',
@@ -205,7 +257,7 @@ export function registerBuiltInNotificationEvents(): void {
       variables: ['refundId', 'refundNo', 'orderNo', 'amount'],
       channels: [...USER_CHANNELS],
       defaults: { title: '退款申请已提交', body: '退款单 {{refundNo}} 已提交，我们会尽快处理。' },
-      link: '/refunds/{{refundId}}',
+      route: REFUND_ROUTE,
     },
     {
       code: 'refund_approved',
@@ -218,7 +270,7 @@ export function registerBuiltInNotificationEvents(): void {
         title: '退款申请已通过',
         body: '退款单 {{refundNo}} 已通过审核，退款将原路返回。',
       },
-      link: '/refunds/{{refundId}}',
+      route: REFUND_ROUTE,
     },
     {
       code: 'refund_rejected',
@@ -228,7 +280,7 @@ export function registerBuiltInNotificationEvents(): void {
       variables: ['refundId', 'refundNo', 'orderNo', 'reason'],
       channels: [...USER_CHANNELS],
       defaults: { title: '退款申请未通过', body: '退款单 {{refundNo}} 未通过审核：{{reason}}。' },
-      link: '/refunds/{{refundId}}',
+      route: REFUND_ROUTE,
     },
     {
       code: 'refund_settled',
@@ -238,7 +290,20 @@ export function registerBuiltInNotificationEvents(): void {
       variables: ['refundId', 'refundNo', 'orderNo', 'amount'],
       channels: [...USER_CHANNELS],
       defaults: { title: '退款已到账', body: '退款单 {{refundNo}} 的 ¥{{amount}} 已原路退回。' },
-      link: '/refunds/{{refundId}}',
+      route: REFUND_ROUTE,
+    },
+    {
+      // 内容安全 (C09): sent by the user domain's `onAvatarRejected`.
+      code: 'user_avatar_rejected',
+      name: '头像未通过审核提醒',
+      description: '用户上传的头像未通过微信内容安全检测、已恢复为默认头像时发送',
+      audience: 'user',
+      variables: [],
+      channels: ['inApp'],
+      defaults: {
+        title: '头像未通过审核',
+        body: '您上传的头像未通过内容安全审核，已恢复为默认头像，请重新上传。',
+      },
     },
 
     // -- admin --------------------------------------------------------------

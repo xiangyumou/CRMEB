@@ -50,6 +50,8 @@
 
 import { registerCatalogPort } from '../order';
 import { registerStockPort } from '../order/ports';
+import { registerMediaRiskHandler, registerMediaUncheckedHandler } from '../wechat';
+import { hideRiskyReviewImage, holdUncheckedReview } from './catalog.review.service';
 import { catalogSalePort } from './catalog.sale';
 import { catalogStockPort } from './catalog.stock';
 // The config group registers itself on import.
@@ -59,6 +61,10 @@ import './catalog.config';
 export function registerCatalogDomain(): void {
   registerStockPort(catalogStockPort);
   registerCatalogPort(catalogSalePort);
+  // 内容安全: a review picture WeChat calls risky comes off the review (C09).
+  registerMediaRiskHandler('review_image', hideRiskyReviewImage);
+  // …and one WeChat cannot check puts the review back in 待审核 (CONTENT-006).
+  registerMediaUncheckedHandler('review_image', holdUncheckedReview);
 }
 
 registerCatalogDomain();
@@ -120,19 +126,6 @@ export {
   adminProtectionUpdate,
 } from './catalog.taxonomy.service';
 
-/** 移动端商家管理 — 商品管理. Ten calls, `auth: 'staff'`, no new capability. */
-export {
-  staffAssignCategories,
-  staffAssignLabels,
-  staffProductCategories,
-  staffProductCreate,
-  staffProductLabels,
-  staffProductList,
-  staffProductSkus,
-  staffSetVisibility,
-  staffUpdateSkus,
-} from './catalog.staff.service';
-
 export {
   adminReviewBatchSetStatus,
   adminReviewCreate,
@@ -152,7 +145,6 @@ export type { AutoReviewResult } from './catalog.review.service';
 
 export {
   categoryTree,
-  categoryVersion,
   clearSearchHistory,
   favoriteAdd,
   favoriteAddBatch,
@@ -168,7 +160,6 @@ export {
   productSkus,
   pruneBrowseHistory,
   searchHistory,
-  skuPrice,
 } from './catalog.storefront.service';
 
 /**

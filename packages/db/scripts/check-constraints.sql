@@ -214,9 +214,6 @@ SELECT pg_temp.expect_violation(
                         receiver_city, receiver_detail)
     VALUES ('SANITY-ORDER-3', 9001, 'h5', 'paid', 1, '10.00', '10.00',
             'B', '13800000000', '北京市', '北京市', 'z')$$);
-SELECT pg_temp.expect_violation(
-  '15. two home DIY pages',
-  $$INSERT INTO diy_pages (name, kind, is_home) VALUES ('h1', 'home', true), ('h2', 'home', true)$$);
 
 \o
 ROLLBACK;

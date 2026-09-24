@@ -12,14 +12,12 @@ import * as stats from '../stats';
 import * as cart from './index';
 
 /**
- * 修改规格 and 减少数量-by-variant, against a real database.
+ * 修改规格, against a real database.
  *
- * Both are server operations so the storefront needs no workaround that could
+ * It is a server operation so the storefront needs no workaround that could
  * lose the shopper's row: 修改规格 as `DELETE` then `POST` from the page leaves
- * no row at all if the second call fails, and a minus button that lists the
- * whole cart to find a row id races with every other tab. What is tested here
- * is that each is *one transaction* and that its conditional statements decide
- * the winner.
+ * no row at all if the second call fails. What is tested here is that it is
+ * *one transaction* and that its conditional statements decide the winner.
  */
 
 let harness: TestCtx;
@@ -278,92 +276,6 @@ describe('changing a row’s SKU', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]!.quantity).toBe(2);
     expect(rows[0]!.skuId).not.toBe(skuIds[0]);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 减少数量 by variant
-// ---------------------------------------------------------------------------
-
-describe('decrementing by SKU', () => {
-  it('takes units off the row that holds the variant', async () => {
-    const userId = await makeUser();
-    const { skuIds } = await makeProduct();
-    await cart.addItem(as(userId), { skuId: String(skuIds[0]!), quantity: 3 });
-
-    const result = await cart.decrementItem(as(userId), { skuId: String(skuIds[0]!), quantity: 1 });
-    expect(result.item).toMatchObject({ quantity: 2 });
-    expect(result.cart).toMatchObject({ items: 1, quantity: 2 });
-  });
-
-  it('removes the row at zero and answers with a null item', async () => {
-    const userId = await makeUser();
-    const { skuIds } = await makeProduct();
-    await cart.addItem(as(userId), { skuId: String(skuIds[0]!), quantity: 1 });
-
-    const result = await cart.decrementItem(as(userId), { skuId: String(skuIds[0]!), quantity: 1 });
-    expect(result.item).toBeNull();
-    expect(result.cart).toEqual({ items: 0, quantity: 0, availableCount: 0, unavailableCount: 0 });
-    expect(await harness.ctx.db.select().from(cartItems)).toHaveLength(0);
-  });
-
-  it('removes the row when asked for more units than it holds', async () => {
-    const userId = await makeUser();
-    const { skuIds } = await makeProduct();
-    await cart.addItem(as(userId), { skuId: String(skuIds[0]!), quantity: 2 });
-
-    const result = await cart.decrementItem(as(userId), { skuId: String(skuIds[0]!), quantity: 9 });
-    expect(result.item).toBeNull();
-    expect(await harness.ctx.db.select().from(cartItems)).toHaveLength(0);
-  });
-
-  it('a variant the cart does not hold is the same 404 as an unknown row id', async () => {
-    const userId = await makeUser();
-    const { skuIds } = await makeProduct();
-    await expectDomainError(
-      cart.decrementItem(as(userId), { skuId: String(skuIds[0]!), quantity: 1 }),
-      'CART_ITEM_NOT_FOUND',
-    );
-  });
-
-  it('never touches somebody else’s row', async () => {
-    const owner = await makeUser();
-    const stranger = await makeUser();
-    const { skuIds } = await makeProduct();
-    await cart.addItem(as(owner), { skuId: String(skuIds[0]!), quantity: 2 });
-
-    await expectDomainError(
-      cart.decrementItem(as(stranger), { skuId: String(skuIds[0]!), quantity: 1 }),
-      'CART_ITEM_NOT_FOUND',
-    );
-    const rows = await harness.ctx.db.select().from(cartItems);
-    expect(rows[0]!.quantity).toBe(2);
-  });
-
-  it('three taps on a row of three take one unit each and remove it exactly once', async () => {
-    const userId = await makeUser();
-    const { skuIds } = await makeProduct();
-    await cart.addItem(as(userId), { skuId: String(skuIds[0]!), quantity: 3 });
-
-    const report = await runConcurrently(
-      5,
-      async () => {
-        try {
-          await cart.decrementItem(racer(userId), { skuId: String(skuIds[0]!), quantity: 1 });
-          return { won: true };
-        } catch (error) {
-          if (DomainError.is(error)) return { won: false, code: error.code };
-          throw error;
-        }
-      },
-      { isWinner: (outcome) => outcome.won },
-    );
-
-    // Three units, five taps: three callers take one each (the third removes
-    // the row) and two are told there is nothing left.
-    expect(report.winners).toBe(3);
-    expect(report.losers).toBe(2);
-    expect(await harness.ctx.db.select().from(cartItems)).toHaveLength(0);
   });
 });
 

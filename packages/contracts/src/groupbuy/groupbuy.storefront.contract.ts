@@ -51,6 +51,18 @@ export const groupbuyList = defineRoute({
       query: { page: 1, pageSize: 20 },
       response: { items: [groupbuyCardExample], total: 1, page: 1, pageSize: 20 },
     },
+    {
+      // 商品详情: is this product in a live activity?
+      name: 'for-a-product',
+      query: { page: 1, pageSize: 1, productId: '11' },
+      response: { items: [groupbuyCardExample], total: 1, page: 1, pageSize: 1 },
+    },
+    {
+      // A DIY 拼团 component's 指定数据: 9 has ended, so it is skipped.
+      name: 'picked',
+      query: { page: 1, pageSize: 20, ids: '9,1' },
+      response: { items: [groupbuyCardExample], total: 1, page: 1, pageSize: 20 },
+    },
   ],
 });
 
@@ -95,7 +107,7 @@ export const groupbuyBanners = defineRoute({
           { imageUrl: 'https://cdn.example.com/banner/groupbuy-1.jpg', link: null },
           {
             imageUrl: 'https://cdn.example.com/banner/groupbuy-2.jpg',
-            link: '/pages/activity/groupbuy/index',
+            link: '/packages/promo/groupbuy/index',
           },
         ],
       },
@@ -159,7 +171,12 @@ export const groupbuyGroupDetailRoute = defineRoute({
     {
       name: 'anonymous-can-join',
       params: { id: '501' },
-      response: { ...groupbuyGroupViewExample, me: null, canJoin: true },
+      response: {
+        ...groupbuyGroupViewExample,
+        members: groupbuyGroupViewExample.members.map((member) => ({ ...member, isMe: false })),
+        me: null,
+        canJoin: true,
+      },
     },
   ],
 });

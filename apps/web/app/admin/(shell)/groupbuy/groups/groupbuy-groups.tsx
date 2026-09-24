@@ -163,8 +163,8 @@ export function GroupbuyGroupsPage() {
             type="warning"
             showIcon
             style={{ marginBottom: 16 }}
-            message="虚拟补齐剩余名额并立即成团。已支付的买家会按成团发货，缺的名额没有真实买家，也不会有货款。"
-            description="需要在「拼团设置」里开启虚拟成团，否则服务端会拒绝。"
+            message="本店不支持虚拟成团：只有人数已满的团可以立即成团。"
+            description="未满员的团会被拒绝，到截止时间自动失败并给已付款的成员原路退款。"
           />
         }
       />

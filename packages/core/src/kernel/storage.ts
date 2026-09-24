@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { imageVariantKey, type ImageVariantWidth } from '@shop/contracts/storage/image-variants';
 
 /**
  * The storage port and its local-disk driver.
@@ -36,6 +37,18 @@ export interface StoredObject {
 
 export interface Storage {
   put(body: Buffer | Uint8Array, options?: PutOptions): Promise<StoredObject>;
+  /**
+   * Writes an image variant next to a stored original and returns its key.
+   * The key is derived from the original's (`imageVariantKey`), never chosen:
+   * a key `put()` did not generate, or a width that is not generated, throws.
+   * Overwrites an existing variant.
+   */
+  putVariant(
+    key: string,
+    width: ImageVariantWidth,
+    body: Buffer | Uint8Array,
+    contentType: string,
+  ): Promise<string>;
   get(key: string): Promise<Buffer>;
   delete(key: string): Promise<void>;
   /** Public URL for a key. Site-relative for the local driver. */
@@ -115,6 +128,13 @@ export function buildStorageKey(now: Date, options: PutOptions = {}): string {
   return `${directory}/${year}/${month}/${randomUUID().replace(/-/g, '')}.${extension}`;
 }
 
+/** The variant key for `putVariant`, or a throw: the port's key rule, in one place. */
+export function requireVariantKey(key: string, width: ImageVariantWidth): string {
+  const variant = imageVariantKey(key, width);
+  if (!variant) throw new Error('storage: 该文件没有缩略图');
+  return variant;
+}
+
 export interface LocalStorageOptions {
   /** Absolute path of the uploads root. */
   root: string;
@@ -158,6 +178,13 @@ export function createLocalStorage(options: LocalStorageOptions): Storage {
           putOptions.contentType ?? CONTENT_TYPES[extension] ?? 'application/octet-stream',
         sha256: createHash('sha256').update(buffer).digest('hex'),
       };
+    },
+    async putVariant(key, width, body) {
+      const variant = requireVariantKey(key, width);
+      const full = resolveKey(variant);
+      await mkdir(path.dirname(full), { recursive: true });
+      await writeFile(full, Buffer.from(body), { mode: 0o644 });
+      return variant;
     },
     async get(key) {
       return readFile(resolveKey(key));
@@ -206,6 +233,11 @@ export function memoryStorage(now: () => Date = () => new Date(0)): Storage & {
         contentType: options.contentType ?? CONTENT_TYPES[extension] ?? 'application/octet-stream',
         sha256: createHash('sha256').update(buffer).digest('hex'),
       };
+    },
+    async putVariant(key, width, body) {
+      const variant = requireVariantKey(key, width);
+      files.set(variant, Buffer.from(body));
+      return variant;
     },
     async get(key) {
       const found = files.get(key);

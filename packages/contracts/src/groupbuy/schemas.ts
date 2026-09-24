@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { id, instant, money, pageQuery, paged, sortQuery } from '../_conventions/common';
+import { id, idList, instant, money, pageQuery, paged, sortQuery } from '../_conventions/common';
+import { storefrontRoute } from '../system/storefront-routes';
 
 /**
  * Shapes shared by the group-buy routes.
@@ -312,7 +313,21 @@ export const groupbuyCard = z.object({
 });
 export type GroupbuyCard = z.infer<typeof groupbuyCard>;
 
-export const groupbuyListQuery = pageQuery;
+export const groupbuyListQuery = pageQuery.extend({
+  /**
+   * Only this product's activities — what 商品详情 asks to learn whether a product is on
+   * 拼团 right now. The list's own rule still holds: `active` and inside its window.
+   */
+  productId: id.optional(),
+  /**
+   * Exactly these activities, in this order — what a DIY 拼团 component's
+   * 指定数据 saved. An activity the shopper cannot see now (paused, outside its
+   * window, deleted) is skipped, not an error. With `productId` as well, the
+   * intersection: the picked activities that are that product's, still in the
+   * picked order.
+   */
+  ids: idList.optional(),
+});
 export type GroupbuyListQuery = z.infer<typeof groupbuyListQuery>;
 export const pagedGroupbuyCards = paged(groupbuyCard);
 
@@ -342,6 +357,7 @@ export type GroupbuyDetail = z.infer<typeof groupbuyDetail>;
 /** A group a shopper may join, on the activity page or the 拼单 list. */
 export const groupbuyOpenGroup = z.object({
   groupId: id,
+  /** Masked, `小*` — this route is public (RISK-D-010). */
   leaderNickname: z.string().nullable(),
   leaderAvatarUrl: z.string().nullable(),
   seatsTotal: z.number().int().min(2),
@@ -366,13 +382,19 @@ export const groupbuyGroupView = z.object({
   seatsLeft: z.number().int().min(0),
   expiresAt: instant,
   succeededAt: instant.nullable(),
-  /** Paid, unrefunded members only — an unpaid order is not a participant. */
+  /**
+   * Paid, unrefunded members only — an unpaid order is not a participant.
+   *
+   * Anybody holding the team link reads this, signed in or not, so a member
+   * carries no account id and a masked nickname (`小*`, RISK-D-010). Whether a
+   * seat is the caller's own is `isMe`, decided from the session on the server.
+   */
   members: z.array(
     z.object({
-      userId: id,
       nickname: z.string().nullable(),
       avatarUrl: z.string().nullable(),
       role: groupbuyMemberRole,
+      isMe: z.boolean(),
     }),
   ),
   /** The caller's own place in this group, or `null` (including anonymous). */
@@ -425,12 +447,19 @@ export const groupbuyPoster = z.object({
   originalPrice: money.nullable(),
   seatsLeft: z.number().int().min(0),
   expiresAt: instant,
+  /** Masked, `小*`: the poster is drawn to be passed around (RISK-D-010). */
   leaderNickname: z.string().nullable(),
   leaderAvatarUrl: z.string().nullable(),
-  /** What the QR code encodes — a storefront URL, never an image. */
+  /**
+   * What the QR code encodes — the team page's mini-program path, never an
+   * image. The mini program draws its 小程序码 from `GET /share/mini-codes`
+   * with `route` instead.
+   */
   qrPayload: z.string(),
-  /** Deep link for a mini-program `navigateTo`. */
+  /** The team page's mini-program path (`toMiniPath(route)`), no leading `/`. */
   page: z.string(),
+  /** The team page in the storefront route catalogue: `groupbuyTeam { id }`. */
+  route: storefrontRoute,
 });
 export type GroupbuyPoster = z.infer<typeof groupbuyPoster>;
 
@@ -440,7 +469,7 @@ export type GroupbuyPoster = z.infer<typeof groupbuyPoster>;
 
 /**
  * One coherent fixture reused by every example, so the mock server tells the
- * uni-app and the admin a single story: activity 1 (三只松鼠坚果礼盒, three
+ * mini program and the admin a single story: activity 1 (三只松鼠坚果礼盒, three
  * seats, 拼团价 59.00 against 88.00), group 501 with two of three seats taken
  * by 小明 (leader) and 小红.
  */
@@ -574,7 +603,7 @@ export const groupbuyDetailExample: GroupbuyDetail = {
 
 export const groupbuyOpenGroupExample: GroupbuyOpenGroup = {
   groupId: '501',
-  leaderNickname: '小明',
+  leaderNickname: '小*',
   leaderAvatarUrl: 'https://cdn.example.com/u/101.jpg',
   seatsTotal: 3,
   seatsTaken: 2,
@@ -596,16 +625,16 @@ export const groupbuyGroupViewExample: GroupbuyGroupView = {
   succeededAt: null,
   members: [
     {
-      userId: '101',
-      nickname: '小明',
+      nickname: '小*',
       avatarUrl: 'https://cdn.example.com/u/101.jpg',
       role: 'leader',
+      isMe: false,
     },
     {
-      userId: '102',
-      nickname: '小红',
+      nickname: '小*',
       avatarUrl: 'https://cdn.example.com/u/102.jpg',
       role: 'member',
+      isMe: true,
     },
   ],
   me: { role: 'member', status: 'joined', orderId: '7002', paid: true },
@@ -635,10 +664,11 @@ export const groupbuyPosterExample: GroupbuyPoster = {
   originalPrice: '88.00',
   seatsLeft: 1,
   expiresAt: '2026-09-23T10:00:00+08:00',
-  leaderNickname: '小明',
+  leaderNickname: '小*',
   leaderAvatarUrl: 'https://cdn.example.com/u/101.jpg',
-  qrPayload: 'https://shop.example.com/pages/activity/groupbuy_status/index?groupId=501',
-  page: 'pages/activity/groupbuy_status/index?groupId=501',
+  qrPayload: 'packages/promo/groupbuy-team/index?id=501',
+  page: 'packages/promo/groupbuy-team/index?id=501',
+  route: { route: 'groupbuyTeam', params: { id: '501' } },
 };
 
 export const groupbuyActivityStatExample: GroupbuyActivityStat = {

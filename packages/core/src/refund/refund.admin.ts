@@ -110,30 +110,18 @@ export async function adminApprove(
   input: { id: string } & RefundApproveBody,
 ): Promise<AdminRefundDetail> {
   requirePermission(ctx, refundPermissions['request:review']);
-  return approveAs(ctx, { kind: 'admin', id: requireAdminId(ctx) }, input);
+  return approveAs(ctx, requireAdminId(ctx), input);
 }
 
 /**
- * Who made a review decision.
- *
- * An operator is an `admins` row and is stamped on
- * `refunds.reviewed_by_admin_id`; a staff member is a `users` row, which that
- * column cannot hold, so their decision is attributed on the log entry
- * (`operator_user_id`) alone and the refund keeps `reviewed_by_admin_id` null.
- * `reviewed_at` is set either way.
+ * A review decision is the operator's: an `admins` row, stamped on
+ * `refunds.reviewed_by_admin_id` and on the log entry (`operator_admin_id`).
+ * (The mobile staff console, which reviewed as a `users` row, was deleted at
+ * the cutover; its old log rows keep `operator_user_id`.)
  */
-type Reviewer = { kind: 'admin'; id: number } | { kind: 'staff'; id: number };
-
-const reviewerStamp = (reviewer: Reviewer) => ({
-  reviewedByAdminId: reviewer.kind === 'admin' ? reviewer.id : null,
-});
-
-const reviewerLog = (reviewer: Reviewer) =>
-  reviewer.kind === 'admin' ? { operatorAdminId: reviewer.id } : { operatorUserId: reviewer.id };
-
 async function approveAs(
   ctx: Ctx,
-  reviewer: Reviewer,
+  adminId: number,
   input: { id: string } & RefundApproveBody,
 ): Promise<AdminRefundDetail> {
   const id = Number(input.id);
@@ -151,7 +139,7 @@ async function approveAs(
         : {};
 
     const { won } = await repo.transitionRefund(tx, id, ['applied'], 'approved', {
-      ...reviewerStamp(reviewer),
+      reviewedByAdminId: adminId,
       reviewedAt: ctx.clock.now(),
       ...freeze,
       ...(input.remark === undefined ? {} : { adminRemark: input.remark }),
@@ -162,8 +150,8 @@ async function approveAs(
       refundId: id,
       fromStatus: row.status,
       toStatus: 'approved',
-      message: approvalMessage(row.kind, input.remark, freeze.returnAddress ?? null, reviewer),
-      ...reviewerLog(reviewer),
+      message: approvalMessage(row.kind, input.remark, freeze.returnAddress ?? null),
+      operatorAdminId: adminId,
     });
 
     if (row.kind === 'refund_only') {
@@ -252,10 +240,8 @@ function approvalMessage(
   kind: repo.RefundRow['kind'],
   remark: string | undefined,
   address: ReturnAddress | null,
-  reviewer: Reviewer,
 ): string {
-  const who = reviewer.kind === 'admin' ? '商家' : '店员';
-  const head = kind === 'return_and_refund' ? `${who}同意退货退款` : `${who}同意退款`;
+  const head = kind === 'return_and_refund' ? '商家同意退货退款' : '商家同意退款';
   const note = remark === undefined ? '' : `：${remark}`;
   const where =
     address === null ? '' : `（退货地址：${address.name} ${address.phone} ${address.address}）`;
@@ -267,12 +253,12 @@ export async function adminReject(
   input: { id: string } & RefundRejectBody,
 ): Promise<AdminRefundDetail> {
   requirePermission(ctx, refundPermissions['request:review']);
-  return rejectAs(ctx, { kind: 'admin', id: requireAdminId(ctx) }, input);
+  return rejectAs(ctx, requireAdminId(ctx), input);
 }
 
 async function rejectAs(
   ctx: Ctx,
-  reviewer: Reviewer,
+  adminId: number,
   input: { id: string } & RefundRejectBody,
 ): Promise<AdminRefundDetail> {
   const id = Number(input.id);
@@ -285,7 +271,7 @@ async function rejectAs(
     // contract makes it a required field. Both, because a rejection nobody can
     // explain later is the complaint that reaches the shop owner.
     const { won } = await repo.transitionRefund(tx, id, ['applied', 'approved'], 'rejected', {
-      ...reviewerStamp(reviewer),
+      reviewedByAdminId: adminId,
       reviewedAt: ctx.clock.now(),
       rejectReason: input.rejectReason,
     });
@@ -295,8 +281,8 @@ async function rejectAs(
       refundId: id,
       fromStatus: row.status,
       toStatus: 'rejected',
-      message: `${reviewer.kind === 'admin' ? '商家' : '店员'}拒绝：${input.rejectReason}`,
-      ...reviewerLog(reviewer),
+      message: `商家拒绝：${input.rejectReason}`,
+      operatorAdminId: adminId,
     });
     await refreshOrderRefundStatus(tx, row.orderId);
 
@@ -359,109 +345,6 @@ export async function adminRemark(
   const row = await repo.findRefund(ctx.db, id);
   if (!row) throw new DomainError('REFUND_NOT_FOUND');
   await repo.setAdminRemark(ctx.db, id, input.adminRemark);
-  return detail(ctx, id);
-}
-
-// ---------------------------------------------------------------------------
-// the 商家管理 phone console
-// ---------------------------------------------------------------------------
-
-/**
- * The staff console's own entry points.
- *
- * `/api/v1/staff/refunds*` cannot forward into the admin services above: they
- * demand an admin atom that a staff actor can never hold, so every staff
- * request would answer 403. Mapping staff onto admin identities would need an
- * `admins` row per store assistant and a role editor for them; the 商家管理
- * console already has its own gate, the `order-staff.staffUserIds` allow-list
- * `handle()` checks for `auth: 'staff'`, and the order console's staff
- * functions all rely on it. So these do too, and they:
- *
- *  - accept **only** a `staff` actor. An admin, a shopper or the system gets
- *    `FORBIDDEN` here, and the admin services keep refusing a staff actor, so
- *    neither surface can be used to reach the other;
- *  - never widen `hasPermission`: a staff actor still holds no atom;
- *  - reach exactly what the phone screen has — the list, the detail, 同意 /
- *    拒绝 and a note. 确认收货 and 重试 (`request:execute`) stay console-only,
- *    and so does approving to an address other than the configured one.
- *
- * Whether a shop lets its staff decide at all is the order domain's
- * `order-staff.allowStaffRefundReview` switch, checked where the surface is
- * (`order.staff.service.ts`), like `allowStaffRepricing`.
- */
-function requireStaffId(ctx: Ctx): number {
-  if (ctx.actor.kind !== 'staff' || ctx.actor.id === null) {
-    throw new DomainError('FORBIDDEN', { details: { reason: 'staff only' } });
-  }
-  return ctx.actor.id;
-}
-
-export async function staffList(
-  ctx: Ctx,
-  query: AdminRefundListQuery,
-): Promise<{ items: AdminRefundListItem[]; total: number; page: number; pageSize: number }> {
-  requireStaffId(ctx);
-  return listRefunds(ctx, query);
-}
-
-export async function staffDetail(ctx: Ctx, input: { id: string }): Promise<AdminRefundDetail> {
-  requireStaffId(ctx);
-  return detail(ctx, Number(input.id));
-}
-
-export async function staffApprove(
-  ctx: Ctx,
-  input: { id: string; remark?: string },
-): Promise<AdminRefundDetail> {
-  const userId = requireStaffId(ctx);
-  // Only the note travels: a staff approval freezes the configured return
-  // address, never one typed on the phone.
-  return approveAs(
-    ctx,
-    { kind: 'staff', id: userId },
-    { id: input.id, ...(input.remark === undefined ? {} : { remark: input.remark }) },
-  );
-}
-
-export async function staffReject(
-  ctx: Ctx,
-  input: { id: string; rejectReason: string },
-): Promise<AdminRefundDetail> {
-  const userId = requireStaffId(ctx);
-  return rejectAs(ctx, { kind: 'staff', id: userId }, input);
-}
-
-/**
- * 售后备注 from the 商家管理 phone console.
- *
- * Deliberately **not** `adminRemark` with a different caller.
- *
- *  - `refunds.admin_remark` is one column the console overwrites. There is no
- *    staff remark column, so a staff note lands in `refund_logs` — appended,
- *    attributed to the `users` row that wrote it, and visible to the console in
- *    the same `logs` array as everything else.
- *  - A note is not a transition, but `refund_logs.to_status` is NOT NULL, so
- *    both ends of the entry are the status the refund is already in. A reader
- *    of the log sees a row that moved nothing, which is exactly what happened.
- *  - No `requirePermission`: the actor is a `staff` user, not an admin, and
- *    `auth: 'staff'` has already decided whether they may be here at all. Only
- *    a `staff` actor, though: a shopper is refused.
- */
-export async function staffRemark(
-  ctx: Ctx,
-  input: { id: string; remark: string },
-): Promise<AdminRefundDetail> {
-  const userId = requireStaffId(ctx);
-  const id = Number(input.id);
-  const row = await repo.findRefund(ctx.db, id);
-  if (!row) throw new DomainError('REFUND_NOT_FOUND');
-  await repo.insertLog(ctx.db, {
-    refundId: id,
-    fromStatus: row.status,
-    toStatus: row.status,
-    message: `店员备注：${input.remark}`,
-    operatorUserId: userId,
-  });
   return detail(ctx, id);
 }
 

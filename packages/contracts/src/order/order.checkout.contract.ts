@@ -13,8 +13,8 @@ import {
   orderDetailExample,
   orderHidden,
   orderListQuery,
-  orderListItemExample,
   pagedOrders,
+  storefrontOrderListItemExample,
 } from './schemas';
 
 /**
@@ -96,6 +96,72 @@ export const checkoutPreviewRoute = defineRoute({
         userCouponId: null,
       },
     },
+    {
+      name: 'groupbuy-join',
+      // 参团: `kindMeta` is typed by `kind` (ORDER-009). Leave `groupId` out to 开团.
+      body: {
+        source: 'buy-now',
+        item: { skuId: '21', quantity: 1 },
+        addressId: '301',
+        kind: 'groupbuy',
+        kindMeta: { activityId: '12', groupId: '501' },
+      },
+      response: {
+        ...checkoutPreviewExample,
+        lines: [
+          {
+            ...checkoutLineExample,
+            cartItemId: null,
+            quantity: 1,
+            subtotal: '60.00',
+            discountAmount: '11.00',
+            totalAmount: '49.00',
+          },
+        ],
+        totalQuantity: 1,
+        itemsAmount: '60.00',
+        freightAmount: '0.00',
+        couponDiscount: '11.00',
+        adjustments: [
+          { source: 'groupbuy:activity-price', label: '拼团价（两人团）', amount: '-11.00' },
+        ],
+        payableAmount: '49.00',
+        userCouponId: null,
+      },
+    },
+    {
+      name: 'presale',
+      body: {
+        source: 'buy-now',
+        item: { skuId: '21', quantity: 1 },
+        addressId: '301',
+        kind: 'presale',
+        kindMeta: { activityId: '31' },
+      },
+      response: {
+        ...checkoutPreviewExample,
+        lines: [
+          {
+            ...checkoutLineExample,
+            cartItemId: null,
+            quantity: 1,
+            subtotal: '60.00',
+            discountAmount: '10.00',
+            totalAmount: '50.00',
+          },
+        ],
+        totalQuantity: 1,
+        itemsAmount: '60.00',
+        freightAmount: '0.00',
+        couponDiscount: '10.00',
+        adjustments: [
+          { source: 'presale:activity-price', label: '预售价（秋季新品）', amount: '-10.00' },
+        ],
+        payableAmount: '50.00',
+        shipAfterDays: 15,
+        userCouponId: null,
+      },
+    },
   ],
 });
 
@@ -152,6 +218,20 @@ export const orderCreate = defineRoute({
       },
       response: orderDetailExample,
     },
+    {
+      name: 'groupbuy-open',
+      // 开团: no `groupId`. `kindMeta` is typed by `kind` (ORDER-009).
+      body: {
+        source: 'buy-now',
+        item: { skuId: '21', quantity: 1 },
+        addressId: '301',
+        kind: 'groupbuy',
+        kindMeta: { activityId: '12' },
+        idempotencyKey: 'ck-20260201-gb000001',
+        expectedPayableAmount: '49.00',
+      },
+      response: { ...orderDetailExample, kind: 'groupbuy', groupbuyTeamId: '501' },
+    },
   ],
 });
 
@@ -168,7 +248,7 @@ export const orderList = defineRoute({
     {
       name: 'unpaid-tab',
       query: { page: 1, pageSize: 20, tab: 'unpaid' },
-      response: { items: [orderListItemExample], total: 1, page: 1, pageSize: 20 },
+      response: { items: [storefrontOrderListItemExample], total: 1, page: 1, pageSize: 20 },
     },
     {
       name: 'empty',

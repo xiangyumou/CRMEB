@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { cartItems } from '@shop/db/schema/cart';
 import { productSkus, products } from '@shop/db/schema/catalog';
+import { expressCompanies } from '@shop/db/schema/reference';
 import { couponTemplates, userCoupons } from '@shop/db/schema/coupon';
 import { orders } from '@shop/db/schema/order';
 import { userAddresses, users } from '@shop/db/schema/user';
@@ -230,6 +231,75 @@ describe('/api/v1/cart', () => {
   });
 });
 
+describe('/api/v1/cart/items/:id on PUT (wx.request has no PATCH)', () => {
+  it('sets the quantity exactly as PATCH does, and answers the same body', async () => {
+    const { headers } = await shopper();
+    const item = await sellable();
+    const { POST } = await import('./cart/items/route');
+    const added = await POST(
+      json('POST', '/api/v1/cart/items', { skuId: String(item.skuId), quantity: 1 }, headers),
+    );
+    const rowId = (await added.json()).item.id as string;
+
+    const byId = await import('./cart/items/[id]/route');
+    const context = { params: Promise.resolve({ id: rowId }) };
+    const put = await byId.PUT(
+      json('PUT', `/api/v1/cart/items/${rowId}`, { quantity: 3 }, headers),
+      context,
+    );
+    expect(put.status).toBe(200);
+    const putBody = await put.json();
+    expect(putBody).toMatchObject({ item: { id: rowId, quantity: 3, subtotal: '180.00' } });
+
+    const patch = await byId.PATCH(
+      json('PATCH', `/api/v1/cart/items/${rowId}`, { quantity: 3 }, headers),
+      { params: Promise.resolve({ id: rowId }) },
+    );
+    expect(await patch.json()).toEqual(putBody);
+  });
+
+  it('refuses the same things PATCH refuses', async () => {
+    const { headers } = await shopper();
+    const byId = await import('./cart/items/[id]/route');
+    const missing = await byId.PUT(
+      json('PUT', '/api/v1/cart/items/999', { quantity: 2 }, headers),
+      {
+        params: Promise.resolve({ id: '999' }),
+      },
+    );
+    expect(missing.status).toBe(404);
+    expect((await missing.json()).code).toBe('CART_ITEM_NOT_FOUND');
+
+    const anonymous = await byId.PUT(json('PUT', '/api/v1/cart/items/1', { quantity: 2 }), {
+      params: Promise.resolve({ id: '1' }),
+    });
+    expect(anonymous.status).toBe(401);
+  });
+});
+
+describe('/api/v1/express-companies', () => {
+  it('lists the enabled carriers to anyone, most used first', async () => {
+    await harness.ctx.db.insert(expressCompanies).values([
+      { code: 'ZTO', name: '中通快递', sortOrder: 10 },
+      { code: 'SF', name: '顺丰速运', sortOrder: 100 },
+      { code: 'OLD', name: '停用快递', sortOrder: 999, isEnabled: false },
+    ]);
+    const { GET } = await import('./express-companies/route');
+    const response = await GET(get('/api/v1/express-companies'));
+    expect(response.status).toBe(200);
+    const { items } = (await response.json()) as { items: { code: string }[] };
+    expect(items.map((row) => row.code)).toEqual(['SF', 'ZTO']);
+
+    // SHIP-003: searched and capped on the server.
+    const searched = await GET(get('/api/v1/express-companies?keyword=%E4%B8%AD%E9%80%9A&limit=5'));
+    expect(searched.status).toBe(200);
+    const found = (await searched.json()) as { items: { code: string }[] };
+    expect(found.items.map((row) => row.code)).toEqual(['ZTO']);
+    const tooMany = await GET(get('/api/v1/express-companies?limit=101'));
+    expect(tooMany.status).toBe(422);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // checkout and orders
 // ---------------------------------------------------------------------------
@@ -264,6 +334,7 @@ describe('/api/v1/checkout and /api/v1/orders', () => {
       payableAmount: '120.00',
       addressRequired: true,
       payWindowMinutes: 30,
+      shipAfterDays: null,
     });
     expect(await harness.ctx.db.select().from(cartItems)).toHaveLength(1);
 

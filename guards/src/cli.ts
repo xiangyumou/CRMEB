@@ -10,19 +10,20 @@
  *   pnpm --filter @shop/guards guards --quiet          only the summary and the failures
  */
 import { adminClient } from './checks/admin-client';
+import { apiCompat } from './checks/api-compat';
 import { bannedConstructs } from './checks/banned';
 import { contractsAndRoutes } from './checks/contracts';
 import { domains } from './checks/domains';
 import { fixtures } from './checks/fixtures';
 import { invariants } from './checks/invariants';
 import { migrations } from './checks/migrations';
+import { miniCheck } from './checks/mini';
 import { permissions } from './checks/permissions';
 import { pipeline } from './checks/pipeline';
 import { retiredFeatures } from './checks/retired';
 import { routeHygiene } from './checks/route-hygiene';
 import { secretsNeverLeak } from './checks/secrets';
 import { txPool } from './checks/tx-pool';
-import { uniappCalls } from './checks/uniapp';
 import { count, type Check, type CheckResult } from './framework';
 
 const CHECKS: readonly Check[] = [
@@ -32,13 +33,14 @@ const CHECKS: readonly Check[] = [
   permissions,
   adminClient,
   fixtures,
-  uniappCalls,
+  miniCheck,
   retiredFeatures,
   bannedConstructs,
   secretsNeverLeak,
   txPool,
   migrations,
   pipeline,
+  apiCompat,
   invariants,
 ];
 

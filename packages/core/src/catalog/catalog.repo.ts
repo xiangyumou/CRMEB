@@ -268,9 +268,9 @@ export async function moveSubtree(
 }
 
 /**
- * A cheap version token for the storefront tree.
+ * A cheap version token for the storefront tree (its `version` and `ETag`).
  *
- * The uni-app caches the tree and refetches only when this moves. It is derived
+ * A client refetches only when this moves. It is derived
  * rather than a key an operator has to remember to bump: newest update plus row
  * count, so any insert, edit or delete changes it and nothing has to be
  * maintained.
@@ -472,6 +472,12 @@ export interface StorefrontProductFilter {
   priceFrom?: string | undefined;
   priceTo?: string | undefined;
   feature?: 'hot' | 'new' | 'best' | 'benefit' | 'recommended' | undefined;
+  /**
+   * A coupon's 指定商品 or 品类 scope (a shop-wide coupon passes none): named, or
+   * filed directly under one of the categories — the rows the checkout reads.
+   * Unlike `ids`, it does not set the order.
+   */
+  couponScope?: { productIds: readonly number[] } | { categoryIds: readonly number[] } | undefined;
 }
 
 const FEATURE_COLUMN = {
@@ -529,6 +535,11 @@ export async function listSellableProducts(
     args.labelIds !== undefined
       ? sql`exists (select 1 from ${productLabelsMap} l where l.product_id = ${products.id} and l.label_id = any(${sql.param([...args.labelIds])}::bigint[]))`
       : undefined,
+    args.couponScope === undefined
+      ? undefined
+      : 'productIds' in args.couponScope
+        ? sql`${products.id} = any(${sql.param([...args.couponScope.productIds])}::bigint[])`
+        : sql`exists (select 1 from ${productCategoriesMap} m where m.product_id = ${products.id} and m.category_id = any(${sql.param([...args.couponScope.categoryIds])}::bigint[]))`,
   );
 
   const column =
@@ -1027,27 +1038,6 @@ export async function listVisibleSkus(db: DbOrTx, productId: number): Promise<Sk
 export async function findSku(db: DbOrTx, id: number): Promise<SkuRow | null> {
   const rows = await db.select().from(productSkus).where(eq(productSkus.id, id)).limit(1);
   return rows[0] ?? null;
-}
-
-/**
- * One product's SKUs with `FOR UPDATE`, in ascending id order.
- *
- * The staff 修改价格/库存 editor writes several rows from one screen and then
- * rolls the product up, so the rows have to agree — `docs/conventions.md`'s
- * "use `lockRow` when several rows must agree". Ordering by id is what keeps
- * two operators editing overlapping rows from deadlocking each other, and
- * holding the lock is what makes a concurrent `reserve` queue behind the edit
- * and decrement the new number instead of racing it. The stock decrement itself
- * is still the single conditional statement in `decStock`; this lock only
- * serialises the roll-up.
- */
-export async function lockSkusOfProduct(tx: Tx, productId: number): Promise<SkuRow[]> {
-  return tx
-    .select()
-    .from(productSkus)
-    .where(eq(productSkus.productId, productId))
-    .orderBy(asc(productSkus.id))
-    .for('update');
 }
 
 export async function findSkuByCode(db: DbOrTx, skuCode: string): Promise<SkuRow | null> {
@@ -1977,6 +1967,46 @@ export type NewReviewValues = typeof productReviews.$inferInsert;
 export async function insertReview(tx: Tx, values: NewReviewValues): Promise<ReviewRow | null> {
   const rows = await tx.insert(productReviews).values(values).onConflictDoNothing().returning();
   return rows[0] ?? null;
+}
+
+/**
+ * Takes one picture off a review (内容安全 said `risky`, C09). `false` when the
+ * picture was no longer on it — edited away, or the review deleted.
+ */
+export async function removeReviewImage(
+  tx: Tx,
+  args: { id: number; url: string; now: Date },
+): Promise<boolean> {
+  const rows = await tx
+    .update(productReviews)
+    .set({ images: sql`${productReviews.images} - ${args.url}::text`, updatedAt: args.now })
+    .where(and(eq(productReviews.id, args.id), sql`${productReviews.images} ? ${args.url}::text`))
+    .returning({ id: productReviews.id });
+  return rows.length > 0;
+}
+
+/**
+ * `published`/`pending` → `pending` with a moderation reason, for a review that
+ * has none yet (CONTENT-006). A reason already recorded means a person has
+ * looked or will, so that row is left alone; a hidden or deleted review too.
+ */
+export async function holdReview(
+  tx: Tx,
+  args: { id: number; reason: string; now: Date },
+): Promise<boolean> {
+  const rows = await tx
+    .update(productReviews)
+    .set({ status: 'pending', moderationReason: args.reason, updatedAt: args.now })
+    .where(
+      and(
+        eq(productReviews.id, args.id),
+        inArray(productReviews.status, ['published', 'pending']),
+        isNull(productReviews.moderationReason),
+        isNull(productReviews.deletedAt),
+      ),
+    )
+    .returning({ id: productReviews.id });
+  return rows.length > 0;
 }
 
 export interface ReviewListFilter {

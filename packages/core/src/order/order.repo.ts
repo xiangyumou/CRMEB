@@ -1,9 +1,9 @@
 import type { DbOrTx, Tx } from '@shop/db';
 import { cartItems } from '@shop/db/schema/cart';
+import { productReviews } from '@shop/db/schema/catalog';
 import { orderItems, orderStatusLogs, orders } from '@shop/db/schema/order';
 import { userAddresses } from '@shop/db/schema/user';
 import { and, asc, desc, eq, inArray, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm';
-import { Money } from '../kernel/money';
 import {
   allOf,
   conditionalDelete,
@@ -103,6 +103,26 @@ export async function stockLinesOf(
 }
 
 /**
+ * Which of these order lines already have a review: any `product_reviews` row, published,
+ * 待审核 or soft-deleted by the shop, because `product_reviews_order_item_uq` refuses a
+ * second review in every one of those cases.
+ *
+ * A named cross-domain read, like the auto-review sweep's join in `order.facts.repo.ts`: the
+ * alternative is a round trip through the catalog for a set of ids this domain already has.
+ */
+export async function reviewedItemIds(
+  db: DbOrTx,
+  itemIds: readonly number[],
+): Promise<Set<number>> {
+  if (itemIds.length === 0) return new Set();
+  const rows = await db
+    .select({ orderItemId: productReviews.orderItemId })
+    .from(productReviews)
+    .where(inArray(productReviews.orderItemId, [...new Set(itemIds)]));
+  return new Set(rows.flatMap((row) => (row.orderItemId === null ? [] : [row.orderItemId])));
+}
+
+/**
  * Units of each product this buyer has already committed to, for a `lifetime`
  * purchase limit. Cancelled orders do not count — a shopper who abandoned a
  * checkout has not used up their allowance.
@@ -154,9 +174,25 @@ export function tabFilter(tab: OrderListTab): SQL | undefined {
       return eq(orders.status, 'cancelled');
     case 'refunding':
       return ne(orders.refundStatus, 'none');
+    case 'unreviewed':
+      return awaitingReview();
     default:
       return undefined;
   }
+}
+
+/**
+ * 待评价 (ORDER-010): `received` or `completed`, with a line not refunded in full and not yet
+ * reviewed — `isReviewable` in `order.query.service.ts`, in SQL, and what `catalog.reviewSubmit`
+ * accepts. Reads `product_reviews` for the same reason as `reviewedItemIds`.
+ */
+export function awaitingReview(): SQL {
+  return sql`(${orders.status} in ('received', 'completed') and exists (
+    select 1 from order_items oi
+    where oi.order_id = ${orders.id}
+      and oi.refunded_quantity < oi.quantity
+      and not exists (select 1 from product_reviews pr where pr.order_item_id = oi.id)
+  ))`;
 }
 
 export interface OrderListFilter {
@@ -205,87 +241,34 @@ export async function listOrders(
   return { rows, total: Number(counted[0]?.total ?? 0) };
 }
 
-/** One grouped query behind all seven badges, rather than seven `count(*)`s. */
+/**
+ * One grouped query behind all the badges, rather than a `count(*)` each. `unreviewed` is
+ * the group's 待评价 orders (`awaitingReview`).
+ */
 export async function countByStatus(
   db: DbOrTx,
   userId: number,
-): Promise<{ status: OrderStatus; fulfillmentStatus: string; refunding: boolean; n: number }[]> {
+): Promise<
+  {
+    status: OrderStatus;
+    fulfillmentStatus: string;
+    refunding: boolean;
+    n: number;
+    unreviewed: number;
+  }[]
+> {
   const rows = await db
     .select({
       status: orders.status,
       fulfillmentStatus: orders.fulfillmentStatus,
       refunding: sql<boolean>`${orders.refundStatus} <> 'none'`,
       n: sql<number>`count(*)::int`,
+      unreviewed: sql<number>`(count(*) filter (where ${awaitingReview()}))::int`,
     })
     .from(orders)
     .where(and(eq(orders.userId, userId), liveForUser()))
     .groupBy(orders.status, orders.fulfillmentStatus, sql`${orders.refundStatus} <> 'none'`);
-  return rows.map((row) => ({ ...row, n: Number(row.n) }));
-}
-
-/**
- * 累计订单 / 累计消费 for a page of customers — the order domain's answer to
- * `UserOrderStatsPort`.
- *
- * **The counting rule, once.** A qualifying order is a *paid order* as
- * `stats/DEFINITIONS.md` §2 defines one — `paid_at is not null and deleted_at
- * is null`, so an admin-deleted order is out of every figure and a buyer
- * hiding the order from their own list changes nothing — **minus the fully
- * refunded ones** (`refund_status = 'refunded'`). That last clause is this
- * figure's own, and it is the one the 店员 screen asks for: a customer whose
- * only order came back in full is not a returning customer.
- *
- * `spend_total` sums **`orders.paid_amount`**, the same column the console's
- * 营业额 sums (`order.console.service.ts::adminStatistics` →
- * `order.fulfil.repo.ts::rangeTotals`, and `stats/DEFINITIONS.md` §3
- * `revenue`). Deliberately not `paid_amount - refunded_amount`: a partial
- * refund is money that moved on its own day and the console reports it as its
- * own figure, so netting it here would make the 店员's number a third
- * definition of 消费总额 — the exact drift the port exists to prevent. A
- * *fully* refunded order contributes nothing because it is not in the
- * population at all, which is the case an operator would actually notice.
- *
- * One grouped query for the whole page (the list route asks about twenty), so
- * a customer list stays one query rather than twenty-one. A user with no
- * qualifying orders is simply absent from the map; the caller reads that as
- * `0` / `"0.00"`.
- */
-export async function statsForUsers(
-  db: DbOrTx,
-  userIds: readonly number[],
-): Promise<Map<number, { orderCount: number; spendTotal: string }>> {
-  const out = new Map<number, { orderCount: number; spendTotal: string }>();
-  const ids = [...new Set(userIds)];
-  if (ids.length === 0) return out;
-
-  const rows = await db
-    .select({
-      userId: orders.userId,
-      orderCount: sql<number>`count(*)::int`,
-      // `numeric(12, 2)` is `money()`'s own precision, so the cast cannot lose
-      // a fen; it is here only because `sum()` of numeric comes back unpadded
-      // (`"0"`, `"5320.0"`) and `Money` is the one thing that guarantees the
-      // two fraction digits the contract spells `"3980.00"`.
-      spendTotal: sql<string>`coalesce(sum(${orders.paidAmount}), 0)::numeric(12, 2)::text`,
-    })
-    .from(orders)
-    .where(
-      and(
-        inArray(orders.userId, ids),
-        isNull(orders.deletedAt),
-        sql`${orders.paidAt} is not null`,
-        ne(orders.refundStatus, 'refunded'),
-      ),
-    )
-    .groupBy(orders.userId);
-
-  for (const row of rows) {
-    out.set(row.userId, {
-      orderCount: Number(row.orderCount),
-      spendTotal: Money.parse(row.spendTotal).toString(),
-    });
-  }
-  return out;
+  return rows.map((row) => ({ ...row, n: Number(row.n), unreviewed: Number(row.unreviewed) }));
 }
 
 /**

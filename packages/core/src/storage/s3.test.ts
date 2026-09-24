@@ -129,6 +129,29 @@ describe('createS3Storage', () => {
     );
   });
 
+  it('writes a thumbnail next to its original, and only there', async () => {
+    const { calls, impl } = recordingFetch();
+    const storage = createS3Storage({ ...baseOptions, addressing: 'virtual', fetchImpl: impl });
+    const original = 'product/2026/09/0123456789abcdef0123456789abcdef.jpg';
+
+    const key = await storage.putVariant(original, 480, new Uint8Array([1]), 'image/jpeg');
+    expect(key).toBe('product/2026/09/0123456789abcdef0123456789abcdef.w480.jpg');
+    expect(calls[0]).toMatchObject({
+      method: 'PUT',
+      url: `https://shop-assets.oss-cn-hangzhou.aliyuncs.com/${key}`,
+    });
+    expect(calls[0]?.headers['content-type']).toBe('image/jpeg');
+
+    // A key the server never generated, or a width it does not make, is refused unsent.
+    await expect(
+      storage.putVariant('../../etc/passwd', 480, new Uint8Array([1]), 'image/jpeg'),
+    ).rejects.toThrow();
+    await expect(
+      storage.putVariant(original, 500 as 480, new Uint8Array([1]), 'image/jpeg'),
+    ).rejects.toThrow();
+    expect(calls).toHaveLength(1);
+  });
+
   it('addresses path-style and virtual-style buckets differently', async () => {
     const pathStyle = recordingFetch();
     await createS3Storage({ ...baseOptions, addressing: 'path', fetchImpl: pathStyle.impl }).put(

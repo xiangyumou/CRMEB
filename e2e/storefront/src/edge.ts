@@ -7,18 +7,17 @@ import { pipeline } from 'node:stream/promises';
 /**
  * The edge, in one process.
  *
- * `docker/edge/nginx.conf` puts three surfaces behind one port, and this
- * mirrors it: the uni-app H5 build as a history-mode SPA at `/`, the `web`
- * container at `/admin`, `/admin-api`, `/api` and `/_next`, and the uploads
- * directory as inert bytes at `/uploads/`.
+ * `docker/edge/nginx.conf` puts the `web` container at `/admin`, `/admin-api`,
+ * `/api` and `/_next`, and the uploads directory as inert bytes at
+ * `/uploads/`. This mirrors those, and serves the mini-program's "模拟小程序"
+ * H5 build (`src/h5.ts`) as a history-mode SPA at `/`: production never
+ * serves that build, but the suite needs a page on the same origin as the
+ * API, as the WeChat build's requests are to its one configured origin.
  *
- * Why an edge at all, rather than pointing Playwright at `next start` and
- * letting it serve the bundle: on H5 the storefront computes its API origin
- * from `window.location` (`apps/uni-app/config/app.js`), so the bundle and
- * the API have to share an origin or every request is cross-origin and the
- * suite would be testing a deployment nobody ships. Production solves that
- * with nginx; a hundred lines of `node:http` solves it here without asking the
- * suite to run a container it would then have to build.
+ * Why an edge at all, rather than pointing Playwright at `next start`: the
+ * bundle and the API have to share an origin or every request is
+ * cross-origin. A hundred lines of `node:http` solves it here without asking
+ * the suite to run a container it would then have to build.
  *
  * What is deliberately *not* mirrored: TLS, gzip, the SSE buffering rules and
  * the cache lifetimes. None of them changes what a spec can observe, and each
@@ -58,13 +57,25 @@ const PROXIED = /^\/(admin|admin-api|api|scan-upload|_next)(\/|$)/;
 
 export interface EdgeOptions {
   port: number;
-  /** The H5 build — `apps/uni-app/dist/dev/h5`. */
+  /** The H5 build — `apps/mini/dist/h5-mp-emulation`. */
   root: string;
   /** Where uploads land. Served as inert bytes at `/uploads/`. */
   uploadsDir: string;
   /** `next start`'s origin. */
   upstream: string;
+  /**
+   * The gateway control-plane's origin
+   * (`gateway-control.ts`). `/__e2e/mini/*` on the edge goes to its
+   * `/mini/*`, which is how the "模拟小程序" build gets its `wx.login` and
+   * `getPhoneNumber` codes and completes `requestPayment`
+   * (`apps/mini/src/platform/h5-mp-emulation.tsx`). Unset, those paths are
+   * an ordinary 404, as they are in production.
+   */
+  controlUpstream?: string | undefined;
 }
+
+/** The emulated WeChat client's harness endpoints, same-origin for the page. */
+const MINI_CONTROL = /^\/__e2e\/mini\/[a-z-]+$/;
 
 export interface RunningEdge {
   url: string;
@@ -128,6 +139,11 @@ async function handle(
     return;
   }
 
+  if (options.controlUpstream && MINI_CONTROL.test(pathname)) {
+    await proxy(req, res, new URL(options.controlUpstream), pathname.slice('/__e2e'.length));
+    return;
+  }
+
   if (pathname.startsWith('/uploads/')) {
     await serveUpload(res, options.uploadsDir, pathname.slice('/uploads/'.length));
     return;
@@ -136,13 +152,18 @@ async function handle(
   await serveStatic(res, options.root, pathname);
 }
 
-function proxy(req: http.IncomingMessage, res: http.ServerResponse, upstream: URL): Promise<void> {
+function proxy(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  upstream: URL,
+  pathOverride?: string,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const proxied = http.request(
       {
         hostname: upstream.hostname,
         port: upstream.port,
-        path: req.url,
+        path: pathOverride ?? req.url,
         method: req.method,
         headers: {
           ...req.headers,

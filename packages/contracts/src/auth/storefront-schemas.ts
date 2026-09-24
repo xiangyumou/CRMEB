@@ -86,6 +86,14 @@ export const passwordLoginBody = z.object({
   account: z.string().min(1).max(64),
   password: z.string().min(1).max(128),
   captchaToken: z.string().max(4096).optional(),
+  /**
+   * A parked WeChat sign-in (`phone-required`) to finish with this password:
+   * once the password is right, its openid is linked to the account, exactly
+   * as `auth.miniPhoneLogin` and `auth.oaPhoneLogin` link theirs, so the next
+   * `wx.login` renewal signs in to this account. Single-use. Omit it and
+   * nothing is linked.
+   */
+  bindToken: z.string().min(1).max(256).optional(),
 });
 export type PasswordLoginBody = z.infer<typeof passwordLoginBody>;
 

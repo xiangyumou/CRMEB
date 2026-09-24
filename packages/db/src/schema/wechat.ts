@@ -7,6 +7,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  smallint,
   text,
   uniqueIndex,
   varchar,
@@ -331,3 +332,74 @@ export const wechatMedia = pgTable(
 
 export type WechatMedium = typeof wechatMedia.$inferSelect;
 export type NewWechatMedium = typeof wechatMedia.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// 内容安全 (mini-program mediaCheckAsync)
+// ---------------------------------------------------------------------------
+
+/** What a checked picture belongs to. The owning domain acts on a `risky` verdict. */
+export const contentSecurityChecksSubject = pgEnum('content_security_checks_subject', [
+  'review_image',
+  'avatar',
+]);
+
+/**
+ * `pending` — recorded, not yet handed to WeChat; `submitted` — WeChat has it
+ * and owes a `wxa_media_check` push; `pass` / `review` / `risky` — WeChat's
+ * verdict; `skipped` — never sent (no mini-program openid, no public HTTPS
+ * address, or 内容安全 switched off).
+ */
+export const contentSecurityChecksStatus = pgEnum('content_security_checks_status', [
+  'pending',
+  'submitted',
+  'pass',
+  'review',
+  'risky',
+  'skipped',
+]);
+
+/**
+ * One picture sent to `mediaCheckAsync`, and what came of it (C09).
+ *
+ * The verdict arrives later, by push, carrying only WeChat's `trace_id`: this
+ * table is how a `trace_id` finds the review or the avatar it is about. It is
+ * also the record of what was hidden and why — a picture taken off a review is
+ * removed from `product_reviews.images`, and its address stays here.
+ */
+export const contentSecurityChecks = pgTable(
+  'content_security_checks',
+  {
+    id: pk(),
+    subject: contentSecurityChecksSubject().notNull(),
+    /** `product_reviews.id` or `users.id`, by `subject`. Not a foreign key: two tables. */
+    subjectId: fk().notNull(),
+    /** Whose openid the check is made under. */
+    userId: fk().references(() => users.id, { onDelete: 'set null' }),
+    mediaUrl: varchar({ length: 1024 }).notNull(),
+    /** WeChat's `scene`: 1 资料, 2 评论. */
+    scene: smallint().notNull(),
+    status: contentSecurityChecksStatus().notNull().default('pending'),
+    traceId: varchar({ length: 64 }),
+    /** WeChat's `label` on a verdict (e.g. 20002 色情). */
+    label: integer(),
+    /** What the owning domain did about a `risky` verdict: `image_hidden`, `avatar_reset`, `none`. */
+    action: varchar({ length: 32 }),
+    submittedAt: instant(),
+    resolvedAt: instant(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('content_security_checks_trace_uq')
+      .on(t.traceId)
+      .where(sql`trace_id is not null`),
+    index('content_security_checks_subject_idx').on(t.subject, t.subjectId),
+    check(
+      'content_security_checks_verdict_shape',
+      sql`${t.status} not in ('pass','review','risky') or ${t.resolvedAt} is not null`,
+    ),
+  ],
+);
+
+export type ContentSecurityCheck = typeof contentSecurityChecks.$inferSelect;
+export type NewContentSecurityCheck = typeof contentSecurityChecks.$inferInsert;

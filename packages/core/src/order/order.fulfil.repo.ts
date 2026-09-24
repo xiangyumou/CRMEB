@@ -21,7 +21,6 @@ import {
   inArray,
   isNull,
   isNotNull,
-  lt,
   lte,
   or,
   sql,
@@ -301,6 +300,18 @@ export async function listExpressCompanies(db: DbOrTx): Promise<ExpressCompanyRo
     .from(expressCompanies)
     .where(eq(expressCompanies.isEnabled, true))
     .orderBy(desc(expressCompanies.sortOrder), asc(expressCompanies.id));
+}
+
+/**
+ * The company a shipment names, enabled or not: a carrier retired after the
+ * parcel left is still the carrier that took it.
+ */
+export async function findExpressCompanyEvenDisabled(
+  db: DbOrTx,
+  id: number,
+): Promise<ExpressCompanyRow | null> {
+  const rows = await db.select().from(expressCompanies).where(eq(expressCompanies.id, id)).limit(1);
+  return rows[0] ?? null;
 }
 
 export async function findExpressCompany(
@@ -603,57 +614,6 @@ export async function rangeTotals(
     paidAmount: row?.paidAmount ?? '0',
     refundedAmount: row?.refundedAmount ?? '0',
   };
-}
-
-export interface DayTotals {
-  /** `YYYY-MM-DD` in Asia/Shanghai. */
-  date: string;
-  orderCount: number;
-  paidOrderCount: number;
-  paidAmount: string;
-}
-
-/**
- * `rangeTotals`, grouped by local calendar day.
- *
- * `created_at` is `timestamptz`, so `at time zone 'Asia/Shanghai'` turns each
- * row into the wall clock the shop keeps and `::date` truncates it there.
- * Postgres does the bucketing because it is the only participant that knows
- * every row's instant; the caller only decides the window and fills the days
- * nothing happened on.
- *
- * The window itself is compared on the raw `created_at` (half-open, `[from,
- * to)`), not on the converted value, so the index on `created_at` is still
- * usable and only the grouping pays for the conversion.
- */
-export async function dailyTotals(
-  db: DbOrTx,
-  args: { from: Date; to: Date },
-): Promise<DayTotals[]> {
-  const day = sql<string>`to_char((${orders.createdAt} at time zone 'Asia/Shanghai')::date, 'YYYY-MM-DD')`;
-  const rows = await db
-    .select({
-      date: day,
-      orderCount: sql<number>`count(*)::int`,
-      paidOrderCount: sql<number>`count(*) filter (where ${orders.paidAt} is not null)::int`,
-      paidAmount: sql<string>`coalesce(sum(${orders.paidAmount}), 0)::text`,
-    })
-    .from(orders)
-    .where(
-      and(
-        gte(orders.createdAt, args.from),
-        lt(orders.createdAt, args.to),
-        isNull(orders.deletedAt),
-      ),
-    )
-    .groupBy(day)
-    .orderBy(day);
-  return rows.map((row) => ({
-    date: row.date,
-    orderCount: Number(row.orderCount),
-    paidOrderCount: Number(row.paidOrderCount),
-    paidAmount: row.paidAmount,
-  }));
 }
 
 export interface WorkQueueCounts {

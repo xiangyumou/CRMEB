@@ -48,16 +48,6 @@ export const catalogErrors = defineErrors({
   // -- virtual cards -------------------------------------------------------
   /** The SKU belongs to a product whose `kind` is not `virtual_card`. */
   CATALOG_NOT_A_CARD_PRODUCT: { status: 422, message: '只有卡密商品可以导入卡密' },
-  /**
-   * Somebody typed a stock for a card-key SKU. The pool *is* the stock
-   * (`adminProductForm` refuses the same thing with a field error); the staff
-   * SKU editor has no card-import screen behind it, so it says no rather than
-   * writing a number the next import would overwrite.
-   */
-  CATALOG_CARD_STOCK_NOT_EDITABLE: {
-    status: 422,
-    message: '卡密商品的库存由导入的卡密数量决定，请在后台导入卡密',
-  },
 
   // -- labels, params, protections -----------------------------------------
   CATALOG_LABEL_NOT_FOUND: { status: 404, message: '商品标签不存在' },
@@ -81,6 +71,12 @@ export const catalogErrors = defineErrors({
    * one code — telling a stranger which of the three it was leaks order data.
    */
   CATALOG_REVIEW_NOT_ALLOWED: { status: 409, message: '该订单暂时不能评价' },
+  /**
+   * A review picture that is not an image our own storage holds — what
+   * `POST /api/v1/uploads` returned (CAT-018). A link to another server is
+   * refused, as the avatar is (USER-019).
+   */
+  CATALOG_REVIEW_IMAGE_NOT_ALLOWED: { status: 422, message: '请上传评价图片后再提交' },
   /** Replying twice. The reply is an edit after that, not a second reply. */
   CATALOG_REVIEW_ALREADY_REPLIED: { status: 409, message: '该评价已经回复过了' },
 

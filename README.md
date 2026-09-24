@@ -2,9 +2,8 @@
 
 [简体中文](./README_ZH.md) | English
 
-A single-merchant online shop for the Chinese market. Shoppers buy through a mobile storefront,
-served as H5 in any phone browser (WeChat's included) and as a WeChat mini-program. The merchant
-runs the shop from a web admin console.
+A single-merchant online shop for the Chinese market. Shoppers buy through a WeChat mini-program;
+the merchant runs the shop from a web admin console.
 
 What it does:
 
@@ -15,9 +14,8 @@ What it does:
 - **Payment and after-sales**: WeChat Pay v3 (JSAPI, mini-program and H5), reconciliation of stale
   payments, refunds with approval.
 - **Marketing**: coupons, group buying (拼团) and presale (预售).
-- **Fulfilment**: shipping, split shipments, logistics tracking, and store-staff (店员) screens on
-  mobile.
-- **Content**: a drag-and-drop page designer (装修) with themes, articles, agreements.
+- **Fulfilment**: shipping, split shipments, logistics tracking.
+- **Content**: a block-based page designer (店铺装修) for the mini-program, articles, agreements.
 - **Customers**: SMS, password, mini-program and WeChat official-account sign-in; addresses, labels
   and groups.
 - **WeChat official account**: menus, auto-replies, QR codes, media.
@@ -26,16 +24,16 @@ What it does:
 
 ## Stack
 
-| Part           | What it is                                                                                                                                         |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web`     | Next.js 16 (App Router, standalone). The admin at `/admin` (React 19, Ant Design 6), its API at `/admin-api/*`, the storefront API at `/api/v1/*`. |
-| `apps/worker`  | The BullMQ worker: scheduled jobs, on-demand jobs, and the dispatcher of post-commit side effects.                                                 |
-| PostgreSQL 17  | The only database. Schema and migrations in Drizzle.                                                                                               |
-| Redis 7        | Admin sessions, the config cache, rate limits, the job queue, pub/sub for live admin notifications.                                                |
-| `apps/uni-app` | The mobile client (uni-app, Vue 2): the H5 storefront and the WeChat mini-program, built from one tree.                                            |
-| edge           | nginx in front of everything: serves the H5 build at `/`, proxies `/admin`, `/admin-api`, `/api` and `/scan-upload` to `web`, serves `/uploads/`.  |
+| Part          | What it is                                                                                                                                         |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`    | Next.js 16 (App Router, standalone). The admin at `/admin` (React 19, Ant Design 6), its API at `/admin-api/*`, the storefront API at `/api/v1/*`. |
+| `apps/worker` | The BullMQ worker: scheduled jobs, on-demand jobs, and the dispatcher of post-commit side effects.                                                 |
+| PostgreSQL 17 | The only database. Schema and migrations in Drizzle.                                                                                               |
+| Redis 7       | Admin sessions, the config cache, rate limits, the job queue, pub/sub for live admin notifications.                                                |
+| `apps/mini`   | The WeChat mini-program storefront (Taro 4, React 18). Its "模拟小程序" H5 build is for e2e and the designer's preview only.                       |
+| edge          | nginx in front of everything: proxies `/` (the landing page), `/admin`, `/admin-api`, `/api` and `/scan-upload` to `web`, serves `/uploads/`.      |
 
-Everything but the uni-app is strict TypeScript on Node 24 and pnpm. Every endpoint is declared
+Everything is strict TypeScript on Node 24 and pnpm. Every endpoint is declared
 once, as a zod contract in `packages/contracts`; the OpenAPI document, the typed admin client, the
 mock server and the guards all derive from it. See [docs/architecture.md](docs/architecture.md).
 
@@ -45,13 +43,15 @@ mock server and the guards all derive from it. See [docs/architecture.md](docs/a
 apps/
   web/          Next.js: admin pages, /admin-api, /api/v1
   worker/       the BullMQ worker and its jobs
-  uni-app/      the mobile client (an npm project, outside the pnpm workspace)
+  mini/         the WeChat mini-program (Taro)
 packages/
   config/       shared ESLint, TypeScript and Vitest presets
   contracts/    route contracts (zod) → OpenAPI; the single source of truth for the API
   core/         the domain logic, one directory per domain, plus kernel/
   db/           Drizzle schema, migrations, the reference-data seed
   testing/      Testcontainers harness, factories, fake WeChat and SMS gateways, the mock server
+  api-client/   the typed /api/v1 client the mini-program uses
+  storefront-blocks/  the decoration blocks shared by the mini-program and the admin designer
 e2e/            Playwright suites: admin/ and storefront/
 guards/         whole-tree static checks (pnpm guards)
 load/           the load smoke
@@ -108,21 +108,19 @@ For a stack already seeded with an admin, a product, a coupon and a shopper, sta
 server instead: `pnpm --filter @shop/e2e-admin exec tsx scripts/serve.ts`. It runs its own
 PostgreSQL and Redis in Testcontainers, and signs in as `e2e-super` / `e2e-Passw0rd!`.
 
-### The mobile client
+### The mini-program
 
-`apps/uni-app` is an npm project of its own:
+`apps/mini` is a workspace package like the others:
 
 ```sh
-cd apps/uni-app
-npm ci
-npm test                  # the API layer, mappers, store and utils
-npm run build:h5          # dist/build/h5, which the edge image serves
-npm run build:mp-weixin
+pnpm --filter @shop/mini dev:weapp     # dist/weapp, to import into 微信开发者工具
+pnpm --filter @shop/mini build         # the WeChat package, the H5 preview and the size gate
 ```
 
-The H5 build talks to the origin it is served from. The mini-program build reads its API origin
-from `VUE_APP_CRMEB_API_ORIGIN`. The modules in `api/` call the `/api/v1` routes, and
-`api/mappers/` turns each response into the field names the pages read.
+The API origin comes from `TARO_APP_API_ORIGIN`; a developer's own AppID and origin go in
+`apps/mini/.env.*.local`. [docs/mini/](docs/mini/README.md) is its design, and
+[docs/mini/device-check.md](docs/mini/device-check.md) how to try it in the developer tools and
+on a phone.
 
 ## Checks
 
@@ -136,8 +134,7 @@ pnpm --filter @shop/contracts check:examples
 pnpm exec prettier --check .
 pnpm guards                                          # 0 failures
 pnpm --filter @shop/e2e-admin e2e                    # serves the build of apps/web
-pnpm --filter @shop/e2e-storefront test
-(cd apps/uni-app && npm test && npm run build:h5)
+pnpm --filter @shop/e2e-storefront test            # the mini-program's "模拟小程序" H5 build
 ```
 
 CI (`.github/workflows/ci.yml`) runs all of these, plus shellcheck, the deploy drill and, on a push, the build of the three production images.

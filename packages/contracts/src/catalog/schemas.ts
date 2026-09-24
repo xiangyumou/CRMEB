@@ -798,6 +798,12 @@ export const adminProductReview = z.object({
   content: z.string().nullable(),
   images: z.array(z.string()),
   status: productReviewStatus,
+  /**
+   * Why it waits in 待审核, when the reason is WeChat's 内容安全 (C09):
+   * `sec_check_risky`, `sec_check_review`, `sec_check_unavailable`,
+   * `sec_check_unchecked`, `sec_check_image_unchecked`; else `null`.
+   */
+  moderationReason: z.string().nullable(),
   replyContent: z.string().nullable(),
   replyAt: instant.nullable(),
   createdAt: instant,
@@ -820,6 +826,16 @@ export const productReview = z.object({
   createdAt: instant,
 });
 export type ProductReview = z.infer<typeof productReview>;
+
+/**
+ * What `POST /catalog/reviews` answers: the review, and whether it is live.
+ * `pending` is neutral on purpose — the client says 「评价已提交，审核后展示」,
+ * whether the reason is 评价需审核 or 内容安全, and never shows it as an error.
+ */
+export const submittedReview = productReview.extend({
+  moderation: z.enum(['published', 'pending']),
+});
+export type SubmittedReview = z.infer<typeof submittedReview>;
 
 export const adminReviewListQuery = pageQuery
   .extend({
@@ -1012,6 +1028,13 @@ export const storefrontProductListQuery = pageQuery
     priceTo: money.optional(),
     /** The 精品/热卖/最新/促销 flags, as one key. */
     feature: z.enum(['hot', 'new', 'best', 'benefit', 'recommended']).optional(),
+    /**
+     * Only the products this coupon **template** covers (`userCoupon.templateId`,
+     * `claimableCoupon.templateId`) — 我的优惠券「去使用」. Shop-wide: every product;
+     * 指定商品: those; 品类券: the products filed under its categories. The scope the
+     * checkout applies. An unknown template, or a draft, lists nothing.
+     */
+    couponId: id.optional(),
   })
   .extend(sortQuery(['price', 'sales', 'createdAt']).shape);
 export type StorefrontProductListQuery = z.infer<typeof storefrontProductListQuery>;
@@ -1033,8 +1056,8 @@ export const storefrontCategoryNode = storefrontCategory.extend({
 export const storefrontCategoryTree = z.object({
   items: z.array(storefrontCategoryNode),
   /**
-   * Changes whenever any visible category does. The uni-app caches the tree and
-   * only refetches when this moves.
+   * Changes whenever any visible category does. A client may cache the tree
+   * and only refetch when this moves.
    */
   version: z.string(),
 });
@@ -1121,7 +1144,7 @@ export const searchHistoryResult = z.object({
 
 /**
  * One consistent fixture reused by every example, so the mock server tells the
- * uni-app and the admin a coherent story: product 1 is 「经典白T恤」, it has
+ * mini program and the admin a coherent story: product 1 is 「经典白T恤」, it has
  * two SKUs, it sits in category 7 and it carries label 3.
  */
 export const productCategoryExample: ProductCategory = {
@@ -1468,6 +1491,7 @@ export const adminProductReviewExample: AdminProductReview = {
   orderId: '9001',
   orderItemId: '9101',
   status: 'published',
+  moderationReason: null,
 };
 
 export const productVirtualCardExample: ProductVirtualCard = {

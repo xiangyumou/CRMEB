@@ -11,7 +11,7 @@ import {
 } from './index';
 
 /**
- * The mock server is what the uni-app and the admin build against before a
+ * The mock server is what the mini program and the admin build against before a
  * handler exists, so "it answers, and it validates" is a promise to both.
  */
 

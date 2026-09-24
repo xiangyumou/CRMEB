@@ -4,8 +4,10 @@ import type {
   AdminReviewForm,
   AdminReviewListQuery,
   ProductReview,
+  ProductReviewStatus,
   ReviewSubmitBody,
   ReviewSummary,
+  SubmittedReview,
 } from '@shop/contracts/catalog/schemas';
 import type { Tx } from '@shop/db';
 
@@ -16,6 +18,14 @@ import * as repo from './catalog.repo';
 import { summariseReviews } from './catalog.rules';
 import { asArray, pageBounds } from './catalog.service';
 import { getOrderFacts } from '../order/ports';
+import { isStoredImageUrl } from '../storage';
+import {
+  checkText,
+  requestMediaCheck,
+  type MediaRiskHandler,
+  type MediaUncheckedHandler,
+  type TextVerdict,
+} from '../wechat';
 
 /**
  * Reviews, on both surfaces.
@@ -274,10 +284,39 @@ export async function productReviewSummary(
  * `reviewRequiresAudit` decides whether it appears immediately or waits for
  * moderation. It is a setting rather than a fixed "visible at once", so a shop
  * can hold reviews back before the first abusive one goes live.
+ *
+ * 内容安全 (C09, CONTENT-001): the text goes to WeChat's `msgSecCheck` first,
+ * outside the transaction. A `risky` or `review` verdict, no verdict at all, or
+ * an author WeChat cannot check under (no mini-program openid, CONTENT-006)
+ * **holds** the review in 待审核 with the reason — it is never refused, because
+ * this shop's honest reviews trip the check too often (the owner's call,
+ * 2026-09-23). The answer says `moderation: 'pending'` and nothing more; the
+ * client shows 「评价已提交，审核后展示」. Each picture is queued for
+ * `mediaCheckAsync` in the same transaction as the review; one that turns out
+ * uncheckable sends the review back to 待审核 (`holdUncheckedReview`).
+ *
+ * Every picture must be one our own storage holds (CAT-018), exactly as the
+ * avatar must (USER-019): a review is public, and a link to somebody else's
+ * server could change what it shows after WeChat checked it, or log every
+ * shopper who opens the product page. Checked before anything else, so a
+ * refused picture costs no `msgSecCheck` call.
  */
-export async function reviewSubmit(ctx: Ctx, body: ReviewSubmitBody): Promise<ProductReview> {
+export async function reviewSubmit(ctx: Ctx, body: ReviewSubmitBody): Promise<SubmittedReview> {
   const userId = requireUserId(ctx);
+  for (const url of new Set(body.images)) {
+    if (!(await isStoredImageUrl(ctx, url))) {
+      throw new DomainError('CATALOG_REVIEW_IMAGE_NOT_ALLOWED');
+    }
+  }
   const config = await ctx.config.get(catalogConfig);
+  const verdict = await checkText(ctx, {
+    userId,
+    content: body.content ?? '',
+    scene: 2,
+    what: 'review',
+  });
+  const moderationReason = HELD_BY[verdict];
+  const status = moderationReason !== null || config.reviewRequiresAudit ? 'pending' : 'published';
 
   return ctx.withTx(async (tx) => {
     const line = await getOrderFacts().findReviewableLine(tx, {
@@ -300,21 +339,90 @@ export async function reviewSubmit(ctx: Ctx, body: ReviewSubmitBody): Promise<Pr
       serviceScore: body.serviceScore,
       content: body.content ?? null,
       images: body.images,
-      status: config.reviewRequiresAudit ? 'pending' : 'published',
+      status,
+      moderationReason,
       createdAt: now,
       updatedAt: now,
     });
     if (!row) throw new DomainError('CATALOG_REVIEW_ALREADY_WRITTEN');
 
-    return toProductReview(row);
+    for (const url of new Set(body.images)) {
+      await requestMediaCheck(tx, ctx, {
+        subject: 'review_image',
+        subjectId: row.id,
+        userId,
+        mediaUrl: url,
+        scene: 2,
+      });
+    }
+
+    return {
+      ...toProductReview(row),
+      moderation: status === 'published' ? 'published' : 'pending',
+    };
   });
 }
+
+/**
+ * Which text verdicts hold a review for a person, and the reason recorded.
+ * `unchecked` — the check is on but the author has no mini-program openid (an
+ * H5 account, or a session opened by SMS or password from any HTTP client) —
+ * holds like `unavailable` (CONTENT-006): otherwise anybody could post
+ * unscreened text by simply not signing in through the mini program.
+ */
+const HELD_BY: Record<TextVerdict, string | null> = {
+  pass: null,
+  skipped: null,
+  review: 'sec_check_review',
+  risky: 'sec_check_risky',
+  unavailable: 'sec_check_unavailable',
+  unchecked: 'sec_check_unchecked',
+};
+
+/** The reason a review goes back to 待审核 when one of its pictures cannot be checked. */
+export const IMAGE_UNCHECKED_REASON = 'sec_check_image_unchecked';
+
+/**
+ * `wxa_media_check` said a review picture is `risky`: it comes off the review
+ * (its address stays on the `content_security_checks` row). The review itself
+ * stays as it was — one bad picture is not a bad review.
+ */
+export const hideRiskyReviewImage: MediaRiskHandler = async (tx, ctx, input) =>
+  (await repo.removeReviewImage(tx, {
+    id: input.subjectId,
+    url: input.mediaUrl,
+    now: ctx.clock.now(),
+  }))
+    ? 'image_hidden'
+    : 'none';
+
+/**
+ * A review picture WeChat will never check although 内容安全 is on (no
+ * mini-program openid, 61010 "not opened lately", no public https address):
+ * the review goes to 待审核 with `sec_check_image_unchecked` (CONTENT-006), so
+ * nothing unscreened stays public. A review that already carries a moderation
+ * reason — held for its text, or held and then approved by an admin — is left
+ * as it is: a person has already looked, or will.
+ */
+export const holdUncheckedReview: MediaUncheckedHandler = async (tx, ctx, input) =>
+  (await repo.holdReview(tx, {
+    id: input.subjectId,
+    reason: IMAGE_UNCHECKED_REASON,
+    now: ctx.clock.now(),
+  }))
+    ? 'review_held'
+    : 'none';
 
 export async function myReviews(
   ctx: Ctx,
   query: PageQuery,
 ): Promise<{
-  items: (ProductReview & { productId: string; productName: string; productImageUrl: string })[];
+  items: (ProductReview & {
+    productId: string;
+    productName: string;
+    productImageUrl: string;
+    status: ProductReviewStatus;
+  })[];
   total: number;
   page: number;
   pageSize: number;
@@ -334,6 +442,7 @@ export async function myReviews(
         productId: String(row.productId),
         productName: product?.name ?? '',
         productImageUrl: product?.imageUrl ?? '',
+        status: row.status,
       };
     }),
     total,
@@ -444,6 +553,7 @@ async function decorateAdminReviews(
       orderId: row.orderId === null ? null : String(row.orderId),
       orderItemId: row.orderItemId === null ? null : String(row.orderItemId),
       status: row.status,
+      moderationReason: row.moderationReason,
     };
   });
 }

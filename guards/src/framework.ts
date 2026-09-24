@@ -2,7 +2,7 @@
  * The guard harness.
  *
  * A guard is a pure function over the repository's own text: contracts, route
- * files, permission atoms, config descriptors, the uni-app sources, the
+ * files, permission atoms, config descriptors, the mini-program sources, the
  * migrations, the CI workflow and the rule catalogue. It never starts a server
  * and never opens a database, so `pnpm guards` is a second or two and can run
  * on every commit.

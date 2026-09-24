@@ -103,9 +103,11 @@ export function assertGroupJoinable(group: GroupShape, now: Date): void {
 
 /**
  * A succeeded team with fewer real members than seats was completed by
- * 虚拟成团 — either the expiry sweep with `virtualFillOnExpiry` on, or an
- * operator pressing 立即成团. There is no flag for it; the two counters are the
- * evidence, and they cannot drift out of agreement with themselves.
+ * 虚拟成团 — before 2026-09-23 the expiry sweep could do that when the shop
+ * had switched it on, and an operator could with 立即成团. Neither can any
+ * more, but teams completed that way keep reading as such. There is no flag
+ * for it; the two counters are the evidence, and they cannot drift out of
+ * agreement with themselves.
  */
 export function wasVirtuallyFilled(
   group: { status: string; seatsTotal: number },
@@ -148,6 +150,33 @@ export function assertCompletable(group: GroupShape): void {
   throw new DomainError('GROUPBUY_GROUP_NOT_COMPLETABLE', {
     details: { status: group.status, seatsTaken: group.seatsTaken },
   });
+}
+
+// ---------------------------------------------------------------------------
+// privacy — what a stranger sees of a team (RISK-D-010)
+// ---------------------------------------------------------------------------
+
+const graphemes = new Intl.Segmenter('zh', { granularity: 'grapheme' });
+
+/**
+ * `小明明` → `小*`: the nickname a team's members show to anybody who holds
+ * the team link, the activity page and the poster.
+ *
+ * A team in this shop says who bought what, so a stranger gets one character
+ * and a single star — never the length, never the rest. The first character is
+ * a whole grapheme (an emoji with a skin tone or a ZWJ family stays one), not a
+ * UTF-16 unit that would split a surrogate pair. A one-character name is all
+ * star: keeping its only character would keep the whole name. Blank is `null`,
+ * the same "no name" the client already draws for an account that never set
+ * one.
+ */
+export function maskNickname(nickname: string | null): string | null {
+  if (nickname === null) return null;
+  const trimmed = nickname.trim();
+  if (trimmed.length === 0) return null;
+  const parts = Array.from(graphemes.segment(trimmed), (part) => part.segment);
+  if (parts.length <= 1) return '*';
+  return `${parts[0]}*`;
 }
 
 // ---------------------------------------------------------------------------

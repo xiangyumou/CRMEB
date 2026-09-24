@@ -1,3 +1,4 @@
+import { StyleProvider } from '@ant-design/cssinjs';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, type RenderOptions, type RenderResult } from '@testing-library/react';
 import { App, ConfigProvider } from 'antd';
@@ -14,6 +15,24 @@ export const testIdentity: AdminIdentity = {
   isSuper: false,
   permissions: ['demo:widget:list', 'demo:widget:create'],
 };
+
+/**
+ * Where antd's CSS-in-JS puts its `<style>` tags: a node outside the document.
+ *
+ * happy-dom computes a style by matching every rule of every sheet in the
+ * document against the element and each of its ancestors, and a DOM change
+ * drops the cache. antd injects thousands of rules, and `*ByRole` asks for the
+ * computed style of every candidate (its accessible name and its visibility),
+ * so with the sheets in `<head>` half of a form test's CPU went to matching
+ * selectors: 拼团活动's edit test took 4.4 s, 1.0 s without them, and the
+ * unit project's summed test time fell from 172 s to 109 s.
+ *
+ * The cost is that antd's stylesheet no longer hides anything here: an element
+ * antd hides only through a class (`.ant-form-item-hidden`, a closed
+ * dropdown's `-hidden`) counts as visible to `*ByRole`. No test relied on
+ * that; one that needs it can render without this wrapper.
+ */
+const detachedStyles = document.createElement('div');
 
 export function makeTestQueryClient(): QueryClient {
   return new QueryClient({
@@ -46,9 +65,11 @@ export function renderAdmin(
     );
     return (
       <QueryClientProvider client={queryClient}>
-        <ConfigProvider locale={zhCN} theme={{ cssVar: { prefix: 'ant' } }}>
-          <App component={false}>{inner}</App>
-        </ConfigProvider>
+        <StyleProvider container={detachedStyles}>
+          <ConfigProvider locale={zhCN} theme={{ cssVar: { prefix: 'ant' } }}>
+            <App component={false}>{inner}</App>
+          </ConfigProvider>
+        </StyleProvider>
       </QueryClientProvider>
     );
   }

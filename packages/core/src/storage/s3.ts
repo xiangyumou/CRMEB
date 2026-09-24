@@ -1,6 +1,7 @@
 import { createHash, createHmac } from 'node:crypto';
 import {
   buildStorageKey,
+  requireVariantKey,
   type PutOptions,
   type Storage,
   type StoredObject,
@@ -235,6 +236,16 @@ export function createS3Storage(options: S3Options): Storage {
         contentType,
         sha256: createHash('sha256').update(body).digest('hex'),
       };
+    },
+
+    async putVariant(key, width, rawBody, contentType) {
+      const variant = requireVariantKey(key, width);
+      const body = rawBody instanceof Uint8Array ? rawBody : new Uint8Array(rawBody);
+      const response = await send('PUT', variant, body, { 'content-type': contentType });
+      if (!response.ok) {
+        throw new S3Error(response.status, `S3 PUT ${response.status}`);
+      }
+      return variant;
     },
 
     async get(key) {

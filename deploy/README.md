@@ -8,7 +8,7 @@ The production stack is one Compose project, `crmeb-next`, on one host:
 | `redis`    | Redis 7 with `noeviction` and AOF: admin sessions, the config cache and the BullMQ queue    | 160 MiB    |
 | `web`      | the Next.js server: `/admin`, `/admin-api/*`, the storefront API `/api/v1`, `/scan-upload/` | 512 MiB    |
 | `worker`   | the BullMQ worker: repeatable jobs, the post-commit effects dispatcher                      | 320 MiB    |
-| `edge`     | nginx: the H5 storefront at `/`, a proxy to `web`, and `/uploads/`                          | 64 MiB     |
+| `edge`     | nginx: a proxy to `web` (the landing page at `/`), `/uploads/`, the verification files      | 64 MiB     |
 | `migrate`  | a one-shot (profile `migrate`) that applies the migrations and the reference seed           | 384 MiB    |
 
 The images are built in CI and pinned by digest. A host needs Docker with Compose v2, `curl`,
@@ -101,8 +101,8 @@ In order, refusing to continue when a step cannot be proven, it:
 5. runs `shop upgrade` for real, detached from the SSH session, with its output streamed and kept
    in `data/releases/<stamp>-<commit>.log`. A dropped connection cannot kill it halfway;
 6. writes `REVISION`;
-7. checks from outside: `https://<NEXT_HOST>/` answers 2xx and `http://<NEXT_HOST>/` redirects
-   to https. It reads that one setting with `shop hostname`, which prints it only while the
+7. checks from outside: `https://<NEXT_HOST>/` (the landing page, answered by `web`) answers 2xx
+   and `http://<NEXT_HOST>/` redirects to https. It reads that one setting with `shop hostname`, which prints it only while the
    Traefik overlay is applied.
 
 | Exit | Meaning                                                                          |
@@ -133,9 +133,7 @@ deploy/ship.sh rollback --last-upgrade    # shop rollback --last-upgrade
 
 A tag is not a release. `shop upgrade` refuses anything that is not `repo@sha256:<64 hex>`: a tag
 can be repointed between the run that passed and the deploy, and then the build that passed can no
-longer be named. A rollback target has to be nameable. CI's `images` job also prints
-`storefront in the edge image: **real**`; if a commit's summary says `placeholder`, its H5 build
-failed and its edge serves a placeholder page at `/`, so do not ship it.
+longer be named. A rollback target has to be nameable.
 
 ## `shop` on the host
 
@@ -179,6 +177,7 @@ Every key the stack reads. `deployment.env.example` carries the same list with p
 | `NEXT_EDGE_TRUSTED_PROXIES`                              | the CIDRs whose `X-Forwarded-For` the edge believes: Traefik's network. Required by `compose.traefik.yml`; see below.                        |
 | `NEXT_COMPOSE_OVERLAYS`                                  | the Compose files every script layers over `compose.yml`, relative to `shop`. Behind Traefik: `compose.traefik.yml`.                         |
 | `NEXT_BACKUP_DIR`                                        | where dumps, upgrade manifests and settings backups go; `./data/backups`, relative to `shop`. Created mode 700.                              |
+| `NEXT_DOMAIN_VERIFICATION_DIR`                           | the WeChat domain-verification files the edge serves at `/<name>.txt`; empty means `./data/domain-verification`, relative to `shop`.         |
 
 `APP_ORIGIN` produces the most confusing failure in this list when it is wrong: every admin read
 works and every admin _mutation_ returns 403.
@@ -268,8 +267,8 @@ proves it got past the settings.
 
    Expected: `readiness gate: passed`; `ok`; `{"status":"ok",…,"checks":{"database":"ok","redis":"ok","migrations":"ok","worker":"ok"}}`;
    `{"status":"ok","time":"…","version":"<commit>"}`; `200`. Through an SSH tunnel
-   (`ssh -L 8080:127.0.0.1:8080 <host>`), sign in to the admin and open a storefront page with an
-   image on it.
+   (`ssh -L 8080:127.0.0.1:8080 <host>`), sign in to the admin, upload an image and open it, and
+   open `/`: the landing page with the shop's name.
 
 7. **Put it behind Traefik**: set `NEXT_COMPOSE_OVERLAYS=compose.traefik.yml` and run
    `./shop compose up -d --wait` (next section). From then on every ship ends by checking the
@@ -369,7 +368,7 @@ In order, refusing to continue when a step cannot be proven, it:
    - **nothing to migrate**: stops nothing. It still takes the dump and proves it; runs the
      reference seed beside the live stack; and recreates only the services whose image or
      configuration changed, one at a time, `web` first and the edge last. The edge finds the new
-     `web` by name through Docker's DNS, so the storefront keeps answering throughout and the app
+     `web` by name through Docker's DNS, so the edge keeps answering throughout and the app
      is out of reach only while `web` restarts: 1.4 to 1.7 s in the drill, against 11 to 13 s for a
      release that migrates;
 5. runs the readiness gate.
@@ -475,17 +474,53 @@ sets `+x` on directories only, so no uploaded file becomes executable.
 
 ## What the edge sends to `web`
 
-The edge proxies `/admin`, `/admin-api`, `/api`, `/scan-upload` and `/_next/static/` to `web`, and
-`/readyz` to the app's `/api/v1/readyz`. Every other path belongs to the H5 storefront, whose
-history-mode fallback answers any path it does not know with its `index.html`. So a Next page the
-edge does not proxy never 404s: it shows the storefront instead, which is easy to miss.
+The edge proxies `/` (exactly), `/admin`, `/admin-api`, `/api`, `/scan-upload` and
+`/_next/static/` to `web`, and `/readyz` to the app's `/api/v1/readyz`. It also proxies exactly
+`/favicon.ico`, `/icon.svg` and `/robots.txt`, which `web` answers from `apps/web/app`: the icon
+every page links (the admin's too) and a `robots.txt` of `User-agent: *` / `Disallow: /`. It serves
+`/uploads/` and the verification files (next section) itself. Every other path is a `302` to `/`
+with a relative `Location: /`: an old H5 or share link lands on the landing page, which shows the
+shop's name and the 小程序码. There is no storefront on the web; the shop is the WeChat
+mini-program. The landing page keeps the root layout's `noindex`, and `robots.txt` says the same to
+crawlers.
 
-A new page or route handler under `apps/web/app` outside those prefixes therefore needs a location
-in `docker/edge/nginx.conf`, with the same `X-Real-IP` and `X-Forwarded-For` handling as the
-others. The drill case `edge/proxies-every-page-route` requests every page route, and one route
-handler per top-level path, through the real edge and fails on any that comes back as the
-storefront. `/` is the one route left to the storefront on purpose: the Next page there only points
-at `/admin`.
+So a Next page the edge does not proxy never 404s: it turns into that redirect, which is easy to
+miss. A new page or route handler under `apps/web/app` outside those prefixes therefore needs a
+location in `docker/edge/nginx.conf`, with the same `X-Real-IP` and `X-Forwarded-For` handling as
+the others. So does a new file-convention icon (an `apple-icon.png`, say): it is not a page, and
+the edge proxies only the icon paths it names. The drill case `edge/proxies-every-page-route`
+requests every page route (`/` included) and one route handler per top-level path through the real
+edge, and fails on any that comes back as the edge's redirect to `/`; it also requires
+`/favicon.ico` and every icon linked from `/` and `/admin/login` to come back as an image.
+
+## Domain verification files
+
+The shop's domain is a WeChat 业务域名 (web-view pages of the shop open inside the mini-program,
+docs/mini/wechat-compliance.md C12). WeChat checks it by fetching a file it hands out,
+`https://<NEXT_HOST>/<name>.txt`, from the root of the domain. The edge serves any root-level
+`/<name>.txt` whose name is letters, digits, `_` and `-` from a host directory mounted read-only
+into it, never from the app:
+
+- the directory is `NEXT_DOMAIN_VERIFICATION_DIR`, by default `data/domain-verification/` beside
+  `shop` (`/home/ubuntu/apps/CRMEB/data/domain-verification/`). No release touches `data/`, so a
+  file placed there survives every ship and rollback;
+- `shop upgrade` creates it (mode 755) when it does not exist, so Docker never creates it as root.
+
+To add a file, download it from 公众平台 → 开发管理 → 开发设置 → 业务域名, then from the machine with the
+repository:
+
+```sh
+scp <name>.txt <host>:/home/ubuntu/apps/CRMEB/data/domain-verification/
+ssh <host> chmod 644 /home/ubuntu/apps/CRMEB/data/domain-verification/<name>.txt
+curl -fsS https://<NEXT_HOST>/<name>.txt; echo     # prints the file's content
+```
+
+No restart is needed: nginx reads the file on each request. Then add the domain in the 公众平台 and
+keep the admin's 微信小程序 → 业务域名 list the same (CLIENT-002). The file must be readable by
+everyone (`644`): nginx's workers are not the host user. A name that is not there is a `404`, not
+the redirect, and a `.txt` anywhere but the root is not served from the directory. Leave the file
+in place: WeChat may check it again. `/robots.txt` is the one name never served from the
+directory: `web` answers it, and a `robots.txt` put there is ignored.
 
 ## Health and readiness
 
@@ -564,7 +599,8 @@ starts and does no work, a readiness gate that finds a table missing, a rollback
 is not there, a successful upgrade and rollback, the same with an overlay configured (a stand-in
 for `compose.traefik.yml` on a stand-in network, never the real one), a release with nothing to
 migrate (with a probe measuring the longest gap in answers), one that changes only the Compose
-files, one with a new migration, and a Next page the edge would not proxy. Its `ship/` cases run
+files, one with a new migration, a Next page or icon the edge would not proxy, and a verification file
+placed in the mounted directory (and a `robots.txt` there, which must lose to `web`'s). Its `ship/` cases run
 `ship.sh` with `SHIP_HOST=local` into a directory of their own, against a stand-in `gh`: a red CI,
 a dry run, a fresh directory, a release that drops a file, and the forwarded commands. They ship
 `HEAD`, so commit first.

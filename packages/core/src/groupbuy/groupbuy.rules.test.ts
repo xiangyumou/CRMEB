@@ -12,6 +12,7 @@ import {
   groupExpiresAt,
   isActivityOpen,
   isGroupJoinable,
+  maskNickname,
   seatsLeft,
   wasVirtuallyFilled,
 } from './groupbuy.rules';
@@ -284,5 +285,32 @@ describe('assertActivityDiscountApplied', () => {
         }),
       ),
     ).toBe('NO_THROW');
+  });
+});
+
+describe('RISK-D-010 — a team shows strangers a masked nickname', () => {
+  it('keeps the first character and one star, whatever the length', () => {
+    expect(maskNickname('小明')).toBe('小*');
+    expect(maskNickname('小明明明明')).toBe('小*');
+    expect(maskNickname('用户8000')).toBe('用*');
+    expect(maskNickname('Alice')).toBe('A*');
+  });
+
+  it('keeps a whole emoji rather than half a surrogate pair', () => {
+    expect(maskNickname('😀开心')).toBe('😀*');
+    expect(maskNickname('👍🏽赞')).toBe('👍🏽*');
+    expect(maskNickname('👨‍👩‍👧一家')).toBe('👨‍👩‍👧*');
+  });
+
+  it('stars out a one-character name entirely', () => {
+    expect(maskNickname('明')).toBe('*');
+    expect(maskNickname('😀')).toBe('*');
+    expect(maskNickname(' 明 ')).toBe('*');
+  });
+
+  it('answers null for no name at all', () => {
+    expect(maskNickname(null)).toBeNull();
+    expect(maskNickname('')).toBeNull();
+    expect(maskNickname('   ')).toBeNull();
   });
 });

@@ -217,16 +217,32 @@ export function AssetPicker({
                         aspectRatio: '1 / 1',
                       }}
                     >
-                      <img
-                        src={item.url}
-                        alt={item.name}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          display: 'block',
-                        }}
-                      />
+                      {item.mime.startsWith('video/') ? (
+                        // A video's first frame, muted and paused; only its metadata loads.
+                        <video
+                          src={item.url}
+                          muted
+                          preload="metadata"
+                          aria-label={item.name}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            display: 'block',
+                          }}
+                        />
+                      ) : (
+                        <img
+                          src={item.url}
+                          alt={item.name}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            display: 'block',
+                          }}
+                        />
+                      )}
                       {active ? (
                         <span
                           style={{

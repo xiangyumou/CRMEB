@@ -414,6 +414,14 @@ The export is one row per SKU, reports truncation honestly rather than silently 
 - `apps/web/app/admin/(shell)/catalog/products/product-list.test.tsx::商品列表 > exports the current tab as a CSV the browser writes`
 - `apps/web/app/admin/(shell)/catalog/products/product-list.test.tsx::hides every write action from a read-only admin`
 
+### CAT-018
+
+A shopper's review pictures must each be a live image our own storage holds — what `POST /api/v1/uploads` returned, or a library image — the same rule as the avatar (USER-019). A link to another server is refused with `CATALOG_REVIEW_IMAGE_NOT_ALLOWED` before anything is checked or written: a review is public, and a foreign picture could change after WeChat checked it or log every shopper who opens the product. One of that image's thumbnails (`….w480.jpg`, `….w960.jpg`, derived by name) counts as the image, the same for REFUND-014 and USER-019, which share the check (`isStoredImageUrl`).
+
+- `packages/core/src/catalog/catalog.int.test.ts::reviews > CAT-018 — review pictures come from our own storage > takes a picture our uploads stored`
+- `packages/core/src/catalog/catalog.int.test.ts::reviews > CAT-018 — review pictures come from our own storage > refuses a link to somebody else’s server, and writes nothing`
+- `packages/core/src/storage/storage.int.test.ts::image variants > CAT-018 — a thumbnail of a live image counts as ours, a thumbnail of anything else does not`
+
 ## Cart and order creation
 
 ### RISK-B1-001
@@ -585,6 +593,20 @@ Over real HTTP, submitting an order with an already spent coupon is refused befo
 
 - `apps/web/app/api/v1/checkout.int.test.ts::/api/v1/checkout and /api/v1/orders > refuses a coupon that was already spent, and writes nothing`
 
+### ORDER-009
+
+`kind` and `kindMeta` are one discriminated union: a group-buy or presale order carries its own typed payload, a key its kind does not declare is stripped, an ordinary order's `kindMeta` is discarded, and every payload the legacy client sends still parses. Nothing inside `kindMeta` can overrule `kind`, so an ordinary order is never priced at an activity price.
+
+- `packages/contracts/src/order/checkout-kind.test.ts::ORDER-009 — typed kindMeta > what the legacy client sends still parses > previews <label>`
+- `packages/contracts/src/order/checkout-kind.test.ts::ORDER-009 — typed kindMeta > what the union tightens > strips a key the kind does not declare, above all a smuggled kind`
+- `packages/contracts/src/order/checkout-kind.test.ts::ORDER-009 — typed kindMeta > what the union tightens > discards whatever kindMeta an ordinary order carries`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::ORDER-009 — a kind smuggled into kindMeta never reprices an ordinary order`
+- `packages/contracts/src/order/checkout-kind.test.ts::ORDER-009 — typed kindMeta > what the union tightens > discards a presale kind smuggled into an ordinary order, on create too`
+- `packages/contracts/src/order/checkout-kind.test.ts::ORDER-009 — typed kindMeta > what the union tightens > refuses a kind the union does not know, however kindMeta is dressed`
+- `packages/core/src/presale/presale.checkout.int.test.ts::ORDER-009 — a presale kind smuggled into kindMeta > never quotes 预售价 on an ordinary order`
+- `packages/core/src/presale/presale.checkout.int.test.ts::ORDER-009 — a presale kind smuggled into kindMeta > places it as an ordinary order at the catalogue price, and leaves the campaign alone`
+- `packages/core/src/presale/presale.checkout.int.test.ts::ORDER-009 — a presale kind smuggled into kindMeta > keeps a real presale order at 预售价 whatever else its kindMeta carries`
+
 ## Orders, ownership and the cashier
 
 ### ORDER-005
@@ -617,6 +639,22 @@ An order whose second stock deduction fails rolls back completely: no order row,
 - `packages/core/src/order/order.concurrency.int.test.ts::two checkouts for the last unit > hands back every line it already took when a later line is short`
 - `packages/core/src/order/order.int.test.ts::the stock port > takes nothing when one line of several is short, and names that line`
 
+### ORDER-010
+
+A line on the shopper's own order is `reviewable` exactly when `catalog.reviewSubmit` accepts it: the order is `received` or `completed`, the line is not refunded in full, and it has no review yet. `reviewed` is any review row for the line — published, held for moderation or removed by the shop — because each of them makes a second review `CATALOG_REVIEW_ALREADY_WRITTEN`. The list and the detail say the same. 待评价 (`order.counts.unreviewed`, the `unreviewed` tab, the 订单入口 badge) is the shopper's live orders with at least one such line; it has no deadline of its own — the auto-review job's default review, `autoReviewDays` after completion, is what takes a line out.
+
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > counts 待评价 as the orders with a reviewable line, and the tab lists exactly those`
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > leaves out an order not yet received, one refunded line by line, and another shopper’s`
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > stops counting a line once the auto-review job has written its default review`
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > marks a line reviewable only once received, and reviewed once written — held or not`
+- `packages/core/src/order/order.int.test.ts::ORDER-010 — review state on the shopper’s lines, and 待评价 > agrees with what reviewSubmit accepts: a fully refunded line is not reviewable`
+
+### ORDER-011
+
+The shopper's order detail names the 拼团 team a group-buy order opened or joined (`groupbuyTeamId`, for 查看拼团 → `groupbuyTeam { id }`), from the moment the order exists and after it is cancelled; any other order names none. The order domain reads it through `OrderKindHandler.detailLinks`, never from a `groupbuy_*` table.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > ORDER-011 — the order detail names the team an order opened or joined, and nothing for an ordinary order`
+
 ### COUPON-007
 
 The last coupon cannot be claimed twice: one concurrent claim wins, the other is refused, `remain_count` never goes negative and exactly one user holds it.
@@ -629,6 +667,13 @@ The last coupon cannot be claimed twice: one concurrent claim wins, the other is
 Two simultaneous claims by one user leave exactly one success, the loser refused by the per-user limit, and one claim record.
 
 - `packages/core/src/coupon/coupon.concurrency.int.test.ts::COUPON-008 — one user tapping 领取 twice > holds the per-user limit, and the unique violation surfaces as a 409`
+
+### COUPON-009
+
+The storefront's coupon-to-product links agree with the checkout's scope rule (`eligibleLineIndexes`: shop-wide, naming the product, or naming one of the categories it is filed under — its direct `product_categories_map` rows, the ones the checkout reads). `coupon.claimableList` narrowed by `productId` lists, among the claimable templates, exactly those that cover the product; `catalog.productList` narrowed by `couponId` (a template id) lists exactly the sellable products the template covers — nothing for an unknown or draft template, and still the scope of a disabled one, whose coupons stay spendable.
+
+- `packages/core/src/coupon/coupon.int.test.ts::listClaimable > COUPON-009 — narrowed to a product, lists exactly the coupons the checkout would apply to it`
+- `packages/core/src/coupon/coupon.int.test.ts::listClaimable > COUPON-009 — the 商品列表 for a coupon lists exactly the products the checkout would apply it to`
 
 ### AUTH-005
 
@@ -670,13 +715,56 @@ Token expiry and cross-user order read/write isolation through HTTP routes.
 - `packages/core/src/order/order.ref.int.test.ts::GET /api/v1/orders/:id > gives a stranger the same 404 for a number as for an id`
 - `packages/core/src/order/order.int.test.ts::hiding a finished order > answers a second tap, a stranger and an unknown id all with the same 404`
 
-### AUTH-004
+### AUTH-006
 
-The staff console (mobile order management) admits exactly the shoppers on the order-staff roster; a shopper who is not on it is refused, and an empty roster closes it.
+The mini-program sign-in counts only codes WeChat refused against a per-address budget (20 per 10 minutes); past it the address is refused with `RATE_LIMITED` without asking WeChat, a code WeChat accepted never counts, and another address is untouched.
 
-- `apps/web/app/admin-api/orders/fulfilment.int.test.ts::the staff console > 403s a shopper who is not on the list`
-- `apps/web/app/admin-api/orders/fulfilment.int.test.ts::the staff console > lets somebody on the list in, and lets them ship`
-- `apps/web/app/admin-api/orders/fulfilment.int.test.ts::the staff console > tells an ordinary shopper they are not staff rather than 403ing them`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-006 — stops asking WeChat for an address that sent 20 codes WeChat refused`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-006 — never counts a code WeChat accepted`
+
+### AUTH-007
+
+A parked mini-program sign-in survives a phone code WeChat refused, and the same bind token can instead be finished with an SMS code on `POST /auth/sessions/wechat-oa/phone`, which links the mini openid so the next launch is silent.
+
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-007 — keeps the bind token when WeChat refuses the phone code`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-007 — finishes a mini sign-in with an SMS code instead, and links the mini openid`
+- `e2e/storefront/specs-mini/login.spec.ts::a new WeChat user ticks the terms, signs up with an SMS code, and a wrong code leaves it usable`
+
+### AUTH-008
+
+A known mini-program openid renews silently: `signed-in`, `registered: false`, the same account, a fresh token of `sessionTtlDays` recorded as `wechat-mini`, no new account or identity, and the shopper's other sessions stay alive; `registered` is true only on the call that created the account, and a disabled account is not renewed.
+
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — renews an expired session silently: the same account, registered false, a fresh token of sessionTtlDays`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — leaves the shopper’s other sessions alone when renewing`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — refuses to renew a disabled account`
+- `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — says registered only on the call that created the account`
+- `e2e/storefront/specs-mini/login.spec.ts::a session the server stopped honouring is renewed once, and the reads that failed are replayed`
+- `e2e/storefront/specs-mini/login.spec.ts::a write that meets an expired session is replayed once after renewal, not lost or doubled`
+
+### AUTH-009
+
+A password sign-in that carries a parked WeChat sign-in's `bindToken` links that openid to the account once the password is right, so the next `wx.login` renewal signs in to the same account. A wrong password neither links nor spends the token; a spent token is `AUTH_WECHAT_BIND_EXPIRED`; an openid that is already taken, or an account that already has an identity on that WeChat app, is `AUTH_WECHAT_ALREADY_BOUND` as on the SMS path, and no session is issued; without a token nothing is linked.
+
+- `packages/core/src/user/storefront-auth.int.test.ts::password login that finishes a parked mini sign-in > AUTH-009 — links the mini openid once the password is right, so the next wx.login renewal is the same account`
+- `packages/core/src/user/storefront-auth.int.test.ts::password login that finishes a parked mini sign-in > AUTH-009 — a wrong password neither links nor spends the bind token`
+- `packages/core/src/user/storefront-auth.int.test.ts::password login that finishes a parked mini sign-in > AUTH-009 — refuses a taken openid the way the SMS path does, and issues no session`
+- `packages/core/src/user/storefront-auth.int.test.ts::password login that finishes a parked mini sign-in > AUTH-009 — refuses a second mini openid for an account that already has one`
+- `packages/core/src/user/storefront-auth.int.test.ts::password login that finishes a parked mini sign-in > AUTH-009 — links nothing without a bind token`
+- `e2e/storefront/specs-mini/login.spec.ts::SMOKE-004: 密码登录 under 其他方式 reaches an authenticated screen, and a wrong password is its field's error`
+
+### AUTH-010
+
+The mini-program replays a request that met a 401 only as the account that sent it. A renewal's `wx.login` signs in to whichever account holds the phone's openid; when that is not the account whose session ended — or that account is unknown (a token stored without its account) — the new session is revoked and not stored, the shopper is signed out, every request that shared the renewal keeps its 401 (a write goes out once, as its sender), and the login page opens once, saying「登录已过期，请重新登录」on the page (not a toast) until the shopper signs in or leaves. A request whose token went stale is replayed with the current token only if it is the same account's. The same account replays exactly as before.
+
+- `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > replays a write as the same account, and opens no login page`
+- `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > sends a write once when WeChat signs in to another account: signed out, that session revoked, the 401 raised, the login page opened with a hint`
+- `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > gives every request that failed alongside the same answer: one wx.login, none replayed, one login page`
+- `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > drops the notice once the shopper signs in again`
+- `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > replays nothing after renewing a token stored with no account beside it`
+- `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > does not replay a stale token's request with another account's session, nor renew for it`
+- `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > undoes another account the same way for 修改密码, which leaves the page itself`
+- `apps/mini/src/pages/login/index.test.tsx::AUTH-010 — the notice of a renewal that reached another account > says why the shopper is here in place of the hint, and drops it on leaving`
+- `e2e/storefront/specs-mini/login.spec.ts::AUTH-010: a write that meets an ended password session is not replayed as the account this phone's WeChat belongs to, and the shopper is back at the login page`
 
 ## Fulfilment, the order console and invoices
 
@@ -772,12 +860,6 @@ A shop out of card keys leaves the order in 待发货 with nothing half-written,
 - `packages/core/src/order/order.console.int.test.ts::修改收货地址 > is refused once the order has been dispatched`
 - `packages/core/src/order/order.fulfil.concurrency.int.test.ts::the console under concurrency > lets 修改地址 lose to a dispatch that commits first`
 
-### CONSOLE-004
-
-A console action reachable from both the web admin and the phone records _which_ surface acted, through `order_status_logs.operator_kind`.
-
-- `packages/core/src/order/order.console.int.test.ts::备注 > records who wrote it, whichever console they used`
-
 ### INVOICE-001
 
 One open invoice per order, enforced by the partial unique index rather than by asking first: five simultaneous requests leave exactly one row, and a cancelled or rejected one frees the slot.
@@ -801,6 +883,134 @@ An invoice can only be asked for on an order that was paid for and not refunded,
 - `packages/core/src/order/order.invoice.int.test.ts::申请开票 > refuses an order nobody has paid for`
 - `packages/core/src/order/order.invoice.int.test.ts::申请开票 > refuses an order whose money went back`
 - `packages/core/src/order/order.invoice.int.test.ts::what the buyer can see > tells a stranger the invoice does not exist`
+
+## 小程序发货信息管理 (WeChat mini-program shipping)
+
+### WXSHIP-001
+
+A shipment of an order paid through the mini program (`payment_attempts.channel = wechat_mini`) is reported to WeChat's 发货信息管理 (`upload_shipping_info`) after its transaction commits, through the effects ledger, keyed by the payment's `transaction_id` and the payer's openid. One shipment that sends everything is one unified upload (`delivery_mode: 1`); a split delivery is one express upload per shipment in dispatch order, `is_all_delivered` on the last. 顺丰 carries the masked receiver phone, a virtual delivery is `logistics_type: 3` with no waybill. A payment through any other channel, or any payment while 录入发货信息 is off, is never reported.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > uploads one unified express shipment with the carrier’s WeChat code — WXSHIP-001`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > adds the masked receiver phone for 顺丰 — WXSHIP-001`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > reports a split delivery in parts, the last one saying all delivered — WXSHIP-001`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > reports a virtual delivery as logistics_type 3 without a waybill — WXSHIP-001`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > reports nothing for a payment made outside the mini program, or while switched off — WXSHIP-001`
+
+### WXSHIP-002
+
+An upload WeChat refused is retried by the ledger, and one WeChat already has (`10060002`, `10060023`) finishes as reported. An express shipment whose carrier has no 微信快递编码 is not sent with a guess: the effect waits, and goes out once an operator fills the code in.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > waits, retrying, while the carrier has no WeChat code — and sends once it is filled in — WXSHIP-002`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > retries a WeChat refusal, and finishes on “already shipped” — WXSHIP-002`
+
+### WXSHIP-003
+
+修改发货信息 on a reported shipment re-uploads it at most once, which is WeChat's own limit; a second correction is not sent.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > corrects a reported waybill once, as WeChat allows, and never twice — WXSHIP-003`
+
+### WXSHIP-004
+
+The mini program's push URL (`/api/v1/webhooks/wechat-mini`) acts only on a delivery signed with our token, fresh (±5 minutes), single-use for its signature triple, and — in 安全/兼容模式 — decrypted with our AES key and addressed to our appid; in 安全模式 a plaintext delivery is refused. A known event becomes one ledger row however often WeChat re-delivers it; an unknown event is acknowledged and dropped.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > answers the URL check only when it is signed with our token — WXSHIP-004`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > refuses a bad signature, a plaintext push in 安全模式, a stale one and a reused nonce — WXSHIP-004`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > accepts plain JSON when 明文模式 is configured, and drops events nobody handles — WXSHIP-004`
+
+### WXSHIP-005
+
+WeChat's settlement push (`trade_manage_order_settlement`) moves a shipped order to received through the same conditional transition the buyer's 确认收货 and the auto-receive job use: a push repeated, and a push racing the buyer's tap, leave exactly one receipt.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > moves the order to received on a settlement push, once, however often WeChat repeats it — WXSHIP-005`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > stamps the settlement when the money moves, without moving the order again — WXSHIP-005`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > leaves one receipt when the settlement push and the buyer’s tap race — WXSHIP-005`
+
+### WXSHIP-006
+
+The 确认收货 component (`GET /api/v1/orders/:id/wechat-receipt`) is handed a payment number only for the signed-in shopper's own order, once it is shipped and WeChat was told everything left; a stranger's order is `ORDER_NOT_FOUND`. A receipt confirmed through the component (`{ via: 'wechat-component' }`) moves the order only after WeChat's `get_order` says the buyer confirmed; otherwise `ORDER_WECHAT_RECEIPT_UNCONFIRMED` and the order stays shipped.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > hands the payment number to the order’s owner only — WXSHIP-006`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > answers null for an order WeChat was not told about — WXSHIP-006`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > moves the order only once WeChat’s get_order says the buyer confirmed — WXSHIP-006`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::the 确认收货 component > refuses the component path for an order that was never reported — WXSHIP-006`
+
+### WXSHIP-007
+
+WeChat's shipping reminder and its 已纳入发货信息管理 notice reach operators as in-app notices. 同步 (`is_trade_managed` + `set_msg_jump_path`) is an operator's action with `payment:config:write`, run by hand rather than on a config save, and says so when the mini program is not configured or WeChat refuses.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::POST /api/v1/webhooks/wechat-mini > tells operators about WeChat’s shipping reminder and about being put under management — WXSHIP-007`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > records WeChat’s answer and points messages at the order page — WXSHIP-007`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > says so when the mini program is not configured, and when WeChat refuses — WXSHIP-007`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > is an admin’s, not a shopper’s — WXSHIP-007`
+
+### WXSHIP-008
+
+The push URL never takes a delivery it cannot bind to its body (decided 2026-09-24). In 明文模式 and 兼容模式 the signature covers only `(token, timestamp, nonce)`, so the single-use triple in Redis is what stops a signed URL from an access log carrying a forged body (a `trade_manage_order_settlement` would mark an order received); with Redis unavailable such a delivery — plaintext or encrypted — is answered 503, not `success`, nothing is recorded, and WeChat re-delivers it later. In 安全模式 `msg_signature` covers the encrypted body, and a delivery is still taken with Redis down.
+
+- `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > refuses a plaintext push in 明文模式 with a retryable 503, and records nothing`
+- `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > refuses in 兼容模式 too, a plaintext and an encrypted delivery alike`
+- `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > still takes an encrypted push in 安全模式, where the signature covers the body`
+- `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > takes a plaintext push in 明文模式 while the store is up, and refuses the triple for another body`
+
+## 内容安全 (WeChat content security)
+
+The policy table and the reasons are in `docs/mini/wechat-compliance.md` C09 and at the top of `packages/core/src/wechat/wechat.sec-check.ts`.
+
+### CONTENT-001
+
+Review text a customer submits is checked by WeChat's `msgSecCheck` (scene 2, the author's mini-program openid) before it is saved, and is **never refused** for what it says: `risky`, `review`, or no answer at all (an errcode, or the call never arriving) saves it 待审核 with the reason in `moderation_reason`, and the answer is `moderation: 'pending'`, not an error. A held review is not public until an admin publishes it through 评价管理, and an admin may delete it instead. A `pass` publishes as configured. Nothing is checked while 内容安全 is off or the mini program has no AppID/AppSecret; with both on, an account WeChat cannot check under is held (CONTENT-006).
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > publishes a review WeChat passes, checked as a comment for the author — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > saves a risky review 待审核 with a neutral answer, not an error — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > holds a review WeChat wants a person to look at — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > holds the review when WeChat cannot answer, rather than publishing it unchecked — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > holds the review when the call never arrives — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > publishes a held review once an admin approves it — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > lets an admin delete a held review — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > does not check anything while switched off, or with no mini program to check with — CONTENT-001`
+- `e2e/storefront/specs-mini/reviews.spec.ts::CONTENT-001: a review the content check holds is shown on the product only once the merchant publishes it`
+
+### CONTENT-002
+
+A changed nickname is refused (`USER_NICKNAME_REJECTED`) only when WeChat says `risky`, and the old one stays; `review` and WeChat being unavailable save it. An unchanged nickname is not sent to WeChat.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::nicknames and invoice titles are refused only when risky > refuses a risky nickname and keeps the old one — CONTENT-002`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::nicknames and invoice titles are refused only when risky > saves a nickname when WeChat cannot answer, and does not re-check an unchanged one — CONTENT-002`
+
+### CONTENT-003
+
+An invoice-title name — in the 抬头 book (create and update) and on an order's invoice request — is refused (`USER_INVOICE_TITLE_REJECTED`, `ORDER_INVOICE_TITLE_REJECTED`) only when WeChat says `risky`; WeChat being unavailable saves it.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::nicknames and invoice titles are refused only when risky > refuses a risky 抬头 in the book, and saves one when WeChat is down — CONTENT-003`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::nicknames and invoice titles are refused only when risky > refuses a risky 抬头 on an invoice request, and takes one when WeChat is down — CONTENT-003`
+
+### CONTENT-004
+
+Every distinct review picture is submitted to `mediaCheckAsync` (scene 2) after the review commits, through the ledger, as an absolute https address. A `risky` `wxa_media_check` verdict takes that picture off the review and nothing else; the verdict is stored with a conditional update on `submitted`, so a repeated or concurrent push acts once. A `pass` keeps the picture. A submission WeChat refuses is retried and the picture stays visible meanwhile; an account without a mini-program identity is `skipped` (and its review held, CONTENT-006).
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > sends each review picture once, as an absolute https address — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > takes a risky picture off the review, and a repeated verdict does nothing more — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > keeps a picture WeChat passes — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > keeps the picture and retries while WeChat refuses the submission — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > skips the picture check for an account without a mini-program identity — CONTENT-004`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > acts once when two different verdict pushes for one picture race — CONTENT-004`
+
+### CONTENT-005
+
+A newly stored avatar (not the current one, not the default) is submitted to `mediaCheckAsync` (scene 1). A `risky` verdict resets the avatar to the default only if the account still shows that picture, and then — only then — sends the in-app notice `user_avatar_rejected`.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > resets a risky avatar and tells the customer — CONTENT-005`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > leaves an avatar the customer has since replaced — CONTENT-005`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > does not check an avatar that did not change — CONTENT-005`
+
+### CONTENT-006
+
+"Not checked" is not "passed" (decided 2026-09-24). While 内容安全 is on and the mini program is configured, a review that WeChat cannot check waits in 待审核 instead of going live: review text from an account with no mini-program openid (an H5 account, or an SMS / password session from any HTTP client) is saved `pending` with `sec_check_unchecked`, and a published review one of whose pictures ends `skipped` — no openid, WeChat's 61010 "not opened lately", or no public https address to submit — goes back to `pending` with `sec_check_image_unchecked`, in the transaction that marks the check skipped. A review that already carries a moderation reason (held for its text, or held and then approved by an admin) is left as it is, and a redelivered effect moves nothing.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > holds a review from an account WeChat cannot check under, rather than publishing it unread — CONTENT-006`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > sends a published review back to 待审核 when WeChat will not check its picture (61010) — CONTENT-006`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > holds the review when the shop has no https address to show WeChat the picture at — CONTENT-006`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > leaves a review an admin already approved when its picture turns out uncheckable — CONTENT-006`
 
 ## Refunds
 
@@ -896,6 +1106,14 @@ It settles through the same path an approved request does — one capital-flow r
 - `packages/core/src/refund/refund.system.int.test.ts::a refund the shop opens by itself > settles through the same path an approved request does`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the system refund for a failed team > gives every paid member exactly one refund, however many sweeps run`
 
+### REFUND-014
+
+A shopper's after-sale evidence photos must each be a live image our own storage holds — what `POST /api/v1/uploads` returned, or a library image — the same rule as a review picture (CAT-018) and the avatar (USER-019). A link to another server, or our path shape for a file we never stored, is refused with `REFUND_IMAGE_NOT_ALLOWED` before the order is locked, so no request is opened and nothing is recorded: the photos are shown only to the shopper and the merchant, but a foreign one would hand its server the IP and browser of every admin who opens the request.
+
+- `packages/core/src/refund/refund.int.test.ts::REFUND-014 — evidence photos come from our own storage > takes a photo our uploads stored`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-014 — evidence photos come from our own storage > refuses a link to somebody else’s server, and opens no request`
+- `packages/core/src/storage/storage.int.test.ts::image variants > CAT-018 — a thumbnail of a live image counts as ours, a thumbnail of anything else does not`
+
 ## Registration and notifications
 
 ### USER-001
@@ -950,7 +1168,7 @@ A channel that fails retries only itself: the effect goes back to pending with t
 
 The events that can fire are compiled in, and a template row is seeded from the registry on first use with in-app on and every channel that costs money or needs a credential off.
 
-- `packages/core/src/notification/notification.int.test.ts::fan-out > seeds the template from the registry and writes the in-app message`
+- `packages/core/src/notification/notification.int.test.ts::fan-out > seeds the template from the registry and writes the in-app message — NOTIF-006`
 - `packages/core/src/notification/notification.int.test.ts::fan-out > does not send at all when the operator turned the event off`
 - `packages/core/src/notification/notification.int.test.ts::fan-out > sends in-app from a template shell the reference-data seed wrote with no channels`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::shopper notifications > lists the four events in 通知管理 with in-app on, over the empty shells the seed writes`
@@ -964,6 +1182,33 @@ Rendering cannot lose a message: an unknown placeholder renders empty rather tha
 - `packages/core/src/notification/notification.render.test.ts::render > renders an unknown placeholder as nothing, never as itself`
 - `packages/core/src/notification/notification.render.test.ts::render > does not re-render what a value itself contains`
 - `packages/core/src/notification/notification.render.test.ts::renderFields > drops a field that rendered empty instead of sending ""`
+
+### NOTIF-006
+
+A customer event names the mini-program page it opens as a route-catalogue key and a `{{…}}` params template, and registration refuses a key the catalogue does not mark `notify`, and a web `link` on a customer event. The template is filled first and validated second: a valid result is stored on the in-app message as `data.route` and is the subscribe message's `page` (`toMiniPath`) — there is no hand-typed page, and a customer event carries no web `link`; a result that does not validate sends no destination rather than a wrong one.
+
+- `packages/core/src/notification/notification.render.test.ts::renderRoute > fills the params in first, then validates the route — NOTIF-006`
+- `packages/core/src/notification/notification.render.test.ts::renderRoute > answers null rather than a wrong destination when a variable is missing — NOTIF-006`
+- `packages/core/src/notification/notification.render.test.ts::renderRoute > refuses at registration a route the catalogue does not let a message open — NOTIF-006`
+- `packages/core/src/notification/notification.render.test.ts::renderRoute > refuses at registration a web link on a customer event — NOTIF-006`
+- `packages/core/src/notification/notification.int.test.ts::fan-out > seeds the template from the registry and writes the in-app message — NOTIF-006`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::shopper notifications > tells every paid member 拼团成功 when the team fills, on every channel switched on — NOTIF-006`
+
+### NOTIF-007
+
+A message says what its sender carried: every placeholder of an event's default wording, link and route is a variable the event declares, and every sender fills the variables that wording uses. The fulfilment notices (发货, 确认收货, 订单完成) read the order number, the amount and the parcel's carrier, tracking number or courier from the order domain when the handler runs, so an effect recorded with ids only — every row already in the ledger — is told in full, a tracking number corrected before the send is the corrected one, and a parcel cancelled first is not announced. 发货 is one message per parcel. A placeholder that still renders blank is logged with the event's code.
+
+- `packages/core/src/notification/notification.registry.test.ts::NOTIF-007 — an event’s wording names only the variables it declares > declares every placeholder its default title, body, link and route use`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > tells the buyer the order number, the carrier and the tracking number of an express parcel`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > reads the facts when the handler runs, so a row that carries ids only is told in full`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > tells a buyer whose order ships in two parcels about each of them`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > says 商家配送 and the courier for a parcel the shop delivers itself`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > says the goods were handed over for an automatic virtual delivery`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > does not announce a parcel cancelled before the dispatcher reached it`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > names the order in 确认收货`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the order hooks carry what their wording names > gives 支付成功 its payment time and 退款到账 its refund number`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the order hooks carry what their wording names > leaves no placeholder of the order events’ default wording blank`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — an old ledger row > is told in full when it carries nothing but the order id`
 
 ### USER-010
 
@@ -1003,6 +1248,40 @@ One phone number is one account and one openid is one account, however many regi
 
 - `packages/core/src/user/user.concurrency.int.test.ts::registration > six concurrent creations of one phone number leave one account`
 - `packages/core/src/user/user.concurrency.int.test.ts::registration > six taps on 微信登录 create one account and sign every caller into it`
+
+### USER-016
+
+A customer keeps at most 20 live 发票抬头 and at most one default, including when their own writes race: every write to one customer's book queues on a per-user advisory lock, so six simultaneous promotions all succeed and leave one default, six simultaneous first titles leave one default, and creates racing the cap let exactly the free slots through.
+
+- `packages/core/src/user/invoice-title.int.test.ts::invoice titles > USER-016 — refuses a title past the cap of 20`
+- `packages/core/src/user/invoice-title.int.test.ts::USER-016 — one customer’s title writes, raced > leaves exactly one default when six titles are promoted at once, and every caller succeeds`
+- `packages/core/src/user/invoice-title.int.test.ts::USER-016 — one customer’s title writes, raced > makes exactly one of six simultaneous first titles the default`
+- `packages/core/src/user/invoice-title.int.test.ts::USER-016 — one customer’s title writes, raced > lets exactly the free slots through when six creates race the cap`
+
+### USER-017
+
+A saved 发票抬头 always prefills a `POST /orders/:id/invoice` body the route accepts: the title form and the request share one header schema and its rules, the service re-checks them after trimming, and `invoiceRequestFromTitle` copies only the non-empty header fields.
+
+- `packages/contracts/src/user/invoice-title.test.ts::USER-017 — a saved title prefills the invoice request > copies <label> into a body the request schema accepts`
+- `packages/core/src/user/invoice-title.int.test.ts::invoice titles > USER-017 — every saved title prefills a request body the invoice route accepts`
+
+### USER-018
+
+A 发票抬头 belongs to the customer who saved it: reading, editing, deleting or promoting somebody else's title answers exactly like one that does not exist, and changes nothing.
+
+- `packages/core/src/user/invoice-title.int.test.ts::invoice titles > USER-018 — never reads, edits, deletes or promotes another customer’s title`
+- `apps/web/app/api/v1/user.int.test.ts::/api/v1/invoice-titles > USER-018 — keeps every title route to its owner: a stranger gets 404 on all four`
+
+### USER-019
+
+A shopper's avatar is a picture we hold: `PUT /profile` takes an `avatarUrl` only when it is a live image in our storage, the account's current avatar re-sent, or the shop's configured default avatar (`''` clears it); anything else is `USER_AVATAR_NOT_ALLOWED` and nothing in the request is saved.
+
+- `packages/core/src/user/user.int.test.ts::USER-019 — the avatar comes from our own storage > takes an image our uploads stored, whoever uploaded the bytes first`
+- `packages/core/src/user/user.int.test.ts::USER-019 — the avatar comes from our own storage > refuses a URL on somebody else’s server, and changes nothing`
+- `packages/core/src/user/user.int.test.ts::USER-019 — the avatar comes from our own storage > refuses a deleted attachment and one that is not an image`
+- `packages/core/src/user/user.int.test.ts::USER-019 — the avatar comes from our own storage > takes the current avatar back unchanged, as every legacy save re-sends it`
+- `apps/web/app/api/v1/user.int.test.ts::/api/v1/profile > USER-019 — takes the avatar our upload returned and refuses one on another server`
+- `packages/core/src/storage/storage.int.test.ts::image variants > CAT-018 — a thumbnail of a live image counts as ours, a thumbnail of anything else does not`
 
 ## Coupons
 
@@ -1088,12 +1367,13 @@ An expired under-filled team refunds every paid member exactly once, through the
 
 ### RISK-D-006
 
-虚拟成团 is an act with a permission and an audit row, not a string argument: 立即成团 is refused when the shop has the feature switched off, and refused to an admin who may read teams but not complete them. A team completed by 立即成团 records exactly one `groupbuy.settle` effect, as the expiry path does.
+虚拟成团 never happens (decided 2026-09-23: the mini-program is the only storefront, and a team completed with invented members reads as a fake transaction there). A team that has not filled by its deadline fails and every paid member is refunded, even in a shop that had the retired `virtualFillOnExpiry` switch stored as on; migration `0005_groupbuy_virtual_fill_off` deletes that stored key so a rollback to the previous image cannot revive it. 立即成团 is refused on an under-filled team whatever is stored, records no `groupbuy.settle`, and is refused to an admin who may read teams but not complete them.
 
-- `packages/core/src/groupbuy/groupbuy.int.test.ts::the admin surface > refuses 立即成团 while the shop has 虚拟成团 switched off`
-- `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > fills the team virtually when the shop has said it may`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > RISK-D-006 — fails and refunds an under-filled team even with the retired 虚拟成团 switch stored as on`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > RISK-D-006 — migration 0004 deletes a stored 虚拟成团 switch`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the admin surface > RISK-D-006 — refuses 立即成团 on an under-filled team, whatever the retired switch says`
 - `apps/web/app/admin-api/groupbuy-activities/groupbuy.int.test.ts::/admin-api/groupbuy-groups and /admin-api/groupbuy-statistics > refuses 立即成团 to an admin who may read teams but not complete them`
-- `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::立即成团 says so > records one groupbuy.settle effect when an operator completes a team`
+- `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::立即成团 says so > RISK-D-006 — refuses an under-filled team and records no groupbuy.settle`
 
 ### RISK-D-007
 
@@ -1119,91 +1399,42 @@ The 拼团价 is what a group-buy order charges, and an ordinary order for the s
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > prices a shopper joining an open team the same way`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::beforeCreate > refuses an order whose draft is not at the activity price`
 
-## 页面装修 (DIY)
+### RISK-D-010
 
-### DIY-001
+A team shows strangers only a masked nickname and never an account id (decided 2026-09-24: in this shop a team says who bought what). `groupbuy.groupDetail` (anybody with the link, signed in or not), `groupbuy.openGroups` (public) and `groupbuy.poster` answer each nickname as its first character and one star (`小明明` → `小*`), counting whole graphemes so an emoji is never split; a one-character name is all star and a blank one is `null`. Avatars stay. A member row carries no `userId`; whether a seat is the caller's own is `isMe`, computed on the server from the session.
 
-A saved page survives parse → serialise byte for byte, including keys no schema in this build knows, for every production export. Validation hands back the caller's own object rather than zod's rebuilt one.
-
-- `packages/contracts/src/diy/schema/round-trip.test.ts::page value round trip > %s: parse -> serialise is byte-identical`
-- `packages/core/src/diy/diy.test.ts::validateDiyContent > hands back the caller’s own object, so the bytes never change`
-
-### DIY-002
-
-Retired components and links to removed storefront pages are filtered on **read**, never on write: the stored row keeps every node, and the storefront is served the page with those nodes stripped.
-
-- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity fixtures > covers every branch of the filter`
-- `packages/core/src/diy/diy.int.test.ts::the storefront read > serves the home page with the retired components stripped`
-
-### DIY-003
-
-Cleaning preserves key order and returns its input by identity when nothing is stripped, so a cleaned page still serialises byte for byte.
-
-- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity fixtures > keeps key order, so a cleaned page still serialises byte for byte`
-
-### DIY-004
-
-Two editors saving the same page do not overwrite each other: the version token covers both `updated_at` and the envelope's `version`, so a save from a stale editor fails with `DIY_VERSION_CONFLICT`.
-
-- `packages/core/src/diy/diy.int.test.ts::saving content > lets exactly one of several simultaneous saves win`
-
-### DIY-005
-
-The editor writes back a page it did not change, unchanged: timestamps and their derived `id`s are only rewritten once the page's order has actually moved.
-
-- `apps/web/src/admin/diy/store.test.ts::serialising > reproduces an untouched page byte for byte`
-- `apps/web/src/admin/diy/store.test.ts::serialising > rewrites timestamps and ids only once the order actually moves`
-
-### DIY-006
-
-Hiding a component never deletes it: `isHide` stays in the payload and the renderer skips it.
-
-- `apps/web/src/admin/diy/store.test.ts::editing > hides without deleting`
-
-### DIY-007
-
-A page kind that owns a footer always saves one (`pageFoot` on 首页, `bottomMenu` on 商品详情) and it always sorts last.
-
-- `apps/web/src/admin/diy/store.test.ts::serialising > appends the factory footer to a home page that has none`
-- `apps/web/src/admin/diy/store.test.ts::serialising > pushes the footer past the body when the body is restamped`
-
-### DIY-008
-
-PostgreSQL `jsonb` reorders the keys inside a node; the guarantee that survives storage is "every key and value is preserved", not the byte order. Pinned so nobody mistakes it for a bug in this code.
-
-- `packages/core/src/diy/diy.int.test.ts::saving content > is the database, not this code, that reorders the keys inside a node`
-
-### DIY-009
-
-超级组件 (`customComponent`) is renderable but not creatable: the palette does not offer it, because the shop has no designer for its inner layout and a freshly created 超级组件 could never be filled. Existing nodes keep their config panel and their `customComponents` tree round-trips untouched.
-
-- `packages/contracts/src/diy/schema/round-trip.test.ts::the registry > keeps customComponent renderable but out of the palette`
+- `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > keeps the first character and one star, whatever the length`
+- `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > keeps a whole emoji rather than half a surrogate pair`
+- `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > stars out a one-character name entirely`
+- `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > answers null for no name at all`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the storefront surface > RISK-D-010 — shows a team to anybody with masked names, no account ids, and isMe from the session`
 
 ## Storefront end to end
 
 ### SMOKE-002
 
-The DIY home's product lists load on the real stack with no console error and no failed request.
+A decorated page's blocks, product lists included, load in the mini-program on the real stack with no console error and no failed request.
 
-- `e2e/storefront/specs/home-category-product.spec.ts::the DIY home page renders every fixture component with no console error`
+- `e2e/storefront/specs-mini/decor.spec.ts::a page published in the admin shows each of its blocks in order, and follows the next publish`
 
 ### SMOKE-003
 
-The home page, `GET /api/v1/diy/pages/home`, loads for a signed-in shopper on the H5 build.
+The mini-program's home page (`GET /api/v1/pages/home`) loads for a signed-in shopper.
 
-- `e2e/storefront/specs/home-category-product.spec.ts::the DIY home page renders every fixture component with no console error`
+- `e2e/storefront/specs-mini/shop-journey.spec.ts::a shopper goes from 首页 through 分类 and the cart to a paid order`
 
 ### SMOKE-004
 
-`GET /api/v1/profile` answers 200 after a password login on the H5 build.
+`GET /api/v1/profile` answers 200 after a sign-in in the mini-program: a password login (the login page's 其他方式) and the silent `wx.login` sign-in.
 
-- `e2e/storefront/specs/login.spec.ts::password login reaches an authenticated screen`
+- `e2e/storefront/specs-mini/login.spec.ts::SMOKE-004: 密码登录 under 其他方式 reaches an authenticated screen, and a wrong password is its field's error`
+- `e2e/storefront/specs-mini/login.spec.ts::a WeChat user the shop knows is signed in on opening the app, with no login page`
 
 ### SMOKE-005
 
 An order is created `pending_payment`, paid through the cashier with the worker running, and read back `paid`.
 
-- `e2e/storefront/specs/cart-checkout-pay.spec.ts::a shopper pays an order at the cashier and the order is paid`
+- `e2e/storefront/specs-mini/new-shopper-buys.spec.ts::a new WeChat user signs in, binds a phone, buys a product and pays`
 
 ### SMOKE-006
 
@@ -1234,13 +1465,6 @@ The group-buy poster is drawn by the client: the server composes and uploads not
 - `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::answers a second shopper the same poster, still without an upload`
 - `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::answers an unknown team with the contract’s 404, not a 500`
 
-### SMOKE-010
-
-The storefront is served DIY data with the components and navigation entries the shop does not have removed whole, and every other node kept.
-
-- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity fixtures > covers every branch of the filter`
-- `packages/core/src/diy/diy.int.test.ts::the storefront read > serves the home page with the retired components stripped`
-
 ### SMOKE-011
 
 Presale expiry unlists only expired presale products.
@@ -1262,9 +1486,9 @@ A successful group updates leader and members once, without repeated notificatio
 
 ### CORE-002
 
-The shop has no 砍价, 秒杀, 抽奖, 直播, 分销, 积分, 签到, 付费会员, 充值, 余额支付, 支付宝, 线下支付, 核销, 门店自提, 自建客服 or the other features `pnpm guards`' `retired` check lists: no identifier or URL token for any of them exists in the application source or the uni-app API layer, and every route file is described by a contract, so there is no unlisted surface for one to come back through.
+The shop has no 砍价, 秒杀, 抽奖, 直播, 分销, 积分, 签到, 付费会员, 充值, 余额支付, 支付宝, 线下支付, 核销, 门店自提, 自建客服 or the other features `pnpm guards`' `retired` check lists: no identifier or URL token for any of them exists in the application source or the mini-program (with `@shop/api-client` and `@shop/storefront-blocks`), and every route file is described by a contract, so there is no unlisted surface for one to come back through.
 
-- `guards/src/checks/retired.test.ts::the retired blacklist > finds no retired identifier in the workspace or the uni-app API layer`
+- `guards/src/checks/retired.test.ts::the retired blacklist > finds no retired identifier in the workspace or the mini-program`
 - `guards/src/checks/contracts.test.ts::contracts and route files > leaves no route file that no contract describes`
 
 ## Test strength and stability
@@ -1461,7 +1685,32 @@ Every contract has a route file that exports its method, and every route file is
 - `guards/src/checks/contracts.test.ts::contracts and route files > matches every contract to a route file that exports its method`
 - `guards/src/checks/contracts.test.ts::leaves no route file that no contract describes`
 
+## Storefront share codes (小程序码)
+
+### SHARE-001
+
+`GET /api/v1/share/mini-codes` accepts only route-catalogue keys marked `miniCode`, and the code it answers opens exactly `storefrontRouteDef(key).path` with `encodeScene(route)` as the scene, which `decodeScene` reads back. The params are validated against the key before anything is looked up or minted: params that do not fit (an `id` on `home`, none on `product`) are `VALIDATION_FAILED` with no WeChat call and no row. A pair is minted once and served from the `(page, scene)` cache afterwards.
+
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > takes the page from the catalogue and the scene from encodeScene — SHARE-001`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::the (page, scene) cache > asks WeChat once for a pair and serves every later caller from the cache`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > refuses params that do not fit the key, without calling WeChat — SHARE-001`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > refuses a key the catalogue does not mark miniCode — SHARE-001`
+- `e2e/storefront/specs-mini/share.spec.ts::SHARE-001: a 小程序码 opens the product, activity, coupon or decor page it was made for`
+
+### SHARE-002
+
+A 拼团 poster points at the team page from the route catalogue, not at a hand-typed path: `route` is `groupbuyTeam { id }`, and `page` and `qrPayload` are `toMiniPath(route)`.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the storefront surface > answers the poster with data and a payload, never an image — SHARE-002`
+
 ## System, storage and uploads
+
+### SHARE-003
+
+The version a 小程序码 opens (`env_version`) is `wechat-mini.codeEnvVersion` — `release` unless an operator picks `trial` or `develop` — and codes are cached per version: a code minted for one version is never served while the setting names another, and switching back reuses the earlier code without calling WeChat.
+
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::SHARE-003 — the version a code opens comes from config > asks for release by default`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::SHARE-003 — the version a code opens comes from config > asks for the configured version, and caches per version`
 
 ### SYS-001
 
@@ -1540,14 +1789,13 @@ The last enabled super admin cannot be disabled or deleted, and nobody can lock 
 
 ### SYS-012
 
-A write is audited with its actor, route and target; every credential-named field and every field the config registry marks secret is stripped at any depth; a read is not audited, and the reader cannot undo the redaction. Staff-surface writes are audited with `actor_kind = 'staff'` and the 店员's user id, and every admin sign-in outcome is audited under `auth.adminLogin` without the body.
+A write is audited with its actor, route and target; every credential-named field and every field the config registry marks secret is stripped at any depth; a read is not audited, and the reader cannot undo the redaction. New rows are always `actor_kind = 'admin'`; the historic `actor_kind = 'staff'` rows (the mobile staff console, deleted at the cutover) stay readable and filterable, and every admin sign-in outcome is audited under `auth.adminLogin` without the body.
 
 - `apps/web/app/admin-api/admins/system.int.test.ts::/admin-api/admins > creates with 201 and writes an audit row without the password in it`
 - `apps/web/app/admin-api/admins/system.int.test.ts::/admin-api/audit-logs > does not record a read`
 - `packages/core/src/auth/audit.redact.test.ts::what the operation log keeps of a request body > redacts the same credential one level down, as the config form sends it`
 - `apps/web/src/server/handle.int.test.ts::what the operation log keeps of a config save > leaves no part of the payment keys in audit_logs`
 - `packages/core/src/auth/admin-login.trail.int.test.ts::what a password-guessing run leaves behind > leaves a readable trail of the failed attempts, without the password`
-- `apps/web/app/api/v1/staff/products/catalog-staff.int.test.ts::/api/v1/staff/products/:id/skus > records the reprice in the operation log, naming the 店员 and the product`
 - `apps/web/src/server/handle.int.test.ts::the 操作日志 reader lists both kinds of actor > returns admin and staff rows, each naming its actor, and filters by kind`
 
 ### SYS-013
@@ -1556,6 +1804,94 @@ A save is refused whole when the schema rejects a value or the group does not de
 
 - `packages/core/src/system/system.int.test.ts::config > refuses a value the schema rejects, and writes nothing`
 - `packages/core/src/system/system.int.test.ts::config > refuses a key the group does not declare`
+
+### SYS-014
+
+`GET /api/v1/app/config` is public and never carries a secret: every `secret: true` field of every registered config group, given a distinctive stored value, is absent from the serialised payload.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-014 — the app config leaks nothing > answers a request with no session, and the answer matches the contract`
+- `packages/core/src/system/app-config.int.test.ts::SYS-014 — the app config leaks nothing > cannot leak any secret in any registered group`
+
+### SYS-015
+
+The `storefront-appearance` group answers a fresh install with every field defaulted (the contract's `appAppearanceDefaults`), always yields exactly the four fixed tabs — 首页, 分类, 购物车, 我的 — in that order, falls back to the default label when one is blanked, serves a blank accent colour as `null` (the client then uses the primary colour), and refuses any colour that is not `#RRGGBB` (and a radius off the scale, and an over-long label) whole, writing nothing. Its 页面显示 switches (`display`: 分类 second-level categories, 商品详情 reviews, 为你推荐, service tags and the product poster) all default to shown — what those pages showed before the switches — and each turns off alone; with the poster switched off 商品详情's share sheet offers no 生成海报 but still sends to a WeChat friend.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > answers a fresh install with every appearance default`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > shows every optional part of 分类 and 商品详情 until the operator switches one off`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > offers the product poster until the operator switches it off`
+- `apps/web/app/api/v1/app/config.int.test.ts::SYS-015 — the product poster switch over HTTP > offers the poster on a fresh install and stops once the operator switches it off`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > serves the theme and the tab bar the operator saved`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > serves the accent colour, and a blanked one as none`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > falls back to the default label when the operator blanks one`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > refuses <label>, and writes nothing`
+- `packages/contracts/src/system/app.schemas.test.ts::SYS-015 — hexColor > refuses <label>`
+- `packages/contracts/src/system/app.schemas.test.ts::SYS-015 — appearance defaults > are a valid appearance, with the four fixed tabs in order`
+- `packages/contracts/src/system/app.schemas.test.ts::SYS-015 — display defaults > show every optional part, the product poster included`
+- `apps/mini/src/pages/product/index.test.tsx::商品详情 > SYS-015 — hides 评价, 为你推荐 and 服务 when the shop switched them off`
+- `apps/mini/src/pages/product/index.test.tsx::商品详情 > SYS-015 — offers no poster when the shop switched product posters off, still shares to a friend`
+
+### SYS-016
+
+A save to any group `GET /api/v1/app/config` is built from drops its cache and moves its `version` (the weak `ETag`) at once, a save to any other group does not, and a caller holding the current version gets a bodyless 304. It serves the site values the operator saved, and the subscribe ids it shares with `GET /api/v1/wechat/subscribe-templates` are built by the same code and agree with them.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > is built from exactly the groups that drop its cache`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > drops the cache and moves the version when <label> is saved`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > leaves the cache alone when a group it does not read is saved`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > carries the same subscribe ids as GET /wechat/subscribe-templates, all four scenes`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > says whether a first WeChat sign-in will ask for a phone`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > serves the site values the operator saved`
+- `apps/web/app/api/v1/app/config.int.test.ts::GET /api/v1/app/config — conditional > answers a caller holding the current version with a bodyless 304`
+- `apps/web/app/api/v1/app/config.int.test.ts::GET /api/v1/app/config — conditional > sends the new settings once the <label> group is saved`
+
+### SYS-017
+
+`GET /api/v1/app/config` carries the server's clock (`serverTime`) outside its `version`: it is stamped per request after the cache, never stored in the cached copy, never moves the weak `ETag`, and goes out as the `X-Server-Time` header on every answer, so a caller holding the current version still gets a bodyless 304 that tells it the time.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-017 — the server clock rides outside the version > stamps serverTime per request, from the cache too, without moving the version`
+- `apps/web/app/api/v1/app/config.int.test.ts::SYS-017 — the server clock rides outside the ETag > stamps every answer with the server time, in the body and the X-Server-Time header`
+- `apps/web/app/api/v1/app/config.int.test.ts::SYS-017 — the server clock rides outside the ETag > keeps answering 304 as the clock moves, and the 304 still carries the time`
+
+### SYS-018
+
+`app/config.subscribeScenes` is built on the server from the operator's subscribe templates, one list per tap in the contract's `appSubscribeScene` enum: the three checkouts ask for shipping, then payment, then creation templates; the two after-sale taps ask for the refund templates; blank ids are dropped, duplicates kept once, and no list is longer than WeChat's three.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-018 — subscribe scenes are built on the server > asks each tap for its templates, shipping first, deduplicated, at most three`
+- `packages/core/src/system/app-config.int.test.ts::SYS-018 — subscribe scenes are built on the server > answers [] for every tap when no template is set`
+- `packages/core/src/system/app-config.int.test.ts::SYS-018 — subscribe scenes are built on the server > skips blank ids and fills from the next list`
+- `packages/contracts/src/system/app.schemas.test.ts::SYS-018 — subscribe scenes > has one key per scene the mini-program asks from, and caps each at three ids`
+
+### SYS-019
+
+`app/config.webviewDomains` is the `wechat-mini` group's 业务域名 list, lower-cased and deduplicated; a save carrying anything but bare host names (a scheme, a path, a port, a wildcard) is refused whole and writes nothing.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-019 — web-view domains > serves the operator list lower-cased and deduplicated, one per line or comma`
+- `packages/core/src/system/app-config.int.test.ts::SYS-019 — web-view domains > refuses <label>, and writes nothing`
+- `packages/contracts/src/system/app.schemas.test.ts::SYS-019 — webview domains > refuses <label>`
+- `e2e/storefront/specs-mini/app-config.spec.ts::the app config answers cached and versioned: an ETag, a 304 for it, a new one after a save`
+
+### CLIENT-002
+
+The mini-program opens a `webview` link in its web-view only when the URL is https and its host is `mp.weixin.qq.com` or on `app/config.webviewDomains`; any other link is copied for the shopper to open in a browser (「链接已复制，请在浏览器中打开」) and never opened, because WeChat refuses a web-view outside the configured 业务域名 (`docs/mini/wechat-compliance.md` C12).
+
+- `apps/mini/src/platform/link.test.ts::openLinkTarget > opens an allowed web page in the web-view and copies any other`
+- `e2e/storefront/specs-mini/decor.spec.ts::a web-view link opens only a 业务域名 the shop listed; any other link is copied`
+
+### SYS-020
+
+The mini-program's splash (`app/config.splashAd.link`) is a `LinkTarget`: the stored `site.splashLinkTarget`, else the legacy `splashLink` as a `webview` link when it is an https URL, else `null`; a legacy uni-app path is never guessed at.
+
+- `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > serves the stored LinkTarget ahead of the legacy path`
+- `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > falls back to an https legacy link as a web-view, and to none for a uni-app path`
+- `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > refuses a LinkTarget that does not parse, and writes nothing`
+
+### SYS-021
+
+`deriveTheme` (`packages/contracts/src/system/theme.ts`, shared by the mini-program and the admin preview) keeps the operator's brand colour and makes the text readable: the primary-text and price tokens reach 4.5:1 on white for every input, the text on the primary colour reaches at least 3:1, a missing accent is the primary colour, and the module stays zod-free at runtime.
+
+- `packages/contracts/src/system/theme.test.ts::SYS-021 — deriveTheme keeps text readable > <label>: text on white reaches 4.5:1, text on the colour 3:1`
+- `packages/contracts/src/system/theme.test.ts::SYS-021 — deriveTheme keeps text readable > holds for 200 random colours`
+- `packages/contracts/src/system/theme.test.ts::SYS-021 — deriveTheme keeps text readable > falls back: no accent is the primary colour, no price is the primary text colour`
+- `packages/contracts/src/system/theme.test.ts::zod-free > imports nothing at runtime, so the mini-program may ship it`
 
 ### SYSC-001
 
@@ -1664,11 +2000,13 @@ Identical bytes are stored once: the second upload returns the existing row.
 
 ### STOR-010
 
-The storefront upload needs a shopper session, takes images only, enforces a per-user hourly budget and answers with the file rather than the library row.
+The storefront upload needs a shopper session, takes images only (never an SVG, whatever it is named), refuses a file over the shopper size ceiling, enforces a per-user hourly budget and answers with the file rather than the library row.
 
 - `apps/web/app/admin-api/attachments/storage.int.test.ts::/api/v1/uploads > requires a shopper session`
 - `packages/core/src/storage/storage.int.test.ts::storefront upload > enforces the per-user hourly budget`
 - `packages/core/src/storage/storage.int.test.ts::storefront upload > accepts an image and answers with the file, not the library`
+- `packages/core/src/storage/storage.int.test.ts::storefront upload > refuses an SVG from a shopper whatever it is called`
+- `packages/core/src/storage/storage.int.test.ts::storefront upload > refuses an image over the shopper ceiling, and stores nothing`
 
 ### STOR-011
 
@@ -1797,6 +2135,12 @@ A courier code identifies one company: a duplicate is refused by the unique inde
 - `packages/core/src/shipping/shipping.concurrency.int.test.ts::creating the same courier code twice at once > keeps one row and refuses the rest by their code`
 - `apps/web/app/admin-api/shipping/shipping.int.test.ts::/admin-api/shipping/express-companies > refuses a duplicate code as 409 with its Chinese message`
 
+### SHIP-003
+
+The shopper's carrier picker (`GET /api/v1/express-companies`) offers enabled carriers only, at most `limit` (default 50, at most 100), those with a WeChat courier code first and then by `sortOrder`; `keyword` matches the name or the code, case-insensitively, with `%` and `_` taken literally. The operators' pickers stay uncapped.
+
+- `packages/core/src/shipping/shipping.int.test.ts::快递公司 > SHIP-003 — the shopper’s picker: enabled only, a WeChat courier code first, searched and capped`
+
 ### CMS-004
 
 An article slug belongs to one article: concurrent publishes of the same slug leave one winner and `CMS_ARTICLE_SLUG_TAKEN` for the rest, and deleting an article releases its slug rather than squatting on the URL.
@@ -1809,3 +2153,191 @@ An article slug belongs to one article: concurrent publishes of the same slug le
 The storefront serves published, visible articles only — in the list and by id.
 
 - `packages/core/src/cms/cms.int.test.ts::文章 storefront > serves published articles only, by id as well as in the list`
+
+## Page decoration (装修 v2)
+
+### DECOR-001
+
+A block type is declared once, with `defineBlock`, and a declaration that could not be served safely fails at load: its props carry the shared base props (`style`, `visibility`), every stored version below the current one has exactly one migration step, the type name and `minClient` are well-formed, and no type is registered twice. Stored props are migrated step by step to the current version.
+
+- `packages/contracts/src/decor/decor.test.ts::defineBlock — DECOR-001 > refuses a props schema without the base props`
+- `packages/contracts/src/decor/decor.test.ts::defineBlock — DECOR-001 > refuses a version without a migration for every older version`
+- `packages/contracts/src/decor/decor.test.ts::defineBlock — DECOR-001 > refuses a bad type name, a bad minClient and a registry with a type twice`
+- `packages/contracts/src/decor/decor.test.ts::defineBlock — DECOR-001 > migrates stored props step by step up to the current version`
+- `packages/contracts/src/decor/decor.test.ts::defineBlock — DECOR-001 > compares client versions numerically, and a garbled one as unknown`
+
+### DECOR-002
+
+A decorated link stores what it opens (`LinkTarget`), never a path: a catalogue route by key with strict params and only among the `linkable` keys, an https page for a web-view, or a well-formed mini-program AppID. It resolves to a catalogue route without zod, so the mini-program can follow it.
+
+- `packages/contracts/src/decor/decor.test.ts::LinkTarget — DECOR-002 > is a typed target, never a path string`
+- `packages/contracts/src/decor/decor.test.ts::LinkTarget — DECOR-002 > links to catalogue routes by key with strict params, linkable keys only`
+- `packages/contracts/src/decor/decor.test.ts::LinkTarget — DECOR-002 > opens only https pages in a web-view and checks a mini-program AppID`
+- `packages/contracts/src/decor/decor.test.ts::LinkTarget — DECOR-002 > resolves to a catalogue route without zod`
+
+### DECOR-003
+
+A draft save is lenient and a publish is strict. A draft whose envelope fails (schema version, block count, byte size) is refused outright; anything inside it that fails — invalid props, an unknown block type, a block type newer than this build, a block the page kind may not hold — is stored as it came and reported as an issue with its path, so an operator's half-finished work is never thrown away. Known blocks are stored migrated with their defaults filled in, and a draft stored before a block's upgrade is read back migrated.
+
+- `packages/contracts/src/decor/decor.test.ts::checkDocument — DECOR-003 > keeps an unknown block type as it came, warns, and blocks publishing it`
+- `packages/contracts/src/decor/decor.test.ts::checkDocument — DECOR-003 > treats a known type stored at a newer version like an unknown one`
+- `packages/contracts/src/decor/decor.test.ts::checkDocument — DECOR-003 > saves invalid props as they came and reports them with a path`
+- `packages/contracts/src/decor/decor.test.ts::checkDocument — DECOR-003 > refuses the envelope outright: schema version, block count, byte size`
+- `packages/contracts/src/decor/decor.test.ts::checkDocument — DECOR-003 > limits the blocks that need server data`
+- `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: a draft with content issues is saved and the issues reported; a broken envelope is refused`
+- `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: an unknown block type is kept as it came, with a warning`
+- `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: a known block is stored migrated, with its defaults filled in`
+- `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: a new page starts empty and titled after its name; a new 个人中心 starts from the built-in one`
+- `packages/contracts/src/decor/blocks.test.ts::商品列表 (productGrid) v2 > migrates a stored v1 block to the two-column grid it always was`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > DECOR-003: a 商品网格 stored at v1 is served at v2 as the two-column grid it was, with its products`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > DECOR-003: a draft stored before a block’s upgrade opens migrated, so the editor can load it`
+- `packages/core/src/decor/decor.int.test.ts::decor documents — DECOR-003 > DECOR-003: lists, renames, duplicates and soft-deletes documents`
+
+### DECOR-004
+
+A link or a data source naming a record the shopper cannot see (off the shelf, deleted, unpublished, outside its window, or an id that never existed) is a warning on save and on publish, never an error; the storefront resolver skips it silently. Links and sources are found through the editor metadata, not by block name.
+
+- `packages/contracts/src/decor/decor.test.ts::collectReferences — DECOR-004 > finds links and sources through the editor metadata, not by block name`
+- `packages/core/src/decor/decor.int.test.ts::references — DECOR-004 > DECOR-004: a record the shopper cannot see is a warning on save, never an error`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-004: a picked campaign that is not running is a warning, checked by id`
+
+### DECOR-005
+
+The storefront always has a 个人中心: with none designated, `GET /api/v1/pages/user-center` serves the built-in one (which passes the strict check for its kind), and a new 个人中心 document starts from it.
+
+- `packages/contracts/src/decor/decor.test.ts::the built-in 个人中心 — DECOR-005 > passes the strict check for a user-centre page, unchanged`
+- `packages/core/src/decor/decor.int.test.ts::the built-in 个人中心 — DECOR-005 > DECOR-005: with nothing designated the storefront gets the built-in 个人中心; once designated, that one`
+- `apps/web/app/api/v1/pages/pages.int.test.ts::GET /api/v1/pages/user-center > serves the built-in 个人中心 until one is designated, then that one`
+
+### DECOR-006
+
+Revisions are append-only: the database refuses an `UPDATE` or `DELETE` on `decor_revisions` (trigger), and a revision reads back exactly as published. Concurrent publishes and rollbacks number revisions without gaps or duplicates.
+
+- `packages/core/src/decor/decor.int.test.ts::revisions — DECOR-006 > DECOR-006: the database refuses to update or delete a revision`
+- `packages/core/src/decor/decor.int.test.ts::revisions — DECOR-006 > DECOR-006: a revision is read back exactly as published`
+- `packages/core/src/decor/decor.concurrency.int.test.ts::concurrent rollbacks — DECOR-011 > DECOR-011: N rollbacks at once each append a revision, numbered without gaps or duplicates`
+
+### DECOR-007
+
+Publishing is atomic and idempotent: in one transaction under the document's row lock, a draft with no issues becomes a new revision and the live pointer moves to it — or nothing is written. A draft already live is `DECOR_NOTHING_TO_PUBLISH`, so N simultaneous publishes make one revision; a publish naming a version other than the draft's is a conflict.
+
+- `packages/core/src/decor/decor.int.test.ts::publishing — DECOR-007 > DECOR-007: publish writes revision 1 and moves the live pointer; the same draft again is nothing to publish`
+- `packages/core/src/decor/decor.int.test.ts::publishing — DECOR-007 > DECOR-007: a draft with issues is not published, and nothing is written`
+- `packages/core/src/decor/decor.int.test.ts::publishing — DECOR-007 > DECOR-007: a block not allowed on the page kind blocks publishing`
+- `packages/core/src/decor/decor.int.test.ts::publishing — DECOR-007 > DECOR-007: publishing a version other than the draft is a conflict`
+- `packages/core/src/decor/decor.concurrency.int.test.ts::concurrent publishes — DECOR-007 > DECOR-007: N publishes of the same draft make one revision; the rest are nothing to publish`
+- `packages/core/src/decor/decor.concurrency.int.test.ts::concurrent publishes — DECOR-007 > DECOR-007: publishes racing saves never publish a version the publisher did not name`
+
+### DECOR-008
+
+At most one document is the 首页 and at most one the 个人中心 (partial unique index, and an advisory lock per designation so concurrent switches queue), and only a published document of the matching kind can be designated. Designating another document moves the designation; `null` clears it.
+
+- `packages/core/src/decor/decor.int.test.ts::designations — DECOR-008 > DECOR-008: only a published document of the matching kind can be designated`
+- `packages/core/src/decor/decor.int.test.ts::designations — DECOR-008 > DECOR-008: designating another document moves the designation; null clears it`
+- `packages/core/src/decor/decor.int.test.ts::designations — DECOR-008 > DECOR-008: the database allows one document per designation`
+- `packages/core/src/decor/decor.concurrency.int.test.ts::concurrent designations — DECOR-008 > DECOR-008: N documents designated as 首页 at once leave exactly one designated`
+- `e2e/admin/specs/decor.spec.ts::DECOR-008: designating a published page as 首页 serves it as the home page`
+
+### DECOR-009
+
+The designated 首页 or 个人中心 cannot be deleted (`DECOR_DOCUMENT_IN_USE`); a delete racing a designation leaves either a live designated document or a deleted undesignated one, never a deleted designated one. A deleted document's revisions stay.
+
+- `packages/core/src/decor/decor.int.test.ts::deletion — DECOR-009 > DECOR-009: the designated document cannot be deleted; once undesignated it can`
+- `packages/core/src/decor/decor.concurrency.int.test.ts::delete against designate — DECOR-009 > DECOR-009: a delete racing a designation never leaves a deleted document designated`
+
+### DECOR-010
+
+A draft save is optimistically locked on `draftVersion`: a save on a stale version is `DECOR_VERSION_CONFLICT` carrying the current version and changes nothing, so of N saves on the same version exactly one lands, whole.
+
+- `packages/core/src/decor/decor.int.test.ts::draft saves — DECOR-010 > DECOR-010: a save on a stale version is refused with the current version, and changes nothing`
+- `packages/core/src/decor/decor.int.test.ts::draft saves — DECOR-010 > DECOR-010: a save on a deleted document is not found, not a conflict`
+- `packages/core/src/decor/decor.concurrency.int.test.ts::concurrent draft saves — DECOR-010 > DECOR-010: of N saves on the same version exactly one lands; the rest are version conflicts`
+
+### DECOR-011
+
+A rollback republishes an old revision's content as a new revision (`restoredFrom` set), checked like any publish; nothing is rewritten and the draft is left as it is.
+
+- `packages/core/src/decor/decor.int.test.ts::rollback — DECOR-011 > DECOR-011: rollback republishes old content as a new revision and leaves the draft alone`
+- `packages/core/src/decor/decor.int.test.ts::rollback — DECOR-011 > DECOR-011: rolling back to a revision that does not exist writes nothing`
+- `packages/core/src/decor/decor.concurrency.int.test.ts::concurrent rollbacks — DECOR-011 > DECOR-011: N rollbacks at once each append a revision, numbered without gaps or duplicates`
+- `e2e/admin/specs/decor.spec.ts::DECOR-011 DECOR-014: create, save, publish, publish again and roll back — the storefront follows each step`
+
+### DECOR-012
+
+A preview token opens the current draft of the one document it was issued for, and nothing else; it is 256 random bits, kept in Redis only as its SHA-256, and expires after `PREVIEW_TOKEN_SECONDS`. A preview is never cached and is marked `preview: true`. Without a token an unpublished document does not exist for the storefront.
+
+- `packages/core/src/decor/decor.int.test.ts::preview tokens — DECOR-012 > DECOR-012: a token opens the draft of its own document, uncached and marked preview`
+- `packages/core/src/decor/decor.int.test.ts::preview tokens — DECOR-012 > DECOR-012: a token does not open another document, and a made-up token opens nothing`
+- `packages/core/src/decor/decor.int.test.ts::preview tokens — DECOR-012 > DECOR-012: the token expires with Redis and is stored only as a hash`
+- `apps/web/app/api/v1/pages/pages.int.test.ts::GET /api/v1/pages/:id > with a preview token serves the draft of that document only`
+- `e2e/admin/specs/decor.spec.ts::DECOR-012: the preview frames the saved draft through a preview token`
+- `e2e/storefront/specs-mini/decor.spec.ts::DECOR-012: the editor’s preview token shows the draft under a banner, and nothing without it`
+
+### DECOR-013
+
+A page serves only what the shopper could see, by each domain's own rule, through that domain's `index.ts`: products on the shelf (a manual list keeps the operator's order and marks a sold-out pick; a category or label rule leaves sold-out products out), claimable coupons, published articles, campaigns in their window. A resolver that fails costs its slot (`null`), never the page.
+
+- `packages/core/src/decor/decor.int.test.ts::resolved data — DECOR-013 > DECOR-013: a manual product list keeps the operator order, skips what is off the shelf and marks what is sold out`
+- `packages/core/src/decor/decor.int.test.ts::resolved data — DECOR-013 > DECOR-013: a category or label rule returns on-shelf products with stock only, at most the limit`
+- `packages/core/src/decor/decor.int.test.ts::resolved data — DECOR-013 > DECOR-013: coupons, 新人券 and articles come back only when the shopper could see them`
+- `packages/core/src/decor/decor.int.test.ts::resolved data — DECOR-013 > DECOR-013: a resolver that fails costs its slot, not the page`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > DECOR-013: a 商品选项卡 resolves every tab’s products with the page, each by its own rule`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-013: 优惠券 shows only what can be claimed now, in the operator’s order`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-013: a manual 拼团 / 预售 pick is found by id, however far down the list it sits`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-013: 资讯 resolves a category’s newest published articles`
+- `e2e/storefront/specs-mini/decor.spec.ts::a page published in the admin shows each of its blocks in order, and follows the next publish`
+
+### DECOR-014
+
+The public part of a page is cached per revision (`decor:page:rev:<id>`, `DECOR_CACHE_SECONDS`); the live revision is read from the database on every request, so a publish or a rollback serves the new revision at once, and the old entry is deleted. The storefront's ETag changes with it.
+
+- `packages/core/src/decor/decor.int.test.ts::page cache — DECOR-014 > DECOR-014: the public page is cached per revision, and a publish serves the new revision at once`
+- `packages/core/src/decor/decor.int.test.ts::page cache — DECOR-014 > DECOR-014: a rollback also moves the page off the cached revision`
+- `packages/core/src/decor/decor.int.test.ts::page cache — DECOR-014 > DECOR-014: no home designated is DECOR_HOME_NOT_SET`
+- `apps/web/app/api/v1/pages/pages.int.test.ts::GET /api/v1/pages/home > answers 304 to a matching If-None-Match, and a publish changes the ETag`
+- `e2e/admin/specs/decor.spec.ts::DECOR-011 DECOR-014: create, save, publish, publish again and roll back — the storefront follows each step`
+
+### DECOR-015
+
+Per-shopper state — coupons claimed / claimable, and what a block declares with `personal` (the 订单入口 counts, the 用户卡片 nickname, avatar and coupon / favourite / history totals, the 新人券 the shopper still holds) — is resolved only when a shopper's session comes with the request, for that shopper, is never part of the cached page (which keeps only _which_ state to fetch), and is `null` for a guest or an admin. A lookup that fails costs its slot, never the page. The mini-program never stands in for that layer: after a claim it fetches the page again instead of changing the button itself.
+
+- `packages/core/src/decor/decor.int.test.ts::per-shopper state — DECOR-015 > DECOR-015: with a session the page carries the coupon state of that shopper; without one, none`
+- `packages/core/src/decor/decor.int.test.ts::per-shopper state — DECOR-015 > DECOR-015: the cached public page holds nothing per shopper`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > per-shopper state of the 个人中心 blocks — DECOR-015 > DECOR-015: a shopper gets their own order counts, profile and totals; a guest gets none`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > per-shopper state of the 个人中心 blocks — DECOR-015 > DECOR-015: the totals are read only when the card shows them`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > per-shopper state of the 个人中心 blocks — DECOR-015 > DECOR-015: a live 个人中心 is cached without anyone’s state, and each shopper still gets theirs`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > per-shopper state of the 个人中心 blocks — DECOR-015 > DECOR-015: a personal lookup that fails costs its slot, not the page`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-015: 优惠券 claim state is each shopper’s own, and never in the cached page`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-015: 新人券 shows a guest the templates, and a shopper only the 新人券 they still hold`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-015: a live 新人券 block is cached without anyone’s wallet`
+- `apps/mini/src/features/decor/decor-host.test.tsx::DecorPage host (decor.md §2.4) > claimCoupon > DECOR-015 — claims for a shopper, says so, and reloads the page rather than flipping the button`
+
+### DECOR-016
+
+Blocks are filtered per request from the one cached page: `visibility.audience` against the session, `visibility.platforms` against `X-Client-Platform`, and each type's `minClient` against `X-Client-Version` (an unreadable version sees everything). Unknown types, types newer than this build and props that do not parse are skipped, never served broken.
+
+- `packages/core/src/decor/decor.int.test.ts::per-request filtering — DECOR-016 > DECOR-016: blocks are filtered by audience and X-Client-Platform, per request, from one cached page`
+- `packages/core/src/decor/decor.int.test.ts::per-request filtering — DECOR-016 > DECOR-016: a block type newer than the client is left out for that client only`
+- `packages/core/src/decor/decor.int.test.ts::per-request filtering — DECOR-016 > DECOR-016: unknown, newer-than-this-build and unparseable blocks are skipped, never served broken`
+- `packages/core/src/decor/decor.int.test.ts::per-request filtering — DECOR-016 > DECOR-016: blockVisibleTo ignores a client version it cannot read`
+- `apps/web/app/api/v1/pages/pages.int.test.ts::GET /api/v1/pages/home > filters blocks per request: session, X-Client-Platform, X-Client-Version`
+
+### DECOR-017
+
+富文本 HTML reaches a shopper only through the allow-list in `packages/contracts/src/decor/rich-text.ts`: text-structure tags only; `script`, `style`, `iframe`, embeds, forms and media dropped with their content; links and unknown tags unwrapped; no attribute but a filtered `style` (colour, alignment, weight, italics, underline — strict values, no `url()`) and, on `img`, an `https://` or site-relative `src` with a fixed fit-the-screen style. The block schema overwrites the value with its sanitised form, so the save stores only that, and the resolver, which parses every block it serves, sanitises again whatever the row holds.
+
+- `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > drops scripts, styles, iframes, embeds and forms with everything inside them`
+- `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > strips every attribute but a filtered style, and event handlers above all`
+- `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > keeps only the allowed style properties, with strict values`
+- `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > keeps https and site images only, with a fixed style that fits the screen`
+- `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > never lets markup out of text or attribute values`
+- `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > is idempotent: sanitising clean output changes nothing`
+- `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > is applied by the block schema, so a save stores only the clean form`
+- `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > DECOR-017: rich text is stored sanitised, and served sanitised even when the row was not`
+
+### DECOR-018
+
+A page holds at most one 悬浮客服 (`floatingContact`: a fixed button, so a second would sit on the first) and at most one 关注公众号 (`followOfficialAccount`: WeChat allows one `<official-account>` per page). A draft with more saves with an issue on the extra block, and publishing it is refused.
+
+- `packages/contracts/src/decor/blocks.test.ts::the batch-2 blocks (G2) > allows one 悬浮客服 and one 关注公众号 per page — DECOR-018`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-018: a page takes one 悬浮客服 and one 关注公众号, and publishing more is refused`

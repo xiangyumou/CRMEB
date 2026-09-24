@@ -38,7 +38,10 @@ import path from 'node:path';
 /** The checkout root, resolved from this file. */
 export const CHECKOUT_ROOT = path.resolve(import.meta.dirname, '../../..');
 
-/** Eight hex digits of the checkout path's SHA-256: stable per checkout, distinct across them. */
+/**
+ * Eight hex digits of the checkout path's SHA-256: stable per checkout,
+ * distinct across them.
+ */
 export const CHECKOUT_ID = createHash('sha256').update(CHECKOUT_ROOT).digest('hex').slice(0, 8);
 
 /**
@@ -55,9 +58,7 @@ export const STACK_FILE =
 
 /**
  * The port the *browser* talks to: the edge, which serves the H5 bundle and
- * proxies `/api` to `next start`. Same origin, because `config/app.js` derives
- * the API origin from `window.location` on H5 — a storefront served from a
- * different origin than its API is not the thing production runs.
+ * proxies `/api` to `next start`, so the page and its API share one origin.
  */
 export const EDGE_PORT = Number(process.env.SHOP_E2E_PORT ?? DEFAULT_BASE_PORT);
 
@@ -95,6 +96,8 @@ export interface StackInfo {
   uploadsDir: string;
   /** The fake WeChat Pay gateway's origin. */
   gatewayUrl: string;
+  /** The fake mini-program's app id: what a `wechat_mini` payment is charged to. */
+  wechatMiniAppId: string;
   /** The gateway control-plane's origin (`src/gateway-control.ts`) — how a
    * spec, running in a different process than the gateway, drives
    * `markPaid`/`postNotify` and `markRefunded`/`postRefundNotify`. */
@@ -125,7 +128,8 @@ export interface StackFixtures {
   primaryAddressId: number;
   secondaryAddressId: number;
   expressCompanyId: number;
-  diyHomePageId: number;
-  /** Every DIY page the seed published, with the component ids each should render. */
-  diyPages: Array<{ fixture: string; id: number; kind: 'home' | 'micro'; componentIds: string[] }>;
+  /** The mini-program's 首页 (页面装修 v2), as the seed designated it. */
+  decorHomeId: number;
+  /** The one province/city/district path the seed inserted: what any address must point at. */
+  division: { provinceId: string; cityId: string; districtId: string };
 }

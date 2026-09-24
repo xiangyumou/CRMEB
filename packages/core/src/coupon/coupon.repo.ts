@@ -64,6 +64,23 @@ export async function findTemplate(db: DbOrTx, id: number): Promise<TemplateRow 
   return rows[0] ?? null;
 }
 
+/**
+ * A template's status whatever its deletion state, or null if there is no such
+ * row. A soft-deleted template's wallet coupons are still spendable, and their
+ * scope is still read from it (`templateTerms`), so a scope lookup must see it.
+ */
+export async function templateStatus(
+  db: DbOrTx,
+  id: number,
+): Promise<'draft' | 'active' | 'disabled' | null> {
+  const rows = await db
+    .select({ status: couponTemplates.status })
+    .from(couponTemplates)
+    .where(eq(couponTemplates.id, id))
+    .limit(1);
+  return rows[0]?.status ?? null;
+}
+
 export interface TemplateListFilter {
   keyword?: string | undefined;
   status?: readonly ('draft' | 'active' | 'disabled')[] | undefined;
@@ -253,16 +270,47 @@ export async function productCategoryIds(
 }
 
 /**
+ * The template's scope covers `productId` — `eligibleLineIndexes` (coupon.rules.ts)
+ * as SQL, over the same rows the checkout reads: `all_products`; `products`
+ * naming it; or `categories` sharing a category with its direct
+ * `product_categories_map` rows (what `productCategoryIds` and the catalog's
+ * `categoryIdsFor` hand the checkout). The two must agree, or a coupon offered on
+ * a product page would be refused at checkout.
+ */
+function coversProduct(productId: number): SQL {
+  return sql`(
+    ${couponTemplates.scope} = 'all_products'
+    or (${couponTemplates.scope} = 'products' and exists (
+      select 1 from ${couponTemplateProducts}
+      where ${couponTemplateProducts.templateId} = ${couponTemplates.id}
+        and ${couponTemplateProducts.productId} = ${productId}))
+    or (${couponTemplates.scope} = 'categories' and exists (
+      select 1 from ${couponTemplateCategories}
+      join ${productCategoriesMap}
+        on ${productCategoriesMap.categoryId} = ${couponTemplateCategories.categoryId}
+      where ${couponTemplateCategories.templateId} = ${couponTemplates.id}
+        and ${productCategoriesMap.productId} = ${productId}))
+  )`;
+}
+
+/**
  * Templates a shopper may claim by hand right now, ignoring their own limit.
  * With `ids`, only those templates, in that order.
  */
 export async function listClaimable(
   db: DbOrTx,
-  args: { now: Date; ids?: readonly number[] | undefined; offset: number; limit: number },
+  args: {
+    now: Date;
+    ids?: readonly number[] | undefined;
+    productId?: number | undefined;
+    offset: number;
+    limit: number;
+  },
 ): Promise<{ rows: TemplateRow[]; total: number }> {
   const where = and(
     liveTemplate(),
     args.ids === undefined ? undefined : inArray(couponTemplates.id, [...args.ids]),
+    args.productId === undefined ? undefined : coversProduct(args.productId),
     eq(couponTemplates.status, 'active'),
     eq(couponTemplates.claimMode, 'manual'),
     or(isNull(couponTemplates.claimFrom), lte(couponTemplates.claimFrom, args.now)),
@@ -637,9 +685,8 @@ export async function expireOverdue(tx: Tx, args: { now: Date; limit: number }):
 export type WalletState = 'unused' | 'used' | 'expired';
 
 /**
- * Which wallet tab a row belongs to. One definition for the shopper's own
- * wallet and the staff view of it, so the two can never disagree on what
- * "unused" means.
+ * Which wallet tab a row belongs to. One definition, so every reader agrees on
+ * what "unused" means.
  */
 function walletStateFilter(state: WalletState, now: Date): SQL | undefined {
   return state === 'unused'
@@ -685,25 +732,30 @@ export async function listUserCoupons(
 }
 
 /**
- * One customer's wallet as a 店员 sees it: one tab, or every row with the
- * spendable ones first, newest first within each half. Capped by `limit` — the
- * staff drawer does not page.
+ * The unused, unexpired coupons of one source kind a user holds, soonest to
+ * expire first. Read-only; the DIY 新人券 block asks it for `gift_new_user`
+ * to tell a shopper their 新人券 are waiting.
  */
-export async function listUserCouponsForStaff(
+export async function listUnusedBySource(
   db: DbOrTx,
-  args: { userId: number; state: WalletState | undefined; now: Date; limit: number },
+  args: {
+    userId: number;
+    sourceKind: UserCouponRow['sourceKind'];
+    now: Date;
+    limit: number;
+  },
 ): Promise<UserCouponRow[]> {
-  const where =
-    args.state === undefined
-      ? eq(userCoupons.userId, args.userId)
-      : and(eq(userCoupons.userId, args.userId), walletStateFilter(args.state, args.now));
-  // The `unused` tab's own predicate, so "first" means exactly what that tab shows.
-  const spendableFirst = sql`case when ${walletStateFilter('unused', args.now)} then 0 else 1 end`;
   return db
     .select()
     .from(userCoupons)
-    .where(where)
-    .orderBy(spendableFirst, desc(userCoupons.id))
+    .where(
+      and(
+        eq(userCoupons.userId, args.userId),
+        eq(userCoupons.sourceKind, args.sourceKind),
+        walletStateFilter('unused', args.now),
+      ),
+    )
+    .orderBy(asc(userCoupons.validTo), asc(userCoupons.id))
     .limit(args.limit);
 }
 

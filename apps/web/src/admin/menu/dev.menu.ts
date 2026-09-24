@@ -19,5 +19,13 @@ export default defineMenu({
       order: 10,
       devOnly: true,
     },
+    {
+      key: 'dev.decorSpike',
+      label: '装修组件沙盒',
+      path: '/admin/dev/decor-spike',
+      icon: 'BuildOutlined',
+      order: 20,
+      devOnly: true,
+    },
   ],
 });

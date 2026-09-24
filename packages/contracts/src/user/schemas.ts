@@ -1,13 +1,12 @@
 import { z } from 'zod';
+import { clientPlatform, id, instant, pageQuery, paged, sortQuery } from '../_conventions/common';
 import {
-  clientPlatform,
-  id,
-  instant,
-  money,
-  pageQuery,
-  paged,
-  sortQuery,
-} from '../_conventions/common';
+  invoiceHeaderInput,
+  invoiceHeaderType,
+  invoiceType,
+  withInvoiceHeaderRules,
+  type InvoiceHeaderInput,
+} from '../order/order.fulfil.schemas';
 
 /**
  * Shapes shared by the user routes.
@@ -85,9 +84,16 @@ export type UserProfile = z.infer<typeof userProfile>;
  * What a shopper may change about themselves.
  *
  * Not the phone (that is `POST /api/v1/auth/phone`, which needs an SMS code)
- * and not the account name (it is the login identity). `avatarUrl` is a URL
- * returned by `POST /api/v1/uploads?purpose=avatar`, so the only way to set an
- * avatar is to have uploaded one through the storage domain.
+ * and not the account name (it is the login identity).
+ *
+ * `avatarUrl` must be one of: the URL `POST /api/v1/uploads?purpose=avatar`
+ * returned (any live image in our storage), the account's current avatar
+ * (clients re-send it on every save), or the shop's configured default avatar.
+ * Anything else is `USER_AVATAR_NOT_ALLOWED` (USER-019). `''` clears it. In
+ * the mini-program, `<button open-type="chooseAvatar">` gives a temporary file:
+ * upload it first, then save the returned URL.
+ *
+ * `nickname` is trimmed; one that is only whitespace is refused.
  */
 export const userProfileForm = z.object({
   nickname: z.string().min(1).max(64).optional(),
@@ -125,7 +131,7 @@ export type UserAddress = z.infer<typeof userAddress>;
  * Create / update an address.
  *
  * The division *names* are required and the ids are optional, which is the
- * reverse of what a normalised design would ask for — but the uni-app picker
+ * reverse of what a normalised design would ask for — but a region picker
  * can return a hand-typed 海外 address with no division id, and refusing it
  * would make the shop unusable for exactly the customers who complain loudest.
  * The names are frozen at save time so renaming a district later does not
@@ -160,6 +166,81 @@ export type UserAddressForm = z.infer<typeof userAddressForm>;
 
 export const userAddressListQuery = pageQuery;
 export const pagedUserAddresses = paged(userAddress);
+
+// ---------------------------------------------------------------------------
+// invoice titles (发票抬头)
+// ---------------------------------------------------------------------------
+
+/**
+ * A saved 发票抬头.
+ *
+ * The field names are the ones `POST /api/v1/orders/:id/invoice` takes, so
+ * prefilling a request is a copy (`invoiceRequestFromTitle`), not a mapping.
+ * The request freezes the fields onto the invoice, so editing or deleting a
+ * title later never rewrites an invoice already asked for.
+ */
+export const invoiceTitle = z.object({
+  id,
+  headerType: invoiceHeaderType,
+  invoiceType,
+  name: z.string(),
+  dutyNumber: z.string().nullable(),
+  drawerPhone: z.string().nullable(),
+  email: z.string().nullable(),
+  registeredTel: z.string().nullable(),
+  registeredAddress: z.string().nullable(),
+  bankName: z.string().nullable(),
+  bankAccount: z.string().nullable(),
+  isDefault: z.boolean(),
+  createdAt: instant,
+  updatedAt: instant,
+});
+export type InvoiceTitle = z.infer<typeof invoiceTitle>;
+
+/**
+ * Create / update a title: exactly the request's header fields and rules
+ * (company needs a 税号, 专票 needs the four bank/registration fields), plus
+ * `isDefault`. An empty string is stored as "not given".
+ */
+export const invoiceTitleForm = withInvoiceHeaderRules(
+  invoiceHeaderInput.extend({
+    /** The first title a customer saves becomes the default whatever this says. */
+    isDefault: z.boolean().default(false),
+  }),
+);
+export type InvoiceTitleForm = z.infer<typeof invoiceTitleForm>;
+
+export const invoiceTitleListQuery = pageQuery;
+export const pagedInvoiceTitles = paged(invoiceTitle);
+
+/**
+ * The `POST /api/v1/orders/:id/invoice` body a saved title prefills: every
+ * non-empty header field, nothing else. The caller adds a `remark` if it has
+ * one. Pure, so the storefront and the tests share it.
+ */
+export function invoiceRequestFromTitle(title: InvoiceTitle): InvoiceHeaderInput {
+  const optional = (value: string | null): string | undefined =>
+    value === null || value === '' ? undefined : value;
+  const body: InvoiceHeaderInput = {
+    headerType: title.headerType,
+    invoiceType: title.invoiceType,
+    name: title.name,
+  };
+  const fields = [
+    'dutyNumber',
+    'drawerPhone',
+    'email',
+    'registeredTel',
+    'registeredAddress',
+    'bankName',
+    'bankAccount',
+  ] as const;
+  for (const field of fields) {
+    const value = optional(title[field]);
+    if (value !== undefined) body[field] = value;
+  }
+  return body;
+}
 
 // ---------------------------------------------------------------------------
 // account cancellation
@@ -450,6 +531,34 @@ export const userAddressExample: UserAddress = {
   updatedAt: '2026-01-06T09:00:00+08:00',
 };
 
+export const invoiceTitleExample: InvoiceTitle = {
+  id: '7001',
+  headerType: 'company',
+  invoiceType: 'plain',
+  name: '杭州某某科技有限公司',
+  dutyNumber: '91330100MA2XXXXX0A',
+  drawerPhone: '13800138000',
+  email: 'finance@example.com',
+  registeredTel: null,
+  registeredAddress: null,
+  bankName: null,
+  bankAccount: null,
+  isDefault: true,
+  createdAt: '2026-01-06T09:00:00+08:00',
+  updatedAt: '2026-01-06T09:00:00+08:00',
+};
+
+export const invoiceTitleSpecialExample: InvoiceTitle = {
+  ...invoiceTitleExample,
+  id: '7002',
+  invoiceType: 'special',
+  registeredTel: '0571-88888888',
+  registeredAddress: '杭州市西湖区文三路 100 号',
+  bankName: '中国工商银行杭州分行',
+  bankAccount: '1202020209000000000',
+  isDefault: false,
+};
+
 export const cancellationRequestExample: CancellationRequest = {
   id: '31',
   userId: '1001',
@@ -514,171 +623,6 @@ export const adminUserDetailExample: AdminUserDetail = {
   addressCount: 2,
   deletedAt: null,
   updatedAt: '2026-09-20T08:31:00+08:00',
-};
-
-// ---------------------------------------------------------------------------
-// staff: 商家管理 → 用户
-// ---------------------------------------------------------------------------
-
-/**
- * What a 店员 may see of a customer.
- *
- * This is the one decision in the staff surface that is not a copy of the admin
- * one. The console's 用户详情 carries the unmasked phone, the address book, the
- * registration IP, the operator remark and the account controls, and none of
- * that belongs on the phone of everyone the shop owner has made staff. A phone
- * in a shop assistant's hand is a different threat model from a console behind
- * an office login — the handset is shared, left on a counter and not revoked
- * when somebody stops working there.
- *
- * So the staff shapes are an allow-list, not the admin shape minus a few
- * fields, and everything below was chosen for a reason:
- *
- * | Field | Why a 店员 needs it |
- * | --- | --- |
- * | `nickname`, `avatarUrl` | recognise the customer standing in front of them |
- * | `phone` (masked) | read the last four digits back to confirm identity |
- * | `groups`, `labels` | the two drawers this surface exists for |
- * | `orderCount`, `spendTotal` | decide whether to offer the 会员 discount |
- * | `status` | explain why a customer cannot place an order — read-only |
- * | `createdAt` | 老客 or new, the other half of the same judgement |
- *
- * Absent on purpose: the unmasked phone, `account` (which *is* the phone for
- * every phone-registered customer, so returning it would undo the mask),
- * `realName`, `birthday`, `registerIp` / `lastLoginIp`, `adminRemark`,
- * `addressCount` and the address book, `boundWechat`, `hasPassword`.
- */
-export const staffUserListItem = z.object({
-  id,
-  nickname: z.string().nullable(),
-  avatarUrl: z.string().nullable(),
-  /** `138****8000`, always. There is no staff route that unmasks it. */
-  phone: maskedPhone.nullable(),
-  status: userStatus,
-  groups: z.array(namedRef),
-  labels: z.array(namedRef),
-  /**
-   * Paid orders and what they came to, or `null`.
-   *
-   * `null` is not zero: it means the order domain has not registered
-   * `UserOrderStatsPort` in this deployment, and a client must render 「--」
-   * rather than 「0 单」. A customer with no orders is `0` / `"0.00"`.
-   */
-  orderCount: z.number().int().min(0).nullable(),
-  spendTotal: money.nullable(),
-  createdAt: instant,
-});
-export type StaffUserListItem = z.infer<typeof staffUserListItem>;
-
-/**
- * 用户详情 for a 店员 — deliberately the same shape as one row of the list.
- *
- * There is no extra field behind the tap. The detail route exists because
- * `pages/admin/user/index.vue` is reached from a scan or a notification with
- * only a uid in hand, not because there is more to show.
- */
-export const staffUserDetail = staffUserListItem;
-export type StaffUserDetail = z.infer<typeof staffUserDetail>;
-
-export const staffUserListQuery = pageQuery.extend({
-  /**
-   * Matches the nickname or the **whole** phone number.
-   *
-   * A 店员 types the number the customer reads out, so the search takes all
-   * eleven digits — but not a fragment of them: `ilike '%1380%'` over a phone
-   * column is a way to enumerate the customer base four digits at a time, which
-   * is exactly what masking the column is meant to prevent. `account` and
-   * `realName` are not searched at all (the console searches both).
-   */
-  keyword: z.string().max(64).optional(),
-  groupId: id.optional(),
-  labelId: id.optional(),
-});
-export type StaffUserListQuery = z.infer<typeof staffUserListQuery>;
-
-export const pagedStaffUsers = paged(staffUserListItem);
-
-/** The group picker: every group, shortest form, no member counts. */
-export const staffUserGroups = z.object({
-  items: z.array(z.object({ id, name: z.string() })),
-});
-export type StaffUserGroups = z.infer<typeof staffUserGroups>;
-
-/**
- * The 标签 drawer: the whole catalogue, grouped by category, with this
- * customer's labels flagged.
- *
- * One request, because the drawer needs both halves to draw a single chip and
- * two requests would let them disagree. Labels with no category come back under
- * a group whose `categoryId` is `null`.
- */
-export const staffUserLabels = z.object({
-  categories: z.array(
-    z.object({
-      categoryId: id.nullable(),
-      categoryName: z.string().nullable(),
-      labels: z.array(z.object({ id, name: z.string(), assigned: z.boolean() })),
-    }),
-  ),
-});
-export type StaffUserLabels = z.infer<typeof staffUserLabels>;
-
-/**
- * 设置分组 — the customer ends up in exactly this group, or in none.
- *
- * The console's route is a batch with a `replace` / `add` / `remove` mode over
- * many customers and many groups; this is one customer and one group, because
- * the drawer is a radio picker (`pages/admin/user/index.vue` binds a
- * `<picker>`). `null` is 未分组 and is how a 店员 undoes a mistake — without it
- * the only way out of a wrong group would be the web console.
- */
-export const staffUserGroupBody = z.object({
-  groupId: id.nullable(),
-});
-export type StaffUserGroupBody = z.infer<typeof staffUserGroupBody>;
-
-/**
- * 设置标签 — the customer's labels become exactly this set.
- *
- * Plural, not `{ labelId }`, because the drawer submits the whole selection on
- * 确定 (`components/userLable/index.vue` builds a `labelIds` array) and a
- * singular field has no way to say "take this one off". An empty array clears
- * them.
- */
-export const staffUserLabelBody = z.object({
-  labelIds: z.array(id).max(50),
-});
-export type StaffUserLabelBody = z.infer<typeof staffUserLabelBody>;
-
-export const staffUserListItemExample: StaffUserListItem = {
-  id: '1001',
-  nickname: '小明',
-  avatarUrl: 'https://cdn.example.com/2026/09/a1b2c3d4.png',
-  phone: '138****8000',
-  status: 'active',
-  groups: [{ id: '3', name: '高价值客户' }],
-  labels: [{ id: '7', name: '母婴' }],
-  orderCount: 12,
-  spendTotal: '3980.00',
-  createdAt: '2026-01-05T10:00:00+08:00',
-};
-
-export const staffUserLabelsExample: StaffUserLabels = {
-  categories: [
-    {
-      categoryId: '2',
-      categoryName: '消费偏好',
-      labels: [
-        { id: '7', name: '母婴', assigned: true },
-        { id: '8', name: '数码', assigned: false },
-      ],
-    },
-    {
-      categoryId: null,
-      categoryName: null,
-      labels: [{ id: '9', name: '未分类标签', assigned: false }],
-    },
-  ],
 };
 
 // ---------------------------------------------------------------------------

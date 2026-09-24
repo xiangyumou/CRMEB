@@ -20,7 +20,7 @@ import { DomainError } from '../kernel/errors';
  * Rules that are not negotiable:
  *  - a transition is a **conditional update**, decided on the affected row
  *    count, never a read-then-write, so two concurrent requests (a
- *    double-tapped 收货, two staff shipping the same order) cannot both win;
+ *    double-tapped 收货, two operators shipping the same order) cannot both win;
  *  - hooks run **inside** the caller's transaction and may only touch the
  *    database — anything that calls a third party records an effect instead
  *    (`docs/conventions.md`: "never inside the transaction");
@@ -128,6 +128,8 @@ export interface OrderCancelledEvent extends OrderEvent {
 
 export interface OrderRefundedEvent extends OrderEvent {
   refundId: number;
+  /** The 退款单号 a shopper sees; what 退款到账提醒 names (NOTIF-007). */
+  refundNo?: string | undefined;
   refundedAmount: Money;
   /** A partial refund does not end the order's life. */
   partial: boolean;
@@ -191,10 +193,34 @@ class HookRegistry<E extends OrderEvent> {
   }
 }
 
+/**
+ * A shipment was dispatched: `shipOrder` (the console) or
+ * the automatic virtual delivery. `deliveryMode` and `allDelivered` are what
+ * WeChat's 发货信息管理 needs to know about the parcel, frozen at the moment of
+ * dispatch so a later shipment cannot rewrite what this one was.
+ */
+export interface ShipmentDispatchedEvent extends OrderEvent {
+  shipmentId: number;
+  deliveryMode: 'express' | 'merchant_delivery' | 'virtual';
+  /** This shipment put the last outstanding unit on its way (`paid -> shipped`). */
+  allDelivered: boolean;
+  /** The order's other shipments, cancelled ones included, oldest first. */
+  otherShipments: ReadonlyArray<{ id: number; cancelled: boolean }>;
+}
+
+/** 修改发货信息: the transport details of a dispatched shipment changed. */
+export interface ShipmentUpdatedEvent extends OrderEvent {
+  shipmentId: number;
+}
+
 export const onOrderPaid = new HookRegistry<OrderPaidEvent>('order.paid');
 export const onOrderCancelled = new HookRegistry<OrderCancelledEvent>('order.cancelled');
 export const onOrderRefunded = new HookRegistry<OrderRefundedEvent>('order.refunded');
 export const onOrderCompleted = new HookRegistry<OrderCompletedEvent>('order.completed');
+export const onShipmentDispatched = new HookRegistry<ShipmentDispatchedEvent>(
+  'shipment.dispatched',
+);
+export const onShipmentUpdated = new HookRegistry<ShipmentUpdatedEvent>('shipment.updated');
 
 // ---------------------------------------------------------------------------
 // Ports
@@ -392,6 +418,32 @@ export interface OrderKindHandler {
   afterCreate(ctx: Ctx, tx: Tx, orderId: number, meta: Record<string, unknown>): Promise<void>;
   /** May refuse a transition the base machine would allow. */
   canTransition?(from: OrderStatus, to: OrderStatus): boolean;
+  /**
+   * Read-only: what the shopper's 订单详情 links to for this kind (the 拼团 team). Optional —
+   * a kind without it adds nothing. Never writes, never throws for a missing row.
+   */
+  detailLinks?(db: DbOrTx, orderId: number): Promise<OrderKindDetailLinks>;
+  /**
+   * Read-only, for 确认订单: what this kind promises before the order exists (the presale
+   * ship time). Optional — a kind without it adds nothing. `selections` are the checkout
+   * body's `kindMeta`, unvalidated: answer nothing for an activity it cannot find rather
+   * than throw — the refusal is `beforeCreate`'s, and the pricing pass already made it.
+   */
+  previewTerms?(
+    db: DbOrTx,
+    selections: Readonly<Record<string, string | undefined>>,
+  ): Promise<OrderKindPreviewTerms>;
+}
+
+/** What `OrderKindHandler.detailLinks` answers; every key is optional. */
+export interface OrderKindPreviewTerms {
+  /** Days after the order is paid in full that it ships (预售: 付款后 N 天内发货). */
+  shipAfterDays?: number | null;
+}
+
+export interface OrderKindDetailLinks {
+  /** The `groupbuy_groups.id` the order holds its membership in. */
+  groupbuyTeamId?: number | null;
 }
 
 /**
@@ -519,4 +571,6 @@ export function resetOrderPorts(): void {
   onOrderCancelled.clear();
   onOrderRefunded.clear();
   onOrderCompleted.clear();
+  onShipmentDispatched.clear();
+  onShipmentUpdated.clear();
 }

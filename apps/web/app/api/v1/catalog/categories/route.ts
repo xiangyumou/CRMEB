@@ -9,8 +9,7 @@ import { handle } from '../../../../../src/server';
  * changes a few times a month and is fetched on every cold start. The same
  * string goes out as an `ETag` so a caching proxy and a client that
  * speaks HTTP rather than our field both see it, and a matching
- * `If-None-Match` gets a bodyless 304. `…/categories/version` stays
- * for a client that only wants the string.
+ * `If-None-Match` gets a bodyless 304.
  */
 export const GET = handle(catalogCategoryTree, async (ctx) => {
   const tree = await catalog.categoryTree(ctx);

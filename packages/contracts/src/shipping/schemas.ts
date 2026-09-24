@@ -284,9 +284,8 @@ export const shippingTemplateDetailExample: ShippingTemplateDetail = {
 // ---------------------------------------------------------------------------
 
 /**
- * The picker shape. `GET /admin-api/express-companies` and
- * `GET /api/v1/staff/express-companies` answer with this and nothing else, so
- * the console's 发货 form and the mobile staff console read the same list.
+ * The picker shape. `GET /admin-api/express-companies` answers with this and
+ * nothing else, so the console's 发货 form reads exactly the list it offers.
  */
 export const expressCompany = z.object({
   id,
@@ -306,9 +305,29 @@ export const expressCompanyListExample = {
   ],
 } satisfies z.infer<typeof expressCompanyList>;
 
+/**
+ * `GET /api/v1/express-companies` — the shopper's 退货物流 picker. Enabled carriers only, at
+ * most `limit` of them, those with a WeChat courier code (`wechatDeliveryId`, which
+ * 小程序发货信息管理 needs) first, then by `sortOrder`. `keyword` matches the name or the
+ * tracking code, case-insensitively, anywhere in it; blank is no filter. Without either
+ * parameter the answer is the first 50 — the seeded table has about 1100 rows, and a phone
+ * has no use for all of them.
+ */
+export const expressCompanyOptionsQuery = z.object({
+  keyword: z.string().trim().max(50).optional(),
+  limit: z.coerce.number<number | string>().int().min(1).max(100).default(50),
+});
+export type ExpressCompanyOptionsQuery = z.infer<typeof expressCompanyOptionsQuery>;
+
 /** The management row. Carries `isEnabled`, which the picker never does — the picker only lists enabled ones. */
 export const expressCompanyRow = expressCompany.extend({
   isEnabled: z.boolean(),
+  /**
+   * The carrier's code in WeChat's list (小程序发货信息管理, `get_delivery_list`'s
+   * `delivery_id`, e.g. `SF`). `null` until filled in; a mini-program shipment by
+   * a carrier without one cannot be reported to WeChat.
+   */
+  wechatDeliveryId: z.string().nullable(),
   createdAt: instant,
   updatedAt: instant,
 });
@@ -325,6 +344,15 @@ export const expressCompanyForm = z.object({
   name: z.string().trim().min(1).max(100),
   sortOrder: z.number().int().min(0).max(9999).default(0),
   isEnabled: z.boolean().default(true),
+  /** WeChat's `delivery_id` for this carrier. Omitted: unchanged on edit, none on create; `null` clears it. */
+  wechatDeliveryId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(32)
+    .regex(/^[A-Za-z0-9_-]+$/, '微信快递编码只能包含字母、数字、下划线和连字符')
+    .nullable()
+    .optional(),
 });
 export type ExpressCompanyForm = z.infer<typeof expressCompanyForm>;
 
@@ -346,6 +374,7 @@ export const expressCompanyRowExample: ExpressCompanyRow = {
   name: '顺丰速运',
   sortOrder: 100,
   isEnabled: true,
+  wechatDeliveryId: 'SF',
   createdAt: '2026-01-01T00:00:00+08:00',
   updatedAt: '2026-01-01T00:00:00+08:00',
 };

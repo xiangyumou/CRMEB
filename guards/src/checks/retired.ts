@@ -2,7 +2,7 @@ import path from 'node:path';
 import { allRoutes } from '@shop/contracts/routes';
 import { defineCheck, fail, result, type Finding } from '../framework';
 import { isScript, walk } from '../lib/files';
-import { rel, repoRoot, uniApp } from '../lib/paths';
+import { apiClientSrc, miniApp, rel, repoRoot, storefrontBlocksSrc } from '../lib/paths';
 
 /**
  * The shop's scope, enforced instead of remembered (CORE-002).
@@ -18,7 +18,7 @@ import { rel, repoRoot, uniApp } from '../lib/paths';
  * feature are matched as identifiers too.
  */
 
-interface RetiredWord {
+export interface RetiredWord {
   /** Matched as a whole word anywhere in source. */
   identifier?: RegExp;
   /** Matched as a whole path segment or hyphen token of a URL. */
@@ -26,7 +26,7 @@ interface RetiredWord {
   feature: string;
 }
 
-const RETIRED: readonly RetiredWord[] = [
+export const RETIRED: readonly RetiredWord[] = [
   { identifier: /\bbargain(s|Id|_id)?\b/i, urlToken: 'bargain', feature: '砍价' },
   { identifier: /\bseckill\b/i, urlToken: 'seckill', feature: '秒杀' },
   { identifier: /\bluckLottery|\blottery\b/i, urlToken: 'lottery', feature: '抽奖' },
@@ -62,16 +62,14 @@ const SOURCE_ROOTS = [
   path.join(repoRoot, 'apps/worker/src'),
   path.join(repoRoot, 'packages/core/src'),
   path.join(repoRoot, 'packages/contracts/src'),
-  path.join(uniApp, 'api'),
+  // The mini-program and the two packages it is built from (docs/mini), tests included.
+  path.join(miniApp, 'src'),
+  apiClientSrc,
+  storefrontBlocksSrc,
 ];
 
-/**
- * Files that must name a retired feature in order to keep it out: the guard's
- * own word list, and the uni-app mappers that answer a page's flag for a
- * feature the shop does not have with a falsy constant, so that branch of the
- * page never renders.
- */
-const ALLOWED = [/^guards\//, /^apps\/uni-app\/api\/mappers\//, /^apps\/uni-app\/api\/README\.md$/];
+/** Files that must name a retired feature in order to keep it out: the guard's own word list. */
+const ALLOWED = [/^guards\//];
 
 /**
  * The deny-lists themselves, word by word.
@@ -92,29 +90,14 @@ interface DenyListFile {
 
 const DENY_LISTS: readonly DenyListFile[] = [
   {
-    file: /^packages\/contracts\/src\/diy\/removed\.ts$/,
-    words: ['砍价', '秒杀', '抽奖', '线下支付', '自建客服'],
-    why: 'REMOVED_DIY_COMPONENTS / REMOVED_STOREFRONT_PAGES: the filter that drops the components and links saved before the features were retired',
-  },
-  {
-    file: /^packages\/core\/src\/diy\/diy\.test\.ts$/,
-    words: ['砍价', '秒杀'],
-    why: 'the cleanDiyData test: it asserts a saved page containing those components comes back without them',
-  },
-  {
     file: /^packages\/contracts\/src\/system\/system\.role\.contract\.ts$/,
     words: ['秒杀'],
     why: 'the documented example of unknownPermissions — a stored grant for a module that no longer exists, shown so it can be cleared',
   },
-  {
-    file: /^apps\/web\/src\/admin\/diy\/defaults\/bottomMenu\.default\.ts$/,
-    words: ['自建客服'],
-    why: "`icon: 'icon-kefu'` is an iconfont glyph name in the DIY default payload, on a 客服 entry whose link the operator sets; the retired module is the page kefu/mobile_list, which REMOVED_STOREFRONT_PAGES drops",
-  },
 ];
 
 /** A retired word only counts in a URL when it is a whole segment or hyphen token. */
-function urlTokens(url: string): Set<string> {
+export function urlTokens(url: string): Set<string> {
   const tokens = new Set<string>();
   for (const segment of url.split('/')) {
     if (!segment) continue;
@@ -124,9 +107,15 @@ function urlTokens(url: string): Set<string> {
   return tokens;
 }
 
+/** The retired feature a URL (or page path) names, or null. The query string is not read. */
+export function retiredInUrl(url: string): RetiredWord | null {
+  const tokens = urlTokens(url.split(/[?#]/)[0] ?? '');
+  return RETIRED.find((word) => word.urlToken !== undefined && tokens.has(word.urlToken)) ?? null;
+}
+
 export const retiredFeatures = defineCheck(
   'retired',
-  'no retired feature reappears in the workspace or the uni-app API layer',
+  'no retired feature reappears in the workspace or the mini-program',
   () => {
     const findings: Finding[] = [];
     const denyListHits = new Set<string>();

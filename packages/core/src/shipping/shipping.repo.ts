@@ -111,6 +111,37 @@ export async function listEnabledExpressCompanies(db: DbOrTx): Promise<ExpressCo
     .orderBy(desc(expressCompanies.sortOrder), asc(expressCompanies.id));
 }
 
+/** `%`, `_` and `\` are literal in a shopper's search, not wildcards. */
+function containsPattern(keyword: string): string {
+  return `%${keyword.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
+/**
+ * The shopper's picker (SHIP-003): enabled only, a WeChat courier code first (a return
+ * shipped with one can be reported to 小程序发货信息管理), then `sortOrder DESC, id ASC`,
+ * at most `limit`.
+ */
+export async function searchEnabledExpressCompanies(
+  db: DbOrTx,
+  args: { keyword?: string | undefined; limit: number },
+): Promise<ExpressCompanyRow[]> {
+  const filters: (SQL | undefined)[] = [eq(expressCompanies.isEnabled, true)];
+  if (args.keyword) {
+    const like = containsPattern(args.keyword);
+    filters.push(or(ilike(expressCompanies.name, like), ilike(expressCompanies.code, like)));
+  }
+  return db
+    .select()
+    .from(expressCompanies)
+    .where(and(...filters))
+    .orderBy(
+      sql`(${expressCompanies.wechatDeliveryId} is null)`,
+      desc(expressCompanies.sortOrder),
+      asc(expressCompanies.id),
+    )
+    .limit(args.limit);
+}
+
 export type ExpressSortKey = 'id' | 'sortOrder' | 'name';
 
 const EXPRESS_SORT = {
@@ -183,6 +214,8 @@ export interface ExpressCompanyValues {
   name: string;
   sortOrder: number;
   isEnabled: boolean;
+  /** `undefined` leaves the column alone; `null` clears it. */
+  wechatDeliveryId?: string | null | undefined;
 }
 
 export async function insertExpressCompany(

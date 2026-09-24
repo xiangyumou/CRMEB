@@ -107,17 +107,18 @@ const get = (path: string, headers: Record<string, string> = {}) =>
 /** Sign in through the real routes and keep the bearer token. */
 async function shopper(
   ip = '203.0.113.7',
+  phone = PHONE,
 ): Promise<{ token: string; headers: Record<string, string> }> {
   const { POST: sendCode } = await import('./auth/sms-codes/route');
   await sendCode(
-    json('POST', '/api/v1/auth/sms-codes', { phone: PHONE, scene: 'login' }, { 'x-real-ip': ip }),
+    json('POST', '/api/v1/auth/sms-codes', { phone, scene: 'login' }, { 'x-real-ip': ip }),
   );
   const { POST: smsLogin } = await import('./auth/sessions/sms/route');
   const response = await smsLogin(
     json(
       'POST',
       '/api/v1/auth/sessions/sms',
-      { phone: PHONE, code: sms.lastCodeFor(PHONE) },
+      { phone, code: sms.lastCodeFor(phone) },
       { 'x-real-ip': ip },
     ),
   );
@@ -264,6 +265,105 @@ describe('/api/v1/profile', () => {
     const bad = await PUT(json('PUT', '/api/v1/profile', { nickname: '' }, headers));
     expect(bad.status).toBe(422);
   });
+
+  it('USER-019 — takes the avatar our upload returned and refuses one on another server', async () => {
+    const { PUT } = await import('./profile/route');
+    const { POST: upload } = await import('./uploads/route');
+    const { headers } = await shopper();
+
+    // What the mini-program does with `chooseAvatar`'s temporary file.
+    const form = new FormData();
+    const bytes = new Uint8Array(26);
+    bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+    new DataView(bytes.buffer).setUint32(16, 1, false);
+    new DataView(bytes.buffer).setUint32(20, 1, false);
+    form.append('file', new File([bytes as BlobPart], 'avatar.png', { type: 'image/png' }));
+    const uploaded = await upload(
+      new Request(`${ORIGIN}/api/v1/uploads?purpose=avatar`, {
+        method: 'POST',
+        body: form,
+        headers: { 'sec-fetch-site': 'same-origin', ...headers },
+      }),
+    );
+    expect(uploaded.status).toBe(201);
+    const { url } = await uploaded.json();
+
+    const ok = await PUT(json('PUT', '/api/v1/profile', { avatarUrl: url }, headers));
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toMatchObject({ avatarUrl: url });
+
+    const foreign = await PUT(
+      json('PUT', '/api/v1/profile', { avatarUrl: 'https://evil.example/pixel.png' }, headers),
+    );
+    expect(foreign.status).toBe(422);
+    expect(await foreign.json()).toMatchObject({ code: 'USER_AVATAR_NOT_ALLOWED' });
+
+    // Re-sending the current avatar, as every legacy save does, still passes.
+    const again = await PUT(
+      json('PUT', '/api/v1/profile', { nickname: '小红', avatarUrl: url }, headers),
+    );
+    expect(again.status).toBe(200);
+  });
+});
+
+describe('/api/v1/invoice-titles', () => {
+  const company = {
+    headerType: 'company',
+    name: '杭州某某科技有限公司',
+    dutyNumber: '91330100MA2XXXXX0A',
+  };
+
+  it('401s without a token and 422s a company title with no 税号, writing nothing', async () => {
+    const { GET, POST } = await import('./invoice-titles/route');
+    expect((await GET(get('/api/v1/invoice-titles'))).status).toBe(401);
+    expect((await POST(json('POST', '/api/v1/invoice-titles', company))).status).toBe(401);
+
+    const { headers } = await shopper();
+    const bad = await POST(
+      json('POST', '/api/v1/invoice-titles', { headerType: 'company', name: '某某公司' }, headers),
+    );
+    expect(bad.status).toBe(422);
+    const list = await GET(get('/api/v1/invoice-titles', headers));
+    expect(await list.json()).toMatchObject({ total: 0, items: [] });
+  });
+
+  it('USER-018 — keeps every title route to its owner: a stranger gets 404 on all four', async () => {
+    const { POST } = await import('./invoice-titles/route');
+    const byId = await import('./invoice-titles/[id]/route');
+    const { POST: setDefault } = await import('./invoice-titles/[id]/default/route');
+    const { GET: getDefault } = await import('./invoice-titles/default/route');
+
+    const owner = await shopper('203.0.113.7', PHONE);
+    const created = await POST(json('POST', '/api/v1/invoice-titles', company, owner.headers));
+    expect(created.status).toBe(201);
+    const title = await created.json();
+    expect(title).toMatchObject({ ...company, invoiceType: 'plain', isDefault: true });
+
+    const stranger = await shopper('203.0.113.8', '13900139000');
+    const path = `/api/v1/invoice-titles/${title.id}`;
+    const params = { params: { id: String(title.id) } };
+    const responses = [
+      await byId.GET(get(path, stranger.headers), params),
+      await byId.PUT(json('PUT', path, { ...company, name: '改掉' }, stranger.headers), params),
+      await byId.DELETE(json('DELETE', path, undefined, stranger.headers), params),
+      await setDefault(json('POST', `${path}/default`, {}, stranger.headers), params),
+    ];
+    for (const response of responses) {
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ code: 'USER_INVOICE_TITLE_NOT_FOUND' });
+    }
+    expect(
+      await (await getDefault(get('/api/v1/invoice-titles/default', stranger.headers))).json(),
+    ).toEqual({
+      title: null,
+    });
+
+    // The owner still has it, unchanged, as the default.
+    const mine = await getDefault(get('/api/v1/invoice-titles/default', owner.headers));
+    expect(await mine.json()).toEqual({ title });
+    const gone = await byId.DELETE(json('DELETE', path, undefined, owner.headers), params);
+    expect(gone.status).toBe(204);
+  });
 });
 
 describe('POST /api/v1/auth/phone/wechat-mini', () => {
@@ -362,108 +462,6 @@ describe('/admin-api/users', () => {
     // The ban takes effect on the session the shopper already holds.
     const { GET } = await import('./profile/route');
     expect((await GET(get('/api/v1/profile', shopperHeaders))).status).toBe(401);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// staff — 商家管理 → 用户
-// ---------------------------------------------------------------------------
-
-/**
- * The six `/api/v1/staff/*` user routes as HTTP.
- *
- * The services are covered in `@shop/core`; the two things only a request can
- * prove are here. First, `auth: 'staff'` is on every one of the six: a shopper
- * with a perfectly good session gets 403, which is the whole reason these are
- * separate routes from `/admin-api/users`. Second, the staff list really does
- * hand back a masked phone over the wire — a response that leaked the number
- * would be a leak in production even though every unit test passed, because
- * the schema, not the service, is what `VALIDATE_RESPONSES` checks.
- *
- * `installStaffCheck()` comes from importing `@shop/core/order`, exactly as it
- * does in the running app; who is staff is `orderStaffConfig`, the order
- * domain's config group, and the tests set it rather than stubbing the check.
- */
-describe('/api/v1/staff/users', () => {
-  /** The six, as [module path, method, url, body]. */
-  const ROUTES = [
-    ['./staff/users/route', 'GET', '/api/v1/staff/users?page=1&pageSize=20', undefined],
-    ['./staff/users/[uid]/route', 'GET', '/api/v1/staff/users/1', undefined],
-    ['./staff/user-groups/route', 'GET', '/api/v1/staff/user-groups', undefined],
-    ['./staff/users/[uid]/group/route', 'POST', '/api/v1/staff/users/1/group', { groupId: null }],
-    ['./staff/users/[uid]/labels/route', 'GET', '/api/v1/staff/users/1/labels', undefined],
-    ['./staff/users/[uid]/labels/route', 'POST', '/api/v1/staff/users/1/labels', { labelIds: [] }],
-  ] as const;
-
-  async function callRoute(
-    index: number,
-    uid: string,
-    headers: Record<string, string>,
-  ): Promise<Response> {
-    const [modulePath, method, url, body] = ROUTES[index]!;
-    const mod = (await import(/* @vite-ignore */ modulePath)) as Record<
-      string,
-      (request: Request, context?: { params: Record<string, string> }) => Promise<Response>
-    >;
-    const handler = mod[method]!;
-    const path = url.replace('/1', `/${uid}`);
-    const request = method === 'GET' ? get(path, headers) : json(method, path, body, headers);
-    return handler(request, { params: { uid } });
-  }
-
-  it('403s an ordinary shopper on every one of the six', async () => {
-    const { headers } = await shopper();
-    const [row] = await harness.ctx.db.select({ id: users.id }).from(users);
-
-    for (let index = 0; index < ROUTES.length; index += 1) {
-      const response = await callRoute(index, String(row!.id), headers);
-      expect({ route: ROUTES[index]![2], status: response.status }).toEqual({
-        route: ROUTES[index]![2],
-        status: 403,
-      });
-      expect((await response.json()).code).toBe('FORBIDDEN');
-    }
-  });
-
-  it('401s without any session at all', async () => {
-    const response = await callRoute(0, '1', {});
-    expect(response.status).toBe(401);
-  });
-
-  it('lets a 店员 through all six and never unmasks a phone', async () => {
-    const { headers } = await shopper();
-    const [row] = await harness.ctx.db.select({ id: users.id }).from(users);
-    const order = await import('@shop/core/order');
-    await harness.ctx.config.set(order.orderStaffConfig, { staffUserIds: [row!.id] });
-
-    for (let index = 0; index < ROUTES.length; index += 1) {
-      const response = await callRoute(index, String(row!.id), headers);
-      expect({ route: ROUTES[index]![2], status: response.status }).toEqual({
-        route: ROUTES[index]![2],
-        status: 200,
-      });
-    }
-
-    // The 店员 is looking at their own account here, which is the sharpest
-    // version of the test: their real number is `PHONE`, and it still must not
-    // come back. The response passed `VALIDATE_RESPONSES`, so the shape is the
-    // contract's too.
-    const listed = await (await callRoute(0, String(row!.id), headers)).json();
-    expect(listed.items[0].phone).toBe('138****8000');
-    expect(JSON.stringify(listed)).not.toContain(PHONE);
-    // The order domain registers `UserOrderStatsPort`, so a
-    // customer with no paid order is a real zero, not "not known".
-    expect(listed.items[0]).toMatchObject({ orderCount: 0, spendTotal: '0.00' });
-  });
-
-  it('422s a uid that is not an id, before touching the database', async () => {
-    const { headers } = await shopper();
-    const [row] = await harness.ctx.db.select({ id: users.id }).from(users);
-    const order = await import('@shop/core/order');
-    await harness.ctx.config.set(order.orderStaffConfig, { staffUserIds: [row!.id] });
-
-    const response = await callRoute(1, 'me', headers);
-    expect(response.status).toBe(422);
   });
 });
 

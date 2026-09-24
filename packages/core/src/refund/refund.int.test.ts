@@ -5,6 +5,7 @@ import { products, productSkus } from '@shop/db/schema/catalog';
 import { orderItems, orders, type OrderItemSnapshot } from '@shop/db/schema/order';
 import { capitalFlows } from '@shop/db/schema/payment';
 import { refunds } from '@shop/db/schema/refund';
+import { attachments } from '@shop/db/schema/storage';
 import { users } from '@shop/db/schema/user';
 import {
   createTestCtx,
@@ -549,6 +550,52 @@ describe('a refund that goes the way it should', () => {
     expect(items.items).toHaveLength(1);
     expect(items.items[0]!.refundableQuantity).toBe(2);
     expect(items.items[0]!.blockedReason).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// REFUND-014 — evidence photos come from our own storage
+// ---------------------------------------------------------------------------
+
+describe('REFUND-014 — evidence photos come from our own storage', () => {
+  const STORED = '/uploads/refund/2026/06/01/refund-014.png';
+
+  async function storeImage(url: string): Promise<void> {
+    await harness.ctx.db.insert(attachments).values({
+      storageKey: url.replace(/^\/uploads\//, ''),
+      driver: 'local',
+      url,
+      name: 'evidence.png',
+      kind: 'image',
+      mime: 'image/png',
+      size: 26,
+      sha256: 'd'.repeat(64),
+    });
+  }
+
+  it('takes a photo our uploads stored', async () => {
+    await storeImage(STORED);
+    const order = await paidOrder();
+    const applied = await service.apply(racer(userActor(order.userId)), {
+      ...applyBody(order, 1),
+      images: [STORED],
+    });
+    expect((await refundRow(Number(applied.id))).images).toEqual([STORED]);
+  });
+
+  it('refuses a link to somebody else’s server, and opens no request', async () => {
+    const order = await paidOrder();
+    for (const url of [
+      'https://tracker.example.net/pixel.png',
+      // Our path shape, but nothing we stored.
+      '/uploads/refund/2026/06/01/never-uploaded.png',
+    ]) {
+      await expect(
+        service.apply(racer(userActor(order.userId)), { ...applyBody(order, 1), images: [url] }),
+      ).rejects.toMatchObject({ code: 'REFUND_IMAGE_NOT_ALLOWED' });
+    }
+    expect(await harness.ctx.db.select().from(refunds)).toHaveLength(0);
+    expect(await refundNotificationKeys()).toEqual([]);
   });
 });
 

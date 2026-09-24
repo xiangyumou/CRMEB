@@ -35,9 +35,6 @@ import {
  * Further file parts in the same request are **ignored**, not refused: the one
  * named `file` is the upload, and a form that also carries, say, a thumbnail
  * the server does not want should not fail outright.
- *
- * `purpose=staff` is refused unless the caller is on the 店员 list, and carries
- * its own size ceiling — see `userUploadPurpose`.
  */
 export const storageUserUpload = defineRoute({
   id: 'storage.userUpload',
@@ -72,18 +69,6 @@ export const storageUserUpload = defineRoute({
         size: 20481,
         width: 256,
         height: 256,
-      },
-    },
-    {
-      name: 'staff-product-image',
-      query: { purpose: 'staff' },
-      response: {
-        ...userUploadResultExample,
-        url: '/uploads/staff/2026/09/5e6f7a8b9c0d1e2f3a4b5c6d7e8f9012.jpg',
-        name: '5e6f7a8b9c0d1e2f3a4b5c6d7e8f9012.jpg',
-        size: 742318,
-        width: 1600,
-        height: 1600,
       },
     },
   ],

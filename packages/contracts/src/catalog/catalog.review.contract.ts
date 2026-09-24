@@ -9,6 +9,8 @@ import {
   pagedAdminReviews,
   pagedReviews,
   productReview,
+  productReviewStatus,
+  submittedReview,
   productReviewExample,
   reviewBatchStatusBody,
   reviewBatchStatusResult,
@@ -274,9 +276,13 @@ export const catalogReviewSubmit = defineRoute({
   summary: '发表商品评价',
   tags: ['catalog'],
   body: reviewSubmitBody,
-  response: productReview,
+  response: submittedReview,
   status: 201,
-  errors: ['CATALOG_REVIEW_NOT_ALLOWED', 'CATALOG_REVIEW_ALREADY_WRITTEN'],
+  errors: [
+    'CATALOG_REVIEW_NOT_ALLOWED',
+    'CATALOG_REVIEW_ALREADY_WRITTEN',
+    'CATALOG_REVIEW_IMAGE_NOT_ALLOWED',
+  ],
   examples: [
     {
       name: 'ok',
@@ -287,7 +293,30 @@ export const catalogReviewSubmit = defineRoute({
         content: '料子很舒服，洗了不变形。',
         images: ['https://cdn.example.com/r/5001-1.png'],
       },
-      response: { ...productReviewExample, replyContent: null, replyAt: null },
+      response: {
+        ...productReviewExample,
+        replyContent: null,
+        replyAt: null,
+        moderation: 'published',
+      },
+    },
+    {
+      name: 'held-for-moderation',
+      body: {
+        orderItemId: '9102',
+        productScore: 5,
+        serviceScore: 5,
+        content: '很满意，包装私密。',
+        images: [],
+      },
+      response: {
+        ...productReviewExample,
+        content: '很满意，包装私密。',
+        images: [],
+        replyContent: null,
+        replyAt: null,
+        moderation: 'pending',
+      },
     },
   ],
 });
@@ -310,6 +339,12 @@ export const catalogMyReviews = defineRoute({
         productId: id,
         productName: z.string(),
         productImageUrl: z.string(),
+        /**
+         * The shopper's own list includes reviews still waiting (`pending`, 评价需审核 or
+         * 内容安全) and ones an operator hid; the client says so neutrally
+         * (「审核后展示」), never as an error. Nobody else ever sees those two.
+         */
+        status: productReviewStatus,
       }),
     ),
   }),
@@ -324,9 +359,39 @@ export const catalogMyReviews = defineRoute({
             productId: '1',
             productName: '经典白T恤',
             productImageUrl: 'https://cdn.example.com/p/1.png',
+            status: 'published',
           },
         ],
         total: 1,
+        page: 1,
+        pageSize: 20,
+      },
+    },
+    {
+      name: 'held-and-hidden',
+      query: { page: 1, pageSize: 20 },
+      response: {
+        items: [
+          {
+            ...productReviewExample,
+            id: '5002',
+            replyContent: null,
+            replyAt: null,
+            productId: '1',
+            productName: '经典白T恤',
+            productImageUrl: 'https://cdn.example.com/p/1.png',
+            status: 'pending',
+          },
+          {
+            ...productReviewExample,
+            id: '5003',
+            productId: '2',
+            productName: '纯棉毛巾',
+            productImageUrl: 'https://cdn.example.com/p/2.png',
+            status: 'hidden',
+          },
+        ],
+        total: 2,
         page: 1,
         pageSize: 20,
       },

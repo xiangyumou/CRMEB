@@ -6,7 +6,7 @@
  * coupon domain and the rest of the system, and everything not re-exported here
  * is private — `coupon.repo.ts` in particular, which no other domain may reach.
  *
- * The six functions other domains call:
+ * The functions other domains call:
  *
  * | Function          | Caller         | When                                       |
  * | ----------------- | -------------- | ------------------------------------------ |
@@ -16,6 +16,7 @@
  * | `grantNewUser`    | user           | inside the registration transaction        |
  * | `grantOrderGifts` | order          | the order-paid effect handler              |
  * | `listOrderGifts`  | order          | the 订单赠券 panel, after the owner check |
+ * | `productScope`    | catalog        | the 商品列表's `couponId` filter           |
  *
  * `redeem`, `release`, `grantNewUser` and `grantOrderGifts` take `(tx, ctx, …)`
  * — a transaction the *caller* owns, plus the context they need a clock and a
@@ -35,21 +36,21 @@ export {
   claim,
   listApplicable,
   listClaimable,
+  listHeldNewUser,
   listMine,
   listNewUser,
-  staffGrant,
-  staffListCoupons,
-  staffListUserCoupons,
   // the domain API other domains call
   grantNewUser,
   grantOrderGifts,
   listOrderGifts,
+  productScope,
   quote,
   redeem,
   release,
 } from './coupon.service';
 
 export type {
+  CouponProductScope,
   OrderGiftInput,
   QuoteInput,
   QuoteResult,

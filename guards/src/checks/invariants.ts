@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defineCheck, fail, result, type Finding } from '../framework';
 import { RULE_ID_IN_TEXT, parseCatalogue } from '../lib/catalogue';
-import { walk } from '../lib/files';
+import { walk, type SourceFile } from '../lib/files';
 import { invariantsDoc, rel, repoRoot } from '../lib/paths';
 import {
   closest,
@@ -29,8 +29,19 @@ import {
  * because the usual cause is a test that was renamed.
  */
 
-/** Where test files live: the whole workspace and the uni-app. */
+/**
+ * Where test files live: the whole repository — the workspace and the
+ * mini-program with the packages it is built from (`apps/mini`,
+ * `packages/api-client`, `packages/storefront-blocks`, `e2e/storefront/specs-mini`).
+ * One root rather than a list, so a new app's tests are read without an edit
+ * here; `walk` skips `node_modules` and build output.
+ */
 const TEST_ROOTS = [repoRoot];
+
+/** Every test module the title scan reads. */
+export function testModules(): SourceFile[] {
+  return TEST_ROOTS.flatMap((root) => walk(root, isTestModule));
+}
 
 interface ReadFile {
   absolute: string;
@@ -107,21 +118,19 @@ export const invariants = defineCheck(
     // --- 3: rule IDs named by test titles ----------------------------------
     const families = new Set([...ids].map(familyOf));
     let testFiles = 0;
-    for (const root of TEST_ROOTS) {
-      for (const file of walk(root, isTestModule)) {
-        testFiles += 1;
-        const unknown = new Set<string>();
-        for (const title of titlesIn(file.text)) {
-          for (const match of title.matchAll(RULE_ID_IN_TEXT)) {
-            const id = match[0];
-            if (families.has(familyOf(id)) && !ids.has(id)) unknown.add(id);
-          }
+    for (const file of testModules()) {
+      testFiles += 1;
+      const unknown = new Set<string>();
+      for (const title of titlesIn(file.text)) {
+        for (const match of title.matchAll(RULE_ID_IN_TEXT)) {
+          const id = match[0];
+          if (families.has(familyOf(id)) && !ids.has(id)) unknown.add(id);
         }
-        for (const id of unknown) {
-          findings.push(
-            fail(rel(file.file), `names ${id} in a test title, which ${doc} does not have`),
-          );
-        }
+      }
+      for (const id of unknown) {
+        findings.push(
+          fail(rel(file.file), `names ${id} in a test title, which ${doc} does not have`),
+        );
       }
     }
 

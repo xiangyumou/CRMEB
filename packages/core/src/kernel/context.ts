@@ -18,7 +18,7 @@ import { withTx, type TxOptions } from './tx';
  * is what makes the whole system testable with `createTestCtx()`.
  */
 
-export type ActorKind = 'admin' | 'user' | 'staff' | 'anonymous' | 'system';
+export type ActorKind = 'admin' | 'user' | 'anonymous' | 'system';
 
 export interface Actor {
   kind: ActorKind;
@@ -60,6 +60,11 @@ export interface Ctx {
   readonly actor: Actor;
   /** From `X-Client-Platform`; `null` on the admin surface and in jobs. */
   readonly platform: ClientPlatform | null;
+  /**
+   * From `X-Client-Version` when it parses (`clientVersion` in the contracts);
+   * absent on the admin surface, in jobs, and for a client that sent none.
+   */
+  readonly clientVersion?: string | undefined;
   /** Correlates every log line, audit row and job of one request. */
   readonly requestId: string;
   /** Route id from the contract, when the context came from `handle()`. */
@@ -90,7 +95,7 @@ export function requireActorId(ctx: Ctx): number {
 }
 
 export function requireUserId(ctx: Ctx): number {
-  if (ctx.actor.kind !== 'user' && ctx.actor.kind !== 'staff') {
+  if (ctx.actor.kind !== 'user') {
     throw new DomainError('UNAUTHENTICATED');
   }
   return requireActorId(ctx);

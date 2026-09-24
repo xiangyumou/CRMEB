@@ -6,6 +6,7 @@ import {
   expressCompanyList,
   expressCompanyListExample,
   expressCompanyListQuery,
+  expressCompanyOptionsQuery,
   expressCompanyRow,
   expressCompanyRowExample,
   expressCompanyStatusBody,
@@ -18,11 +19,13 @@ import {
  * Two surfaces with two different jobs, which is why the same table has two
  * list routes:
  *
- * 1. **The picker** — `GET /admin-api/express-companies` and
- *    `GET /api/v1/staff/express-companies`: the `expressCompanyList` body, and
- *    the `order:order:read` permission on the admin one, because the console's
- *    发货 form and the mobile staff console are its callers. Enabled companies
- *    only, ordered `sortOrder DESC, id ASC`.
+ * 1. **The picker** — `GET /admin-api/express-companies`: the
+ *    `expressCompanyList` body, and the `order:order:read` permission, because
+ *    the console's 发货 form is its caller. Enabled companies only, ordered
+ *    `sortOrder DESC, id ASC`.
+ *    The storefront reads the same body at `GET /api/v1/express-companies`
+ *    (public reference data) for the 退货物流 form, whose legacy page had no
+ *    list to pick from — searched and capped there (`expressCompanyOptionsQuery`).
  * 2. **The management screen** — `/admin-api/shipping/express-companies`, paged,
  *    including disabled rows, with its own `shipping:express:*` atoms.
  *
@@ -33,7 +36,7 @@ import {
 const companyParams = z.object({ id });
 
 // ---------------------------------------------------------------------------
-// the picker — paths the 发货 form and the staff console call
+// the picker — the path the 发货 form calls
 // ---------------------------------------------------------------------------
 
 export const expressCompanyPicker = defineRoute({
@@ -51,15 +54,27 @@ export const expressCompanyPicker = defineRoute({
   examples: [{ name: 'ok', response: expressCompanyListExample }],
 });
 
-export const staffExpressCompanyPicker = defineRoute({
-  id: 'shipping.staffExpressCompanies',
+/**
+ * The shopper's 退货物流 picker: searched on the server and capped (`expressCompanyOptionsQuery`),
+ * carriers with a WeChat courier code first. Its one caller is the mini-program.
+ */
+export const expressCompanyOptions = defineRoute({
+  id: 'shipping.expressCompanyOptions',
   method: 'GET',
-  path: '/api/v1/staff/express-companies',
-  auth: 'staff',
-  summary: '店员物流公司列表',
+  path: '/api/v1/express-companies',
+  auth: 'public',
+  summary: '快递公司列表（退货物流）',
   tags: ['shipping'],
+  query: expressCompanyOptionsQuery,
   response: expressCompanyList,
-  examples: [{ name: 'ok', response: expressCompanyListExample }],
+  examples: [
+    { name: 'ok', response: expressCompanyListExample },
+    {
+      name: 'search',
+      query: { keyword: '顺丰', limit: 20 },
+      response: { items: [expressCompanyListExample.items[0]!] },
+    },
+  ],
 });
 
 // ---------------------------------------------------------------------------

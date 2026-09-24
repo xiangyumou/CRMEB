@@ -6,10 +6,10 @@ import { grantOrderGifts } from '../coupon';
 import { orderFulfilConfig } from './order.fulfil.config';
 import * as fulfilRepo from './order.fulfil.repo';
 import * as rules from './order.fulfil.rules';
-import { resolveFulfilmentNotifier } from './order.fulfil.ports';
+import { resolveFulfilmentNotifier, type FulfilmentNoticeShipment } from './order.fulfil.ports';
 import { scheduleAutoReceive } from './order.fulfil.service';
 import * as repo from './order.repo';
-import { onOrderPaid } from './ports';
+import { onOrderPaid, onShipmentDispatched } from './ports';
 import { orderStateMachine } from './order.state-machine';
 
 /**
@@ -248,6 +248,19 @@ export async function autoDeliver(ctx: Ctx, orderId: number): Promise<AutoDelive
       payload: { orderId, userId: order.userId, shipmentId: shipment.id },
     });
 
+    await onShipmentDispatched.dispatch(tx, ctx, {
+      orderId,
+      orderNo: order.orderNo,
+      userId: order.userId,
+      at: now,
+      shipmentId: shipment.id,
+      deliveryMode: 'virtual',
+      allDelivered: rollUp === 'fulfilled',
+      otherShipments: (await fulfilRepo.listShipments(tx, [orderId]))
+        .filter((other) => other.id !== shipment.id)
+        .map((other) => ({ id: other.id, cancelled: other.status === 'cancelled' })),
+    });
+
     return {
       delivered: true,
       fulfilled: rollUp === 'fulfilled',
@@ -295,22 +308,65 @@ registerEffectHandler('order', 'order.completed', async (ctx, effect) => {
   await notify(ctx, effect, 'order.completed');
 });
 
+/**
+ * The effect rows carry ids only (`{ orderId, userId, shipmentId? }`), and
+ * rows of that shape are already in the ledger. So what the message says —
+ * the order number, the carrier, the tracking number — is read here, when the
+ * handler runs, from this domain's own tables: an old row and a new one say
+ * the same thing, and a tracking number corrected through 修改发货信息 before
+ * the send goes out is the corrected one (NOTIF-007).
+ *
+ * A shipment cancelled before the handler got to it is not announced.
+ */
 async function notify(
   ctx: Ctx,
   effect: Effect,
   kind: 'shipment.dispatched' | 'order.received' | 'order.completed',
 ): Promise<void> {
   const notifier = resolveFulfilmentNotifier();
-  const payload = (effect.payload ?? {}) as { orderId?: number; userId?: number };
+  const payload = (effect.payload ?? {}) as {
+    orderId?: number;
+    userId?: number;
+    shipmentId?: number;
+  };
   if (!notifier) {
     ctx.logger.debug({ kind, effectId: effect.id }, 'no fulfilment notifier registered');
     return;
   }
+  const orderId = Number(payload.orderId ?? 0);
+  const order = await repo.findOrder(ctx.db, orderId);
+
+  let shipment: FulfilmentNoticeShipment | null = null;
+  if (kind === 'shipment.dispatched') {
+    const shipmentId = Number(payload.shipmentId ?? effect.scopeId);
+    const row = await fulfilRepo.findShipment(ctx.db, shipmentId);
+    if (row?.status === 'cancelled') {
+      ctx.logger.info({ shipmentId, effectId: effect.id }, 'shipment cancelled before its notice');
+      return;
+    }
+    if (row) {
+      const company =
+        row.expressCompanyId === null
+          ? null
+          : await fulfilRepo.findExpressCompanyEvenDisabled(ctx.db, row.expressCompanyId);
+      shipment = {
+        id: row.id,
+        deliveryMode: row.deliveryMode,
+        expressCompanyName: company?.name ?? null,
+        trackingNo: row.trackingNo,
+        courierName: row.courierName,
+        courierPhone: row.courierPhone,
+      };
+    }
+  }
+
   await notifier.notify(ctx, {
     kind,
-    orderId: Number(payload.orderId ?? 0),
-    userId: Number(payload.userId ?? 0),
+    orderId,
+    userId: Number(payload.userId ?? order?.userId ?? 0),
     payload: (effect.payload ?? {}) as Record<string, unknown>,
+    order: order ? { orderNo: order.orderNo, paidAmount: order.paidAmount } : null,
+    shipment,
   });
 }
 

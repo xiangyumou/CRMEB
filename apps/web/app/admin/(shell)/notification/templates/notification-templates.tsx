@@ -243,20 +243,17 @@ function fieldsFor(template: NotificationTemplate): FormField[] {
           />
         ),
       },
-      channel === 'wechatOa'
-        ? {
-            kind: 'text',
-            name: ['channels', 'wechatOa', 'linkUrl'],
-            label: '点击跳转',
-            visibleWhen: enabled('wechatOa'),
-          }
-        : {
-            kind: 'text',
-            name: ['channels', 'wechatMini', 'page'],
-            label: '小程序页面',
-            visibleWhen: enabled('wechatMini'),
-          },
     );
+    // The mini program's page is the event's own route; only the 公众号
+    // message takes a hand-typed link.
+    if (channel === 'wechatOa') {
+      fields.push({
+        kind: 'text',
+        name: ['channels', 'wechatOa', 'linkUrl'],
+        label: '点击跳转',
+        visibleWhen: enabled('wechatOa'),
+      });
+    }
   }
 
   return fields;

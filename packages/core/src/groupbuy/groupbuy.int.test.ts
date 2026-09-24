@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { and, eq, inArray } from 'drizzle-orm';
 import { products, productSkus } from '@shop/db/schema/catalog';
 import { notificationMessages, notificationTemplates } from '@shop/db/schema/notification';
-import { effects } from '@shop/db/schema/system';
+import { configValues, effects } from '@shop/db/schema/system';
 import { wechatIdentities } from '@shop/db/schema/wechat';
 import {
   groupbuyActivities,
@@ -20,7 +22,7 @@ import { getEffectHandler } from '../effects/index';
 import { notificationAdmin, registerSmsPort, type SmsPort } from '../notification';
 import { resetWechatTokenFlight, wechatConfig } from '../wechat';
 import { registerShippingFreightPort } from '../shipping';
-import type { Actor, Ctx } from '../kernel/context';
+import { anonymousActor, type Actor, type Ctx } from '../kernel/context';
 import { Money } from '../kernel/money';
 import { withTx } from '../kernel/tx';
 import * as checkout from '../order';
@@ -68,7 +70,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await harness.db.truncateAll();
   // `truncateAll` empties the settings table but not the config cache, and a
-  // test that switches 虚拟成团 on would otherwise leak it into the next one.
+  // test that stores config would otherwise leak it into the next one.
   await harness.ctx.config.invalidate(groupbuyConfig.group);
   // The 人气条 is cached in Redis for a minute; without this a test reads the
   // previous test's count.
@@ -395,12 +397,16 @@ describe('the group-buy price through the real checkout', () => {
     return { userId, ctx: asUser(userId) };
   }
 
-  const buyNow = (fixture: ActivityFixture, kindMeta?: Record<string, string>) => ({
+  const buyNow = (
+    fixture: ActivityFixture,
+    kindMeta?: { activityId: string; groupId?: string },
+  ) => ({
     source: 'buy-now' as const,
     cartItemIds: [],
     item: { skuId: String(fixture.skuId), quantity: 1 },
-    kind: kindMeta === undefined ? ('normal' as const) : ('groupbuy' as const),
-    ...(kindMeta === undefined ? {} : { kindMeta }),
+    ...(kindMeta === undefined
+      ? { kind: 'normal' as const }
+      : { kind: 'groupbuy' as const, kindMeta }),
   });
 
   it('prices a group-buy order at the activity price, preview and create', async () => {
@@ -437,6 +443,42 @@ describe('the group-buy price through the real checkout', () => {
     expect((await readGroup(member!.groupId)).activityId).toBe(fixture.activityId);
   });
 
+  it('ORDER-011 — the order detail names the team an order opened or joined, and nothing for an ordinary order', async () => {
+    const fixture = await makeActivity();
+    const leader = await shopper();
+    const opened = await checkout.create(leader.ctx, {
+      ...buyNow(fixture, { activityId: String(fixture.activityId) }),
+      idempotencyKey: `open-${fixture.activityId}`,
+    });
+    const team = await repo.findMemberByOrder(harness.ctx.db, Number(opened.id));
+    // 开团: the team exists with the unpaid order, so the link is there from the start.
+    expect(opened.groupbuyTeamId).toBe(String(team!.groupId));
+    await pay(Number(opened.id));
+
+    const joiner = await shopper();
+    const joined = await checkout.create(joiner.ctx, {
+      ...buyNow(fixture, {
+        activityId: String(fixture.activityId),
+        groupId: String(team!.groupId),
+      }),
+      idempotencyKey: `join-${fixture.activityId}`,
+    });
+    const read = await checkout.detail(joiner.ctx, { id: joined.id });
+    expect(read.groupbuyTeamId).toBe(String(team!.groupId));
+
+    // A cancelled join keeps the link: the team page shows how it went on without them.
+    await cancel(Number(joined.id));
+    expect((await checkout.detail(joiner.ctx, { id: joined.id })).groupbuyTeamId).toBe(
+      String(team!.groupId),
+    );
+
+    const ordinary = await checkout.create(joiner.ctx, {
+      ...buyNow(fixture),
+      idempotencyKey: `plain-${fixture.activityId}`,
+    });
+    expect(ordinary.groupbuyTeamId).toBeNull();
+  });
+
   it('leaves the same SKU at its ordinary price on an ordinary order', async () => {
     const fixture = await makeActivity();
     const { ctx } = await shopper();
@@ -453,6 +495,23 @@ describe('the group-buy price through the real checkout', () => {
     expect(created.payableAmount).toBe('88.00');
     expect(created.kind).toBe('normal');
     expect(await repo.findMemberByOrder(harness.ctx.db, Number(created.id))).toBeNull();
+  });
+
+  it('ORDER-009 — a kind smuggled into kindMeta never reprices an ordinary order', async () => {
+    // The contract strips it; this is the service's own half, for a caller
+    // that reaches `preview` without the contract. `kind` is written after
+    // the kind's payload, so `{ kind: 'groupbuy' }` inside it cannot turn the
+    // activity price on for an order that joins no team.
+    const fixture = await makeActivity();
+    const { ctx } = await shopper();
+    const smuggled = {
+      ...buyNow(fixture),
+      kindMeta: { kind: 'groupbuy', activityId: String(fixture.activityId) },
+    } as unknown as Parameters<typeof checkout.preview>[1];
+
+    const preview = await checkout.preview(ctx, smuggled);
+    expect(preview.payableAmount).toBe('88.00');
+    expect(preview.adjustments).toEqual([]);
   });
 
   it('prices a shopper joining an open team the same way', async () => {
@@ -788,26 +847,39 @@ describe('the expiry sweep', () => {
     expect(await effectsFor(opened.orderId, 'groupbuy.refund')).toHaveLength(1);
   });
 
-  it('fills the team virtually when the shop has said it may', async () => {
+  it('RISK-D-006 — fails and refunds an under-filled team even with the retired 虚拟成团 switch stored as on', async () => {
     const fixture = await makeActivity({ seatsRequired: 3, ttlSeconds: 3_600, stock: 10 });
     const leader = await makeUser();
     const opened = await placeOrder({ userId: leader, fixture });
     await pay(opened.orderId);
-    await setVirtualFill(true);
+    await storeRetiredVirtualFill();
 
     harness.clock.set('2026-06-01T02:00:00.000Z');
     const report = await settleExpiredGroups(harness.ctx);
 
-    expect(report).toMatchObject({ succeeded: 1, refunds: 0 });
-    expect(await readGroup(opened.groupId)).toMatchObject({
-      status: 'succeeded',
-      seatsTaken: 3,
-    });
-    // One real buyer in a three-seat team: the admin list must say so.
+    expect(report).toMatchObject({ succeeded: 0, failed: 1, refunds: 1 });
+    expect(await readGroup(opened.groupId)).toMatchObject({ status: 'failed', seatsTaken: 1 });
+    expect(await effectsFor(opened.orderId, 'groupbuy.refund')).toHaveLength(1);
     const detail = await service.adminGroupDetail(asAdmin(['groupbuy:group:read']), {
       id: String(opened.groupId),
     });
-    expect(detail.virtuallyFilled).toBe(true);
+    expect(detail.virtuallyFilled).toBe(false);
+  });
+
+  it('RISK-D-006 — migration 0004 deletes a stored 虚拟成团 switch', async () => {
+    await storeRetiredVirtualFill();
+    const sql = readFileSync(
+      fileURLToPath(
+        new URL('../../../db/migrations/0005_groupbuy_virtual_fill_off.sql', import.meta.url),
+      ),
+      'utf8',
+    );
+    await harness.db.handle.pool.query(sql);
+    const left = await harness.ctx.db
+      .select()
+      .from(configValues)
+      .where(eq(configValues.group, 'groupbuy'));
+    expect(left.map((row) => row.key)).not.toContain('virtualFillOnExpiry');
   });
 
   it('cancels a team nobody ever paid into', async () => {
@@ -929,6 +1001,67 @@ describe('the system refund for a failed team', () => {
 });
 
 describe('the storefront surface', () => {
+  it('narrows the list to one product: its live activities only, none for a product with none', async () => {
+    const shown = await makeActivity();
+    await makeActivity();
+    const draft = await makeActivity({ status: 'draft' });
+
+    const forProduct = await service.list(harness.ctx, {
+      page: 1,
+      pageSize: 20,
+      productId: String(shown.productId),
+    });
+    expect(forProduct.total).toBe(1);
+    expect(forProduct.items.map((item) => item.activityId)).toEqual([String(shown.activityId)]);
+    expect(forProduct.items[0]?.productId).toBe(String(shown.productId));
+
+    // A product whose only activity is not live is in none, as far as the shopper can tell.
+    const hidden = await service.list(harness.ctx, {
+      page: 1,
+      pageSize: 20,
+      productId: String(draft.productId),
+    });
+    expect(hidden).toMatchObject({ total: 0, items: [] });
+  });
+
+  it('answers a manual pick by id, in the given order, with only what the list would show', async () => {
+    const first = await makeActivity({ stock: 10 });
+    const second = await makeActivity({ stock: 10 });
+    const paused = await makeActivity({ stock: 10, status: 'paused' });
+    const over = await makeActivity({ stock: 10, endAt: new Date('2026-05-02T00:00:00.000Z') });
+    const leader = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture: second });
+    await pay(opened.orderId);
+
+    const ids = [second, paused, over, first].map((f) => String(f.activityId));
+    const cards = await service.cardsFor(harness.ctx, [...ids, 'x', '0', ids[0]!]);
+
+    expect(cards.map((card) => card.activityId)).toEqual([
+      String(second.activityId),
+      String(first.activityId),
+    ]);
+    const listed = await service.list(harness.ctx, { page: 1, pageSize: 20 });
+    expect(cards[0]).toEqual(
+      listed.items.find((card) => card.activityId === String(second.activityId)),
+    );
+    expect(cards[0]!.formingGroups).toBe(1);
+    expect(await service.cardsFor(harness.ctx, [])).toEqual([]);
+  });
+
+  it('finds a picked campaign however many campaigns come before it in the list', async () => {
+    const picked = await makeActivity({ stock: 10 });
+    await harness.ctx.db
+      .update(groupbuyActivities)
+      .set({ sortOrder: -1 })
+      .where(eq(groupbuyActivities.id, picked.activityId));
+    for (let index = 0; index < 3; index += 1) await makeActivity({ stock: 10 });
+
+    const firstPage = await service.list(harness.ctx, { page: 1, pageSize: 3 });
+    expect(firstPage.items.map((card) => card.activityId)).not.toContain(String(picked.activityId));
+    const cards = await service.cardsFor(harness.ctx, [String(picked.activityId)]);
+    expect(cards.map((card) => card.activityId)).toEqual([String(picked.activityId)]);
+  });
+
   it('offers a team only once its leader has paid', async () => {
     const fixture = await makeActivity({ stock: 10 });
     const leader = await makeUser();
@@ -960,9 +1093,43 @@ describe('the storefront surface', () => {
     await placeOrder({ userId: joiner, fixture, groupId: opened.groupId });
 
     const view = await service.groupDetail(asUser(joiner), { id: String(opened.groupId) });
-    expect(view.members.map((m) => m.nickname)).toEqual(['小明']);
+    expect(view.members.map((m) => m.nickname)).toEqual(['小*']);
     expect(view.me).toMatchObject({ role: 'member', status: 'joined', paid: false });
     expect(view.canJoin).toBe(false);
+  });
+
+  it('RISK-D-010 — shows a team to anybody with masked names, no account ids, and isMe from the session', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await makeUser('小明明');
+    const joiner = await makeUser('😀开心');
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    const joined = await placeOrder({ userId: joiner, fixture, groupId: opened.groupId });
+    await pay(joined.orderId);
+    const id = { id: String(opened.groupId) };
+
+    const anonymous = await service.groupDetail(harness.as(anonymousActor), id);
+    expect(anonymous.members).toEqual([
+      { nickname: '小*', avatarUrl: expect.anything(), role: 'leader', isMe: false },
+      { nickname: '😀*', avatarUrl: expect.anything(), role: 'member', isMe: false },
+    ]);
+    // No account id anywhere in what a stranger reads.
+    const text = JSON.stringify(anonymous);
+    expect(text).not.toContain('userId');
+    expect(text).not.toContain('小明明');
+
+    const asJoiner = await service.groupDetail(asUser(joiner), id);
+    expect(asJoiner.members.map((m) => m.isMe)).toEqual([false, true]);
+    const asLeader = await service.groupDetail(asUser(leader), id);
+    expect(asLeader.members.map((m) => m.isMe)).toEqual([true, false]);
+
+    const open = await service.openGroups(
+      harness.as(anonymousActor),
+      { id: String(fixture.activityId) },
+      { page: 1, pageSize: 20 },
+    );
+    expect(open.items.map((team) => team.leaderNickname)).toEqual(['小*']);
+    expect(JSON.stringify(open)).not.toContain('userId');
   });
 
   it('lets a leader withdraw a team nobody paid into, and not one they did', async () => {
@@ -981,16 +1148,19 @@ describe('the storefront surface', () => {
     ).rejects.toMatchObject({ code: 'GROUPBUY_GROUP_NOT_WITHDRAWABLE' });
   });
 
-  it('answers the poster with data and a payload, never an image', async () => {
+  it('answers the poster with data and a payload, never an image — SHARE-002', async () => {
     const fixture = await makeActivity({ stock: 10 });
     const leader = await makeUser('小明');
     const opened = await placeOrder({ userId: leader, fixture });
     await pay(opened.orderId);
 
     const poster = await service.poster(asUser(leader), { id: String(opened.groupId) });
-    expect(poster.qrPayload).toContain(String(opened.groupId));
+    expect(poster.route).toEqual({ route: 'groupbuyTeam', params: { id: String(opened.groupId) } });
+    expect(poster.page).toBe(`packages/promo/groupbuy-team/index?id=${opened.groupId}`);
+    expect(poster.qrPayload).toBe(poster.page);
     expect(poster.seatsLeft).toBe(2);
-    expect(poster.leaderNickname).toBe('小明');
+    // Masked even for the leader: a poster is made to be passed on (RISK-D-010).
+    expect(poster.leaderNickname).toBe('小*');
   });
 });
 
@@ -1145,7 +1315,7 @@ describe('the admin surface', () => {
     ).rejects.toMatchObject({ code: 'GROUPBUY_ACTIVITY_IN_USE' });
   });
 
-  it('refuses 立即成团 while the shop has 虚拟成团 switched off', async () => {
+  it('RISK-D-006 — refuses 立即成团 on an under-filled team, whatever the retired switch says', async () => {
     const fixture = await makeActivity({ stock: 10 });
     const leader = await makeUser();
     const opened = await placeOrder({ userId: leader, fixture });
@@ -1156,9 +1326,11 @@ describe('the admin surface', () => {
       service.adminGroupComplete(admin, { id: String(opened.groupId) }, {}),
     ).rejects.toMatchObject({ code: 'GROUPBUY_VIRTUAL_FILL_DISABLED' });
 
-    await setVirtualFill(true);
-    const detail = await service.adminGroupComplete(admin, { id: String(opened.groupId) }, {});
-    expect(detail).toMatchObject({ status: 'succeeded', seatsTaken: 3, virtuallyFilled: true });
+    await storeRetiredVirtualFill();
+    await expect(
+      service.adminGroupComplete(admin, { id: String(opened.groupId) }, {}),
+    ).rejects.toMatchObject({ code: 'GROUPBUY_VIRTUAL_FILL_DISABLED' });
+    expect(await readGroup(opened.groupId)).toMatchObject({ status: 'forming', seatsTaken: 1 });
   });
 
   it('keeps the sales counter across an edit', async () => {
@@ -1234,8 +1406,15 @@ async function allMembers(groupId: number) {
     .orderBy(groupbuyMembers.id);
 }
 
-async function setVirtualFill(enabled: boolean): Promise<void> {
-  await harness.ctx.config.set(groupbuyConfig, { virtualFillOnExpiry: enabled });
+/**
+ * What a shop that had 虚拟成团 switched on before 2026-09-23 still has stored:
+ * the key the `groupbuy` group no longer declares.
+ */
+async function storeRetiredVirtualFill(): Promise<void> {
+  await harness.ctx.db
+    .insert(configValues)
+    .values({ group: 'groupbuy', key: 'virtualFillOnExpiry', value: true });
+  await harness.ctx.config.invalidate(groupbuyConfig.group);
 }
 
 // ---------------------------------------------------------------------------
@@ -1372,15 +1551,16 @@ describe('shopper notifications', () => {
     expect(opened).toMatchObject({ code: 'groupbuy_created', title: '开团成功' });
     expect(opened?.content).toContain('3 人成团，请在 2026-06-01 09:00 前邀请好友参团');
     expect(opened?.data).toMatchObject({
-      link: `/pages/activity/goods_combination_status/index?id=${leader.groupId}`,
+      route: { route: 'groupbuyTeam', params: { id: String(leader.groupId) } },
     });
+    expect(opened?.data).not.toHaveProperty('link');
 
     const [joined] = await inbox(joinerId);
     expect(await inbox(joinerId)).toHaveLength(1);
     expect(joined).toMatchObject({ code: 'groupbuy_joined', title: '参团成功' });
   });
 
-  it('tells every paid member 拼团成功 when the team fills, on every channel switched on', async () => {
+  it('tells every paid member 拼团成功 when the team fills, on every channel switched on — NOTIF-006', async () => {
     // The operator configures the event in 通知管理 before the team fills.
     const current = await notificationAdmin.getTemplate(superAdmin(), {
       code: 'groupbuy_succeeded',
@@ -1397,13 +1577,14 @@ describe('shopper notifications', () => {
             templateKey: 'OPENTM1',
             templateId: 'TPL_OA_GROUP_OK',
             fields: { first: '拼团成功', keyword1: '{{orderNo}}', keyword2: '{{activityTitle}}' },
+            // The only link a 公众号 message carries is the one the operator typed.
+            linkUrl: '/groupbuy/teams/{{groupId}}',
           },
           wechatMini: {
             enabled: true,
             templateKey: '1001',
             templateId: 'TPL_MINI_GROUP_OK',
             fields: { character_string1: '{{orderNo}}', thing2: '{{activityTitle}}' },
-            page: 'pages/activity/goods_combination_status/index?id={{groupId}}',
           },
           sms: { enabled: true, templateCode: 'SMS_GROUP_OK' },
         },
@@ -1435,7 +1616,7 @@ describe('shopper notifications', () => {
       expect(oaSend?.body).toEqual({
         touser: `oa-openid-${index}`,
         template_id: 'TPL_OA_GROUP_OK',
-        url: `https://shop.example.test/pages/activity/goods_combination_status/index?id=${team.groupId}`,
+        url: `https://shop.example.test/groupbuy/teams/${team.groupId}`,
         data: {
           first: { value: '拼团成功' },
           keyword1: { value: orderNo },
@@ -1448,7 +1629,7 @@ describe('shopper notifications', () => {
         .find((call) => (call.body as { touser: string }).touser === `mini-openid-${index}`);
       expect(miniSend?.body).toMatchObject({
         template_id: 'TPL_MINI_GROUP_OK',
-        page: `pages/activity/goods_combination_status/index?id=${team.groupId}`,
+        page: `packages/promo/groupbuy-team/index?id=${team.groupId}`,
         data: { character_string1: { value: orderNo }, thing2: { value: team.title } },
       });
 

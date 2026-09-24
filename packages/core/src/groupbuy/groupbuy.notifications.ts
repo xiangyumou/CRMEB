@@ -1,4 +1,4 @@
-import { registerNotificationEvents } from '../notification';
+import { registerNotificationEvents, type NotificationRouteTemplate } from '../notification';
 
 /**
  * What a group-buy shopper is told, and when.
@@ -20,9 +20,6 @@ import { registerNotificationEvents } from '../notification';
  * rolled back. It also covers the shopper who paid for a seat somebody else took
  * a moment earlier, whose team did not fail at all but who is owed the same
  * news.
- *
- * Links open the uni-app pages: the 拼团 page takes the group id, the order page
- * the order number (`order_id` is the number the pages print and route on).
  */
 
 export const GROUPBUY_EVENTS = {
@@ -42,9 +39,18 @@ const TEAM_VARS = [
   'expiresAt',
 ] as const;
 
-const TEAM_LINK = '/pages/activity/goods_combination_status/index?id={{groupId}}';
-const ORDER_LINK = '/pages/goods/order_details/index?order_id={{orderNo}}';
 const USER_CHANNELS = ['inApp', 'wechatOa', 'wechatMini', 'sms'] as const;
+
+/** The mini-program pages (docs/mini/pages.md §3.4). */
+const TEAM_ROUTE: NotificationRouteTemplate = {
+  route: 'groupbuyTeam',
+  params: { id: '{{groupId}}' },
+};
+/** A failed team is refunded automatically: the refund is what to look at. */
+const REFUND_ROUTE: NotificationRouteTemplate = {
+  route: 'refund',
+  params: { id: '{{refundId}}' },
+};
 
 /** Idempotent: the registry accepts the same code twice with the same name. */
 export function registerGroupbuyNotificationEvents(): void {
@@ -60,7 +66,7 @@ export function registerGroupbuyNotificationEvents(): void {
         title: '开团成功',
         body: '「{{activityTitle}}」开团成功，{{seatsTotal}} 人成团，请在 {{expiresAt}} 前邀请好友参团。',
       },
-      link: TEAM_LINK,
+      route: TEAM_ROUTE,
     },
     {
       code: GROUPBUY_EVENTS.joined,
@@ -73,7 +79,7 @@ export function registerGroupbuyNotificationEvents(): void {
         title: '参团成功',
         body: '您已加入「{{activityTitle}}」的拼团，成团后我们会尽快发货。',
       },
-      link: TEAM_LINK,
+      route: TEAM_ROUTE,
     },
     {
       code: GROUPBUY_EVENTS.succeeded,
@@ -86,7 +92,7 @@ export function registerGroupbuyNotificationEvents(): void {
         title: '拼团成功',
         body: '「{{activityTitle}}」拼团成功，订单 {{orderNo}} 将尽快为您发货。',
       },
-      link: TEAM_LINK,
+      route: TEAM_ROUTE,
     },
     {
       code: GROUPBUY_EVENTS.failed,
@@ -99,7 +105,7 @@ export function registerGroupbuyNotificationEvents(): void {
         title: '拼团失败',
         body: '「{{activityTitle}}」{{reason}}，订单 {{orderNo}} 的 ¥{{amount}} 将原路退回。',
       },
-      link: ORDER_LINK,
+      route: REFUND_ROUTE,
     },
   ]);
 }

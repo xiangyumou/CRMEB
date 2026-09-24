@@ -25,6 +25,7 @@ import type {
   MyGroupbuyListQuery,
 } from '@shop/contracts/groupbuy/schemas';
 import { GROUPBUY_SUMMARY_AVATAR_LIMIT } from '@shop/contracts/groupbuy/schemas';
+import { toMiniPath } from '@shop/contracts/system/storefront-routes';
 import { DomainError } from '../kernel/errors';
 import { toId, toIdOrNull } from '../kernel/ids';
 import type { Ctx } from '../kernel/context';
@@ -37,6 +38,7 @@ import {
   assertWithdrawable,
   isActivityOpen,
   isGroupJoinable,
+  maskNickname,
   seatsLeft,
   wasVirtuallyFilled,
 } from './groupbuy.rules';
@@ -284,9 +286,10 @@ export async function adminGroupDetail(
 /**
  * 立即成团.
  *
- * Gated on its own permission atom (`groupbuy:group:complete`) and on the
- * shop-wide 虚拟成团 switch: an operator may not fake a team in a shop that has
- * decided not to fake teams.
+ * Gated on its own permission atom (`groupbuy:group:complete`), and it never
+ * invents members: 虚拟成团 is off for good (2026-09-23; see
+ * `groupbuy.config.ts`), so an under-filled team is refused with
+ * `GROUPBUY_VIRTUAL_FILL_DISABLED` and settles at its deadline like any other.
  */
 export async function adminGroupComplete(
   ctx: Ctx,
@@ -294,13 +297,12 @@ export async function adminGroupComplete(
   body: { reason?: string | undefined },
 ): Promise<GroupbuyGroupDetail> {
   const id = Number(input.id);
-  const config = await ctx.config.get(groupbuyConfig);
 
   await ctx.withTx(async (tx) => {
     const group = await repo.lockGroup(tx, id);
     if (!group) throw new DomainError('GROUPBUY_GROUP_NOT_FOUND');
     assertCompletable(group);
-    if (group.seatsTaken < group.seatsTotal && !config.virtualFillOnExpiry) {
+    if (group.seatsTaken < group.seatsTotal) {
       throw new DomainError('GROUPBUY_VIRTUAL_FILL_DISABLED', {
         details: { seatsTaken: group.seatsTaken, seatsTotal: group.seatsTotal },
       });
@@ -329,10 +331,27 @@ export async function adminGroupComplete(
 // storefront
 // ---------------------------------------------------------------------------
 
+/**
+ * `GET /api/v1/groupbuy/activities`: the 拼团 channel list, or with `ids` a DIY
+ * 拼团 component's 指定数据 — those activities in the order saved, the
+ * invisible skipped (`cardsFor`), then paged. `ids` and `productId` together
+ * are the intersection: the picked activities that are that product's.
+ */
 export async function list(ctx: Ctx, query: GroupbuyListQuery): Promise<Paged<GroupbuyCard>> {
+  if (query.ids !== undefined) {
+    const cards = await cardsFor(ctx, query.ids, { productId: query.productId });
+    const from = (query.page - 1) * query.pageSize;
+    return {
+      items: cards.slice(from, from + query.pageSize),
+      total: cards.length,
+      page: query.page,
+      pageSize: query.pageSize,
+    };
+  }
   const now = ctx.clock.now();
   const { rows, total } = await repo.listActivities(ctx.db, {
     visibleAt: now,
+    productId: query.productId === undefined ? undefined : Number(query.productId),
     sortBy: 'sortOrder',
     sortOrder: 'desc',
     ...pageBounds(query),
@@ -347,6 +366,39 @@ export async function list(ctx: Ctx, query: GroupbuyListQuery): Promise<Paged<Gr
     page: query.page,
     pageSize: query.pageSize,
   };
+}
+
+/**
+ * The storefront cards of exactly these activities, in the order given — what
+ * a DIY 拼团 block's manual pick shows. Read-only and additive: the same
+ * visibility as `list` (active, inside its window, not deleted), so an id the
+ * shopper could not see there is skipped here, as is a malformed or repeated
+ * one. At most `DECOR_LIMITS.records` ids arrive, so one query answers it.
+ */
+export async function cardsFor(
+  ctx: Ctx,
+  ids: readonly string[],
+  options: { productId?: string | undefined } = {},
+): Promise<GroupbuyCard[]> {
+  const wanted = [...new Set(ids.filter((id) => /^[1-9]\d{0,14}$/.test(id)))].map(Number);
+  if (wanted.length === 0) return [];
+  const now = ctx.clock.now();
+  const { rows } = await repo.listActivities(ctx.db, {
+    visibleAt: now,
+    ids: wanted,
+    productId: options.productId === undefined ? undefined : Number(options.productId),
+    limit: wanted.length,
+    offset: 0,
+  });
+  const forming = await repo.countFormingGroupsByActivity(
+    ctx.db,
+    rows.map((row) => row.id),
+  );
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return wanted.flatMap((id) => {
+    const row = byId.get(id);
+    return row ? [toCard(row, forming.get(row.id) ?? 0, now)] : [];
+  });
 }
 
 /** How long the 人气条 may be stale. A minute, and the strip says nothing that needs to be exact. */
@@ -416,7 +468,7 @@ export async function detail(ctx: Ctx, input: { id: string }): Promise<GroupbuyD
   // A shopper who is already in a live team is offered "看看我的团" instead of
   // "开团", so the page needs to know. `null` for an anonymous visitor: "cannot
   // join" and "we do not know you" are different answers.
-  const userId = ctx.actor.kind === 'user' || ctx.actor.kind === 'staff' ? ctx.actor.id : null;
+  const userId = ctx.actor.kind === 'user' ? ctx.actor.id : null;
   const myOpenGroupId =
     userId === null ? null : await repo.findMyOpenGroup(ctx.db, { activityId: id, userId, now });
 
@@ -459,7 +511,8 @@ export async function openGroups(
   return {
     items: rows.map((row) => ({
       groupId: toId(row.id),
-      leaderNickname: row.leaderNickname,
+      // Public route: a stranger's name stays masked (RISK-D-010).
+      leaderNickname: maskNickname(row.leaderNickname),
       leaderAvatarUrl: row.leaderAvatarUrl,
       seatsTotal: row.seatsTotal,
       seatsTaken: row.seatsTaken,
@@ -542,10 +595,10 @@ export async function myGroups(
 export async function poster(ctx: Ctx, input: { id: string }): Promise<GroupbuyPoster> {
   const id = Number(input.id);
   requireShopper(ctx);
-  const config = await ctx.config.get(groupbuyConfig);
   const row = await repo.findGroupRow(ctx.db, id);
   if (!row) throw new DomainError('GROUPBUY_GROUP_NOT_FOUND');
-  const page = config.posterPage.replaceAll('{groupId}', String(id));
+  const route = { route: 'groupbuyTeam', params: { id: toId(id) } } as const;
+  const page = toMiniPath(route);
   return {
     groupId: toId(id),
     title: row.activityTitle,
@@ -554,10 +607,13 @@ export async function poster(ctx: Ctx, input: { id: string }): Promise<GroupbuyP
     originalPrice: row.activityOriginalPrice,
     seatsLeft: seatsLeft(row),
     expiresAt: row.expiresAt.toISOString(),
-    leaderNickname: row.leaderNickname,
+    // Masked for everybody, the leader included: a poster is made to be passed
+    // on, and any signed-in shopper may ask for any team's (RISK-D-010).
+    leaderNickname: maskNickname(row.leaderNickname),
     leaderAvatarUrl: row.leaderAvatarUrl,
     qrPayload: page,
     page,
+    route,
   };
 }
 
@@ -573,7 +629,7 @@ async function buildGroupView(ctx: Ctx, groupId: number): Promise<GroupbuyGroupV
   if (!row) throw new DomainError('GROUPBUY_GROUP_NOT_FOUND');
   const now = ctx.clock.now();
   const paid = await repo.listPaidMembers(ctx.db, groupId);
-  const userId = ctx.actor.kind === 'user' || ctx.actor.kind === 'staff' ? ctx.actor.id : null;
+  const userId = ctx.actor.kind === 'user' ? ctx.actor.id : null;
   const mine = userId === null ? null : await repo.findMember(ctx.db, { groupId, userId });
 
   return {
@@ -589,12 +645,15 @@ async function buildGroupView(ctx: Ctx, groupId: number): Promise<GroupbuyGroupV
     expiresAt: row.expiresAt.toISOString(),
     succeededAt: row.succeededAt?.toISOString() ?? null,
     // Paid and unrefunded only: an unpaid order is not a participant, and
-    // showing one would be a "phantom member" in the participant list.
+    // showing one would be a "phantom member" in the participant list. Anybody
+    // with the link reads this, so no account id and a masked name; "is this
+    // seat mine" comes from the session, never from an id the client compares
+    // (RISK-D-010).
     members: paid.map((member) => ({
-      userId: toId(member.userId),
-      nickname: member.nickname,
+      nickname: maskNickname(member.nickname),
       avatarUrl: member.avatarUrl,
       role: member.role,
+      isMe: userId !== null && member.userId === userId,
     })),
     me:
       mine === null
@@ -781,7 +840,7 @@ function toMemberDto(row: repo.MemberRow): GroupbuyMember {
 }
 
 function requireShopper(ctx: Ctx): number {
-  if ((ctx.actor.kind !== 'user' && ctx.actor.kind !== 'staff') || ctx.actor.id === null) {
+  if (ctx.actor.kind !== 'user' || ctx.actor.id === null) {
     throw new DomainError('UNAUTHENTICATED');
   }
   return ctx.actor.id;

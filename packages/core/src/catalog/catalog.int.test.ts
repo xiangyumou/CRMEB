@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { productReviews, productSkus, productVirtualCards } from '@shop/db/schema/catalog';
 import { productEvents } from '@shop/db/schema/stats';
+import { attachments } from '@shop/db/schema/storage';
 import { effects as effectsTable } from '@shop/db/schema/system';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 
@@ -213,26 +214,15 @@ describe('categories', () => {
     expect(tree.items.map((i) => i.id)).not.toContain(id);
   });
 
-  // The cheap "has the tree changed?" the storefront asks on every cold start.
-  // It has to be the *same* string the tree carries, or a client that compares
-  // the two decides the menu moved when it did not.
-  it('answers the version alone with exactly what the tree carries', async () => {
-    await makeCategory(asAdmin(), '版本类目');
-    const tree = await storefront.categoryTree(harness.ctx);
-
-    expect(await storefront.categoryVersion(harness.ctx)).toEqual({ version: tree.version });
-  });
-
-  it('moves the standalone version when a category is hidden, not only when one is added', async () => {
+  it('moves the tree version when a category is hidden, not only when one is added', async () => {
     const id = await makeCategory(asAdmin(), '待隐藏类目');
-    const before = await storefront.categoryVersion(harness.ctx);
+    const before = (await storefront.categoryTree(harness.ctx)).version;
 
     harness.clock.set('2026-06-03T00:00:00.000Z');
     await service.adminCategorySetVisibility(asAdmin(), { id }, { isVisible: false });
-    const after = await storefront.categoryVersion(harness.ctx);
+    const after = (await storefront.categoryTree(harness.ctx)).version;
 
-    expect(after.version).not.toBe(before.version);
-    expect(after).toEqual({ version: (await storefront.categoryTree(harness.ctx)).version });
+    expect(after).not.toBe(before);
   });
 });
 
@@ -1242,6 +1232,65 @@ describe('reviews', () => {
         images: [],
       }),
     ).rejects.toMatchObject({ code: 'CATALOG_REVIEW_NOT_ALLOWED' });
+  });
+
+  describe('CAT-018 — review pictures come from our own storage', () => {
+    const STORED = '/uploads/review/2026/06/01/cat-018.png';
+
+    async function reviewableLine() {
+      const product = await makeProduct(asAdmin());
+      const skuId = await firstSkuId(harness, product.id);
+      const userId = await makeUser(harness);
+      const { orderItemId } = await makeOrderLine(harness, {
+        userId,
+        productId: Number(product.id),
+        skuId,
+      });
+      return { userId, orderItemId: String(orderItemId) };
+    }
+
+    it('takes a picture our uploads stored', async () => {
+      await harness.ctx.db.insert(attachments).values({
+        storageKey: STORED.replace(/^\/uploads\//, ''),
+        driver: 'local',
+        url: STORED,
+        name: 'review.png',
+        kind: 'image',
+        mime: 'image/png',
+        size: 26,
+        sha256: 'c'.repeat(64),
+      });
+      const { userId, orderItemId } = await reviewableLine();
+
+      const review = await reviews.reviewSubmit(asUser(userId), {
+        orderItemId,
+        productScore: 5,
+        serviceScore: 5,
+        images: [STORED],
+      });
+      expect(review.images).toEqual([STORED]);
+    });
+
+    it('refuses a link to somebody else’s server, and writes nothing', async () => {
+      const { userId, orderItemId } = await reviewableLine();
+
+      for (const url of [
+        'https://tracker.example.net/pixel.png',
+        // Our path shape, but nothing we stored.
+        '/uploads/review/2026/06/01/never-uploaded.png',
+      ]) {
+        await expect(
+          reviews.reviewSubmit(asUser(userId), {
+            orderItemId,
+            productScore: 5,
+            serviceScore: 5,
+            content: '很好',
+            images: [url],
+          }),
+        ).rejects.toMatchObject({ code: 'CATALOG_REVIEW_IMAGE_NOT_ALLOWED' });
+      }
+      expect(await harness.ctx.db.select().from(productReviews)).toHaveLength(0);
+    });
   });
 
   it('allows any number of admin-written reviews for one product', async () => {

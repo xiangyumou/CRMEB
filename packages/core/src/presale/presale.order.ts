@@ -200,6 +200,18 @@ export const presaleKindHandler: OrderKindHandler = {
       updatedAt: now,
     });
   },
+
+  /**
+   * 确认订单's 发货时间: the activity's `shipAfterDays` as it stands. The promise itself is
+   * made at payment (`handlePaid` stamps `ship_not_before_at` from the same column), so
+   * this is what the shopper gets unless the operator edits the campaign in between.
+   */
+  async previewTerms(db, selections) {
+    const activityId = Number(selections['activityId']);
+    if (!Number.isInteger(activityId) || activityId <= 0) return {};
+    const activity = await repo.findActivity(db, activityId);
+    return activity ? { shipAfterDays: activity.shipAfterDays } : {};
+  },
 };
 
 // ---------------------------------------------------------------------------

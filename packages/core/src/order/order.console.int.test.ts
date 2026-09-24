@@ -323,7 +323,7 @@ describe('one order', () => {
 // ---------------------------------------------------------------------------
 
 describe('备注', () => {
-  it('records who wrote it, whichever console they used', async () => {
+  it('records the operator who wrote it', async () => {
     const adminId = await makeAdmin();
     const placed = await placeOrder();
     await pay(placed);
@@ -335,19 +335,25 @@ describe('备注', () => {
     );
     expect((await orderRow(placed.orderId)).adminRemark).toBe('后台备注');
 
-    // The same service reached from the phone, as a shop assistant.
-    const staffId = await makeUser();
-    await order.orderConsole.adminRemark(
-      as(staffId),
-      { id: String(placed.orderId) },
-      { adminRemark: '店员备注' },
+    const remarks = (await logsOf(placed.orderId)).filter(
+      (log) => log.changeType === 'remark_updated',
     );
-    expect((await orderRow(placed.orderId)).adminRemark).toBe('店员备注');
+    expect(remarks).toMatchObject([{ operatorKind: 'admin', operatorAdminId: adminId }]);
+  });
 
-    const kinds = (await logsOf(placed.orderId))
-      .filter((log) => log.changeType === 'remark_updated')
-      .map((log) => log.operatorKind);
-    expect(kinds).toEqual(['admin', 'user']);
+  it('refuses a shopper: only an operator acts through the console', async () => {
+    const placed = await placeOrder();
+    await pay(placed);
+    const shopperId = await makeUser();
+
+    await expect(
+      order.orderConsole.adminRemark(
+        as(shopperId),
+        { id: String(placed.orderId) },
+        { adminRemark: '不该写进去' },
+      ),
+    ).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    expect((await orderRow(placed.orderId)).adminRemark).not.toBe('不该写进去');
   });
 });
 

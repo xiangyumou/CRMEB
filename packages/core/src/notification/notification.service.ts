@@ -14,7 +14,7 @@ import {
   type ChannelOutcome,
 } from './notification.send';
 import { publishToAdmin, type AdminStreamEvent } from './notification.stream';
-import { render } from './notification.render';
+import { placeholdersIn, render, renderRoute } from './notification.render';
 
 /**
  * One entry point for every domain: `notify(tx, ctx, input)`.
@@ -324,10 +324,24 @@ async function deliverInApp(
   }
 
   const { title, content } = renderInApp(event, channels, data);
+  // A placeholder with nothing behind it renders empty (NOTIF-005), which keeps
+  // the message readable but hides the sender's bug: say so where an operator
+  // looking at a half-empty 站内信 will find it (NOTIF-007).
+  const blank = placeholdersIn(
+    `${channels.inApp?.title || event.defaults.title} ${channels.inApp?.body || event.defaults.body}`,
+  ).filter((name) => (data[name] ?? '') === '');
+  if (blank.length > 0) {
+    ctx.logger.warn({ event: event.code, blank }, 'notification rendered with blank variables');
+  }
   // The in-app link stays a **path**: the bell and the message centre are both
   // inside the app, and an absolute URL there would send the operator on a
   // round trip through the public origin. Only the WeChat channels absolutise.
   const link = render(event.link ?? '', data);
+  // The mini program opens `data.route` (docs/mini/pages.md §3.4).
+  const route = event.route ? renderRoute(event.route, data) : null;
+  if (event.route && route === null) {
+    ctx.logger.warn({ event: event.code }, 'notification route did not render to a valid route');
+  }
   const now = ctx.clock.now();
 
   const rows = await ctx.withTx((tx) =>
@@ -339,7 +353,7 @@ async function deliverInApp(
         ...(event.audience === 'user' ? { userId: recipient } : { adminId: recipient }),
         title,
         content,
-        data: { ...data, ...(link === '' ? {} : { link }) },
+        data: { ...data, ...(link === '' ? {} : { link }), ...(route ? { route } : {}) },
       })),
       now,
     ),

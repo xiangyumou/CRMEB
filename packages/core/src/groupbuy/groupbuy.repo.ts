@@ -70,6 +70,8 @@ export interface ActivityListFilters {
   productId?: number | undefined;
   /** A storefront list shows only what a shopper may see, at this instant. */
   visibleAt?: Date | undefined;
+  /** Only these activities (a DIY block's manual pick). Additive: omitted means no id filter. */
+  ids?: readonly number[] | undefined;
   sortBy?: string | undefined;
   sortOrder?: 'asc' | 'desc' | undefined;
   limit: number;
@@ -95,6 +97,9 @@ function activityWhere(filters: ActivityListFilters): SQL | undefined {
   }
   if (filters.productId !== undefined) {
     parts.push(eq(groupbuyActivities.productId, filters.productId));
+  }
+  if (filters.ids !== undefined) {
+    parts.push(inArray(groupbuyActivities.id, [...filters.ids]));
   }
   if (filters.visibleAt) {
     parts.push(eq(groupbuyActivities.status, 'active'));
