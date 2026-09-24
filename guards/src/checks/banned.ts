@@ -9,8 +9,8 @@ import { rel, repoRoot } from '../lib/paths';
  *
  * ESLint already forbids `eval`, `new Function` and the ambient clock in core.
  * A guard repeats the ban for two reasons: lint is configuration and can be
- * turned off in a single line, and lint does not see `.vue` or the uni-app
- * tree. So the rule set is asserted *and* the source is read.
+ * turned off in a single line, and lint does not read plain `.js` / `.mjs`
+ * files. So the rule set is asserted *and* the source is read.
  */
 
 interface Ban {

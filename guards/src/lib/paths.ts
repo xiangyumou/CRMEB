@@ -2,14 +2,13 @@ import path from 'node:path';
 
 /** `guards` */
 export const guardsRoot = path.resolve(import.meta.dirname, '../..');
-/** The repository root: the pnpm workspace, plus the uni-app, `deploy/`, `docs/` and `.github/`. */
+/** The repository root: the pnpm workspace, plus `deploy/`, `docs/` and `.github/`. */
 export const repoRoot = path.resolve(guardsRoot, '..');
 
 export const webApp = path.join(repoRoot, 'apps/web');
 export const coreSrc = path.join(repoRoot, 'packages/core/src');
 export const migrationsDir = path.join(repoRoot, 'packages/db/migrations');
-export const uniApp = path.join(repoRoot, 'apps/uni-app');
-/** The Taro mini-program that replaces the uni-app (docs/mini). */
+/** The Taro mini-program, the storefront (docs/mini). */
 export const miniApp = path.join(repoRoot, 'apps/mini');
 /** The storefront's typed `/api/v1` client, shared by the mini-program and its tests. */
 export const apiClientSrc = path.join(repoRoot, 'packages/api-client/src');

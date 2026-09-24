@@ -2,7 +2,7 @@ import path from 'node:path';
 import { allRoutes } from '@shop/contracts/routes';
 import { defineCheck, fail, result, type Finding } from '../framework';
 import { isScript, walk } from '../lib/files';
-import { apiClientSrc, miniApp, rel, repoRoot, storefrontBlocksSrc, uniApp } from '../lib/paths';
+import { apiClientSrc, miniApp, rel, repoRoot, storefrontBlocksSrc } from '../lib/paths';
 
 /**
  * The shop's scope, enforced instead of remembered (CORE-002).
@@ -62,20 +62,14 @@ const SOURCE_ROOTS = [
   path.join(repoRoot, 'apps/worker/src'),
   path.join(repoRoot, 'packages/core/src'),
   path.join(repoRoot, 'packages/contracts/src'),
-  path.join(uniApp, 'api'),
   // The mini-program and the two packages it is built from (docs/mini), tests included.
   path.join(miniApp, 'src'),
   apiClientSrc,
   storefrontBlocksSrc,
 ];
 
-/**
- * Files that must name a retired feature in order to keep it out: the guard's
- * own word list, and the uni-app mappers that answer a page's flag for a
- * feature the shop does not have with a falsy constant, so that branch of the
- * page never renders.
- */
-const ALLOWED = [/^guards\//, /^apps\/uni-app\/api\/mappers\//, /^apps\/uni-app\/api\/README\.md$/];
+/** Files that must name a retired feature in order to keep it out: the guard's own word list. */
+const ALLOWED = [/^guards\//];
 
 /**
  * The deny-lists themselves, word by word.
@@ -136,7 +130,7 @@ export function retiredInUrl(url: string): RetiredWord | null {
 
 export const retiredFeatures = defineCheck(
   'retired',
-  'no retired feature reappears in the workspace, the uni-app API layer or the mini-program',
+  'no retired feature reappears in the workspace or the mini-program',
   () => {
     const findings: Finding[] = [];
     const denyListHits = new Set<string>();

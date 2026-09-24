@@ -29,8 +29,7 @@ import { retiredInUrl } from './retired';
 
 /**
  * The Taro mini-program (`apps/mini`), read against the route catalogue and the
- * WeChat rules in `docs/mini/wechat-compliance.md`. It replaces the `uniapp`
- * check at the cutover; until then both run.
+ * WeChat rules in `docs/mini/wechat-compliance.md`.
  *
  * Eight rules, each reported with its tag so a finding says which one broke:
  *
