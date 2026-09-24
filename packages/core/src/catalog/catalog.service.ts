@@ -22,9 +22,11 @@ import type {
 import type { DbOrTx, Tx } from '@shop/db';
 import { randomBytes } from 'node:crypto';
 
+import { hasPermission } from '../auth/rbac';
 import { DomainError } from '../kernel/errors';
 import { requireAdminId, type Ctx } from '../kernel/context';
 import { catalogConfig } from './catalog.config';
+import { catalogPermissions } from './permissions';
 import * as repo from './catalog.repo';
 import {
   MAX_CATEGORY_DEPTH,
@@ -331,7 +333,7 @@ export async function adminProductList(
     ...pageBounds(query),
   });
 
-  const items = await decorateProducts(ctx.db, rows);
+  const items = await decorateProducts(ctx.db, rows, seesCost(ctx));
   return { items, total, page: query.page, pageSize: query.pageSize };
 }
 
@@ -1280,10 +1282,24 @@ function toSpec(entry: { spec: repo.SpecRow; values: repo.SpecValueRow[] }): Pro
   };
 }
 
+/**
+ * 成本价 is the shop's margin. The editor sets it, so `product:write` sees it,
+ * and the export carries it, so `product:export` does; a role that may only
+ * look at products (support, say) gets `null`. It cannot save, so a `null` it
+ * never sends back cannot wipe anything.
+ */
+function seesCost(ctx: Ctx): boolean {
+  return (
+    hasPermission(ctx.actor, catalogPermissions['product:write']) ||
+    hasPermission(ctx.actor, catalogPermissions['product:export'])
+  );
+}
+
 /** The list shape, with the two batched lookups every row needs. */
 async function decorateProducts(
   db: DbOrTx,
   rows: readonly repo.ProductRow[],
+  showCost: boolean,
 ): Promise<AdminProductListItem[]> {
   const ids = rows.map((r) => r.id);
   const [categoryIds, labels] = await Promise.all([
@@ -1298,7 +1314,7 @@ async function decorateProducts(
       ...toProductCard(row, labels.get(row.id) ?? []),
       spu: row.spu,
       status: row.status,
-      cost: row.cost,
+      cost: showCost ? row.cost : null,
       sales: row.sales,
       displaySalesBoost: row.displaySalesBoost,
       views: row.views,
@@ -1324,7 +1340,8 @@ async function buildProductDetail(
   tx?: Tx,
 ): Promise<AdminProductDetail> {
   const db = tx ?? ctx.db;
-  const [listItem] = await decorateProducts(db, [row]);
+  const showCost = seesCost(ctx);
+  const [listItem] = await decorateProducts(db, [row], showCost);
   const [specs, skus, params, links, descriptionHtml] = await Promise.all([
     repo.listSpecs(db, row.id),
     repo.listSkus(db, row.id),
@@ -1350,7 +1367,7 @@ async function buildProductDetail(
     customForm: row.customForm,
     descriptionHtml,
     specs: specs.map(toSpec),
-    skus: skus.map(toSku),
+    skus: skus.map((sku) => (showCost ? toSku(sku) : { ...toSku(sku), cost: null })),
     params: params.map((param) => ({
       id: String(param.id),
       name: param.name,

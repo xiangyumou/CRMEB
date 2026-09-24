@@ -1666,6 +1666,58 @@ describe('taxonomy', () => {
 // the export
 // ---------------------------------------------------------------------------
 
+describe('成本价', () => {
+  const readOnly = (): Ctx =>
+    harness.as({
+      kind: 'admin',
+      id: adminId,
+      permissions: [catalogPermissions['product:read']],
+      isSuper: false,
+    });
+  const costed = () =>
+    makeProduct(asAdmin(), {
+      skus: [
+        {
+          specValues: {},
+          price: '99.00',
+          cost: '22.00',
+          stock: 1,
+          isDefault: true,
+          isVisible: true,
+          sortOrder: 0,
+        },
+      ],
+    });
+
+  it('is not shown to a role that may only look at products', async () => {
+    const product = await costed();
+
+    const list = await service.adminProductList(readOnly(), {
+      tab: 'all',
+      page: 1,
+      pageSize: 20,
+    } as never);
+    expect(list.items[0]!.cost).toBeNull();
+    const detail = await service.adminProductDetail(readOnly(), { id: product.id });
+    expect(detail.cost).toBeNull();
+    expect(detail.skus.map((sku) => sku.cost)).toEqual([null]);
+  });
+
+  it('is shown to whoever edits the product, since they set it', async () => {
+    const product = await costed();
+    const editor = harness.as({
+      kind: 'admin',
+      id: adminId,
+      permissions: [catalogPermissions['product:read'], catalogPermissions['product:write']],
+      isSuper: false,
+    });
+
+    const detail = await service.adminProductDetail(editor, { id: product.id });
+    expect(detail.cost).toBe('22.00');
+    expect(detail.skus.map((sku) => sku.cost)).toEqual(['22.00']);
+  });
+});
+
 describe('export', () => {
   it('emits one row per SKU and reports truncation honestly', async () => {
     await makeProduct(asAdmin(), {
