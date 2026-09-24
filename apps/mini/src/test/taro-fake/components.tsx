@@ -265,3 +265,14 @@ export function RichText(
 export function WebView(props: { src: string; onMessage?: unknown; onLoad?: unknown }) {
   return <div data-testid="web-view" data-src={props.src} />;
 }
+
+/** WeChat's 关注公众号 bar: a marker, since only WeChat draws it. */
+export function OfficialAccount(props: { onError?: unknown; onLoad?: unknown }) {
+  void props;
+  return <div data-testid="official-account" />;
+}
+
+/** The native player: a marker with its source. */
+export function Video(props: BaseProps & { src: string; poster?: string | undefined }) {
+  return <div {...common(props)} data-testid="native-video" data-src={props.src} />;
+}

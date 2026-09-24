@@ -37,6 +37,7 @@ export {
   type StackPage,
 } from './nav';
 export { onNetworkReachability } from './network';
+export { officialAccountBar } from './official-account';
 export {
   agreePrivacy,
   disagreePrivacy,

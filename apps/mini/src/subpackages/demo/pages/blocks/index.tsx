@@ -1,6 +1,5 @@
-import { Button, OfficialAccount, View } from '@tarojs/components';
+import { View } from '@tarojs/components';
 import { useRouter } from '@tarojs/taro';
-import type { ReactNode } from 'react';
 import {
   BlockList,
   type BlockHost,
@@ -40,6 +39,7 @@ import {
   fixtureVideo,
   resolveFixtureProducts,
 } from '@shop/storefront-blocks/fixtures';
+import { useDecorRenderIntent } from '@/features/decor/decor-host';
 import { showToast } from '@/platform';
 
 /**
@@ -56,8 +56,9 @@ import { showToast } from '@/platform';
  *   预售 end time instead of a countdown.
  * - Without it, the live look: a signed-in shopper's coupon states and held
  *   新人券, the countdown against the fixture server time, the floating button,
- *   and the host wrappers a real page adds (`renderIntent`: WeChat's contact
- *   button and `<OfficialAccount />` in the mini-program).
+ *   and the host wrappers a real page adds (`useDecorRenderIntent`, the same
+ *   as 首页's: WeChat's contact button per the shop's 客服 setting, and the
+ *   关注公众号 bar in the mini-program).
  */
 const BLOCKS: RenderedBlock[] = [
   { id: 'search-bar-1', type: 'searchBar', props: fixtureSearchBar },
@@ -103,26 +104,6 @@ const PERSONAL = {
   'newcomer-coupon-1': fixturePersonalG2.newcomerCoupon,
 };
 
-const WEAPP = process.env.TARO_ENV === 'weapp';
-
-/** The host wrappers a real page adds; see `docs/mini/decor.md` §2.4 (host wrappers). */
-function renderIntent(intent: BlockIntent, children: ReactNode): ReactNode {
-  if (intent.kind === 'contact') {
-    if (!WEAPP) return children;
-    return (
-      <Button
-        openType="contact"
-        sessionFrom="route:demo"
-        style={{ padding: 0, margin: 0, background: 'transparent', lineHeight: 'inherit' }}
-      >
-        {children}
-      </Button>
-    );
-  }
-  if (intent.kind === 'officialAccount') return WEAPP ? <OfficialAccount /> : null;
-  return children;
-}
-
 /** The demo only names the intent a real page would handle. */
 function onIntent(intent: BlockIntent): void {
   showToast(`intent: ${intent.kind}`);
@@ -130,6 +111,7 @@ function onIntent(intent: BlockIntent): void {
 
 export default function BlocksDemo() {
   const canvas = useRouter().params.canvas === '1';
+  const renderIntent = useDecorRenderIntent('route:demo');
   const host: BlockHost = canvas ? { canvas: true } : { serverNow: fixtureServerNow };
   return (
     <View style={{ background: '#f5f5f5', minHeight: '100vh' }}>

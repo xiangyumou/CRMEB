@@ -5,6 +5,7 @@ import { assetUrl } from '@/lib/asset-url';
 import { serverNow } from '@/lib/server-clock';
 import { openLinkTarget, storage } from '@/platform';
 import { Image } from '@/ui/image';
+import { useOverlayStore } from '@/ui/overlay-store';
 import { Pressable } from '@/ui/pressable';
 import { SPLASH_DAY_KEY, shopDay, splashDue } from './splash';
 import './splash-overlay.scss';
@@ -44,7 +45,17 @@ export function SplashOverlay() {
     return () => clearTimeout(timer);
   }, [phase, left]);
 
-  const open = phase === 'open';
+  const open = phase === 'open' && ad !== undefined;
+  // It covers the page like a sheet: the page behind stops scrolling, and a 视频 block shows its
+  // poster (a native player would draw above the picture).
+  const push = useOverlayStore((state) => state.push);
+  const pop = useOverlayStore((state) => state.pop);
+  useEffect(() => {
+    if (!open) return;
+    push();
+    return pop;
+  }, [open, push, pop]);
+
   if (!open || !ad) return null;
   const link = ad.link;
   const close = () => setPhase('closed');

@@ -2266,7 +2266,7 @@ The public part of a page is cached per revision (`decor:page:rev:<id>`, `DECOR_
 
 ### DECOR-015
 
-Per-shopper state — coupons claimed / claimable, and what a block declares with `personal` (the 订单入口 counts, the 用户卡片 nickname, avatar and coupon / favourite / history totals, the 新人券 the shopper still holds) — is resolved only when a shopper's session comes with the request, for that shopper, is never part of the cached page (which keeps only _which_ state to fetch), and is `null` for a guest or an admin. A lookup that fails costs its slot, never the page.
+Per-shopper state — coupons claimed / claimable, and what a block declares with `personal` (the 订单入口 counts, the 用户卡片 nickname, avatar and coupon / favourite / history totals, the 新人券 the shopper still holds) — is resolved only when a shopper's session comes with the request, for that shopper, is never part of the cached page (which keeps only _which_ state to fetch), and is `null` for a guest or an admin. A lookup that fails costs its slot, never the page. The mini-program never stands in for that layer: after a claim it fetches the page again instead of changing the button itself.
 
 - `packages/core/src/decor/decor.int.test.ts::per-shopper state — DECOR-015 > DECOR-015: with a session the page carries the coupon state of that shopper; without one, none`
 - `packages/core/src/decor/decor.int.test.ts::per-shopper state — DECOR-015 > DECOR-015: the cached public page holds nothing per shopper`
@@ -2277,6 +2277,7 @@ Per-shopper state — coupons claimed / claimable, and what a block declares wit
 - `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-015: 优惠券 claim state is each shopper’s own, and never in the cached page`
 - `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-015: 新人券 shows a guest the templates, and a shopper only the 新人券 they still hold`
 - `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-015: a live 新人券 block is cached without anyone’s wallet`
+- `apps/mini/src/features/decor/decor-host.test.tsx::DecorPage host (decor.md §2.4) > claimCoupon > DECOR-015 — claims for a shopper, says so, and reloads the page rather than flipping the button`
 
 ### DECOR-016
 

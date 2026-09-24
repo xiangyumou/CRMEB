@@ -96,5 +96,11 @@ function Body({ query }: { query: ReturnType<typeof useRouteQuery<'decor.pageHom
     }
     return <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />;
   }
-  return <DecorPage page={query.data} route={{ route: 'home', params: {} }} />;
+  return (
+    <DecorPage
+      page={query.data}
+      route={{ route: 'home', params: {} }}
+      reload={() => query.refetch()}
+    />
+  );
 }

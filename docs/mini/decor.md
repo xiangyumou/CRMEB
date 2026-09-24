@@ -107,19 +107,19 @@
 
 ### 2.4 宿主要做的事（host wrappers）
 
-块只报告意图，不做平台调用，所以渲染 `BlockList` 的小程序页面（首页、个人中心、微页面）要自己补上下面这些。演示页 `subpackages/demo/pages/blocks` 里有一份最小实现。
+块只报告意图，不做平台调用，所以渲染 `BlockList` 的小程序页面（首页、个人中心、微页面）要自己补上下面这些。实现在 `features/decor/decor-host.tsx`：`DecorPage` 用 `useDecorHost(route, reload)`，页面传入 `reload`（重新请求页面）；演示页 `subpackages/demo/pages/blocks` 只复用 `useDecorRenderIntent`，意图仍只弹提示。
 
 - **`personal` 和 `host`**：把接口返回的 `personal` 原样传给 `BlockList`，未登录时是 `null`。
   - `host.serverNow` 传 `@/lib/server-clock` 的 `serverNow`，它和其他倒计时（`ui/countdown.tsx`）共用一个服务器时间偏移。不要用页面响应的 `resolvedAt` 校时：它随公共层一起缓存，最多晚 60 秒。偏移目前没有来源，`app/config` 还不带 `serverTime`（server-clock.ts 里的 TODO），在补上之前，偏移为 0，等于设备时间。
-  - 页面上打开弹层（SKU 选择、分享面板、确认框）时传 `host.overlayOpen = true`，视频会卸载并换成封面。
+  - 页面上打开弹层（SKU 选择、分享面板、确认框）时传 `host.overlayOpen = true`，视频会卸载并换成封面。取自 `ui/overlay-store` 的计数，开屏浮层打开时也计入。
 - **`onIntent`**：
   - `login`：进登录页，回来后重新请求页面。
-  - `claimCoupon { templateId }`：未登录时先走登录门禁；已登录时调 `POST /api/v1/coupons/:id/claims`（`couponClaim`），成功后提示并**重新请求页面**，领取状态只在个人层里，从不缓存（DECOR-015）。不要在本地改按钮状态充当结果。
+  - `claimCoupon { templateId }`：未登录时先走登录门禁（回来后需要再点一次领取，和其他登录门禁一致）；已登录时调 `POST /api/v1/coupons/:id/claims`（`couponClaim`），成功后提示并**重新请求页面**，领取状态只在个人层里，从不缓存（DECOR-015）。不要在本地改按钮状态充当结果。
   - `claimNewcomerCoupons`：新人券在注册时由服务端发放，不能手动领，所以这个意图就是去登录 / 注册；回来后重新请求页面，块会改为显示「新人券已到账」。
   - `contact`：只在没有传 `renderIntent` 时才会收到（比如 H5）。按 `useSupport()` 处理：`phone` 时拨打电话，`none` 时什么都不做。
 - **`renderIntent`**：只要传了，块就不再给这个元素挂点击处理，所以返回的包装必须自己能响应点击。
   - `contact`：按 `useSupport()` 返回：`mini-program` 时返回 `<Button openType="contact" sessionFrom={sessionFromOf(...)}>`（去掉按钮默认样式）包住 `children`；`phone` 时返回一个点击后调用 `callPhone` 的元素包住 `children`；`none` 时返回 `null`。悬浮客服收到 `null` 就整块不显示，服务宫格的该项留空。
-  - `officialAccount`：小程序返回 `<OfficialAccount />`（可以加 `onError` 记录日志），H5 返回 `null`。
+  - `officialAccount`：小程序返回 `<OfficialAccount />`，H5 返回 `null`，经平台层 `officialAccountBar()`。
   - 其他意图返回 `children`。
 - **悬浮客服的位置**：按钮固定在距底部 `bottom` 设计 px 加 `env(safe-area-inset-bottom)` 的位置。页面有自定义 tabBar 或底部操作栏时，按钮会在它们之上，`z-index` 用 `$z-bar`（200）。如果和页面自己的浮层冲突，由页面决定是否在弹层打开时隐藏。
 
