@@ -528,6 +528,117 @@ export async function listSweepableAttachments(
     .limit(limit);
 }
 
+/**
+ * Tables that record what happened rather than what the shop shows. A URL in
+ * an audit entry or a job payload is not a picture on a page, and these are
+ * the tables that grow without bound, so the reference scan skips them.
+ * Everything else is scanned — a table added later is covered without anyone
+ * remembering to list it here.
+ */
+const NOT_CONTENT_TABLES = [
+  'attachments',
+  'attachment_categories',
+  'audit_logs',
+  'user_sessions',
+  'admin_api_tokens',
+  'oauth_clients',
+  'effects',
+  'failed_jobs',
+  'payment_attempts',
+  'payment_callbacks',
+  'payment_exceptions',
+  'capital_flows',
+  'wechat_trade_orders',
+  'notification_messages',
+  'sms_logs',
+  'product_events',
+  'user_visits',
+  'search_logs',
+  'order_status_logs',
+  'refund_logs',
+  'presale_stock_ledger',
+  'content_security_checks',
+  'wechat_qrcode_scans',
+  'cities',
+];
+
+/** The text-like column types a URL can sit in. */
+const TEXT_UDTS = ['text', 'varchar', 'bpchar', 'json', 'jsonb', '_text', '_varchar'];
+
+const regexpLiteral = (text: string) => text.replace(/[\\^$.|?*+()[\]{}]/g, '\\$&');
+
+/**
+ * Which of `needles` some content still contains, anywhere in a text, JSON or
+ * text-array column of a content table: a product's pictures and description,
+ * a page document and its revisions, an article, a config value, an avatar, an
+ * order line's snapshot.
+ *
+ * One pass per table, whatever the number of needles. A needle is matched as a
+ * substring, so a false hit keeps a file that could have gone — the safe side
+ * for a job whose other mistake is a broken picture.
+ */
+export async function referencedNeedles(
+  db: DbOrTx,
+  needles: readonly string[],
+): Promise<Set<string>> {
+  const found = new Set<string>();
+  if (needles.length === 0) return found;
+
+  const columns = await db.execute<{ table_name: string; column_name: string }>(sql`
+    select c.table_name, c.column_name
+      from information_schema.columns c
+      join information_schema.tables t
+        on t.table_schema = c.table_schema and t.table_name = c.table_name
+     where c.table_schema = current_schema()
+       and t.table_type = 'BASE TABLE'
+       and c.udt_name in (${sql.join(
+         TEXT_UDTS.map((udt) => sql`${udt}`),
+         sql`, `,
+       )})
+       and c.table_name not in (${sql.join(
+         NOT_CONTENT_TABLES.map((table) => sql`${table}`),
+         sql`, `,
+       )})
+     order by c.table_name, c.ordinal_position`);
+
+  const byTable = new Map<string, string[]>();
+  for (const row of columns.rows) {
+    byTable.set(row.table_name, [...(byTable.get(row.table_name) ?? []), row.column_name]);
+  }
+
+  for (const [table, names] of byTable) {
+    const pending = needles.filter((needle) => !found.has(needle));
+    if (pending.length === 0) break;
+    const pattern = `(${pending.map(regexpLiteral).join('|')})`;
+    const text = sql.join(
+      names.map((name) => sql`${sql.identifier(name)}::text`),
+      sql`, `,
+    );
+    const hits = await db.execute<{ needle: string }>(sql`
+      select distinct m[1] as needle
+        from ${sql.identifier(table)},
+             regexp_matches(concat_ws(' ', ${text}), ${pattern}, 'g') as m`);
+    for (const hit of hits.rows) found.add(hit.needle);
+  }
+  return found;
+}
+
+/**
+ * Put still-referenced tombstones to the back of the queue: they are asked
+ * about again a full retention later instead of filling every batch.
+ */
+export async function deferAttachments(
+  db: DbOrTx,
+  ids: readonly number[],
+  now: Date,
+): Promise<void> {
+  if (ids.length === 0) return;
+  await db
+    .update(attachments)
+    .set({ deletedAt: now })
+    .where(and(inArray(attachments.id, [...ids]), sql`${attachments.deletedAt} is not null`));
+}
+
 /** Hard delete, once the bytes are gone. Only ever called by the sweeper. */
 export async function purgeAttachments(db: DbOrTx, ids: readonly number[]): Promise<number> {
   if (ids.length === 0) return 0;

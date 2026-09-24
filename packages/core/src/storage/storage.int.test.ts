@@ -10,6 +10,7 @@ import { DomainError } from '../kernel/errors';
 import { cleanOrphanAttachments } from './storage.jobs';
 import { backfillImageVariants, generateImageVariants } from './image-variants';
 import type { Transport } from './safe-fetch';
+import { siteConfig } from '../system/site.config';
 import { storageConfig } from './storage.config';
 import { createScanTokenStore } from './scan-token';
 import {
@@ -672,8 +673,61 @@ describe('cleanOrphans', () => {
     await attachmentDeleteMany(ctx, { ids: [one.attachment.id] });
 
     harness.clock.set('2027-01-01T00:00:00.000Z');
-    expect(await cleanOrphanAttachments(ctx)).toEqual({ examined: 0, removed: 0, failed: 0 });
+    expect(await cleanOrphanAttachments(ctx)).toEqual({
+      examined: 0,
+      removed: 0,
+      kept: 0,
+      failed: 0,
+    });
     expect(await harness.ctx.db.select().from(attachments)).toHaveLength(1);
+  });
+
+  // Deleting from the library says nothing about the content that shows the
+  // picture: a logo, an avatar, a product description. The sweep asks the
+  // content before it removes the bytes.
+  it('keeps a picture the shop still shows, deleted from the library or not', async () => {
+    const ctx = as(adminActor(adminId));
+    const logo = await attachmentUpload(ctx, {}, png(1, 1, 1));
+    const avatar = await attachmentUpload(ctx, {}, png(1, 1, 2));
+    const unused = await attachmentUpload(ctx, {}, png(1, 1, 3));
+    const logoKey = await storageKeyOf(logo.attachment.id);
+    const avatarKey = await storageKeyOf(avatar.attachment.id);
+    // A JSON config value, and a thumbnail of the other in a plain column.
+    await ctx.config.set(siteConfig, { logo: logo.attachment.url });
+    await harness.ctx.db
+      .update(users)
+      .set({ avatarUrl: avatar.attachment.url.replace(/\.png$/, '.w480.png') })
+      .where(eq(users.id, shopperId));
+    await attachmentDeleteMany(ctx, {
+      ids: [logo.attachment.id, avatar.attachment.id, unused.attachment.id],
+    });
+
+    harness.clock.set('2026-10-05T08:00:00.000Z');
+    expect(await cleanOrphanAttachments(ctx)).toMatchObject({ removed: 1, kept: 2, failed: 0 });
+    expect(await harness.ctx.storage.exists(logoKey)).toBe(true);
+    expect(await harness.ctx.storage.exists(avatarKey)).toBe(true);
+    const left = await harness.ctx.db.select({ id: attachments.id }).from(attachments);
+    expect(left.map((row) => String(row.id)).sort()).toEqual(
+      [logo.attachment.id, avatar.attachment.id].sort(),
+    );
+  });
+
+  it('asks again a retention later, and sweeps what the content has let go of', async () => {
+    const ctx = as(adminActor(adminId));
+    const logo = await attachmentUpload(ctx, {}, png(1, 1, 1));
+    await ctx.config.set(siteConfig, { logo: logo.attachment.url });
+    await attachmentDeleteMany(ctx, { ids: [logo.attachment.id] });
+
+    harness.clock.set('2026-10-05T08:00:00.000Z');
+    expect(await cleanOrphanAttachments(ctx)).toMatchObject({ kept: 1 });
+    // A kept row goes to the back of the queue rather than being examined (and
+    // filling the batch) on every run.
+    expect(await cleanOrphanAttachments(ctx)).toMatchObject({ examined: 0 });
+
+    await ctx.config.set(siteConfig, { logo: '' });
+    harness.clock.set('2026-10-13T08:00:00.000Z');
+    expect(await cleanOrphanAttachments(ctx)).toMatchObject({ removed: 1, kept: 0 });
+    expect(await harness.ctx.db.select().from(attachments)).toHaveLength(0);
   });
 });
 
