@@ -165,6 +165,8 @@ export interface StackFixtures {
   secondaryAddressId: number;
   expressCompanyId: number;
   diyHomePageId: number;
+  /** The mini-program's 首页 (页面装修 v2), as the seed designated it. */
+  decorHomeId: number;
   /** The one province/city/district path the seed inserted: what any address must point at. */
   division: { provinceId: string; cityId: string; districtId: string };
   /** Every DIY page the seed published, with the component ids each should render. */

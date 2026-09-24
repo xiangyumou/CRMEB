@@ -1,9 +1,12 @@
 import { test, expect } from '../src/mini';
 import {
   block,
+  createClaimableCoupon,
   createDecorPage,
+  DecorHomePage,
   decorDocument,
   decorPreviewToken,
+  designateDecorHome,
   MicroPage,
   publishDecorPage,
   saveConfig,
@@ -251,5 +254,60 @@ test('a web-view link opens only a 业务域名 the shop listed; any other link 
     expect(consoleErrors).toEqual([]);
   } finally {
     await saveConfig(adminApi, 'wechat-mini', { webviewDomains: '' });
+  }
+});
+
+test('DECOR-015: a visitor claims from the 首页 优惠券 block after signing up, and the reloaded page says 去使用', async ({
+  miniPage: page,
+  shop,
+  adminApi,
+  consoleErrors,
+  failedRequests,
+}) => {
+  const templateId = await createClaimableCoupon(adminApi, `E2E 首页券 ${Date.now()}`, '8.00');
+  const draft = await createDecorPage(
+    adminApi,
+    `E2E 首页领券 ${Date.now()}`,
+    decorDocument('E2E 领券首页', [
+      block('b-coupons', 'couponList', {
+        title: '首页领券',
+        showMore: false,
+        source: { mode: 'manual', ids: [templateId] },
+        layout: 'stack',
+      }),
+    ]),
+    'home',
+  );
+  await publishDecorPage(adminApi, draft, 'e2e 首页领券');
+  await designateDecorHome(adminApi, draft.id);
+  try {
+    const home = new DecorHomePage(page);
+    await home.open();
+    const ticket = home.couponTicket(templateId);
+    await expect(ticket).toHaveAttribute('data-action', 'claim');
+    await expect(ticket).toContainText('领取');
+
+    // A WeChat user the shop has never seen: 领取 needs an account, the login page comes back.
+    await ticket.click();
+    await expect(page).toHaveURL(/pages\/login\/index\?redirect=/);
+    await shown(page).getByRole('checkbox', { name: '我已阅读并同意用户协议和隐私政策' }).click();
+    await shown(page).getByText('手机号快速登录', { exact: true }).click();
+    await expect(page).toHaveURL(/pages\/index\/index/);
+
+    // Back on 首页, now signed in: the page was fetched again and nothing is claimed yet.
+    await expect(ticket).toHaveAttribute('data-action', 'claim');
+    await ticket.click();
+    await expect(shown(page).getByText('领取成功')).toBeVisible();
+    // One per shopper: the reloaded page's personal layer turns the button into 去使用.
+    await expect(ticket).toHaveAttribute('data-action', 'use');
+    await expect(ticket).toContainText('去使用');
+
+    await ticket.click();
+    await expect(page).toHaveURL(/packages\/promo\/my-coupons\/index/);
+
+    expect(consoleErrors).toEqual([]);
+    expect(failedRequests).toEqual([]);
+  } finally {
+    await designateDecorHome(adminApi, shop.fixtures.decorHomeId);
   }
 });
