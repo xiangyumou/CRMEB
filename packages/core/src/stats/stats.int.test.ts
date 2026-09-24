@@ -497,6 +497,7 @@ describe('orders', () => {
     expect(tile(page, 'paidAmount').value).toBe(650);
     expect(tile(page, 'refundOrderCount').value).toBe(2);
     expect(tile(page, 'refundAmount').value).toBe(145);
+    expect(tile(page, 'refundRate').value).toBe(50);
 
     const platform = page.breakdowns.find((row) => row.key === 'platform');
     expect(platform?.rows).toEqual([

@@ -93,12 +93,19 @@ collected.
 
 ### Orders — `GET /admin-api/stats/orders`
 
-| Key                | 名称       | Definition                                                |
-| ------------------ | ---------- | --------------------------------------------------------- |
-| `paidOrderCount`   | 订单量     | same figure as 支付订单数 above                           |
-| `paidAmount`       | 订单销售额 | `Σ orders.paid_amount` over the paid orders of the bucket |
-| `refundOrderCount` | 退款订单数 | `count(distinct refunds.order_id)` over succeeded refunds |
-| `refundAmount`     | 退款金额   | same figure as 商品退款金额 above                         |
+| Key                | 名称       | Definition                                                                         |
+| ------------------ | ---------- | ---------------------------------------------------------------------------------- |
+| `paidOrderCount`   | 订单量     | same figure as 支付订单数 above                                                    |
+| `paidAmount`       | 订单销售额 | `Σ orders.paid_amount` over the paid orders of the bucket                          |
+| `refundOrderCount` | 退款订单数 | `count(distinct refunds.order_id)` over succeeded refunds                          |
+| `refundAmount`     | 退款金额   | same figure as 商品退款金额 above                                                  |
+| `refundRate`       | 退款率     | `refundOrderCount ÷ paidOrderCount × 100`, two decimals, `0` when nothing was paid |
+
+退款率 counts every succeeded refund — 仅退款 and 退货退款 alike — because
+both are a sale that did not stick. Its two counts are bucketed where each
+happened (payments by `paid_at`, refunds by `succeeded_at`), so a short window
+can show a refund for an order paid before it, and the rate is only meaningful
+over a window of weeks, which is why the home page shows it for the last 30 days.
 
 Breakdowns: **订单来源** counts paid orders by `orders.platform`, **订单类型**
 sums `orders.paid_amount` by `orders.kind`. Percentages are of the window's

@@ -298,6 +298,13 @@ export async function orderStats(ctx: Ctx, input: StatsRangeQuery): Promise<Orde
           previous.refundOrderCount,
         ),
         metric('refundAmount', '退款金额', 'money', current.refundAmount, previous.refundAmount),
+        metric(
+          'refundRate',
+          '退款率',
+          'percent',
+          percent(current.refundOrderCount, current.orderCount),
+          percent(previous.refundOrderCount, previous.orderCount),
+        ),
       ],
       chart: chart(range, [
         series(

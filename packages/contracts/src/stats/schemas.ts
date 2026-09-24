@@ -356,6 +356,7 @@ export const orderStatsExample: OrderStats = {
     { key: 'paidAmount', label: '订单销售额', value: 82310.4, format: 'money', previous: 79204.1 },
     { key: 'refundOrderCount', label: '退款订单数', value: 9, format: 'count', previous: 7 },
     { key: 'refundAmount', label: '退款金额', value: 1820.0, format: 'money', previous: 1400.0 },
+    { key: 'refundRate', label: '退款率', value: 2.83, format: 'percent', previous: 2.32 },
   ],
   chart: {
     bucket: 'day',

@@ -62,6 +62,21 @@ describe('工作台', () => {
     expect(calls.some((call) => call.url.includes('/admin-api/dashboard/header'))).toBe(true);
   });
 
+  it('shows the last 30 days: net revenue, refund rate and a sales ranking', async () => {
+    const calls = stubApi();
+    renderAdmin(<DashboardPage />, { identity: identityWith(ALL) });
+
+    expect(await screen.findByText('经营概览（最近30天）')).toBeInTheDocument();
+    // Picked from the stats pages' own metrics, not recomputed here.
+    expect(await screen.findByText('营业额')).toBeInTheDocument();
+    expect(await screen.findByText('退款率')).toBeInTheDocument();
+    expect(screen.getByText('2.83%')).toBeInTheDocument();
+    await waitFor(() => {
+      const ranking = calls.find((call) => call.url.includes('/stats/products/ranking'));
+      expect(ranking?.url).toContain('sortBy=paidQuantity');
+    });
+  });
+
   it('asks only for the blocks the admin may see', async () => {
     const calls = stubApi();
     renderAdmin(<DashboardPage />, {

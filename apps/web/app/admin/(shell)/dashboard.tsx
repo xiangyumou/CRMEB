@@ -2,8 +2,10 @@
 
 import { ArrowDownOutlined, ArrowUpOutlined } from '@ant-design/icons';
 import { Alert, Card, Col, Row, Skeleton, Space, Typography } from 'antd';
+import type { Dayjs } from 'dayjs';
 import Link from 'next/link';
 import { statsOrders, statsTrade } from '@shop/contracts/stats/stats.admin.contract';
+import type { StatsMetric } from '@shop/contracts/stats/schemas';
 import type { DashboardTile } from '@shop/contracts/system/schemas';
 import { systemDashboardHeader } from '@shop/contracts/system/system.settings.contract';
 
@@ -13,6 +15,7 @@ import { useMemoryUrlState } from '@/admin/kit/table/url-state';
 import { useCan, useSession } from '@/admin/session/session-provider';
 import {
   formatFigure,
+  MetricCards,
   ProductRankingTable,
   StatsChart,
   StatsRangePicker,
@@ -32,7 +35,10 @@ import {
  *
  * Everything below the tiles is the ordinary statistics surface, with a window
  * held in memory rather than in the URL: the home page is where an operator
- * lands, and it should not accumulate a query string.
+ * lands, and it should not accumulate a query string. The window defaults to
+ * the last 30 days, and the 经营概览 row picks its figures from the 交易 and
+ * 订单 pages' own metrics — 营业额 is already net of refunds — so the home page
+ * adds no definition of its own.
  */
 export function DashboardPage() {
   const { identity } = useSession();
@@ -72,6 +78,18 @@ export function DashboardPage() {
 
         <HeaderTiles tiles={header.data?.tiles} loading={header.isPending} />
 
+        {can('stats:trade:read') || can('stats:order:read') ? (
+          <div>
+            <Typography.Title level={5} style={{ marginTop: 0 }}>
+              经营概览（{rangeLabel(range.value)}）
+            </Typography.Title>
+            <MetricCards
+              metrics={overviewMetrics(trade.data?.metrics, orders.data?.metrics)}
+              loading={trade.isPending || orders.isPending}
+            />
+          </div>
+        ) : null}
+
         <Row gutter={[16, 16]}>
           {can('stats:trade:read') ? (
             <Col xs={24} xl={12}>
@@ -89,14 +107,43 @@ export function DashboardPage() {
           <ProductRankingTable
             query={range.query}
             defaultLimit={10}
+            defaultSort="paidQuantity"
             controls={false}
-            title="商品排行（前 10）"
+            title="商品销量排行（前 10）"
             extra={<Link href="/admin/stats/products">查看全部</Link>}
           />
         ) : null}
       </Space>
     </PageContainer>
   );
+}
+
+/** The server's default window is the last 30 days; a picked one is shown as dates. */
+function rangeLabel(value: [Dayjs, Dayjs] | null): string {
+  if (!value) return '最近30天';
+  const [from, to] = value;
+  return from.isSame(to, 'day')
+    ? from.format('YYYY-MM-DD')
+    : `${from.format('YYYY-MM-DD')} 至 ${to.format('YYYY-MM-DD')}`;
+}
+
+/** 营业额 from 交易统计, the rest from 订单统计; whichever the admin may read. */
+const OVERVIEW: [source: 'trade' | 'orders', key: string][] = [
+  ['trade', 'revenue'],
+  ['orders', 'paidOrderCount'],
+  ['orders', 'refundOrderCount'],
+  ['orders', 'refundRate'],
+];
+
+function overviewMetrics(
+  trade: StatsMetric[] | undefined,
+  orders: StatsMetric[] | undefined,
+): StatsMetric[] | undefined {
+  if (!trade && !orders) return undefined;
+  return OVERVIEW.flatMap(([source, key]) => {
+    const found = (source === 'trade' ? trade : orders)?.find((metric) => metric.key === key);
+    return found ? [found] : [];
+  });
 }
 
 function HeaderTiles({ tiles, loading }: { tiles: DashboardTile[] | undefined; loading: boolean }) {
