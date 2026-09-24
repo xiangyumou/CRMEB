@@ -363,5 +363,34 @@ export const catalogMyReviews = defineRoute({
         pageSize: 20,
       },
     },
+    {
+      name: 'held-and-hidden',
+      query: { page: 1, pageSize: 20 },
+      response: {
+        items: [
+          {
+            ...productReviewExample,
+            id: '5002',
+            replyContent: null,
+            replyAt: null,
+            productId: '1',
+            productName: '经典白T恤',
+            productImageUrl: 'https://cdn.example.com/p/1.png',
+            status: 'pending',
+          },
+          {
+            ...productReviewExample,
+            id: '5003',
+            productId: '2',
+            productName: '纯棉毛巾',
+            productImageUrl: 'https://cdn.example.com/p/2.png',
+            status: 'hidden',
+          },
+        ],
+        total: 2,
+        page: 1,
+        pageSize: 20,
+      },
+    },
   ],
 });

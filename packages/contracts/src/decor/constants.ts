@@ -148,9 +148,8 @@ export type ImageCubeLayout = keyof typeof IMAGE_CUBE_LAYOUTS;
 
 /**
  * 订单入口: what one entry opens, and which `order.counts` badge it shows.
- * `unpaid` / `unshipped` / `unreceived` open `orderList { tab }` with the same
- * key; `unreviewed` opens `myReviews`; `aftersale` opens `refundList` with the
- * `refunding` count.
+ * `unpaid` / `unshipped` / `unreceived` / `unreviewed` open `orderList { tab }`
+ * with the same key; `aftersale` opens `refundList` with the `refunding` count.
  */
 export const ORDER_ENTRY_KEYS = {
   unpaid: '待付款',

@@ -1,7 +1,7 @@
 import { productReviews } from '@shop/db/schema/catalog';
 import { eq } from 'drizzle-orm';
 
-import { miniRoute, test, expect } from '../src/mini';
+import { miniRoute, newWechatUser, test, expect } from '../src/mini';
 import { openFresh, shown } from '../src/mini-pages/shown';
 import {
   dialogButton,
@@ -136,4 +136,52 @@ test('a shopper cancels an order they have not paid', async ({
 
   expect(consoleErrors).toEqual([]);
   expect(failedRequests).toEqual([]);
+});
+
+test.describe("when WeChat's 确认收货 component never calls back", () => {
+  test.use({
+    // eslint-disable-next-line no-empty-pattern
+    wechatUser: async ({}, use) => {
+      await use(newWechatUser({ receipt: 'confirm-silently' }));
+    },
+  });
+
+  test('the app, back in the foreground, asks the server and shows the order received', async ({
+    miniPage: page,
+    wechatUser,
+    shop,
+    playwright,
+    adminApi,
+    consoleErrors,
+    failedRequests,
+  }) => {
+    const shopper = await signUpFromOrders(page, wechatUser, shop, playwright);
+    const order = await placeOrder(shopper, shop);
+    const detail = new OrderDetailPage(page);
+    await new OrderListPage(page).open('unpaid');
+    await new OrderListPage(page)
+      .card(order.orderNo)
+      .getByText('立即付款', { exact: true })
+      .click();
+    await payAtMiniCashier(page);
+    await expectOrderStatus(shopper, order.id, ['paid']);
+    await shipByExpress(adminApi, shop, order.id);
+    await waitForWechatReceipt(shopper, order.id);
+
+    await detail.open(order.id);
+    await detail.expectHeadline('已发货');
+    const receipt = page.waitForRequest(
+      (request) =>
+        new URL(request.url()).pathname === `/api/v1/orders/${order.id}/receipt` &&
+        request.method() === 'POST',
+    );
+    await detail.action('确认收货').click();
+    // No callback: the onShow fallback asks the server, which asks WeChat (C07).
+    expect((await receipt).postDataJSON()).toEqual({ via: 'wechat-component' });
+    await detail.expectHeadline('已收货');
+    await expectOrderStatus(shopper, order.id, ['received', 'completed']);
+
+    expect(consoleErrors).toEqual([]);
+    expect(failedRequests).toEqual([]);
+  });
 });

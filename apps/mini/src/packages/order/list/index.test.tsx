@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useSession } from '@/session/session';
 import { serveApi } from '@/test/fake-api';
-import { orderListItem, paged } from '@/test/order-fixtures';
+import { orderItem, orderListItem, paged } from '@/test/order-fixtures';
 import { renderPage } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
 import OrderListPage from './index';
@@ -15,6 +15,7 @@ const counts = {
   finished: 0,
   cancelled: 0,
   refunding: 0,
+  unreviewed: 3,
 };
 
 /** The `tab` of every order-list request, in order. */
@@ -58,6 +59,34 @@ describe('我的订单', () => {
     fireEvent.click(screen.getByRole('tab', { name: '已取消' }));
     await screen.findByText('没有已取消的订单');
     expect(requestedTabs()).toEqual(['all', 'cancelled']);
+  });
+
+  it('lists the orders still to review under 待评价, with its count, and offers 去评价', async () => {
+    taroFake.routerParams = { tab: 'unreviewed' };
+    serveApi({
+      'GET /api/v1/orders/counts': () => ({ body: counts }),
+      'GET /api/v1/orders': () => ({
+        body: paged([
+          orderListItem({
+            status: 'completed',
+            fulfillmentStatus: 'fulfilled',
+            items: [orderItem('7001', { reviewable: true })],
+          }),
+        ]),
+      }),
+    });
+    await renderPage(<OrderListPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '去评价' }));
+    expect(screen.getByRole('tab', { name: '待评价 3' }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    expect(screen.getByText('待评价', { selector: '.shop-order__status' })).toBeTruthy();
+    expect(requestedTabs()).toEqual(['unreviewed']);
+    expect(taroFake.calls).toContainEqual({
+      api: 'navigateTo',
+      args: { url: '/packages/order/review/index?orderId=9001' },
+    });
   });
 
   it('cancels an unpaid order after asking, and refreshes the list', async () => {

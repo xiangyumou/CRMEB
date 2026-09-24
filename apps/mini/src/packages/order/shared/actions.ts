@@ -83,10 +83,10 @@ export function useOrderActions(options: OrderActionsOptions = {}): OrderActions
           void guarded(orderId, key, async () => {
             const outcome = await confirmReceipt(client, orderId);
             if (outcome.kind === 'failed') toast.text(outcome.message);
-            if (outcome.kind === 'confirmed') {
-              toast.success('已确认收货');
+            if (outcome.kind === 'confirmed') toast.success('已确认收货');
+            // `returned`: back from WeChat's component without its answer; show what is true now.
+            if (outcome.kind === 'confirmed' || outcome.kind === 'returned')
               await invalidate(...ORDER_READS);
-            }
           });
           return;
         case 'cancel':

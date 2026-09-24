@@ -38,7 +38,7 @@ export interface NetworkStatus {
   networkType: string;
 }
 
-const appShow = new Channel<void>();
+const appShow = new Channel<unknown>();
 const appHide = new Channel<void>();
 const network = new Channel<NetworkStatus>();
 const pageShow = new Channel<void>();
@@ -116,8 +116,11 @@ export const taroFake = {
   address: null as Record<string, string> | null,
   /** `chooseInvoiceTitle` resolves with this, or rejects (`null`: the shopper cancelled). */
   invoiceTitle: null as Record<string, string> | null,
-  /** What the 确认收货 component (`openBusinessView`) reports as `extraData.status`. */
-  businessViewStatus: 'success' as 'success' | 'fail' | 'cancel',
+  /**
+   * What the 确认收货 component (`openBusinessView`) reports as `extraData.status`; `hang`: its
+   * callback never comes (the shopper is back through `onAppShow` only).
+   */
+  businessViewStatus: 'success' as 'success' | 'fail' | 'cancel' | 'hang',
   /** `chooseMedia` temp paths, or `null` for a cancel. */
   media: ['wxfile://tmp/1.jpg'] as string[] | null,
   /** How `saveImageToPhotosAlbum` ends: saved, 相册 refused, privacy refused, or cancelled. */
@@ -140,7 +143,8 @@ export const taroFake = {
     timeline: (() => unknown) | null;
   },
   storage: storageMap,
-  showApp: () => appShow.emit(undefined),
+  /** The app comes back to the foreground, with WeChat's `onAppShow` options if given. */
+  showApp: (options?: Record<string, unknown>) => appShow.emit(options),
   hideApp: () => appHide.emit(undefined),
   setNetwork(isConnected: boolean, type = isConnected ? 'wifi' : 'none') {
     networkType = type;
@@ -411,10 +415,12 @@ const Taro = {
       tempFilePath: `wxfile://tmp/${args.url.split('/').pop()}`,
     }),
   openBusinessView: (args: unknown) =>
-    record('openBusinessView', args, {
-      errMsg: 'openBusinessView:ok',
-      extraData: { status: taroFake.businessViewStatus },
-    }),
+    taroFake.businessViewStatus === 'hang'
+      ? (taroFake.calls.push({ api: 'openBusinessView', args }), new Promise<never>(() => {}))
+      : record('openBusinessView', args, {
+          errMsg: 'openBusinessView:ok',
+          extraData: { status: taroFake.businessViewStatus },
+        }),
   getEnterOptionsSync: () => taroFake.enterOptions,
   makePhoneCall: (args: unknown) => record('makePhoneCall', args, {}),
   getWindowInfo: () => ({ statusBarHeight: 20, windowWidth: 375, windowHeight: 812 }),

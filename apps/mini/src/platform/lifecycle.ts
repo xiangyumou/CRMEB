@@ -16,3 +16,16 @@ export function onAppVisibility(listener: (visible: boolean) => void): Unsubscri
     Taro.offAppHide(hide);
   };
 }
+
+/** What WeChat passes `onAppShow`: `referrerInfo` when the shopper comes back from another app. */
+export interface AppShowOptions {
+  referrerInfo?: { appId?: string; extraData?: Record<string, unknown> } | undefined;
+}
+
+/** Every return to the foreground, with its options (the H5 builds pass none that matter). */
+export function onAppShown(listener: (options: AppShowOptions) => void): Unsubscribe {
+  const show = (options: unknown) =>
+    listener(options && typeof options === 'object' ? (options as AppShowOptions) : {});
+  Taro.onAppShow(show);
+  return () => Taro.offAppShow(show);
+}

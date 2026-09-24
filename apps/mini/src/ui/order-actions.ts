@@ -1,4 +1,4 @@
-import type { OrderListItem } from '@shop/contracts/order/schemas';
+import type { OrderListItem, StorefrontOrderItem } from '@shop/contracts/order/schemas';
 import type { ButtonVariant } from './button';
 
 /**
@@ -25,7 +25,18 @@ const LABEL: Record<OrderActionKey, string> = {
   delete: '删除订单',
 };
 
-type OrderShape = Pick<OrderListItem, 'status' | 'refundStatus' | 'fulfillmentStatus' | 'kind'>;
+type OrderShape = Pick<OrderListItem, 'status' | 'refundStatus' | 'fulfillmentStatus' | 'kind'> & {
+  /**
+   * The lines' review state (`storefrontOrderItem.reviewable`, ORDER-010): 去评价 and 待评价
+   * only while some line can still be reviewed.
+   */
+  items: ReadonlyArray<Pick<StorefrontOrderItem, 'reviewable'>>;
+};
+
+/** Some line can be reviewed now (the order was received and the line has no review yet). */
+export function awaitsReview(order: Pick<OrderShape, 'items'>): boolean {
+  return order.items.some((item) => item.reviewable);
+}
 
 /** Left to right as shown; the last one is the primary action where there is one. */
 export function orderActions(order: OrderShape): OrderAction[] {
@@ -45,10 +56,12 @@ export function orderActions(order: OrderShape): OrderAction[] {
       break;
     case 'received':
       if (refundable) keys.push('aftersale');
-      keys.push('rebuy', 'review');
+      keys.push('rebuy');
+      if (awaitsReview(order)) keys.push('review');
       break;
     case 'completed':
       keys.push('delete', 'rebuy');
+      if (awaitsReview(order)) keys.push('review');
       break;
     case 'cancelled':
     case 'refunded':
@@ -64,7 +77,10 @@ export function orderActions(order: OrderShape): OrderAction[] {
   }));
 }
 
-/** The status line on a card: 待付款, 待发货, 部分发货, 待收货, 待评价, 已完成… */
+/**
+ * The status line on a card: 待付款, 待发货, 部分发货, 待收货, 待评价, 已完成… A received or
+ * completed order is 待评价 while a line awaits its review (the 待评价 tab), else 已完成.
+ */
 export function orderStatusText(order: OrderShape): string {
   switch (order.status) {
     case 'pending_payment':
@@ -74,9 +90,8 @@ export function orderStatusText(order: OrderShape): string {
     case 'shipped':
       return '待收货';
     case 'received':
-      return '待评价';
     case 'completed':
-      return '已完成';
+      return awaitsReview(order) ? '待评价' : '已完成';
     case 'cancelled':
       return '已取消';
     case 'refunded':

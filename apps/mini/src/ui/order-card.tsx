@@ -1,6 +1,7 @@
-import type { OrderItem, OrderListItem } from '@shop/contracts/order/schemas';
+import type { OrderItem, StorefrontOrderListItem } from '@shop/contracts/order/schemas';
 import { Text, View } from '@tarojs/components';
 import { cx } from '@/lib/cx';
+import { orderPrices } from '@/lib/order-price';
 import { formatSpec } from '@/lib/spec';
 import { navigate } from '@/platform';
 import { Button } from './button';
@@ -14,15 +15,21 @@ import './order-card.scss';
 
 const MAX_ROWS = 3;
 
-/** One bought line: picture, name, spec, unit price and quantity (design.md `OrderItemRow`). */
+/**
+ * One bought line: picture, name, spec, unit price and quantity (design.md `OrderItemRow`).
+ * `price` is what the shopper paid per unit when that is not `unitPrice` (an activity line,
+ * `orderPrices`).
+ */
 export function OrderItemRow({
   item,
+  price,
   note,
 }: {
   item: Pick<
     OrderItem,
     'productName' | 'productImageUrl' | 'skuImageUrl' | 'specText' | 'unitPrice' | 'quantity'
   >;
+  price?: string | undefined;
   /** A small tag under the spec: 「退款中」. */
   note?: string | undefined;
 }) {
@@ -44,7 +51,7 @@ export function OrderItemRow({
         ) : null}
       </View>
       <View className="shop-order-row__side">
-        <Price value={item.unitPrice} size="sm" tone="text" />
+        <Price value={price ?? item.unitPrice} size="sm" tone="text" />
         <Text className="shop-order-row__qty">×{item.quantity}</Text>
       </View>
     </View>
@@ -52,8 +59,8 @@ export function OrderItemRow({
 }
 
 export interface OrderCardProps {
-  order: OrderListItem;
-  onAction: (key: OrderActionKey, order: OrderListItem) => void;
+  order: StorefrontOrderListItem;
+  onAction: (key: OrderActionKey, order: StorefrontOrderListItem) => void;
   /** Opens the order by default. */
   onClick?: (() => void) | undefined;
   /** Which action is in flight (its button spins). */
@@ -71,6 +78,7 @@ export function OrderCard({ order, onAction, onClick, busy, className }: OrderCa
   const actions = orderActions(order);
   const open = onClick ?? (() => void navigate({ route: 'order', params: { id: order.id } }));
   const shown = order.items.slice(0, MAX_ROWS);
+  const { unitPrices } = orderPrices(order);
   const paid = order.paidAmount ?? order.payableAmount;
   const refunding = order.refundStatus === 'requested';
 
@@ -96,7 +104,7 @@ export function OrderCard({ order, onAction, onClick, busy, className }: OrderCa
           </Text>
         </View>
         {shown.map((item) => (
-          <OrderItemRow key={item.id} item={item} />
+          <OrderItemRow key={item.id} item={item} price={unitPrices[item.id]} />
         ))}
         {order.items.length > MAX_ROWS ? (
           <Text className="shop-order__more">还有 {order.items.length - MAX_ROWS} 种商品</Text>

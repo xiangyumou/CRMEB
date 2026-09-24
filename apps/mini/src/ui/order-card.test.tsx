@@ -1,4 +1,4 @@
-import type { OrderListItem } from '@shop/contracts/order/schemas';
+import type { StorefrontOrderListItem } from '@shop/contracts/order/schemas';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { taroFake } from '@/test/taro-fake/taro';
@@ -24,9 +24,11 @@ const item = (id: string) => ({
   refundedQuantity: 0,
   shippedQuantity: 0,
   adjustments: [],
+  reviewed: false,
+  reviewable: false,
 });
 
-const order: OrderListItem = {
+const order: StorefrontOrderListItem = {
   id: '9001',
   orderNo: '202602011000000010123456',
   kind: 'normal',
@@ -44,8 +46,14 @@ const order: OrderListItem = {
   items: [item('1'), item('2'), item('3'), item('4')],
 };
 
-const keys = (o: Partial<OrderListItem>) =>
+const keys = (o: Partial<StorefrontOrderListItem>) =>
   orderActions({ ...order, ...o }).map((action) => action.key);
+/** Lines as the shopper's own reads carry them, one still to review. */
+const toReview = [
+  { ...item('1'), reviewed: true },
+  { ...item('2'), reviewable: true },
+];
+const reviewed = [{ ...item('1'), reviewed: true }];
 
 describe('orderActions', () => {
   it('gives each status its buttons, the primary one last', () => {
@@ -56,11 +64,16 @@ describe('orderActions', () => {
       'logistics',
     ]);
     expect(keys({ status: 'shipped' })).toEqual(['aftersale', 'logistics', 'confirm']);
-    expect(keys({ status: 'received' })).toEqual(['aftersale', 'rebuy', 'review']);
+    expect(keys({ status: 'received', items: toReview })).toEqual(['aftersale', 'rebuy', 'review']);
     expect(keys({ status: 'completed' })).toEqual(['delete', 'rebuy']);
     expect(keys({ status: 'cancelled' })).toEqual(['delete', 'rebuy']);
     expect(keys({ status: 'cancelled', kind: 'groupbuy' })).toEqual(['delete']);
     expect(orderActions({ ...order, status: 'pending_payment' }).at(-1)?.variant).toBe('primary');
+  });
+
+  it('offers 去评价 only while some line can be reviewed', () => {
+    expect(keys({ status: 'received', items: reviewed })).toEqual(['aftersale', 'rebuy']);
+    expect(keys({ status: 'completed', items: toReview })).toEqual(['delete', 'rebuy', 'review']);
   });
 
   it('holds 申请售后 back while one is open', () => {
@@ -74,7 +87,9 @@ describe('orderActions', () => {
     expect(
       orderStatusText({ ...order, status: 'paid', fulfillmentStatus: 'partially_fulfilled' }),
     ).toBe('部分发货');
-    expect(orderStatusText({ ...order, status: 'received' })).toBe('待评价');
+    expect(orderStatusText({ ...order, status: 'received', items: toReview })).toBe('待评价');
+    expect(orderStatusText({ ...order, status: 'completed', items: toReview })).toBe('待评价');
+    expect(orderStatusText({ ...order, status: 'received', items: reviewed })).toBe('已完成');
   });
 });
 
@@ -122,6 +137,36 @@ describe('OrderCard', () => {
     expect(screen.getByRole('button', { name: '立即付款' }).className).toContain(
       'shop-btn--loading',
     );
+  });
+
+  it('prints an activity line at the price paid, not the catalogue price', () => {
+    const { container } = render(
+      <OrderCard
+        order={{
+          ...order,
+          kind: 'presale',
+          totalQuantity: 1,
+          itemsAmount: '88.00',
+          couponDiscount: '15.00',
+          payableAmount: '73.00',
+          paidAmount: '73.00',
+          items: [
+            {
+              ...item('1'),
+              unitPrice: '88.00',
+              adjustments: [
+                { source: 'presale:activity-price', label: '预售价', amount: '-10.00' },
+                { source: 'coupon:discount', label: '券', amount: '-5.00' },
+              ],
+            },
+          ],
+        }}
+        onAction={() => undefined}
+      />,
+    );
+    expect(container.textContent).toContain('¥78.00×1');
+    expect(container.textContent).toContain('实付¥73.00');
+    expect(container.textContent).not.toContain('88.00');
   });
 
   it('tags a group-buy order and says 售后中 while a refund is open', () => {

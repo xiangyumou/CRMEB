@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Text, View } from '@tarojs/components';
-import type { OrderDetail, OrderItem } from '@shop/contracts/order/schemas';
+import type { OrderDetail, StorefrontOrderItem } from '@shop/contracts/order/schemas';
 import { isApiError } from '@shop/api-client';
 import { useApiClient, useInvalidateRoutes, useRouteQuery } from '@shop/api-client/react';
 import { goBack, navigate, useRouteParams } from '@/platform';
@@ -34,11 +34,14 @@ interface Draft {
 const SCORE_WORDS = ['', '非常差', '差', '一般', '好', '非常好'];
 const MAX_TEXT = 500;
 
-/** Lines a review can be written for: the order was received, and the line not all refunded. */
-export function reviewableLines(order: OrderDetail, only?: string): OrderItem[] {
-  if (order.status !== 'received' && order.status !== 'completed') return [];
+/**
+ * The lines this page shows: those a review can be written for now (`reviewable`, ORDER-010:
+ * the order received, the line not all refunded, no review yet) and those already reviewed,
+ * shown as done.
+ */
+export function reviewLines(order: OrderDetail, only?: string): StorefrontOrderItem[] {
   return order.items.filter(
-    (item) => item.refundedQuantity < item.quantity && (only === undefined || item.id === only),
+    (item) => (item.reviewable || item.reviewed) && (only === undefined || item.id === only),
   );
 }
 
@@ -88,7 +91,7 @@ function ReviewForm({ orderId, only }: { orderId: string; only?: string | undefi
     return <ErrorBlock error={detail.error} onRetry={() => void detail.refetch()} />;
   }
   if (!detail.data) return <CellSkeleton rows={6} />;
-  const lines = reviewableLines(detail.data, only);
+  const lines = reviewLines(detail.data, only);
   if (lines.length === 0) {
     return (
       <Empty
@@ -107,16 +110,19 @@ function ReviewForm({ orderId, only }: { orderId: string; only?: string | undefi
   const draftOf = (id: string): Draft => drafts[id] ?? { productScore: 5, content: '', images: [] };
   const update = (id: string, patch: Partial<Draft>) =>
     setDrafts((all) => ({ ...all, [id]: { ...draftOf(id), ...patch } }));
-  const remaining = lines.filter((line) => outcomes[line.id] === undefined);
+  const outcomeOf = (line: StorefrontOrderItem): LineOutcome | undefined =>
+    outcomes[line.id] ?? (line.reviewed ? 'already' : undefined);
+  const remaining = lines.filter((line) => outcomeOf(line) === undefined);
 
   if (remaining.length === 0) {
     const held = Object.values(outcomes).includes('pending');
+    const submitted = Object.values(outcomes).some((outcome) => outcome !== 'already');
     return (
       <Result
         id="review-result"
         status="success"
-        title={held ? '评价已提交，审核后展示' : '评价成功'}
-        description="感谢你的评价"
+        title={held ? '评价已提交，审核后展示' : submitted ? '评价成功' : '已经评价过了'}
+        description={submitted ? '感谢你的评价' : '这些商品都已评价'}
         actions={
           <Button
             variant="primary"
@@ -179,7 +185,7 @@ function ReviewForm({ orderId, only }: { orderId: string; only?: string | undefi
   return (
     <View className="review">
       {lines.map((line) => {
-        const outcome = outcomes[line.id];
+        const outcome = outcomeOf(line);
         const draft = draftOf(line.id);
         return (
           <Card key={line.id} className="review__card">

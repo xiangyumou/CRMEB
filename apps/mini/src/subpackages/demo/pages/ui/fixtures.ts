@@ -1,4 +1,4 @@
-import type { OrderListItem } from '@shop/contracts/order/schemas';
+import type { StorefrontOrderListItem } from '@shop/contracts/order/schemas';
 import type { ProductCardData } from '@/ui/product-card';
 
 /**
@@ -149,11 +149,13 @@ const item = (
   refundedQuantity: 0,
   shippedQuantity: 0,
   adjustments: [],
+  reviewed: false,
+  reviewable: false,
 });
 
 const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
 
-export const orders: OrderListItem[] = [
+export const orders: StorefrontOrderListItem[] = [
   {
     id: '9001',
     orderNo: '202609231000000010123456',

@@ -126,4 +126,101 @@ describe('订单详情', () => {
       args: { data: '202602011000000010123456' },
     });
   });
+
+  it('prints a presale line at its activity price and only the coupon as 优惠券', async () => {
+    taroFake.routerParams = { id: '9001' };
+    serveApi({
+      'GET /api/v1/orders/9001': () => ({
+        body: orderDetail({
+          kind: 'presale',
+          status: 'pending_payment',
+          paidAmount: null,
+          paidAt: null,
+          itemsAmount: '88.00',
+          couponDiscount: '15.00',
+          payableAmount: '73.00',
+          userCouponId: '31',
+          items: [
+            orderItem('7001', {
+              productName: '预售商品',
+              unitPrice: '88.00',
+              discountAmount: '15.00',
+              totalAmount: '73.00',
+              adjustments: [
+                { source: 'presale:activity-price', label: '预售价', amount: '-10.00' },
+                { source: 'coupon:discount', label: '叠加券', amount: '-5.00' },
+              ],
+            }),
+          ],
+        }),
+      }),
+    });
+    await renderPage(<OrderDetailPage />);
+    await screen.findByText('预售商品');
+    const page = document.querySelector('#order-detail')!;
+    expect(page.textContent).toContain('¥78.00×1');
+    expect(page.textContent).toContain('商品金额¥78.00');
+    expect(page.textContent).toContain('优惠券-¥5.00');
+    expect(page.textContent).toContain('应付款¥73.00');
+    expect(page.textContent).not.toContain('88.00');
+  });
+
+  it('links a group-buy order to its team', async () => {
+    taroFake.routerParams = { id: '9001' };
+    serveApi({
+      'GET /api/v1/orders/9001': () => ({
+        body: orderDetail({ kind: 'groupbuy', groupbuyTeamId: '501' }),
+      }),
+    });
+    await renderPage(<OrderDetailPage />);
+    fireEvent.click(await screen.findByRole('link', { name: '查看拼团' }));
+    expect(taroFake.calls).toContainEqual({
+      api: 'navigateTo',
+      args: { url: '/packages/promo/groupbuy-team/index?id=501' },
+    });
+  });
+
+  it('has no team link for any other order', async () => {
+    taroFake.routerParams = { id: '9001' };
+    serveApi({ 'GET /api/v1/orders/9001': () => ({ body: orderDetail() }) });
+    await renderPage(<OrderDetailPage />);
+    await screen.findByText('等待发货');
+    expect(screen.queryByText('查看拼团')).toBeNull();
+  });
+
+  it("re-reads the order when the shopper is back from WeChat's component without an answer", async () => {
+    taroFake.routerParams = { id: '9001' };
+    taroFake.businessViewStatus = 'hang';
+    const shipped = orderDetail({
+      status: 'shipped',
+      fulfillmentStatus: 'fulfilled',
+      shippedAt: '2026-02-02T09:00:00+08:00',
+    });
+    // WeChat told the server itself (trade_manage_order_settlement) while the app was away.
+    let reads = 0;
+    serveApi({
+      'GET /api/v1/orders/9001': () => {
+        reads += 1;
+        return { body: reads === 1 ? shipped : { ...shipped, status: 'received' } };
+      },
+      'GET /api/v1/orders/9001/shipments': () => ({ body: { items: [shipment('4001')] } }),
+      'GET /api/v1/orders/9001/wechat-receipt': () => ({
+        body: { receipt: { transactionId: '4200' } },
+      }),
+      'POST /api/v1/orders/9001/receipt': () => ({
+        status: 409,
+        body: { code: 'ORDER_NOT_RECEIVABLE', message: '订单当前无法确认收货' },
+      }),
+    });
+    await renderPage(<OrderDetailPage />);
+    fireEvent.click(await screen.findByRole('button', { name: '确认收货' }));
+    await waitFor(() =>
+      expect(taroFake.calls.map((call) => call.api)).toContain('openBusinessView'),
+    );
+
+    taroFake.showApp({});
+    await screen.findByText('已收货', undefined, { timeout: 4000 });
+    // Nothing went wrong from the shopper's side: no error toast.
+    expect(taroFake.calls.some((call) => call.api === 'showToast')).toBe(false);
+  });
 });
