@@ -94,6 +94,28 @@ describe('ORDER-009 — typed kindMeta', () => {
       expect(parsed.kindMeta).toBeUndefined();
     });
 
+    it('discards a presale kind smuggled into an ordinary order, on create too', () => {
+      const parsed = checkoutCreateBody.parse({
+        kind: 'normal',
+        ...BUY_NOW,
+        kindMeta: { kind: 'presale', activityId: '2' },
+        idempotencyKey: 'ck-20260201-7f3a9b21',
+      });
+      expect(parsed.kind).toBe('normal');
+      expect(parsed.kindMeta).toBeUndefined();
+    });
+
+    it('refuses a kind the union does not know, however kindMeta is dressed', () => {
+      expect(
+        checkoutCreateBody.safeParse({
+          ...BUY_NOW,
+          kind: 'PRESALE',
+          kindMeta: { activityId: '2' },
+          idempotencyKey: 'ck-20260201-7f3a9b21',
+        }).success,
+      ).toBe(false);
+    });
+
     it.each([
       ['a group-buy order with no kindMeta', { kind: 'groupbuy', ...BUY_NOW }],
       ['a presale order with no activity', { kind: 'presale', ...BUY_NOW, kindMeta: {} }],

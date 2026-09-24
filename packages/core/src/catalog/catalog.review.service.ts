@@ -18,6 +18,7 @@ import * as repo from './catalog.repo';
 import { summariseReviews } from './catalog.rules';
 import { asArray, pageBounds } from './catalog.service';
 import { getOrderFacts } from '../order/ports';
+import { isStoredImageUrl } from '../storage';
 import { checkText, requestMediaCheck, type MediaRiskHandler, type TextVerdict } from '../wechat';
 
 /**
@@ -285,9 +286,20 @@ export async function productReviewSummary(
  * 2026-09-23). The answer says `moderation: 'pending'` and nothing more; the
  * client shows 「评价已提交，审核后展示」. Each picture is queued for
  * `mediaCheckAsync` in the same transaction as the review.
+ *
+ * Every picture must be one our own storage holds (CAT-018), exactly as the
+ * avatar must (USER-019): a review is public, and a link to somebody else's
+ * server could change what it shows after WeChat checked it, or log every
+ * shopper who opens the product page. Checked before anything else, so a
+ * refused picture costs no `msgSecCheck` call.
  */
 export async function reviewSubmit(ctx: Ctx, body: ReviewSubmitBody): Promise<SubmittedReview> {
   const userId = requireUserId(ctx);
+  for (const url of new Set(body.images)) {
+    if (!(await isStoredImageUrl(ctx, url))) {
+      throw new DomainError('CATALOG_REVIEW_IMAGE_NOT_ALLOWED');
+    }
+  }
   const config = await ctx.config.get(catalogConfig);
   const verdict = await checkText(ctx, {
     userId,

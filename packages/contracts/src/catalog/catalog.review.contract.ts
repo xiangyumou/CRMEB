@@ -278,7 +278,11 @@ export const catalogReviewSubmit = defineRoute({
   body: reviewSubmitBody,
   response: submittedReview,
   status: 201,
-  errors: ['CATALOG_REVIEW_NOT_ALLOWED', 'CATALOG_REVIEW_ALREADY_WRITTEN'],
+  errors: [
+    'CATALOG_REVIEW_NOT_ALLOWED',
+    'CATALOG_REVIEW_ALREADY_WRITTEN',
+    'CATALOG_REVIEW_IMAGE_NOT_ALLOWED',
+  ],
   examples: [
     {
       name: 'ok',

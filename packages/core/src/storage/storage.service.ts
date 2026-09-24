@@ -737,8 +737,8 @@ export async function userUpload(
 /**
  * Whether `url` is exactly the URL of a live image in our own storage — what
  * `POST /api/v1/uploads` handed back, or any library image. For callers that
- * must only accept a picture we stored (the profile avatar), never one on
- * somebody else's server.
+ * must only accept a picture we stored (the profile avatar, a review
+ * picture), never one on somebody else's server.
  */
 export async function isStoredImageUrl(ctx: Ctx, url: string): Promise<boolean> {
   if (url.length === 0 || url.length > 2048) return false;
