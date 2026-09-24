@@ -22,6 +22,10 @@ export const storefrontRoutesFile = path.join(
 );
 /** The business-rule catalogue every rule ID is cited from. */
 export const invariantsDoc = path.join(repoRoot, 'docs/invariants.md');
+/** The OpenAPI document `pnpm gen` writes from the contracts (gitignored). */
+export const openapiFile = path.join(repoRoot, 'packages/contracts/openapi.json');
+/** The storefront API as the last released mini-program saw it (`api-compat`). */
+export const apiBaselineFile = path.join(guardsRoot, 'baselines/storefront-api.json');
 /** The workflow that builds, tests and publishes the shop. */
 export const workflowFile = path.join(repoRoot, '.github/workflows/ci.yml');
 

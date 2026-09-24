@@ -33,7 +33,7 @@ somewhere is an entry in an allow-list inside the check, with the reason next
 to it (below). The last line is the count:
 
 ```
-15 checks, 0 failure(s)
+16 checks, 0 failure(s)
 ```
 
 ## The checks
@@ -54,6 +54,7 @@ to it (below). The last line is the count:
 | `tx-pool`       | no `ctx.config.get(` / `ctx.db` / `ctx.withTx(` inside a function that takes a `tx`, `Tx` or `DbOrTx` (STAB-001)                                                                                |
 | `migrations`    | every destructive statement in `packages/db/migrations` carries `-- destructive: approved` (OPS-007)                                                                                            |
 | `pipeline`      | `ci.yml` publishes through `publish-release.sh`, never promotes, and keeps its guards, soak and admin e2e gates (REL-*)                                                                         |
+| `api-compat`    | the storefront API (`/api/v1/**` in the generated OpenAPI) only grows against `baselines/storefront-api.json`, the surface the released mini-program uses; report-only until the first release  |
 | `invariants`    | every rule in `docs/invariants.md` cites a test that exists, and every rule a test title names exists                                                                                           |
 
 ## The allow-lists
@@ -116,6 +117,44 @@ whose default export is `defineAppConfig({...})`), so the check sees the
 manifest the build writes, including the parts computed from `TAB_PAGES`.
 Tests (`*.test.*`, `src/test/`) are exempt from `[platform]`, `[nutui]` and
 `[privacy]`.
+
+## The `api-compat` check
+
+A released mini-program version stays on phones for weeks, so once one is out
+the storefront API must keep answering what it sends and keep sending what it
+reads. `baselines/storefront-api.json` is the `/api/v1/**` part of the OpenAPI
+document `pnpm gen` writes, reduced to what a client depends on (parameters,
+body, success status and body; no prose), as the last released version saw
+it. The check diffs today's document against it (`lib/api-compat.ts`):
+
+| breaking (fails once enforced)                                                                                                                                                              | passes                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| a path or method removed                                                                                                                                                                    | a new path, method, optional parameter or optional request field                                   |
+| response: a field removed, made optional or made nullable; an enum value or union variant removed; a type changed                                                                           | response: a new field; a new enum value or variant (printed as a note: old clients do not know it) |
+| request: a field or parameter made required (a new required one too), removed, or narrowed — an enum value, `null` or a type no longer accepted, a tighter length, bound, pattern or format | request: anything widened                                                                          |
+
+A union is matched branch by branch on its tag (`object(kind=product)`), so
+reordering branches changes nothing. Response limits are not compared: the
+production build does not validate responses.
+
+**Report-only until the first mini-program release.** `ENFORCED` at the top of
+`checks/api-compat.ts` is the switch: `false` prints each breaking change as a
+note (`[breaking, report-only]`) and passes; `true` fails. It is flipped in the
+commit that refreshes the baseline for the first release
+([cutover.md §5](../docs/mini/cutover.md#5-商城接口兼容守卫api-compat)).
+
+**The refresh command**, run only when a mini-program version is released:
+
+```sh
+pnpm --filter @shop/guards api-compat:refresh --release <x.y.z>   # apps/mini/package.json `version`
+pnpm --filter @shop/guards api-compat:refresh --unreleased        # before the first release only
+```
+
+It regenerates the contracts' OpenAPI document, prints the breaking changes the
+new baseline forgives (put them in the commit message), and rewrites the file.
+`--unreleased` is refused once the baseline records a release. The file is
+generated: never edit it by hand, and after a merge that changes `/api/v1`
+before the first release, regenerate it with `--unreleased`.
 
 ## Tests
 
