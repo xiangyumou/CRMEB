@@ -1,10 +1,14 @@
 import type { ConsoleMessage, Page } from '@playwright/test';
 
+import { menuRegistry } from '../../../apps/web/src/admin/menu/menu.gen';
+import type { MenuNode } from '../../../apps/web/src/admin/menu/types';
 import { test, expect, cjk } from '../src/fixtures';
 
 /**
  * The browser smoke: the login page renders, the shell renders for a real
- * session, and every tab of the kit demo page leaves the console clean.
+ * session, every tab of the kit demo page leaves the console clean, and every
+ * page of the menu — plus every settings group — mounts for 超管 without an
+ * error boundary, a 404, a 5xx or a console error.
  *
  * `curl` can prove the server did not throw; it cannot prove the browser did
  * not. That is why this runs in a browser, and why the suite runs a
@@ -100,6 +104,85 @@ test('every tab of the kit demo mounts without a console error', async ({ adminP
   }
 
   expect(errors, errors.join('\n')).toEqual([]);
+});
+
+/**
+ * Every page the sider can link to, read from the menu files themselves: a
+ * page added to a menu is in this list without anybody editing it. Pages with
+ * a parameter in the path are reached from a list and covered by their own
+ * specs; `devOnly` pages are not in a production build.
+ */
+function menuPages(): { label: string; path: string }[] {
+  const out: { label: string; path: string }[] = [];
+  const visit = (nodes: readonly MenuNode[]) => {
+    for (const node of nodes) {
+      if (node.devOnly) continue;
+      if (node.path && !/[:[]/.test(node.path)) out.push({ label: node.label, path: node.path });
+      if (node.children) visit(node.children);
+    }
+  };
+  visit(menuRegistry);
+  return out;
+}
+
+test('every page in the menu, and every settings group, opens for 超管 with nothing broken', async ({
+  adminPage,
+  adminApi,
+}) => {
+  test.setTimeout(6 * 60_000);
+  const errors = collectErrors(adminPage);
+  const serverErrors: string[] = [];
+  adminPage.on('response', (response) => {
+    if (response.status() >= 500) serverErrors.push(`${response.status()} ${response.url()}`);
+  });
+
+  const groups = (await (await adminApi.get('/admin-api/system/config-groups')).json()) as {
+    groups: { group: string; title: string }[];
+  };
+  const pages = [
+    ...menuPages(),
+    ...groups.groups.map((group) => ({
+      label: `设置 · ${group.title}`,
+      path: `/admin/system/settings/${group.group}`,
+    })),
+  ];
+  // A menu that lost its pages, or a registry that failed to generate, would
+  // otherwise pass by visiting nothing.
+  expect(pages.length).toBeGreaterThan(50);
+
+  const problems: string[] = [];
+  for (const entry of pages) {
+    await test.step(`${entry.label} ${entry.path}`, async () => {
+      const consoleBefore = errors.length;
+      const serverBefore = serverErrors.length;
+      const response = await adminPage.goto(entry.path);
+      const where = `${entry.label} (${entry.path})`;
+      if (!response || response.status() >= 400) {
+        problems.push(`${where}: navigation answered ${response?.status() ?? 'nothing'}`);
+      }
+      await expect(adminPage.getByTestId('user-menu')).toBeVisible();
+      // Let the page's queries land; a component that throws on data arrival
+      // would otherwise be measured before it had any.
+      await expect(adminPage.locator('.ant-spin-spinning'))
+        .toHaveCount(0, { timeout: 15_000 })
+        .catch(() => problems.push(`${where}: still loading after 15s`));
+      await adminPage.waitForTimeout(300);
+
+      if (await adminPage.getByText('出错了', { exact: true }).count()) {
+        problems.push(`${where}: the error boundary rendered`);
+      }
+      if (await adminPage.getByText('抱歉，你访问的页面不存在。').count()) {
+        problems.push(`${where}: 404`);
+      }
+      if (!adminPage.url().endsWith(entry.path)) {
+        problems.push(`${where}: ended on ${adminPage.url()}`);
+      }
+      for (const line of errors.slice(consoleBefore)) problems.push(`${where}: console ${line}`);
+      for (const line of serverErrors.slice(serverBefore)) problems.push(`${where}: ${line}`);
+    });
+  }
+
+  expect(problems, problems.join('\n')).toEqual([]);
 });
 
 test('the health endpoint answers before anything else does', async ({ request }) => {
