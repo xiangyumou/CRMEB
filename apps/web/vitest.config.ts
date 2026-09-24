@@ -49,6 +49,8 @@ export default defineConfig({
           // editor, groupbuy activities) past 20 s a test. This timeout is a
           // hang detector, not a speed budget, so it must outlast load. Fewer
           // workers would not help: the load is not ours (4 workers, 32 CPUs).
+          // What was ours, happy-dom matching antd's stylesheets for every
+          // `*ByRole`, is gone: see `src/test/render.tsx`.
           testTimeout: 120_000,
           hookTimeout: 120_000,
         },
