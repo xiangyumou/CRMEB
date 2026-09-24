@@ -111,6 +111,17 @@ backup_dir() {
   printf '%s\n' "$dir"
 }
 
+# The WeChat domain-verification directory the edge mounts read-only at
+# `/srv/domain-verification` (compose.yml): `NEXT_DOMAIN_VERIFICATION_DIR`
+# from the environment or the settings, relative to the deploy directory —
+# the same default and the same base as the Compose file's.
+verification_dir() {
+  local dir="${NEXT_DOMAIN_VERIFICATION_DIR:-$(setting NEXT_DOMAIN_VERIFICATION_DIR)}"
+  dir="${dir:-$deploy_root/data/domain-verification}"
+  case "$dir" in /*) ;; *) dir="$deploy_root/${dir#./}" ;; esac
+  printf '%s\n' "$dir"
+}
+
 # Rewrites one key in place, preserving mode. Used only for image digests.
 set_setting() {
   local key="$1" value="$2" temporary
