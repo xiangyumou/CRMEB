@@ -1101,6 +1101,13 @@ It settles through the same path an approved request does — one capital-flow r
 - `packages/core/src/refund/refund.system.int.test.ts::a refund the shop opens by itself > settles through the same path an approved request does`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the system refund for a failed team > gives every paid member exactly one refund, however many sweeps run`
 
+### REFUND-014
+
+A shopper's after-sale evidence photos must each be a live image our own storage holds — what `POST /api/v1/uploads` returned, or a library image — the same rule as a review picture (CAT-018) and the avatar (USER-019). A link to another server, or our path shape for a file we never stored, is refused with `REFUND_IMAGE_NOT_ALLOWED` before the order is locked, so no request is opened and nothing is recorded: the photos are shown only to the shopper and the merchant, but a foreign one would hand its server the IP and browser of every admin who opens the request.
+
+- `packages/core/src/refund/refund.int.test.ts::REFUND-014 — evidence photos come from our own storage > takes a photo our uploads stored`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-014 — evidence photos come from our own storage > refuses a link to somebody else’s server, and opens no request`
+
 ## Registration and notifications
 
 ### USER-001

@@ -17,6 +17,7 @@ import { Money } from '../kernel/money';
 import { notify } from '../notification';
 import { requireOrderRef, resolveStockPort } from '../order';
 import { onOrderRefunded } from '../order/ports';
+import { isStoredImageUrl } from '../storage';
 import {
   applyExceptionRefundNotification,
   findPaidPaymentAttempt,
@@ -164,9 +165,22 @@ export async function applicableItems(
 // applying
 // ---------------------------------------------------------------------------
 
+/**
+ * 申请售后.
+ *
+ * Every evidence photo must be an image our own storage holds — what
+ * `POST /api/v1/uploads` returned (REFUND-014), the rule a review picture
+ * (CAT-018) and the avatar (USER-019) already follow. Only the shopper and the
+ * merchant see them, but a link to somebody else's server would hand that
+ * server the IP and browser of every admin who opens the request. Checked
+ * before the order is locked, so a refused photo costs no transaction.
+ */
 export async function apply(ctx: Ctx, body: RefundApplyBody): Promise<RefundDetail> {
   const userId = requireUserId(ctx);
   const orderId = Number(body.orderId);
+  for (const url of new Set(body.images)) {
+    if (!(await isStoredImageUrl(ctx, url))) throw new DomainError('REFUND_IMAGE_NOT_ALLOWED');
+  }
 
   const refundId = await ctx.withTx(async (tx) => {
     const order = await repo.lockOrder(tx, orderId);
