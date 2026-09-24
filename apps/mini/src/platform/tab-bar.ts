@@ -35,7 +35,16 @@ function localIcon(url: string | null): Promise<string | null> {
   return pending;
 }
 
-/** Colours, labels and icons. Icons that fail to download keep the bundled ones. */
+/**
+ * A bundled icon (`assets/tab-bar/`, scripts/tab-icons.mjs), as a package path. Passed when a
+ * shop has no uploaded icon, or it failed to download, so a removed upload goes back to it.
+ */
+export function bundledTabIcon(index: number, selected: boolean): string | null {
+  const icon = TAB_PAGES[index]?.icon;
+  return icon ? `/assets/tab-bar/${icon}${selected ? '-active' : ''}.png` : null;
+}
+
+/** Colours, labels and icons; an icon not uploaded, or not downloaded, is the bundled one. */
 export async function applyTabBarLook(look: TabBarLook): Promise<void> {
   if (process.env.TARO_ENV !== 'weapp') return;
   await Taro.setTabBarStyle({
@@ -48,10 +57,12 @@ export async function applyTabBarLook(look: TabBarLook): Promise<void> {
     look.items.map(async (item) => {
       const index = tabIndex(item.key);
       if (index < 0) return;
-      const [iconPath, selectedIconPath] = await Promise.all([
+      const [uploaded, uploadedSelected] = await Promise.all([
         localIcon(item.iconUrl),
         localIcon(item.selectedIconUrl),
       ]);
+      const iconPath = uploaded ?? bundledTabIcon(index, false);
+      const selectedIconPath = uploadedSelected ?? bundledTabIcon(index, true);
       await Taro.setTabBarItem({
         index,
         text: item.label || (TAB_PAGES[index]?.text ?? ''),

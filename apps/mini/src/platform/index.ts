@@ -20,9 +20,11 @@ export { onAppVisibility } from './lifecycle';
 export { openLinkTarget } from './link';
 export {
   goBack,
+  loginReturn,
   navigate,
   parseLoginRedirect,
   readRouteParams,
+  returnFromLogin,
   routeKeyOfPath,
   takeTabParams,
   toPath,
@@ -30,6 +32,7 @@ export {
   usePreviewToken,
   useRouteParams,
   type RouteParamsOf,
+  type StackPage,
 } from './nav';
 export { onNetworkReachability } from './network';
 export {

@@ -2,6 +2,7 @@ import { Text, View } from '@tarojs/components';
 import type { ResponseOf } from '@shop/api-client';
 import { assetUrl } from '@/lib/asset-url';
 import { formatDate } from '@/lib/format';
+import { formatSpec } from '@/lib/spec';
 import { previewImages } from '@/platform';
 import { Icon } from '@/ui/icon';
 import { Image } from '@/ui/image';
@@ -44,7 +45,7 @@ export function ReviewItem({ review, clamp = false }: { review: Review; clamp?: 
         <Text className="shop-review__date">{formatDate(review.createdAt)}</Text>
       </View>
       {review.specText ? (
-        <Text className="shop-review__spec">规格：{review.specText.replaceAll('|', ' / ')}</Text>
+        <Text className="shop-review__spec">规格：{formatSpec(review.specText)}</Text>
       ) : null}
       <Text
         className={

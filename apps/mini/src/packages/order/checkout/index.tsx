@@ -24,6 +24,7 @@ import {
 } from '@/features/checkout/draft';
 import { useCityTree } from '@/data/cities';
 import { useRefetchOnShow } from '@/data/use-refetch-on-show';
+import { formatSpec } from '@/lib/spec';
 import { navigate, subscribe, type ChosenAddress } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { AddressCard } from '@/ui/address-card';
@@ -267,7 +268,7 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
             <View className="checkout__line-body">
               <Text className="checkout__line-name">{line.productName}</Text>
               {line.specText ? (
-                <Text className="checkout__line-spec">{line.specText.replace(/\|/g, ' / ')}</Text>
+                <Text className="checkout__line-spec">{formatSpec(line.specText)}</Text>
               ) : null}
               <View className="checkout__line-foot">
                 <Price value={line.unitPrice} size="sm" />

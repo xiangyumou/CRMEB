@@ -49,7 +49,10 @@ build:mp-weixin` if a `#ifdef MP-WEIXIN` block changed).
   covers them (above); `pnpm --filter @shop/mini build` on its own is the quick way to see the
   package sizes. Anything that changes what runs on a phone (the platform seam, a page's first
   render, the tab bar, sign-in, payment) also gets a pass in 微信开发者工具 and on a real device,
-  per [mini/device-check.md](mini/device-check.md); report what you could not check.
+  per [mini/device-check.md](mini/device-check.md); report what you could not check. A
+  mini-program release bumps `version` in `apps/mini/package.json` first: it is the
+  `X-Client-Version` every request sends and the upload version
+  ([device-check.md §9](mini/device-check.md#9-版本号)).
 - `deploy/**` or `docker/**`: `shellcheck deploy/*.sh deploy/lib/*.sh deploy/rehearsal/*.sh` and the
   drill, `deploy/rehearsal/drill.sh` (it builds the three images; allow about fifteen minutes).
 - `.github/**`: `actionlint`, and `.github/scripts/publish-release.test.sh` if the publish script

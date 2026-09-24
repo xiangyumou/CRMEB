@@ -102,7 +102,7 @@ describe('ProductGrid', () => {
         onLink={onLink}
       />,
     );
-    fireEvent.click(screen.getByText('厨房收纳三件套'));
+    fireEvent.click(screen.getByRole('link', { name: '厨房收纳三件套' }));
     expect(onLink).toHaveBeenCalledWith({ kind: 'product', id: '15' });
   });
 });

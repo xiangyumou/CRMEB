@@ -28,6 +28,8 @@ declare namespace NodeJS {
     TARO_APP_API_ORIGIN: string;
     /** `mp` in the e2e suite's H5 build only (`build:h5:mp-emulation`), `''` otherwise. */
     TARO_APP_PLATFORM_EMULATION: '' | 'mp';
+    /** The release version, sent as `X-Client-Version` (config/index.ts). */
+    TARO_APP_VERSION: string;
     /** `1` keeps the dev-only demo package in a production weapp build (app.config.ts). */
     TARO_APP_DEMO?: '' | '1';
   }

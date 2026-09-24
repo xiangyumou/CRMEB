@@ -48,6 +48,8 @@ export interface StandardProps extends DataAttributes {
   style?: CSSProperties | undefined;
   children?: ReactNode;
   hidden?: boolean | undefined;
+  /** WeChat's `aria-role`; rendered as `role` (View only). */
+  ariaRole?: string | undefined;
   ariaLabel?: string | undefined;
   onClick?: ((event: ShimEvent) => void) | undefined;
 }
@@ -99,8 +101,18 @@ export interface ViewProps extends StandardProps {
 }
 
 export function View(props: ViewProps) {
-  const { id, className, style, children, hidden, ariaLabel, onClick, hoverClass, hoverStayTime } =
-    props;
+  const {
+    id,
+    className,
+    style,
+    children,
+    hidden,
+    ariaRole,
+    ariaLabel,
+    onClick,
+    hoverClass,
+    hoverStayTime,
+  } = props;
   const [pressed, setPressed] = useState(false);
   const hover = hoverClass && hoverClass !== 'none' ? hoverClass : undefined;
   const release = () => {
@@ -114,6 +126,7 @@ export function View(props: ViewProps) {
       className={cx('sbd-view', className, pressed && hover)}
       style={style}
       hidden={hidden}
+      role={ariaRole}
       aria-label={ariaLabel}
       onClick={tapHandler(onClick)}
       onPointerDown={hover ? () => setPressed(true) : undefined}

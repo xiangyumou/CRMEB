@@ -104,6 +104,8 @@ export const taroFake = {
   },
   /** How many pages `getCurrentPages()` reports (the stack depth; WeChat's limit is 10). */
   pageStackDepth: 1,
+  /** What `getCurrentPages()` returns when a test needs routes (else `pageStackDepth` blanks). */
+  pageStack: null as Array<Record<string, unknown>> | null,
   /** `showModal` answers confirm (`true`) or cancel. */
   modalConfirm: true,
   /** `setClipboardData` fails with this `errMsg`. */
@@ -166,6 +168,7 @@ export const taroFake = {
     this.phoneNumberDetail = { code: 'fake-phone-code', errMsg: 'getPhoneNumber:ok' };
     this.avatarDetail = { avatarUrl: 'wxfile://tmp/avatar.png', errMsg: 'chooseAvatar:ok' };
     this.pageStackDepth = 1;
+    this.pageStack = null;
     this.modalConfirm = true;
     this.clipboardError = null;
     this.subscribeAnswer = 'accept';
@@ -330,7 +333,8 @@ const Taro = {
   switchTab: (args: unknown) => record('switchTab', args, {}),
   reLaunch: (args: unknown) => record('reLaunch', args, {}),
   navigateBack: (args: unknown) => record('navigateBack', args, {}),
-  getCurrentPages: () => Array.from({ length: taroFake.pageStackDepth }, () => ({})),
+  getCurrentPages: () =>
+    taroFake.pageStack ?? Array.from({ length: taroFake.pageStackDepth }, () => ({})),
   showModal: (args: unknown) =>
     record('showModal', args, { confirm: taroFake.modalConfirm, cancel: !taroFake.modalConfirm }),
   showLoading: (args: unknown) => record('showLoading', args, {}),

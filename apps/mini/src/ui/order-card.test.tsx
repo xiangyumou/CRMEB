@@ -84,6 +84,7 @@ describe('OrderCard', () => {
     render(<OrderCard order={order} onAction={onAction} />);
     expect(screen.getByText('待收货')).toBeTruthy();
     expect(screen.getByText('商品 3')).toBeTruthy();
+    expect(screen.getAllByText('混合装 / 1000g')).toHaveLength(3);
     expect(screen.queryByText('商品 4')).toBeNull();
     expect(screen.getByText('还有 1 种商品')).toBeTruthy();
     expect(screen.getByText('共 4 件')).toBeTruthy();

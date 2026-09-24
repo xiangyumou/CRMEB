@@ -1,5 +1,6 @@
 import { Text, View } from '@tarojs/components';
 import { cx } from '@/lib/cx';
+import { formatSpec } from '@/lib/spec';
 import { navigate } from '@/platform';
 import { Checkbox } from '@/ui/choice';
 import { Icon } from '@/ui/icon';
@@ -28,7 +29,7 @@ export interface CartRowProps {
 export function CartRow({ item, quantity, onSelect, onQuantity, onSpec }: CartRowProps) {
   const open = () => void navigate({ route: 'product', params: { id: item.productId } });
   const rescue = item.available ? null : rescueQuantity(item);
-  const specs = item.specText.replace(/\|/g, ' / ');
+  const specs = formatSpec(item.specText);
   return (
     <View className={cx('cart-row', !item.available && 'cart-row--off')} id={`cart-row-${item.id}`}>
       {item.available ? (

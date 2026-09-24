@@ -34,7 +34,12 @@ export default defineConfig({
           exclude: ['**/node_modules/**', '**/dist/**'],
           setupFiles: ['src/test/setup.ts'],
           // What config/index.ts defines for every Taro build.
-          env: { TARO_ENV: 'weapp', TARO_APP_API_ORIGIN: '', TARO_APP_PLATFORM_EMULATION: '' },
+          env: {
+            TARO_ENV: 'weapp',
+            TARO_APP_API_ORIGIN: '',
+            TARO_APP_PLATFORM_EMULATION: '',
+            TARO_APP_VERSION: '1.0.0-test',
+          },
         },
       },
     ],

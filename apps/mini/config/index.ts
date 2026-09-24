@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig, type UserConfigExport } from '@tarojs/cli';
 import { BundleStatsPlugin } from './bundle-stats';
@@ -52,6 +53,23 @@ if (emulation !== '' && (emulation !== 'mp' || taroEnv !== 'h5')) {
   );
 }
 const buildName = emulation === 'mp' ? 'h5-mp-emulation' : taroEnv;
+
+/**
+ * The release version, sent as `X-Client-Version` (src/data/api.ts): `TARO_APP_VERSION` when set
+ * (a CI build), else `version` in apps/mini/package.json, which is also what
+ * scripts/preview.mjs uploads as. The shape is the server's `clientVersion`
+ * (packages/contracts/src/_conventions/common.ts); anything else would be dropped by the server,
+ * so it fails the build instead.
+ */
+const packageVersion = (
+  JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8')) as { version: string }
+).version;
+const appVersion = process.env.TARO_APP_VERSION || packageVersion;
+if (!/^\d{1,5}(\.\d{1,5}){0,2}(-[0-9A-Za-z.]{1,20})?$/.test(appVersion) || appVersion.length > 32) {
+  throw new Error(
+    `TARO_APP_VERSION / package.json version is not a client version: "${appVersion}".`,
+  );
+}
 
 /**
  * Dependencies that ship syntax newer than our target (babel.config.js): TanStack Query's
@@ -112,11 +130,12 @@ export default defineConfig<'webpack5'>(async (merge) => {
     plugins: [path.join(appRoot, 'config/a11y-plugin.js')],
     defineConstants: {},
     // Compile-time `process.env.*` for src/platform. Taro only defines the `TARO_APP_*` keys it
-    // finds in `.env*` files; these two must exist (as `''`) in every build, or the WeChat
-    // runtime, which has no `process`, would throw on the bare reference.
+    // finds in `.env*` files; these must exist in every build, or the WeChat runtime, which has
+    // no `process`, would throw on the bare reference.
     env: {
       TARO_APP_API_ORIGIN: JSON.stringify(process.env.TARO_APP_API_ORIGIN ?? ''),
       TARO_APP_PLATFORM_EMULATION: JSON.stringify(emulation),
+      TARO_APP_VERSION: JSON.stringify(appVersion),
     },
     alias: {
       '@': path.join(appRoot, 'src'),
