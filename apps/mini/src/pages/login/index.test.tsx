@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { TOKEN_KEY, useSession } from '@/session/session';
 import { rejected } from '@/test/account-fixture';
@@ -62,6 +62,15 @@ describe('登录 · 其他方式 · 密码登录', () => {
         taroFake.calls.some((call) => call.api === 'switchTab' || call.api === 'reLaunch'),
       ).toBe(true),
     );
+
+    // It leaves once: a later renewal, with this page still mounted under the tab it went to,
+    // does not send the shopper home again (SMOKE-004's renewal step).
+    const leaves = () =>
+      taroFake.calls.filter((call) => call.api === 'switchTab' || call.api === 'reLaunch').length;
+    const before = leaves();
+    act(() => useSession.setState({ session: { status: 'signing-in' } }));
+    act(() => useSession.setState({ session: { status: 'signed-in', token: 'renewed' } }));
+    expect(leaves()).toBe(before);
   });
 
   it('says a wrong password on the password field, and stays parked for WeChat', async () => {

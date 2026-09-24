@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, Text, View } from '@tarojs/components';
 import { useAppConfig } from '@/app-config';
 import { assetUrl } from '@/lib/asset-url';
@@ -49,8 +49,12 @@ export default function LoginPage() {
   const [codeError, setCodeError] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
 
+  // Leave once. A page opened first stays mounted under the tab it went to, and a later session
+  // renewal (signed-in → signing-in → signed-in) must not pull the shopper back from where they are.
+  const left = useRef(false);
   useEffect(() => {
-    if (session.status !== 'signed-in') return;
+    if (session.status !== 'signed-in' || left.current) return;
+    left.current = true;
     const target = parseLoginRedirect(redirect) ?? { route: 'home' as const, params: {} };
     void returnFromLogin(target);
   }, [session.status, redirect]);
