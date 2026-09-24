@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSession } from '@/session/session';
 import { serveApi } from '@/test/fake-api';
 import { paged, refundDetail, refundListItem } from '@/test/order-fixtures';
@@ -18,6 +18,9 @@ function requestedStates(): string[] {
 describe('我的售后', () => {
   beforeEach(() => {
     useSession.setState({ session: { status: 'signed-in', token: 't' } });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('lists refunds and returns together, by state', async () => {
@@ -75,6 +78,36 @@ describe('我的售后', () => {
     await screen.findByText('售后单号 R2-RF1');
     expect(seen.map((r) => r.query.page)).toEqual(['1', '2', '1']);
     expect(screen.getByText('售后单号 RF11')).toBeTruthy();
+  });
+
+  it('coming back after 5 minutes away, reloads every page from page 1', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    let round = 0;
+    const seen = serveApi({
+      'GET /api/v1/refunds': () => {
+        const page = Number(seen.at(-1)?.query.page);
+        if (page === 1) round += 1;
+        const ids = page === 1 ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [11];
+        const items = ids.map((n) =>
+          refundListItem({
+            id: String(n),
+            refundNo: n === 1 || n === 11 ? `R${round}-RF${n}` : `RF${n}`,
+          }),
+        );
+        return { body: paged(items, 11, page) };
+      },
+    });
+    await renderPage(<RefundListPage />);
+    await screen.findByText('售后单号 R1-RF1');
+    taroFake.reachBottom();
+    await screen.findByText('售后单号 R1-RF11');
+
+    taroFake.hidePage();
+    vi.setSystemTime(Date.now() + 5 * 60_000);
+    taroFake.showPage();
+    await screen.findByText('售后单号 R2-RF11');
+    expect(seen.map((r) => r.query.page)).toEqual(['1', '2', '1', '2']);
+    expect(screen.getByText('售后单号 R2-RF1')).toBeTruthy();
   });
 
   it('withdraws a request after asking', async () => {

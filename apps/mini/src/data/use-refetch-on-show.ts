@@ -6,7 +6,7 @@ import {
   type QueryKey,
   useQueryClient,
 } from '@tanstack/react-query';
-import { useDidShow } from '@tarojs/taro';
+import { useDidHide, useDidShow } from '@tarojs/taro';
 
 export interface RefetchOnShowOptions {
   /**
@@ -28,7 +28,20 @@ export interface RefetchOnShowOptions {
    *   any page.
    */
   pages?: 'all' | 'first' | undefined;
+  /**
+   * With `pages: 'first'`: when the page was hidden at least this long (ms), every loaded page
+   * is fetched again instead, from page 1 on, as 下拉刷新 does. A shopper back after a long
+   * while expects the whole list current, not only its top; after a short trip to a detail page
+   * they expect their place, which page 1 alone keeps cheaply. Still only a stale list.
+   */
+  allPagesAfter?: number | undefined;
 }
+
+/**
+ * How long away makes 我的订单 / 我的售后 fetch every loaded page again on return, instead of
+ * only page 1 (`allPagesAfter`).
+ */
+export const LIST_FULL_RELOAD_AFTER_MS = 5 * 60_000;
 
 /**
  * Refetches this page's stale queries when the page is shown again (back navigation, tab
@@ -40,14 +53,22 @@ export interface RefetchOnShowOptions {
 export function useRefetchOnShow(queryKey: QueryKey, options: RefetchOnShowOptions = {}): void {
   const client = useQueryClient();
   const firstShow = useRef(true);
+  const hiddenAt = useRef<number | null>(null);
   const when = options.when ?? 'stale';
   const pages = options.pages ?? 'all';
+  const allPagesAfter = options.allPagesAfter;
+  useDidHide(() => {
+    hiddenAt.current = Date.now();
+  });
   useDidShow(() => {
     if (firstShow.current) {
       firstShow.current = false;
       return;
     }
-    if (pages === 'first' && when === 'stale') {
+    const away = hiddenAt.current === null ? 0 : Date.now() - hiddenAt.current;
+    hiddenAt.current = null;
+    const longAway = allPagesAfter !== undefined && away >= allPagesAfter;
+    if (pages === 'first' && when === 'stale' && !longAway) {
       for (const query of client
         .getQueryCache()
         .findAll({ queryKey, type: 'active', stale: true })) {

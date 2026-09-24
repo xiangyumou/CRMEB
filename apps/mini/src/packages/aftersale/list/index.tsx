@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View } from '@tarojs/components';
 import type { RefundListItem } from '@shop/contracts/refund/schemas';
 import { routeKey, useInfiniteRouteQuery } from '@shop/api-client/react';
-import { useRefetchOnShow } from '@/data/use-refetch-on-show';
+import { LIST_FULL_RELOAD_AFTER_MS, useRefetchOnShow } from '@/data/use-refetch-on-show';
 import { scrollPageToTop, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
@@ -61,7 +61,10 @@ function RefundList({ state }: { state: State }) {
     { query: { state, pageSize: 10 } },
     { enabled: signedIn },
   );
-  useRefetchOnShow(routeKey('refund.myList'), { pages: 'first' });
+  useRefetchOnShow(routeKey('refund.myList'), {
+    pages: 'first',
+    allPagesAfter: LIST_FULL_RELOAD_AFTER_MS,
+  });
   const actions = useRefundActions();
   return (
     <View className="refund-list">

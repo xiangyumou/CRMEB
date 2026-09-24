@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSession } from '@/session/session';
 import { serveApi } from '@/test/fake-api';
 import { orderItem, orderListItem, paged } from '@/test/order-fixtures';
@@ -31,6 +31,9 @@ function requestedTabs(): string[] {
 describe('我的订单', () => {
   beforeEach(() => {
     useSession.setState({ session: { status: 'signed-in', token: 't' } });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('opens on the tab it was sent to, with the counts of what waits', async () => {
@@ -91,6 +94,38 @@ describe('我的订单', () => {
     await screen.findByText('订单号 R2-0001');
     expect(pages()).toEqual(['1', '2', '1']);
     expect(screen.getByText('订单号 00012')).toBeTruthy();
+  });
+
+  it('coming back after 5 minutes away, reloads every page from page 1', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    let round = 0;
+    const seen = serveApi({
+      'GET /api/v1/orders/counts': () => ({ body: counts }),
+      'GET /api/v1/orders': () => {
+        const page = Number(seen.at(-1)?.query.page);
+        if (page === 1) round += 1;
+        const ids = page === 1 ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [11, 12];
+        const items = ids.map((n) =>
+          orderListItem({
+            id: String(9000 + n),
+            orderNo: n === 1 || n === 12 ? `R${round}-000${n}` : `000${n}`,
+          }),
+        );
+        return { body: paged(items, 12, page) };
+      },
+    });
+    await renderPage(<OrderListPage />);
+    await screen.findByText('订单号 R1-0001');
+    taroFake.reachBottom();
+    await screen.findByText('订单号 R1-00012');
+
+    taroFake.hidePage();
+    vi.setSystemTime(Date.now() + 5 * 60_000);
+    taroFake.showPage();
+    await screen.findByText('订单号 R2-00012');
+    const pages = () => seen.filter((r) => r.key === 'GET /api/v1/orders').map((r) => r.query.page);
+    expect(pages()).toEqual(['1', '2', '1', '2']);
+    expect(screen.getByText('订单号 R2-0001')).toBeTruthy();
   });
 
   it('lists the orders still to review under 待评价, with its count, and offers 去评价', async () => {
