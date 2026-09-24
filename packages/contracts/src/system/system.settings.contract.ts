@@ -11,6 +11,8 @@ import {
   configGroupValues,
   configGroupValuesExample,
   configSaveBody,
+  configTestBody,
+  configTestResult,
   dashboardHeader,
   dashboardHeaderExample,
   pagedAuditLogs,
@@ -158,6 +160,60 @@ export const systemConfigSave = defineRoute({
         ...configGroupValuesExample,
         values: { ...configGroupValuesExample.values, siteName: 'CRMEB 旗舰店' },
         updatedAt: '2026-09-22T09:05:00+08:00',
+      },
+    },
+  ],
+});
+
+/**
+ * 「测试」: tries the values on the screen without saving them.
+ *
+ * Password boxes left empty fall back to the stored secret, so an operator can
+ * change the sign name and test it without retyping the key. The result is a
+ * list of steps rather than a 4xx, because a provider's refusal is the answer
+ * the operator asked for, not an error in the request.
+ */
+export const systemConfigTest = defineRoute({
+  id: 'system.configTest',
+  method: 'POST',
+  path: '/admin-api/system/config/:group/test',
+  auth: 'admin',
+  permission: 'system:config:write',
+  summary: '测试配置分组',
+  tags: ['system'],
+  params: configGroupParams,
+  body: configTestBody,
+  response: configTestResult,
+  errors: [
+    'SYSTEM_CONFIG_GROUP_NOT_FOUND',
+    'SYSTEM_CONFIG_UNKNOWN_KEY',
+    'CONFIG_FIELD_READ_ONLY',
+    'SYSTEM_CONFIG_TEST_UNSUPPORTED',
+    'RATE_LIMITED',
+  ],
+  examples: [
+    {
+      name: 'sms-sent',
+      params: { group: 'sms' },
+      body: {
+        values: { provider: 'tencent', tencentSignName: '某某商城' },
+        input: { phone: '13800138000' },
+      },
+      response: {
+        ok: true,
+        steps: [
+          { name: '检查配置', ok: true, detail: '腾讯云 · 签名「某某商城」', ms: 0 },
+          { name: '发送验证码短信', ok: true, detail: '已受理，消息 ID 2433:1234567890', ms: 312 },
+        ],
+      },
+    },
+    {
+      name: 'storage-refused',
+      params: { group: 'storage' },
+      body: { values: { driver: 's3', s3Bucket: 'shop' }, input: {} },
+      response: {
+        ok: false,
+        steps: [{ name: '写入探针文件', ok: false, detail: 'S3 403 AccessDenied', ms: 120 }],
       },
     },
   ],

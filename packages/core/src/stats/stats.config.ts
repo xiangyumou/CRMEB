@@ -27,6 +27,8 @@ import { defineConfigGroup } from '../kernel/config-registry';
 export const statsConfig = defineConfigGroup({
   group: 'stats',
   title: '统计设置',
+  description: '统计缓存、导出上限与访问记录保留。',
+  category: 'rules',
   permission: 'system:config:read',
   schema: z.object({
     // The floor is deliberately low: a shop that wants exports effectively
@@ -44,14 +46,16 @@ export const statsConfig = defineConfigGroup({
       order: 1,
     },
     cacheSeconds: {
-      label: '统计缓存（秒）',
+      label: '统计缓存',
       type: 'number',
+      unit: 'seconds',
       help: '0 表示不缓存；统计页面的每个区块按时间范围缓存这么久',
       order: 2,
     },
     visitRetentionDays: {
       label: '访问记录保留天数',
       type: 'number',
+      unit: 'days',
       help: '每天凌晨删除更早的页面访问记录；超出范围的访客数、浏览量显示为 0。同比需要至少 366 天',
       order: 3,
     },

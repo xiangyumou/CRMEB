@@ -17,6 +17,8 @@ import { defineConfigGroup } from '../kernel/config-registry';
 export const miniTradeConfig = defineConfigGroup({
   group: 'wechat-mini-trade',
   title: '小程序发货信息管理',
+  description: '小程序发货信息管理：录入方式与微信侧同步状态。',
+  category: 'wechat',
   permission: 'payment:config:write',
   schema: z.object({
     uploadEnabled: z.boolean().default(true),

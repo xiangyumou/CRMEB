@@ -12,6 +12,7 @@
  * | `GET /admin-api/audit-logs` | `auditLogList` |
  * | `GET /admin-api/system/config-groups` | `configGroupList` |
  * | `GET/PUT /admin-api/system/config/:group` | `configGet` / `configSave` |
+ * | `POST /admin-api/system/config/:group/test` | `configTest` |
  * | `GET /api/v1/agreements/:key` | `agreementGet` |
  * | `GET /api/v1/app/config` | `appConfigGet` |
  * | `GET /admin-api/dashboard/header` | `dashboardHeader` |
@@ -64,7 +65,13 @@ export {
   roleUpdate,
 } from './role.service';
 
-export { configGet, configGroupList, configSave, describeGroup } from './config.service';
+export {
+  configGet,
+  configGroupList,
+  configSave,
+  configTest,
+  describeGroup,
+} from './config.service';
 export { agreementGet } from './agreement.service';
 export { auditLogList, pruneAuditLogs } from './audit.service';
 

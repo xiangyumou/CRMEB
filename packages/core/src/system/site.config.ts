@@ -40,6 +40,8 @@ function trimOrigin(value: string): string {
 export const siteConfig = defineConfigGroup({
   group: 'site',
   title: '站点设置',
+  description: '商城名称、Logo、备案信息、分享卡片与开屏广告。',
+  category: 'basic',
   permission: 'system:config:read',
   schema: z.object({
     siteName: z.string().max(64).default('CRMEB 商城'),
@@ -197,8 +199,9 @@ export const siteConfig = defineConfigGroup({
       order: 63,
     },
     splashSeconds: {
-      label: '停留秒数',
+      label: '停留时间',
       type: 'number',
+      unit: 'seconds',
       section: '开屏广告',
       visibleWhen: { key: 'splashEnabled', equals: true },
       order: 64,

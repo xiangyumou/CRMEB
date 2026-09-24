@@ -1,21 +1,26 @@
 'use client';
 
+import { ExperimentOutlined } from '@ant-design/icons';
 import {
+  Anchor,
+  Badge,
   Button,
   Card,
   Col,
-  Divider,
   Form,
   Input,
   InputNumber,
   Row,
   Select,
   Skeleton,
+  Space,
   Switch,
   Tag,
+  Tooltip,
   Typography,
+  theme,
 } from 'antd';
-import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import type { RouteInput } from '../../api/call-route';
 import type { AnyRouteDef, ResponseOf } from '../../api/contracts';
@@ -24,8 +29,12 @@ import { useRouteMutation } from '../../api/hooks';
 import { AssetField } from '../form/asset-field';
 import { MoneyInput } from '../form/money-input';
 import { FormErrorBanner, useFieldErrors } from '../form/form-errors';
+import { RichTextField } from '../form/rich-text-field';
+import { ColorField, UnitNumberInput, UrlInput } from './config-controls';
+import { ConfigTestModal, type ConfigTestOutcome } from './config-test-modal';
 import {
   buildConfigPayload,
+  changedConfigKeys,
   isConfigFieldVisible,
   type ConfigFieldDescriptor,
   type ConfigGroupDescriptor,
@@ -33,7 +42,7 @@ import {
 } from './types';
 import { defined } from '../props';
 
-export interface ConfigGroupFormProps<R extends AnyRouteDef> {
+export interface ConfigGroupFormProps<R extends AnyRouteDef, T extends AnyRouteDef = AnyRouteDef> {
   descriptor: ConfigGroupDescriptor;
   /** Current values. `password` keys hold a boolean "is set" flag, not the secret. */
   values: ConfigValues | undefined;
@@ -53,6 +62,18 @@ export interface ConfigGroupFormProps<R extends AnyRouteDef> {
   columns?: 1 | 2 | undefined;
   /** Extra content between the description and the fields. */
   header?: ReactNode | undefined;
+  /**
+   * The 「测试」 route, used when `descriptor.test` is set. Default input
+   * `{ params: { group }, body: { values: payload, input } }`.
+   */
+  testRoute?: T | undefined;
+  /** Invalidated after a test run, e.g. the index that shows 「上次测试」. */
+  testInvalidate?: readonly AnyRouteDef[] | undefined;
+  /**
+   * A right-hand column that follows the form as it is edited — a live preview.
+   * Receives the values on the screen, saved or not.
+   */
+  aside?: ((values: ConfigValues) => ReactNode) | undefined;
 }
 
 /**
@@ -60,9 +81,13 @@ export interface ConfigGroupFormProps<R extends AnyRouteDef> {
  * route. Every settings page in the admin is this component plus a descriptor —
  * the 575-key `sys_config` screen zoo is gone.
  *
- * Fields carrying a `section` are grouped under a left-aligned heading, in the
- * order the sections first appear. A descriptor with no sections renders as one
- * flat list, exactly as before.
+ * Layout: fields with no `section` sit in one card, each section in a card of
+ * its own, in the order the sections first appear. Three sections or more get
+ * a table of contents in the right-hand column, under the `aside` preview.
+ *
+ * The save bar sticks to the bottom of the window: it counts the fields that
+ * differ from what is saved (each one is marked in the form), offers 放弃修改,
+ * and answers Ctrl/⌘+S. Leaving the page with changes asks first.
  *
  * Secrets: a `password` field shows 已设置 / 未设置 and an empty box. Leaving it
  * empty keeps the stored credential; typing replaces it. The secret itself is
@@ -78,7 +103,7 @@ export interface ConfigGroupFormProps<R extends AnyRouteDef> {
  * />
  * ```
  */
-export function ConfigGroupForm<R extends AnyRouteDef>({
+export function ConfigGroupForm<R extends AnyRouteDef, T extends AnyRouteDef = AnyRouteDef>({
   descriptor,
   values,
   route,
@@ -90,10 +115,14 @@ export function ConfigGroupForm<R extends AnyRouteDef>({
   disabled = false,
   columns = 1,
   header,
-}: ConfigGroupFormProps<R>) {
+  testRoute,
+  testInvalidate,
+  aside,
+}: ConfigGroupFormProps<R, T>) {
   const [form] = Form.useForm();
   // Typed secrets live outside the form value so they can never be round-tripped.
   const [secrets, setSecrets] = useState<Record<string, string>>({});
+  const { token } = theme.useToken();
 
   const watched = Form.useWatch([], form) as ConfigValues | undefined;
   const current = watched ?? values ?? {};
@@ -129,6 +158,10 @@ export function ConfigGroupForm<R extends AnyRouteDef>({
         ? { message: error.message, details: serverMatch.unmatched }
         : null;
 
+  const changed = disabled ? [] : changedConfigKeys(descriptor, current, values, secrets);
+  const dirty = changed.length > 0;
+  const changedSet = new Set(changed);
+
   const defaultSpan = 24 / columns;
 
   const submit = (raw: ConfigValues): void => {
@@ -139,78 +172,284 @@ export function ConfigGroupForm<R extends AnyRouteDef>({
     mutation.mutate(input);
   };
 
+  const discard = (): void => {
+    form.resetFields();
+    if (values) form.setFieldsValue(values);
+    setSecrets({});
+  };
+
+  // Ctrl/⌘+S saves, instead of the browser's "save page as".
+  const save = useCallback(() => form.submit(), [form]);
+  useEffect(() => {
+    if (disabled) return;
+    const onKey = (event: KeyboardEvent): void => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        save();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [disabled, save]);
+
+  // Closing the tab or reloading with unsaved changes asks first.
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent): void => {
+      event.preventDefault();
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
+
+  // 「测试」
+  const [testOpen, setTestOpen] = useState(false);
+  const [outcome, setOutcome] = useState<ConfigTestOutcome | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+  const testMutation = useRouteMutation((testRoute ?? route) as T, {
+    presentError: false,
+    ...(testInvalidate ? { invalidate: testInvalidate } : {}),
+  });
+  const runTest = async (input: ConfigValues): Promise<void> => {
+    setTestError(null);
+    setOutcome(null);
+    let raw: ConfigValues;
+    try {
+      raw = (await form.validateFields()) as ConfigValues;
+    } catch {
+      setTestError('表单里有未通过校验的项，先改正再测试');
+      return;
+    }
+    const payload = buildConfigPayload(descriptor, raw, secrets);
+    testMutation.mutate(
+      { params: { group: descriptor.group }, body: { values: payload, input } } as RouteInput<T>,
+      {
+        onSuccess: (data) => setOutcome(data as ConfigTestOutcome),
+        onError: (err) => setTestError(describeTestError(err)),
+      },
+    );
+  };
+  const canTest = descriptor.test !== undefined && testRoute !== undefined && !disabled;
+
   if (loading) {
     return (
-      <Card title={descriptor.title} size="small">
+      <Card size="small">
         <Skeleton active paragraph={{ rows: 6 }} />
       </Card>
     );
   }
 
-  return (
-    <Card title={descriptor.title} size="small">
-      {descriptor.description ? (
-        <Typography.Paragraph type="secondary">{descriptor.description}</Typography.Paragraph>
-      ) : null}
-      {header}
-      {banner ? <FormErrorBanner message={banner.message} details={banner.details} /> : null}
+  const runs = groupBySection(visibleFields);
+  const named = runs.filter((run) => run.section !== undefined);
+  const showToc = named.length >= 3;
+  const asideContent = aside ? aside(current) : null;
+  const hasAside = asideContent !== null || showToc;
 
-      <Form
-        form={form}
-        layout="vertical"
-        disabled={disabled}
-        {...defined({ initialValues: values })}
-        onFinish={(raw) => submit(raw as ConfigValues)}
+  const renderField = (field: ConfigFieldDescriptor): ReactNode => {
+    const isChanged = changedSet.has(field.key);
+    const control =
+      field.readOnly === true ? (
+        <ReadOnlyField field={field} value={values?.[field.key]} />
+      ) : field.kind === 'password' ? (
+        <SecretField
+          field={field}
+          isSet={Boolean(values?.[field.key])}
+          value={secrets[field.key] ?? ''}
+          disabled={disabled}
+          onChange={(next) => setSecrets((prev) => ({ ...prev, [field.key]: next }))}
+        />
+      ) : (
+        <Form.Item
+          name={field.key}
+          label={field.label}
+          extra={field.help}
+          valuePropName={field.kind === 'switch' ? 'checked' : 'value'}
+          rules={
+            field.required
+              ? [{ required: true, message: `请填写${field.label}` }]
+              : field.kind === 'json'
+                ? [{ validator: validateJson }]
+                : field.kind === 'color'
+                  ? [{ validator: validateColor }]
+                  : []
+          }
+        >
+          {renderConfigControl(field, disabled)}
+        </Form.Item>
+      );
+    return (
+      <Col
+        key={field.key}
+        xs={24}
+        md={field.kind === 'richtext' ? 24 : (field.span ?? defaultSpan)}
+        data-changed={isChanged ? 'true' : undefined}
       >
-        {groupBySection(visibleFields).map(({ section, fields }) => (
-          <Fragment key={section ?? ''}>
-            {section === undefined ? null : (
-              <Divider titlePlacement="start" plain style={{ margin: '4px 0 16px' }}>
-                <Typography.Text strong>{section}</Typography.Text>
-              </Divider>
-            )}
-            <Row gutter={16}>
-              {fields.map((field) => (
-                <Col key={field.key} xs={24} md={field.span ?? defaultSpan}>
-                  {field.readOnly === true ? (
-                    <ReadOnlyField field={field} value={values?.[field.key]} />
-                  ) : field.kind === 'password' ? (
-                    <SecretField
-                      field={field}
-                      isSet={Boolean(values?.[field.key])}
-                      value={secrets[field.key] ?? ''}
-                      disabled={disabled}
-                      onChange={(next) => setSecrets((prev) => ({ ...prev, [field.key]: next }))}
-                    />
-                  ) : (
-                    <Form.Item
-                      name={field.key}
-                      label={field.label}
-                      extra={field.help}
-                      valuePropName={field.kind === 'switch' ? 'checked' : 'value'}
-                      rules={
-                        field.required
-                          ? [{ required: true, message: `请填写${field.label}` }]
-                          : field.kind === 'json'
-                            ? [{ validator: validateJson }]
-                            : []
-                      }
-                    >
-                      {renderConfigControl(field, disabled)}
-                    </Form.Item>
-                  )}
-                </Col>
-              ))}
-            </Row>
-          </Fragment>
-        ))}
+        <div
+          style={{
+            borderInlineStart: `3px solid ${isChanged ? token.colorWarning : 'transparent'}`,
+            paddingInlineStart: 10,
+            marginInlineStart: -13,
+            transition: 'border-color 0.2s',
+          }}
+        >
+          {control}
+        </div>
+      </Col>
+    );
+  };
 
-        <Button type="primary" htmlType="submit" loading={mutation.isPending}>
-          保存
-        </Button>
-      </Form>
-    </Card>
+  const formBody = (
+    <Form
+      form={form}
+      layout="vertical"
+      disabled={disabled}
+      {...defined({ initialValues: values })}
+      onFinish={(raw) => submit(raw as ConfigValues)}
+    >
+      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        {descriptor.description || header || banner ? (
+          <div>
+            {descriptor.description ? (
+              <Typography.Paragraph type="secondary" style={{ marginBottom: header ? 8 : 0 }}>
+                {descriptor.description}
+              </Typography.Paragraph>
+            ) : null}
+            {header}
+            {banner ? <FormErrorBanner message={banner.message} details={banner.details} /> : null}
+          </div>
+        ) : null}
+
+        {runs.map(({ section, fields }, index) => (
+          <Card
+            key={section ?? ''}
+            id={sectionId(index)}
+            size="small"
+            {...(section === undefined ? {} : { title: section })}
+            styles={{ body: { paddingBottom: 0 } }}
+            style={{ scrollMarginTop: 72 }}
+          >
+            <Row gutter={16}>{fields.map(renderField)}</Row>
+          </Card>
+        ))}
+      </Space>
+
+      <div
+        style={{
+          position: 'sticky',
+          bottom: 0,
+          zIndex: 5,
+          marginTop: 16,
+          padding: '12px 16px',
+          background: token.colorBgContainer,
+          border: `1px solid ${token.colorBorderSecondary}`,
+          borderRadius: token.borderRadiusLG,
+          boxShadow: dirty ? token.boxShadowSecondary : 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+          flexWrap: 'wrap',
+        }}
+      >
+        <span data-testid="config-dirty-state">
+          {dirty ? (
+            <Badge status="warning" text={`已修改 ${changed.length} 项，尚未保存`} />
+          ) : (
+            <Badge status="default" text="没有未保存的修改" />
+          )}
+        </span>
+        <Space wrap>
+          {canTest ? (
+            <Button
+              icon={<ExperimentOutlined />}
+              onClick={() => {
+                setOutcome(null);
+                setTestError(null);
+                setTestOpen(true);
+              }}
+            >
+              {descriptor.test!.label}
+            </Button>
+          ) : null}
+          <Button disabled={!dirty || disabled} onClick={discard}>
+            放弃修改
+          </Button>
+          <Tooltip title="Ctrl / ⌘ + S">
+            <Button type="primary" htmlType="submit" loading={mutation.isPending}>
+              保存
+            </Button>
+          </Tooltip>
+        </Space>
+      </div>
+    </Form>
   );
+
+  return (
+    <>
+      {hasAside ? (
+        <Row gutter={16} wrap>
+          <Col xs={24} xl={asideContent !== null ? 15 : 19}>
+            {formBody}
+          </Col>
+          <Col xs={24} xl={asideContent !== null ? 9 : 5}>
+            <div style={{ position: 'sticky', top: 72 }}>
+              <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                {asideContent}
+                {showToc ? (
+                  <Card size="small" title="目录">
+                    <Anchor
+                      offsetTop={72}
+                      affix={false}
+                      items={runs.flatMap((run, index) =>
+                        run.section === undefined
+                          ? []
+                          : [
+                              {
+                                key: sectionId(index),
+                                href: `#${sectionId(index)}`,
+                                title: run.section,
+                              },
+                            ],
+                      )}
+                    />
+                  </Card>
+                ) : null}
+              </Space>
+            </div>
+          </Col>
+        </Row>
+      ) : (
+        formBody
+      )}
+
+      {canTest ? (
+        <ConfigTestModal
+          open={testOpen}
+          onClose={() => setTestOpen(false)}
+          test={descriptor.test!}
+          dirty={dirty}
+          running={testMutation.isPending}
+          outcome={outcome}
+          error={testError}
+          onRun={(input) => void runTest(input)}
+          renderControl={(field) => renderConfigControl(field, false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+const sectionId = (index: number): string => `config-section-${index}`;
+
+function describeTestError(error: unknown): string {
+  if (!ApiError.is(error)) return '测试请求失败，请稍后再试';
+  if (Array.isArray(error.details)) {
+    const messages = error.details
+      .map((item) => (item as { message?: unknown }).message)
+      .filter((message): message is string => typeof message === 'string');
+    if (messages.length > 0) return `${error.message}：${messages.join('；')}`;
+  }
+  return error.message;
 }
 
 /**
@@ -325,8 +564,27 @@ async function validateJson(_rule: unknown, value: unknown): Promise<void> {
   }
 }
 
+async function validateColor(_rule: unknown, value: unknown): Promise<void> {
+  if (value === undefined || value === null || value === '') return;
+  if (!/^#[0-9a-fA-F]{6}$/.test(String(value))) throw new Error('颜色格式应为 #RRGGBB');
+}
+
 function renderConfigControl(field: ConfigFieldDescriptor, disabled: boolean): ReactNode {
   switch (field.kind) {
+    case 'color':
+      // Clearable when the placeholder says what blank means (「留空则与主题色相同」);
+      // a placeholder that is itself a colour is just the default, and blank is refused.
+      return (
+        <ColorField
+          disabled={disabled}
+          allowClear={field.placeholder !== undefined && !field.placeholder.startsWith('#')}
+          {...defined({ placeholder: field.placeholder })}
+        />
+      );
+    case 'richtext':
+      return <RichTextField />;
+    case 'url':
+      return <UrlInput disabled={disabled} {...defined({ placeholder: field.placeholder })} />;
     case 'text':
       return <Input placeholder={field.placeholder} disabled={disabled} allowClear />;
     case 'textarea':
@@ -341,6 +599,15 @@ function renderConfigControl(field: ConfigFieldDescriptor, disabled: boolean): R
         />
       );
     case 'number':
+      if (field.unit) {
+        return (
+          <UnitNumberInput
+            unit={field.unit}
+            disabled={disabled}
+            {...defined({ min: field.min, placeholder: field.placeholder })}
+          />
+        );
+      }
       return (
         <InputNumber
           style={{ width: '100%' }}

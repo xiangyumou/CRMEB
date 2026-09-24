@@ -30,6 +30,8 @@ import { defineConfigGroup } from '../kernel/config-registry';
 export const orderConfig = defineConfigGroup({
   group: 'order',
   title: '订单设置',
+  description: '未支付订单保留时间、超时清理与满额包邮。',
+  category: 'trade',
   schema: z.object({
     /** How long an order stays in `pending_payment` before the auto-cancel takes it. */
     payWindowMinutes: z.number().int().min(1).max(10_080).default(30),
@@ -48,8 +50,9 @@ export const orderConfig = defineConfigGroup({
   }),
   ui: {
     payWindowMinutes: {
-      label: '未支付订单保留时间（分钟）',
+      label: '未支付订单保留时间',
       type: 'number',
+      unit: 'minutes',
       help: '超时后系统自动取消订单并退回库存与优惠券',
       section: '下单',
     },

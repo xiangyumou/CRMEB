@@ -38,6 +38,8 @@ const configText = (max: number) => z.string().max(max).default('');
 export const paymentConfig = defineConfigGroup({
   group: 'payment',
   title: '微信支付',
+  description: '微信支付商户号、APIv3 密钥、证书与支付有效期。',
+  category: 'trade',
   permission: 'payment:config:write',
   schema: z.object({
     /** The merchant id. Recorded on every attempt so a later config change is detectable (PAYC-005). */
@@ -118,8 +120,9 @@ export const paymentConfig = defineConfigGroup({
       order: 70,
     },
     payExpiryMinutes: {
-      label: '支付有效期（分钟）',
+      label: '支付有效期',
       type: 'number',
+      unit: 'minutes',
       section: '微信支付',
       order: 80,
     },

@@ -19,6 +19,8 @@ import { defineConfigGroup } from '../kernel/config-registry';
 export const notificationConfig = defineConfigGroup({
   group: 'notification',
   title: '通知设置',
+  description: '订阅消息跳转的小程序版本与站内信保留天数。',
+  category: 'integration',
   permission: 'system:config:read',
   schema: z.object({
     /**
@@ -41,7 +43,13 @@ export const notificationConfig = defineConfigGroup({
       ],
       order: 3,
     },
-    retentionDays: { label: '站内信保留天数', type: 'number', help: '0 表示永久保留', order: 4 },
+    retentionDays: {
+      label: '站内信保留天数',
+      type: 'number',
+      unit: 'days',
+      help: '0 表示永久保留',
+      order: 4,
+    },
   },
 });
 

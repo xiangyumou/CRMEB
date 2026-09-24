@@ -92,3 +92,10 @@ export {
 export { createS3Storage, signS3Request, S3Error, type S3Options } from './s3';
 export { createScanTokenStore, type ScanTokenStore } from './scan-token';
 export * as attachmentRepo from './storage.repo';
+
+import { registerStorageConfigTest } from './storage.config-test';
+
+/** Wires the domain into the platform; called once per process from the gen'd bootstrap. */
+export function registerStorageDomain(): void {
+  registerStorageConfigTest();
+}

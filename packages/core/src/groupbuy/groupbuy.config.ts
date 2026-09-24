@@ -21,6 +21,8 @@ import { defineConfigGroup } from '../kernel/config-registry';
 export const groupbuyConfig = defineConfigGroup({
   group: 'groupbuy',
   title: '拼团设置',
+  description: '过期拼团清理与拼团频道头图。',
+  category: 'trade',
   permission: 'groupbuy:activity:read',
   schema: z.object({
     /** Groups one sweep pass handles. The per-group delayed job does the real work. */

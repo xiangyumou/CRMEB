@@ -4,6 +4,8 @@ import type {
   ConfigGroupSummary,
   ConfigGroupValues,
   ConfigSaveBody,
+  ConfigTestBody,
+  ConfigTestResult,
 } from '@shop/contracts/system/schemas';
 import type { Ctx } from '../kernel/context';
 import { requireAdminId } from '../kernel/context';
@@ -14,7 +16,9 @@ import {
   type ConfigFieldUi,
   type ConfigGroupDef,
 } from '../kernel/config-registry';
+import { getConfigTest } from '../kernel/config-test';
 import { DomainError } from '../kernel/errors';
+import { enforce, fixedWindow } from '../kernel/rate-limit';
 import { hasPermission } from '../auth/rbac';
 import { invalidateAppConfigCache } from './app-config.service';
 import * as repo from './system.repo';
@@ -53,6 +57,9 @@ const FIELD_KIND: Record<ConfigFieldType, ConfigFieldDescriptor['kind']> = {
   file: 'asset',
   password: 'password',
   json: 'json',
+  color: 'color',
+  richtext: 'richtext',
+  url: 'url',
 };
 
 /**
@@ -84,6 +91,7 @@ function fieldDescriptor(key: string, ui: ConfigFieldUi): ConfigFieldDescriptor 
     ...(ui.visibleWhen === undefined ? {} : { visibleWhen: { ...ui.visibleWhen } }),
     ...(secret ? { secret: true } : {}),
     ...(ui.readOnly === true ? { readOnly: true } : {}),
+    ...(ui.unit === undefined ? {} : { unit: ui.unit }),
   };
 }
 
@@ -101,11 +109,23 @@ export function describeGroup(def: ConfigGroupDef): ConfigGroupDescriptor {
     if (!entry.ui) continue;
     fields.push(fieldDescriptor(entry.key, entry.ui));
   }
+  const test = getConfigTest(def.group);
   return {
     group: def.group,
     title: def.title,
+    ...(def.description === undefined ? {} : { description: def.description }),
+    ...(def.category === undefined ? {} : { category: def.category }),
     permission: def.permission ?? 'system:config:read',
     fields,
+    ...(test === undefined
+      ? {}
+      : {
+          test: {
+            label: test.label,
+            ...(test.confirm === undefined ? {} : { confirm: test.confirm }),
+            inputs: Object.entries(test.inputUi ?? {}).map(([key, ui]) => fieldDescriptor(key, ui)),
+          },
+        }),
   };
 }
 
@@ -149,20 +169,33 @@ function requireGroup(name: string): ConfigGroupDef {
 }
 
 export async function configGroupList(ctx: Ctx): Promise<{ groups: ConfigGroupSummary[] }> {
-  const groups = allConfigGroups()
+  const summaries = allConfigGroups()
     .map((def) => {
       const descriptor = describeGroup(def);
       return {
         group: descriptor.group,
         title: descriptor.title,
+        ...(descriptor.description === undefined ? {} : { description: descriptor.description }),
+        ...(descriptor.category === undefined ? {} : { category: descriptor.category }),
         permission: descriptor.permission,
         fieldCount: descriptor.fields.length,
         writable: hasPermission(ctx.actor, writePermissionFor(descriptor.permission)),
+        testable: descriptor.test !== undefined,
       };
     })
     // A group the caller may not read is not listed at all: a settings index
     // that names screens you cannot open is just a list of 403s.
     .filter((summary) => hasPermission(ctx.actor, summary.permission));
+  const testable = summaries.filter((summary) => summary.testable);
+  const last =
+    testable.length === 0
+      ? []
+      : await ctx.redis.mget(...testable.map((summary) => lastTestKey(summary.group)));
+  const lastByGroup = new Map(testable.map((summary, i) => [summary.group, last[i] ?? null]));
+  const groups = summaries.map((summary) => {
+    const raw = lastByGroup.get(summary.group);
+    return raw ? { ...summary, lastTest: parseLastTest(raw) } : summary;
+  });
   return { groups };
 }
 
@@ -216,8 +249,29 @@ export async function configSave(
   // next token refresh. "Not on the screen" means "not writable from the
   // screen"; a group that ever needs a hidden writable key has to say so in its
   // `ui`, not inherit it from the schema.
+  refuseForeignKeys(def, body.values);
+  const patch = secretSafePatch(def, body.values);
+
+  // `set` validates the *whole* merged group, so a patch that would leave the
+  // group invalid is refused rather than half-written.
+  await ctx.config.set(def, patch as never, { updatedBy: adminIdOrNull(ctx) });
+  // The mini-program's `GET /api/v1/app/config` is a 60-second Redis cache over
+  // a few of these groups (`appConfigSourceGroups`); saving one of them drops
+  // it, so the operator sees their change in the app now rather than within
+  // the minute.
+  await invalidateAppConfigCache(ctx, def.group);
+  const secrets = secretKeys(def);
+  ctx.logger.info(
+    { group: def.group, keys: Object.keys(patch).filter((k) => !secrets.has(k)) },
+    'config group saved',
+  );
+  return configGet(ctx, params);
+}
+
+/** What `configSave` refuses before it looks at a single value. `configTest` refuses the same. */
+function refuseForeignKeys(def: ConfigGroupDef, values: Record<string, unknown>): void {
   const known = writableKeys(def);
-  const unknown = Object.keys(body.values).filter((key) => !known.has(key));
+  const unknown = Object.keys(values).filter((key) => !known.has(key));
   if (unknown.length > 0) {
     throw new DomainError('SYSTEM_CONFIG_UNKNOWN_KEY', { details: { keys: unknown } });
   }
@@ -228,36 +282,117 @@ export async function configSave(
   // this exists to surface: a caller that thinks `site.publicOrigin` is its to
   // write is wrong even when it happens to send the right string.
   const frozen = readOnlyKeys(def);
-  const attempted = Object.keys(body.values).filter((key) => frozen.has(key));
+  const attempted = Object.keys(values).filter((key) => frozen.has(key));
   if (attempted.length > 0) {
     throw new DomainError('CONFIG_FIELD_READ_ONLY', { details: { keys: attempted } });
   }
+}
 
+/**
+ * The browser round-trips a secret's "is set" flag. Anything that is not a
+ * non-empty string means "leave it alone", so saving the site name can never
+ * blank out a credential.
+ */
+function secretSafePatch(
+  def: ConfigGroupDef,
+  values: Record<string, unknown>,
+): Record<string, unknown> {
   const secrets = secretKeys(def);
   const patch: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(body.values)) {
-    if (secrets.has(key)) {
-      // The browser round-trips the "is set" flag. Treat anything that is not a
-      // non-empty string as "leave it alone", so saving the site name can never
-      // blank out a credential.
-      if (typeof value !== 'string' || value.length === 0) continue;
-    }
+  for (const [key, value] of Object.entries(values)) {
+    if (secrets.has(key) && (typeof value !== 'string' || value.length === 0)) continue;
     patch[key] = value;
   }
+  return patch;
+}
 
-  // `set` validates the *whole* merged group, so a patch that would leave the
-  // group invalid is refused rather than half-written.
-  await ctx.config.set(def, patch as never, { updatedBy: adminIdOrNull(ctx) });
-  // The mini-program's `GET /api/v1/app/config` is a 60-second Redis cache over
-  // a few of these groups (`appConfigSourceGroups`); saving one of them drops
-  // it, so the operator sees their change in the app now rather than within
-  // the minute.
-  await invalidateAppConfigCache(ctx, def.group);
-  ctx.logger.info(
-    { group: def.group, keys: Object.keys(patch).filter((k) => !secrets.has(k)) },
-    'config group saved',
+/** Tests per admin per minute. A test can send an SMS, which is billed. */
+const TESTS_PER_MINUTE = 6;
+/** How long the index remembers a group's last test. */
+const LAST_TEST_TTL_MS = 30 * 24 * 3600 * 1000;
+
+const lastTestKey = (group: string): string => `config:test:last:${group}`;
+
+function parseLastTest(raw: string): { ok: boolean; at: string } | null {
+  try {
+    const parsed = JSON.parse(raw) as { ok?: unknown; at?: unknown };
+    return typeof parsed.ok === 'boolean' && typeof parsed.at === 'string'
+      ? { ok: parsed.ok, at: parsed.at }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 「测试」: runs the group's test hook against the form as it stands.
+ *
+ * The values are the stored group with the form's patch on top — the same merge
+ * `configSave` would validate — so an empty password box tests the stored
+ * secret. Nothing is written back except "last tested at", which the settings
+ * index shows.
+ */
+export async function configTest(
+  ctx: Ctx,
+  params: { group: string },
+  body: ConfigTestBody,
+): Promise<ConfigTestResult> {
+  const def = requireGroup(params.group);
+  const descriptor = describeGroup(def);
+  const writePermission = writePermissionFor(descriptor.permission);
+  if (!hasPermission(ctx.actor, writePermission)) {
+    throw new DomainError('FORBIDDEN', { details: { permission: writePermission } });
+  }
+  const hook = getConfigTest(def.group);
+  if (!hook) throw new DomainError('SYSTEM_CONFIG_TEST_UNSUPPORTED');
+
+  refuseForeignKeys(def, body.values);
+  const stored = await ctx.config.getRaw(def.group);
+  const merged = def.schema.safeParse({ ...stored, ...secretSafePatch(def, body.values) });
+  if (!merged.success) {
+    throw new DomainError('VALIDATION_FAILED', {
+      details: merged.error.issues.map((i) => ({
+        field: `values.${i.path.join('.')}`,
+        message: i.message,
+      })),
+    });
+  }
+  let input: Record<string, unknown> = {};
+  if (hook.input) {
+    const parsed = hook.input.safeParse(body.input);
+    if (!parsed.success) {
+      throw new DomainError('VALIDATION_FAILED', {
+        details: parsed.error.issues.map((i) => ({
+          field: `input.${i.path.join('.')}`,
+          message: i.message,
+        })),
+      });
+    }
+    input = parsed.data as Record<string, unknown>;
+  }
+
+  const nowMs = ctx.clock.now().getTime();
+  await enforce(
+    fixedWindow(ctx.redis, {
+      key: `config:test:${adminIdOrNull(ctx) ?? 'anon'}`,
+      limit: TESTS_PER_MINUTE,
+      windowMs: 60_000,
+      nowMs,
+    }),
   );
-  return configGet(ctx, params);
+
+  const result = await hook.run(ctx, merged.data, input);
+  await ctx.redis.set(
+    lastTestKey(def.group),
+    JSON.stringify({ ok: result.ok, at: ctx.clock.now().toISOString() }),
+    'PX',
+    LAST_TEST_TTL_MS,
+  );
+  ctx.logger.info(
+    { group: def.group, ok: result.ok, steps: result.steps.map((s) => [s.name, s.ok]) },
+    'config group tested',
+  );
+  return result;
 }
 
 function adminIdOrNull(ctx: Ctx): number | null {

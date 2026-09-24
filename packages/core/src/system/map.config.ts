@@ -15,6 +15,8 @@ const MAP_ON: ConfigVisibleWhen = { key: 'provider', equals: ['tencent', 'amap']
 export const mapConfig = defineConfigGroup({
   group: 'map',
   title: '地图设置',
+  description: '地图服务商与前端、服务端 Key。',
+  category: 'integration',
   permission: 'system:config:read',
   schema: z.object({
     provider: z.enum(['none', 'tencent', 'amap']).default('none'),

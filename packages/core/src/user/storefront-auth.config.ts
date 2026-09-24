@@ -18,6 +18,8 @@ import { defineConfigGroup } from '../kernel/config-registry';
 export const storefrontAuthConfig = defineConfigGroup({
   group: 'storefront-auth',
   title: '商城登录',
+  description: '验证码、登录保护、登录保持与收货地址上限。',
+  category: 'basic',
   permission: 'system:config:read',
   schema: z.object({
     /**
@@ -71,10 +73,17 @@ export const storefrontAuthConfig = defineConfigGroup({
       order: 1,
     },
 
-    codeTtlSec: { label: '验证码有效期（秒）', type: 'number', section: '短信验证码', order: 10 },
-    codeResendSec: {
-      label: '重新发送间隔（秒）',
+    codeTtlSec: {
+      label: '验证码有效期',
       type: 'number',
+      unit: 'seconds',
+      section: '短信验证码',
+      order: 10,
+    },
+    codeResendSec: {
+      label: '重新发送间隔',
+      type: 'number',
+      unit: 'seconds',
       section: '短信验证码',
       order: 11,
     },
@@ -87,8 +96,20 @@ export const storefrontAuthConfig = defineConfigGroup({
     codePerIpPerDay: { label: '每 IP 每天上限', type: 'number', section: '短信验证码', order: 13 },
 
     loginMaxAttempts: { label: '登录失败次数上限', type: 'number', section: '登录保护', order: 20 },
-    loginWindowSec: { label: '统计窗口（秒）', type: 'number', section: '登录保护', order: 21 },
-    sessionTtlDays: { label: '登录保持天数', type: 'number', section: '登录保护', order: 22 },
+    loginWindowSec: {
+      label: '统计窗口',
+      type: 'number',
+      unit: 'seconds',
+      section: '登录保护',
+      order: 21,
+    },
+    sessionTtlDays: {
+      label: '登录保持天数',
+      type: 'number',
+      unit: 'days',
+      section: '登录保护',
+      order: 22,
+    },
 
     requirePhoneForWechat: {
       label: '微信登录强制绑定手机号',

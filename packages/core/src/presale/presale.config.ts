@@ -16,6 +16,8 @@ import { defineConfigGroup } from '../kernel/config-registry';
 export const presaleConfig = defineConfigGroup({
   group: 'presale',
   title: '预售设置',
+  description: '预售活动的下架与开售处理。',
+  category: 'trade',
   permission: 'presale:activity:read',
   schema: z.object({
     /** Campaigns one sweep pass may close. Bounds the statement, nothing more. */
@@ -42,6 +44,7 @@ export const presaleConfig = defineConfigGroup({
     windowOpenLookbackHours: {
       label: '开售事件回溯小时数',
       type: 'number',
+      unit: 'hours',
       help: '定时任务向前回溯多久，为刚刚开售的活动补记一次开售事件；不影响前台是否可买',
       section: '活动窗口',
     },

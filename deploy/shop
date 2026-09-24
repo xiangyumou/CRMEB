@@ -21,7 +21,7 @@
 #
 # `upgrade` and `rollback` run one at a time: each holds `data/shop.lock` (an
 # flock, beside `deployment.env`) for as long as it runs, and one that finds it
-# held exits 4 having changed nothing. The lock goes with the process, so a
+# held exits 4 having changed nothing (`--dry-run` takes no lock). The lock goes with the process, so a
 # crashed or killed run never leaves it behind. `ship.sh` takes the same lock
 # before it syncs a release's files and hands it to the upgrade it starts
 # (SHOP_LOCK_HELD=1), so the files and the images of one release are never
@@ -66,8 +66,10 @@ hold_lock() {
 
 case "$command" in
   upgrade | rollback)
+    # A dry run and --help change nothing, so they neither take the lock nor
+    # create its file.
     case " $* " in
-      *' --help '* | *' -h '*) ;;
+      *' --help '* | *' -h '* | *' --dry-run '*) ;;
       *) [ -n "${SHOP_LOCK_HELD-}" ] || hold_lock ;;
     esac
     exec bash "$here/lib/commands/$command.sh" "$@"

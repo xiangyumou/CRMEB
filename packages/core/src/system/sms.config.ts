@@ -17,6 +17,8 @@ const TENCENT: ConfigVisibleWhen = { key: 'provider', equals: 'tencent' };
 export const smsConfig = defineConfigGroup({
   group: 'sms',
   title: '短信设置',
+  description: '短信服务商密钥、签名、模板与发送频率。',
+  category: 'integration',
   permission: 'system:config:read',
   schema: z.object({
     provider: z.enum(['none', 'aliyun', 'tencent']).default('none'),

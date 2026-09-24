@@ -19,6 +19,8 @@ import { defineConfigGroup } from '../kernel/config-registry';
 export const wechatOaConfig = defineConfigGroup({
   group: 'wechat-oa',
   title: '微信公众号',
+  description: '公众号开关、服务器配置 Token 与 EncodingAESKey。',
+  category: 'wechat',
   permission: 'system:config:read',
   schema: z.object({
     enabled: z.boolean().default(false),

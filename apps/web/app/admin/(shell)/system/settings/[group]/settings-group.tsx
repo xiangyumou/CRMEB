@@ -1,19 +1,30 @@
 'use client';
 
 import { Alert, Skeleton, Space, Typography } from 'antd';
-import { systemConfigGet, systemConfigSave } from '@shop/contracts/system/system.settings.contract';
+import {
+  systemConfigGet,
+  systemConfigGroupList,
+  systemConfigSave,
+  systemConfigTest,
+} from '@shop/contracts/system/system.settings.contract';
 
 import { useRouteQuery } from '@/admin/api/hooks';
 import { ConfigGroupForm } from '@/admin/kit/config/config-group-form';
-import type { ConfigFieldDescriptor } from '@/admin/kit/config/types';
+import type { ConfigFieldDescriptor, ConfigValues } from '@/admin/kit/config/types';
 import { InstantText } from '@/admin/kit/instant-text';
 import { PageContainer } from '@/admin/kit/page-container';
 
+import { AppearancePreview } from './appearance-preview';
 import { MiniTradePanel } from './mini-trade-panel';
 
 /** Groups whose screen carries an action beside the form. */
 const PANELS: Record<string, () => React.ReactNode> = {
   'wechat-mini-trade': () => <MiniTradePanel />,
+};
+
+/** Groups with a live preview beside the form, fed the values on the screen. */
+const PREVIEWS: Record<string, (values: ConfigValues) => React.ReactNode> = {
+  'storefront-appearance': (values) => <AppearancePreview values={values} />,
 };
 
 /**
@@ -80,13 +91,27 @@ export function SettingsGroupPage({ group }: { group: string }) {
               ? {}
               : { description: data.descriptor.description }),
             fields: data.descriptor.fields.map(toKitField),
+            ...(data.descriptor.test === undefined
+              ? {}
+              : {
+                  test: {
+                    label: data.descriptor.test.label,
+                    ...(data.descriptor.test.confirm === undefined
+                      ? {}
+                      : { confirm: data.descriptor.test.confirm }),
+                    inputs: data.descriptor.test.inputs.map(toKitField),
+                  },
+                }),
           }}
           values={data.values}
           route={systemConfigSave}
           toInput={(payload) => ({ params: { group }, body: { values: payload } })}
-          invalidate={[systemConfigGet]}
+          invalidate={[systemConfigGet, systemConfigGroupList]}
           successMessage="已保存"
           disabled={!writable}
+          testRoute={systemConfigTest}
+          testInvalidate={[systemConfigGroupList]}
+          aside={PREVIEWS[group]}
         />
         {PANELS[group]?.() ?? null}
       </Space>
@@ -112,6 +137,8 @@ function toKitField(field: {
   section?: string | undefined;
   multiple?: boolean | undefined;
   visibleWhen?: { key: string; equals: unknown } | undefined;
+  readOnly?: boolean | undefined;
+  unit?: ConfigFieldDescriptor['unit'];
 }): ConfigFieldDescriptor {
   return {
     key: field.key,
@@ -123,5 +150,7 @@ function toKitField(field: {
     ...(field.section === undefined ? {} : { section: field.section }),
     ...(field.multiple === undefined ? {} : { multiple: field.multiple }),
     ...(field.visibleWhen === undefined ? {} : { visibleWhen: field.visibleWhen }),
+    ...(field.readOnly === undefined ? {} : { readOnly: field.readOnly }),
+    ...(field.unit === undefined ? {} : { unit: field.unit }),
   };
 }

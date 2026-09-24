@@ -47,6 +47,8 @@ export const systemErrors = defineErrors({
    * would create a row nothing ever reads. `details` carries `{ keys }`.
    */
   SYSTEM_CONFIG_UNKNOWN_KEY: { status: 422, message: '包含未知的配置项' },
+  /** 「测试」 on a group that has no test hook. A stale tab or a hand-made request. */
+  SYSTEM_CONFIG_TEST_UNSUPPORTED: { status: 404, message: '这个配置分组没有测试功能' },
   /**
    * The patch named a `readOnly` field — one the deployment's environment
    * decides, not an operator. The settings screen renders those as plain text

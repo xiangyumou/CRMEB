@@ -9,7 +9,12 @@ import { on, respondWithError, stubRoutes } from '@/test/api';
 import { renderAdmin, zhName } from '@/test/render';
 
 import { ConfigGroupForm } from './config-group-form';
-import { buildConfigPayload, isConfigFieldVisible, type ConfigGroupDescriptor } from './types';
+import {
+  buildConfigPayload,
+  changedConfigKeys,
+  isConfigFieldVisible,
+  type ConfigGroupDescriptor,
+} from './types';
 
 const descriptor: ConfigGroupDescriptor = {
   group: 'demo',
@@ -268,24 +273,25 @@ describe('<ConfigGroupForm> rendering', () => {
       <ConfigGroupForm descriptor={sectioned} values={{}} route={saveRoute} />,
     );
 
-    const headings = [...container.querySelectorAll('.ant-divider')].map((n) => n.textContent);
+    const headings = [...container.querySelectorAll('.ant-card-head-title')].map(
+      (n) => n.textContent,
+    );
     expect(headings).toEqual(['S3', '售后']);
     // The sectionless field is still there, above the first heading.
     expect(screen.getByLabelText('站点名称')).toBeInTheDocument();
     expect(screen.getByLabelText('退货地址')).toBeInTheDocument();
   });
 
-  it('renders a descriptor with no sections exactly as it did before', () => {
-    // Every existing caller passes a sectionless descriptor, so the grouping
-    // pass must collapse to the one `<Row>` the form has always rendered —
-    // same markup, no divider, nothing reordered.
+  it('renders a descriptor with no sections as one untitled card', () => {
+    // A sectionless descriptor collapses to one card with one `<Row>` — no
+    // heading, nothing reordered.
     stubSave();
     const { container } = renderAdmin(
       <ConfigGroupForm descriptor={descriptor} values={values} route={saveRoute} />,
     );
 
-    expect(container.querySelectorAll('.ant-divider')).toHaveLength(0);
-    const rows = container.querySelectorAll('form > .ant-row');
+    expect(container.querySelectorAll('.ant-card-head-title')).toHaveLength(0);
+    const rows = container.querySelectorAll('form .ant-card-body > .ant-row');
     expect(rows).toHaveLength(1);
     expect([...rows[0]!.children].map((col) => col.querySelector('label')?.textContent)).toEqual([
       '站点名称',
@@ -322,9 +328,9 @@ describe('<ConfigGroupForm> rendering', () => {
       <ConfigGroupForm descriptor={sectioned} values={{ mode: 'express' }} route={saveRoute} />,
     );
     // An empty 'S3' heading over nothing would be worse than no heading.
-    expect([...container.querySelectorAll('.ant-divider')].map((n) => n.textContent)).toEqual([
-      '售后',
-    ]);
+    expect(
+      [...container.querySelectorAll('.ant-card-head-title')].map((n) => n.textContent),
+    ).toEqual(['售后']);
   });
 
   it('shows a skeleton while the values are loading', () => {
@@ -409,5 +415,186 @@ describe('<ConfigGroupForm> read-only fields', () => {
     await waitFor(() => expect(bodies).toHaveLength(1));
     const sent = (bodies[0] as { values: Record<string, unknown> }).values;
     expect(sent).toEqual({ siteName: '改过的名称' });
+  });
+});
+
+describe('changedConfigKeys', () => {
+  it('counts a visible field that differs, and treats blank as blank', () => {
+    expect(
+      changedConfigKeys(
+        descriptor,
+        { siteName: '新名字', mode: 'express', threshold: '' },
+        values,
+        {},
+      ),
+    ).toEqual(['siteName']);
+  });
+
+  it('counts a secret only once something was typed into it', () => {
+    expect(changedConfigKeys(descriptor, values, values, { apiSecret: '' })).toEqual([]);
+    expect(changedConfigKeys(descriptor, values, values, { apiSecret: 'k' })).toEqual([
+      'apiSecret',
+    ]);
+  });
+});
+
+describe('<ConfigGroupForm> save bar', () => {
+  it('counts unsaved changes and puts them back on 放弃修改', async () => {
+    const user = userEvent.setup();
+    stubSave();
+    renderAdmin(<ConfigGroupForm descriptor={descriptor} values={values} route={saveRoute} />);
+
+    expect(screen.getByTestId('config-dirty-state')).toHaveTextContent('没有未保存的修改');
+    await user.type(screen.getByLabelText('站点名称'), '2');
+    await user.type(screen.getByTestId('secret-input-smsSecret'), 'new-key');
+    expect(screen.getByTestId('config-dirty-state')).toHaveTextContent('已修改 2 项');
+
+    await user.click(screen.getByRole('button', { name: zhName('放弃修改') }));
+    expect(screen.getByTestId('config-dirty-state')).toHaveTextContent('没有未保存的修改');
+    expect(screen.getByLabelText('站点名称')).toHaveValue('示例商城');
+    expect(screen.getByTestId('secret-input-smsSecret')).toHaveValue('');
+  });
+
+  it('saves on Ctrl+S', async () => {
+    const user = userEvent.setup();
+    const { bodies } = stubSave();
+    renderAdmin(<ConfigGroupForm descriptor={descriptor} values={values} route={saveRoute} />);
+
+    await user.keyboard('{Control>}s{/Control}');
+    await waitFor(() => expect(bodies).toHaveLength(1));
+  });
+});
+
+describe('<ConfigGroupForm> units', () => {
+  const sized: ConfigGroupDescriptor = {
+    group: 'demo',
+    title: '演示配置',
+    fields: [
+      { key: 'maxBytes', label: '上传上限', kind: 'number', unit: 'bytes' },
+      { key: 'ttl', label: '有效期', kind: 'number', unit: 'seconds' },
+    ],
+  };
+
+  it('edits bytes in MB and saves bytes', async () => {
+    const user = userEvent.setup();
+    const { bodies } = stubSave();
+    renderAdmin(
+      <ConfigGroupForm
+        descriptor={sized}
+        values={{ maxBytes: 10 * 1024 * 1024, ttl: 600 }}
+        route={saveRoute}
+      />,
+    );
+
+    const box = screen.getByLabelText('上传上限');
+    expect(box).toHaveValue('10.00');
+    expect(screen.getByText('MB')).toBeInTheDocument();
+    expect(screen.getByText('秒')).toBeInTheDocument();
+    await user.clear(box);
+    await user.type(box, '2.5');
+    await user.click(screen.getByRole('button', { name: zhName('保存') }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect((bodies[0] as { values: Record<string, unknown> }).values).toEqual({
+      maxBytes: 2.5 * 1024 * 1024,
+      ttl: 600,
+    });
+  });
+});
+
+describe('<ConfigGroupForm> 测试', () => {
+  const testRoute = defineRoute({
+    id: 'test.configTest',
+    method: 'POST',
+    path: '/admin-api/config/:group/test',
+    auth: 'admin',
+    permission: 'test:config:save',
+    summary: '测试配置',
+    tags: ['test'],
+    params: z.object({ group: z.string() }),
+    body: z.object({
+      values: z.record(z.string(), z.unknown()),
+      input: z.record(z.string(), z.unknown()),
+    }),
+    response: z.object({
+      ok: z.boolean(),
+      steps: z.array(
+        z.object({
+          name: z.string(),
+          ok: z.boolean(),
+          detail: z.string().optional(),
+          ms: z.number().optional(),
+        }),
+      ),
+    }),
+    examples: [
+      {
+        name: 'ok',
+        params: { group: 'demo' },
+        body: { values: {}, input: {} },
+        response: { ok: true, steps: [] },
+      },
+    ],
+  });
+
+  const testable: ConfigGroupDescriptor = {
+    ...descriptor,
+    test: {
+      label: '发送测试短信',
+      confirm: '会真实发送一条短信',
+      inputs: [{ key: 'phone', label: '接收手机号', kind: 'text' }],
+    },
+  };
+
+  it('asks first, then tests the unsaved form and shows each step', async () => {
+    const user = userEvent.setup();
+    const bodies: unknown[] = [];
+    stubRoutes([
+      on(saveRoute, () => ({ ok: true })),
+      on(testRoute, (call) => {
+        bodies.push(call.body);
+        return {
+          ok: false,
+          steps: [
+            { name: '检查配置', ok: true, detail: '腾讯云', ms: 0 },
+            { name: '发送验证码短信', ok: false, detail: 'FailedOperation.SignatureIncorrect' },
+          ],
+        };
+      }),
+    ]);
+    renderAdmin(
+      <ConfigGroupForm
+        descriptor={testable}
+        values={values}
+        route={saveRoute}
+        testRoute={testRoute}
+      />,
+    );
+
+    await user.type(screen.getByLabelText('站点名称'), '2');
+    await user.type(screen.getByTestId('secret-input-smsSecret'), 'typed-key');
+    await user.click(screen.getByRole('button', { name: zhName('发送测试短信') }));
+    await user.type(screen.getByLabelText('接收手机号'), '13800138000');
+    await user.click(screen.getByRole('button', { name: zhName('开始测试') }));
+    // The warning comes first; nothing has been sent yet.
+    expect(screen.getByText('会真实发送一条短信')).toBeInTheDocument();
+    expect(bodies).toHaveLength(0);
+
+    await user.click(screen.getByRole('button', { name: zhName('确定，开始测试') }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({
+      values: { siteName: '示例商城2', smsSecret: 'typed-key', mode: 'express' },
+      input: { phone: '13800138000' },
+    });
+    expect(await screen.findByText('测试未通过')).toBeInTheDocument();
+    expect(screen.getByText('FailedOperation.SignatureIncorrect')).toBeInTheDocument();
+    // Testing saved nothing.
+    expect(screen.getByTestId('config-dirty-state')).toHaveTextContent('已修改 2 项');
+  });
+
+  it('offers no 测试 button without a test route', () => {
+    stubSave();
+    renderAdmin(<ConfigGroupForm descriptor={testable} values={values} route={saveRoute} />);
+    expect(screen.queryByRole('button', { name: zhName('发送测试短信') })).toBeNull();
   });
 });

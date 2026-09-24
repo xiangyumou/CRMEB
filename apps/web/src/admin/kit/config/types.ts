@@ -8,7 +8,21 @@
  */
 
 export type ConfigFieldKind =
-  'text' | 'password' | 'number' | 'money' | 'switch' | 'select' | 'textarea' | 'asset' | 'json';
+  | 'text'
+  | 'password'
+  | 'number'
+  | 'money'
+  | 'switch'
+  | 'select'
+  | 'textarea'
+  | 'asset'
+  | 'json'
+  | 'color'
+  | 'richtext'
+  | 'url';
+
+/** What a `number` counts. `bytes` is edited in MB and stored in bytes. */
+export type ConfigFieldUnit = 'seconds' | 'minutes' | 'hours' | 'days' | 'ms' | 'bytes' | 'items';
 
 export interface ConfigSelectOption {
   label: string;
@@ -52,8 +66,19 @@ export interface ConfigFieldDescriptor {
   max?: number | undefined;
   /** `number` only. */
   min?: number | undefined;
+  /** `number` only: shown as a suffix; `bytes` is edited in MB. */
+  unit?: ConfigFieldUnit | undefined;
   /** Width out of 24 at `md`+. Defaults to the form's `columns` setting. */
   span?: number | undefined;
+}
+
+/** The group's 「测试」 button. The hook runs on the server. */
+export interface ConfigTestDescriptor {
+  label: string;
+  /** Asked before running, when the test costs money or reaches a real person. */
+  confirm?: string | undefined;
+  /** Filled in by the operator before running, e.g. the phone to text. */
+  inputs: ConfigFieldDescriptor[];
 }
 
 export interface ConfigGroupDescriptor {
@@ -62,6 +87,7 @@ export interface ConfigGroupDescriptor {
   title: string;
   description?: string | undefined;
   fields: ConfigFieldDescriptor[];
+  test?: ConfigTestDescriptor | undefined;
 }
 
 /**
@@ -110,4 +136,35 @@ export function buildConfigPayload(
     payload[field.key] = formValues[field.key];
   }
   return payload;
+}
+
+/** `undefined`, `null` and `''` are all "nothing there" to an operator. */
+function sameValue(a: unknown, b: unknown): boolean {
+  const blank = (v: unknown) => v === undefined || v === null || v === '';
+  if (blank(a) && blank(b)) return true;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * The keys whose value on the screen differs from the saved one: every visible,
+ * writable field, plus each secret the operator typed something into.
+ */
+export function changedConfigKeys(
+  descriptor: ConfigGroupDescriptor,
+  formValues: ConfigValues,
+  saved: ConfigValues | undefined,
+  secrets: Record<string, string>,
+): string[] {
+  const out: string[] = [];
+  for (const field of descriptor.fields) {
+    if (field.readOnly === true) continue;
+    if (field.kind === 'password') {
+      if ((secrets[field.key] ?? '') !== '') out.push(field.key);
+      continue;
+    }
+    if (!isConfigFieldVisible(field, formValues)) continue;
+    if (!(field.key in formValues)) continue;
+    if (!sameValue(formValues[field.key], saved?.[field.key])) out.push(field.key);
+  }
+  return out;
 }

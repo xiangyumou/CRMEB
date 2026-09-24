@@ -21,6 +21,8 @@ const LOCAL_ONLY: ConfigVisibleWhen = { key: 'driver', equals: 'local' };
 export const storageConfig = defineConfigGroup({
   group: 'storage',
   title: '存储设置',
+  description: '上传驱动（本地 / S3）、大小上限与扫码上传。',
+  category: 'integration',
   permission: 'system:config:read',
   schema: z.object({
     driver: z.enum(['local', 's3']).default('local'),
@@ -145,14 +147,16 @@ export const storageConfig = defineConfigGroup({
     },
 
     maxUploadBytes: {
-      label: '后台上传大小上限（字节）',
+      label: '后台上传大小上限',
       type: 'number',
+      unit: 'bytes',
       section: '限制',
       order: 30,
     },
     maxUserUploadBytes: {
-      label: '用户上传大小上限（字节）',
+      label: '用户上传大小上限',
       type: 'number',
+      unit: 'bytes',
       section: '限制',
       order: 31,
     },
@@ -164,8 +168,9 @@ export const storageConfig = defineConfigGroup({
     },
 
     scanTokenTtlSeconds: {
-      label: '扫码上传有效期（秒）',
+      label: '扫码上传有效期',
       type: 'number',
+      unit: 'seconds',
       section: '扫码',
       order: 40,
     },
@@ -178,14 +183,16 @@ export const storageConfig = defineConfigGroup({
     },
 
     remoteImportMaxBytes: {
-      label: '网址导入大小上限（字节）',
+      label: '网址导入大小上限',
       type: 'number',
+      unit: 'bytes',
       section: '网址导入',
       order: 50,
     },
     remoteImportTimeoutMs: {
-      label: '网址导入超时（毫秒）',
+      label: '网址导入超时',
       type: 'number',
+      unit: 'ms',
       section: '网址导入',
       order: 51,
     },
@@ -200,6 +207,7 @@ export const storageConfig = defineConfigGroup({
     orphanRetentionDays: {
       label: '孤儿素材保留天数',
       type: 'number',
+      unit: 'days',
       section: '清理',
       help: '0 表示不自动清理',
       order: 60,

@@ -78,7 +78,14 @@ export async function resolveSender(ctx: Ctx): Promise<SmsSender> {
   const registered = getSmsSenderOverride();
   if (registered) return registered;
 
-  const config = await ctx.config.get(smsConfig);
+  return senderFor(ctx, await ctx.config.get(smsConfig));
+}
+
+/**
+ * The provider a given set of `sms` values names — the stored ones, or the
+ * unsaved form 「测试」 runs against.
+ */
+export function senderFor(ctx: Pick<Ctx, 'clock'>, config: SmsConfigValues): SmsSender {
   if (!smsProviderConfigured(config)) return nullSmsSender;
   if (config.provider === 'aliyun') {
     return createAliyunSmsSender({

@@ -24,6 +24,8 @@ import { defineConfigGroup } from '../kernel/config-registry';
 export const wechatOaRuntimeConfig = defineConfigGroup({
   group: 'wechat-oa-runtime',
   title: '公众号行为',
+  description: 'JS-SDK 授权域名、扫码去重与模板消息 ID。',
+  category: 'wechat',
   permission: 'system:config:read',
   schema: z.object({
     /**
@@ -59,8 +61,9 @@ export const wechatOaRuntimeConfig = defineConfigGroup({
       order: 10,
     },
     scanDedupeSeconds: {
-      label: '扫码去重窗口（秒）',
+      label: '扫码去重窗口',
       type: 'number',
+      unit: 'seconds',
       section: '渠道码',
       order: 20,
     },

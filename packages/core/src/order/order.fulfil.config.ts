@@ -12,6 +12,8 @@ import { defineConfigGroup } from '../kernel/config-registry';
 export const orderFulfilConfig = defineConfigGroup({
   group: 'order-fulfil',
   title: '发货与收货设置',
+  description: '自动确认收货、评价期与订单导出上限。',
+  category: 'trade',
   schema: z.object({
     /**
      * Days a shipped order waits before the system confirms receipt for the
@@ -33,6 +35,7 @@ export const orderFulfilConfig = defineConfigGroup({
     autoReceiveDays: {
       label: '自动确认收货天数',
       type: 'number',
+      unit: 'days',
       help: '发货后超过该天数，系统自动确认收货',
       section: '发货收货',
     },
@@ -45,6 +48,7 @@ export const orderFulfilConfig = defineConfigGroup({
     reviewWindowDays: {
       label: '评价期天数',
       type: 'number',
+      unit: 'days',
       help: '确认收货后超过该天数订单变为已完成，填 0 表示确认收货即完成',
       section: '发货收货',
     },

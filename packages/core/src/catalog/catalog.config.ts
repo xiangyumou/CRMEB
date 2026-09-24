@@ -17,6 +17,8 @@ import { defineConfigGroup } from '../kernel/config-registry';
 export const catalogConfig = defineConfigGroup({
   group: 'catalog',
   title: '商品设置',
+  description: '库存预警、自动好评、搜索热词与足迹。',
+  category: 'rules',
   permission: 'catalog:product:read',
   schema: z.object({
     /**
@@ -69,6 +71,7 @@ export const catalogConfig = defineConfigGroup({
     autoReviewDays: {
       label: '自动好评天数',
       type: 'number',
+      unit: 'days',
       help: '订单完成后多少天未评价则自动给出好评；填 0 关闭。',
       section: '评价',
       order: 10,
@@ -90,6 +93,7 @@ export const catalogConfig = defineConfigGroup({
     hotKeywordDays: {
       label: '热词统计天数',
       type: 'number',
+      unit: 'days',
       help: '热门搜索词按最近多少天的搜索记录统计。',
       section: '搜索',
       order: 20,
@@ -98,6 +102,7 @@ export const catalogConfig = defineConfigGroup({
     browseHistoryDays: {
       label: '足迹保留天数',
       type: 'number',
+      unit: 'days',
       help: '超过该天数的浏览记录会被定时任务清理。',
       section: '搜索',
       order: 40,

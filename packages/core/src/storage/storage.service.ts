@@ -24,6 +24,7 @@ import {
 import type { Tx } from '@shop/db';
 import { sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
+import type { z } from 'zod';
 import type { Ctx } from '../kernel/context';
 import { requireAdminId, requireUserId } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
@@ -100,21 +101,29 @@ export async function resolveStorage(ctx: Ctx): Promise<ResolvedStorage> {
   ].join('|');
 
   if (!s3Cache || s3Cache.signature !== signature) {
-    s3Cache = {
-      signature,
-      storage: createS3Storage({
-        bucket: settings.s3Bucket,
-        region: settings.s3Region,
-        endpoint: settings.s3Endpoint === '' ? undefined : settings.s3Endpoint,
-        accessKeyId: settings.s3AccessKeyId,
-        secretAccessKey: settings.s3SecretAccessKey,
-        publicBaseUrl: settings.s3PublicBaseUrl,
-        addressing: settings.s3Addressing,
-        now: () => ctx.clock.now(),
-      }),
-    };
+    s3Cache = { signature, storage: s3StorageFor(ctx, settings) };
   }
   return { storage: s3Cache.storage, driver: 's3', bucket: settings.s3Bucket };
+}
+
+/**
+ * An S3 client for a given set of `storage` values, not memoised — the stored
+ * ones through `resolveStorage`, or the unsaved form 「测试」 runs against.
+ */
+export function s3StorageFor(
+  ctx: Pick<Ctx, 'clock'>,
+  settings: z.infer<typeof storageConfig.schema>,
+): Storage {
+  return createS3Storage({
+    bucket: settings.s3Bucket,
+    region: settings.s3Region,
+    endpoint: settings.s3Endpoint === '' ? undefined : settings.s3Endpoint,
+    accessKeyId: settings.s3AccessKeyId,
+    secretAccessKey: settings.s3SecretAccessKey,
+    publicBaseUrl: settings.s3PublicBaseUrl,
+    addressing: settings.s3Addressing,
+    now: () => ctx.clock.now(),
+  });
 }
 
 /** Test helper: forgets the memoised S3 client. */

@@ -35,6 +35,8 @@ const configText = (max: number) => z.string().max(max).default('');
 export const wechatConfig = defineConfigGroup({
   group: 'wechat',
   title: '微信公众号 / 小程序',
+  description: '公众号与小程序的 AppID、AppSecret 与消息加解密。',
+  category: 'wechat',
   permission: 'payment:config:write',
   schema: z.object({
     oaAppId: configText(64),

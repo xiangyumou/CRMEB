@@ -14,6 +14,8 @@ import { defineConfigGroup } from '../kernel/config-registry';
 export const contentSecurityConfig = defineConfigGroup({
   group: 'content-security',
   title: '内容安全',
+  description: '用户提交的文字与图片是否先经过微信内容安全检测。',
+  category: 'wechat',
   permission: 'payment:config:write',
   schema: z.object({
     enabled: z.boolean().default(true),

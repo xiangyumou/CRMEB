@@ -16,6 +16,8 @@ import { defineConfigGroup } from '../kernel/config-registry';
 export const agreementConfig = defineConfigGroup({
   group: 'agreement',
   title: '协议与条款',
+  description: '用户协议、隐私政策、注销协议的标题与正文。',
+  category: 'basic',
   permission: 'system:config:read',
   schema: z.object({
     userTitle: z.string().max(64).default('用户服务协议'),

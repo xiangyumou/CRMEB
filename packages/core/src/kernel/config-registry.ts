@@ -31,7 +31,19 @@ export type ConfigFieldType =
   | 'images'
   | 'file'
   | 'password'
-  | 'json';
+  | 'json'
+  | 'color'
+  | 'richtext'
+  | 'url';
+
+/**
+ * What a `number` field counts. The form shows it as a suffix, and `bytes`
+ * is edited in MB and stored in bytes, so nobody types 10485760.
+ */
+export type ConfigFieldUnit = 'seconds' | 'minutes' | 'hours' | 'days' | 'ms' | 'bytes' | 'items';
+
+/** Where a group sits on the settings index. */
+export type ConfigGroupCategory = 'basic' | 'wechat' | 'trade' | 'integration' | 'rules';
 
 /**
  * Data-only conditional visibility: render the field when `values[key]` matches.
@@ -90,12 +102,18 @@ export interface ConfigFieldUi {
   source?: string;
   /** Display order inside the section; ties fall back to declaration order. */
   order?: number;
+  /** `number` only. */
+  unit?: ConfigFieldUnit;
 }
 
 export interface ConfigGroupDef<S extends z.ZodObject = z.ZodObject> {
   /** Stable group name; also the `config_values.group` value. Domain-named. */
   group: string;
   title: string;
+  /** One line under the title, on the index card and the screen. */
+  description?: string;
+  /** Which block of the settings index the group is listed under. Default `rules`. */
+  category?: ConfigGroupCategory;
   schema: S;
   ui: Partial<Record<keyof z.infer<S> & string, ConfigFieldUi>>;
   /** Permission atom required to read/write this group in the admin UI. */

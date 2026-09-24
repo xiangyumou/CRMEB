@@ -34,6 +34,8 @@ const configText = (max: number) => z.string().max(max).default('');
 export const refundConfig = defineConfigGroup({
   group: 'refund',
   title: '售后设置',
+  description: '退货收件信息与售后期限。',
+  category: 'trade',
   permission: 'refund:config:read',
   schema: z.object({
     /** Consignee for returned goods. Empty means "no address configured yet". */
@@ -51,8 +53,9 @@ export const refundConfig = defineConfigGroup({
     returnPhone: { label: '退货联系电话', type: 'text', section: '售后', order: 20 },
     returnAddress: { label: '退货地址', type: 'textarea', section: '售后', order: 30 },
     afterSaleDays: {
-      label: '售后期限（天）',
+      label: '售后期限',
       type: 'number',
+      unit: 'days',
       help: '0 表示不限制',
       section: '售后',
       order: 40,

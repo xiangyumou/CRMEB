@@ -16,9 +16,9 @@ import { defineConfigGroup, type ConfigFieldUi } from '../kernel/config-registry
  * Named with a hyphen because a group name is `[a-z][a-z0-9-]` (it is also the
  * `config_values.group` value and a URL segment on the settings screen).
  *
- * **Colours are text fields validated as `#RRGGBB`** (`hexColor`): the config
- * registry has no colour kind, and the mini-program's own tab-bar API accepts
- * that form and no other. A value in any other form is refused on save
+ * **Colours are `color` fields validated as `#RRGGBB`** (`hexColor`): the
+ * picker emits that form, and the mini-program's own tab-bar API accepts it
+ * and no other. A value in any other form is refused on save
  * (`VALIDATION_FAILED`), never stored and "fixed up" on the way out.
  *
  * **Every field has a default**, and the defaults are the contract's
@@ -46,6 +46,8 @@ const tabIcon = () => z.string().max(512).default('');
 export const storefrontAppearanceConfig = defineConfigGroup({
   group: 'storefront-appearance',
   title: '小程序外观',
+  description: '主题色、价格色、圆角、底部导航和页面显示开关，右侧实时预览。',
+  category: 'basic',
   permission: 'system:config:read',
   schema: z.object({
     primaryColor: hexColor.default(theme.primaryColor),
@@ -81,33 +83,32 @@ export const storefrontAppearanceConfig = defineConfigGroup({
   ui: {
     primaryColor: {
       label: '主题色',
-      type: 'text',
+      type: 'color',
       placeholder: theme.primaryColor,
-      help: '#RRGGBB，按钮、选中态等',
+      help: '按钮、选中态等',
       section: '主题',
       order: 1,
     },
     primaryContrastColor: {
       label: '主题色上的文字颜色',
-      type: 'text',
+      type: 'color',
       placeholder: theme.primaryContrastColor,
-      help: '#RRGGBB，主题色按钮上的文字和图标',
+      help: '主题色按钮上的文字和图标',
       section: '主题',
       order: 2,
     },
     accentColor: {
       label: '辅助色',
-      type: 'text',
+      type: 'color',
       placeholder: '留空则与主题色相同',
-      help: '#RRGGBB，渐变按钮起点、「加入购物车」按钮；不用于小字',
+      help: '渐变按钮起点、「加入购物车」按钮；不用于小字',
       section: '主题',
       order: 3,
     },
     priceColor: {
       label: '价格颜色',
-      type: 'text',
+      type: 'color',
       placeholder: theme.priceColor,
-      help: '#RRGGBB',
       section: '主题',
       order: 4,
     },
@@ -126,25 +127,22 @@ export const storefrontAppearanceConfig = defineConfigGroup({
 
     tabBarColor: {
       label: '文字颜色',
-      type: 'text',
+      type: 'color',
       placeholder: bar.color,
-      help: '#RRGGBB',
       section: '底部导航',
       order: 10,
     },
     tabBarSelectedColor: {
       label: '选中文字颜色',
-      type: 'text',
+      type: 'color',
       placeholder: bar.selectedColor,
-      help: '#RRGGBB',
       section: '底部导航',
       order: 11,
     },
     tabBarBackgroundColor: {
       label: '背景颜色',
-      type: 'text',
+      type: 'color',
       placeholder: bar.backgroundColor,
-      help: '#RRGGBB',
       section: '底部导航',
       order: 12,
     },

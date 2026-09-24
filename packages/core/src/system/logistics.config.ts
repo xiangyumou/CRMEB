@@ -21,6 +21,8 @@ const TRACKING_ON: ConfigVisibleWhen = { key: 'provider', equals: 'aliyun-market
 export const logisticsConfig = defineConfigGroup({
   group: 'logistics',
   title: '物流设置',
+  description: '物流轨迹查询服务与默认发件人。',
+  category: 'integration',
   permission: 'system:config:read',
   schema: z.object({
     /** `none` disables the 物流跟踪 tab rather than showing an empty one. */
@@ -52,8 +54,9 @@ export const logisticsConfig = defineConfigGroup({
       order: 2,
     },
     cacheMinutes: {
-      label: '查询结果缓存（分钟）',
+      label: '查询结果缓存',
       type: 'number',
+      unit: 'minutes',
       visibleWhen: TRACKING_ON,
       order: 4,
     },

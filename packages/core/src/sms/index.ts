@@ -17,12 +17,14 @@
  * domain's `storefront-auth` group and arrive as arguments.
  */
 import { registerSiteAuthMethod, smsConfig } from '../system';
+import { registerSmsConfigTest } from './sms.config-test';
 import { smsSenderUsable } from './sms.service';
 
 export {
   sendVerificationCode,
   verifyCode,
   resolveSender,
+  senderFor,
   smsProviderConfigured,
   smsSenderUsable,
 } from './sms.service';
@@ -61,4 +63,5 @@ export {
  */
 export function registerSmsDomain(): void {
   registerSiteAuthMethod('phone', { groups: [smsConfig.group], isEnabled: smsSenderUsable });
+  registerSmsConfigTest();
 }

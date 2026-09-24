@@ -40,6 +40,8 @@ export type MiniCodeEnvVersion = z.infer<typeof miniCodeEnvVersion>;
 export const wechatMiniConfig = defineConfigGroup({
   group: 'wechat-mini',
   title: '微信小程序',
+  description: '小程序开关、名称、客服方式与小程序码版本。',
+  category: 'wechat',
   permission: 'system:config:read',
   schema: z.object({
     enabled: z.boolean().default(false),

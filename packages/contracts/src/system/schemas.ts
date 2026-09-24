@@ -347,8 +347,26 @@ export const configFieldKind = z.enum([
   'password',
   'json',
   'asset',
+  'color',
+  'richtext',
+  'url',
 ]);
 export type ConfigFieldKind = z.infer<typeof configFieldKind>;
+
+/** What a `number` counts; `bytes` is edited in MB and stored in bytes. */
+export const configFieldUnit = z.enum([
+  'seconds',
+  'minutes',
+  'hours',
+  'days',
+  'ms',
+  'bytes',
+  'items',
+]);
+export type ConfigFieldUnit = z.infer<typeof configFieldUnit>;
+
+export const configGroupCategory = z.enum(['basic', 'wechat', 'trade', 'integration', 'rules']);
+export type ConfigGroupCategory = z.infer<typeof configGroupCategory>;
 
 export const configSelectOption = z.object({
   label: z.string(),
@@ -380,24 +398,47 @@ export const configFieldDescriptor = z.object({
    * `CONFIG_FIELD_READ_ONLY`.
    */
   readOnly: z.boolean().optional(),
+  /** `number` only. */
+  unit: configFieldUnit.optional(),
 });
 export type ConfigFieldDescriptor = z.infer<typeof configFieldDescriptor>;
+
+/**
+ * The group's 「测试」 button, when it has one. The hook itself stays on the
+ * server; this is what the screen needs to offer it.
+ */
+export const configTestDescriptor = z.object({
+  label: z.string(),
+  /** Asked before running: the test costs money or reaches a real person. */
+  confirm: z.string().optional(),
+  /** Filled in by the operator before running, e.g. the phone to text. */
+  inputs: z.array(configFieldDescriptor),
+});
+export type ConfigTestDescriptor = z.infer<typeof configTestDescriptor>;
 
 export const configGroupDescriptor = z.object({
   group: z.string(),
   title: z.string(),
   description: z.string().optional(),
+  category: configGroupCategory.optional(),
   /** Permission atom required to read and to write this group. */
   permission: z.string(),
   fields: z.array(configFieldDescriptor),
+  test: configTestDescriptor.optional(),
 });
 export type ConfigGroupDescriptor = z.infer<typeof configGroupDescriptor>;
 
+/** The last 「测试」 run on a group, kept for a while so the index can show it. */
+export const configTestSummary = z.object({ ok: z.boolean(), at: instant });
+
 /** The list entry; the fields are fetched with the group itself. */
-export const configGroupSummary = configGroupDescriptor.omit({ fields: true }).extend({
+export const configGroupSummary = configGroupDescriptor.omit({ fields: true, test: true }).extend({
   fieldCount: z.number().int().min(0),
   /** False when the caller may see the group exists but not open it. */
   writable: z.boolean(),
+  /** Whether the group has a 「测试」 button at all. */
+  testable: z.boolean().optional(),
+  lastTest: configTestSummary.nullable().optional(),
 });
 export type ConfigGroupSummary = z.infer<typeof configGroupSummary>;
 
@@ -421,6 +462,27 @@ export const configSaveBody = z.object({
   values: z.record(z.string(), z.unknown()),
 });
 export type ConfigSaveBody = z.infer<typeof configSaveBody>;
+
+export const configTestBody = z.object({
+  /** The form as it stands, in the save payload's shape. Nothing is saved. */
+  values: z.record(z.string(), z.unknown()),
+  /** The test's own inputs (`descriptor.test.inputs`). */
+  input: z.record(z.string(), z.unknown()).default({}),
+});
+export type ConfigTestBody = z.infer<typeof configTestBody>;
+
+export const configTestResult = z.object({
+  ok: z.boolean(),
+  steps: z.array(
+    z.object({
+      name: z.string(),
+      ok: z.boolean(),
+      detail: z.string().optional(),
+      ms: z.number().int().min(0).optional(),
+    }),
+  ),
+});
+export type ConfigTestResult = z.infer<typeof configTestResult>;
 
 export const configGroupParams = z.object({
   group: z.string().regex(/^[a-z][a-z0-9-]{1,31}$/, '配置分组名不合法'),
