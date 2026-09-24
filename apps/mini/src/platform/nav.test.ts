@@ -112,9 +112,7 @@ describe('navigate', () => {
     });
 
     it('forgets a failed open, so trying again opens the page', async () => {
-      const spy = vi
-        .spyOn(Taro, 'navigateTo')
-        .mockRejectedValueOnce(new Error('navigateTo:fail'));
+      const spy = vi.spyOn(Taro, 'navigateTo').mockRejectedValueOnce(new Error('navigateTo:fail'));
       await expect(navigate(product)).rejects.toThrow('navigateTo:fail');
       spy.mockRestore();
       await navigate(product);
