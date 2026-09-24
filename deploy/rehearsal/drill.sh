@@ -608,6 +608,10 @@ if labels.get('traefik.http.routers.crmeb-next-https.rule') != 'Host(`drill.inva
 if labels.get('traefik.http.routers.crmeb-next-http.middlewares') != 'crmeb-next-https-redirect' \
         or labels.get('traefik.http.middlewares.crmeb-next-https-redirect.redirectscheme.scheme') != 'https':
     failures.append('with the overlay the http router does not redirect to https')
+# WeChat's mini-program requests on iOS need TLS 1.2; the shared Traefik's
+# default options are 1.3 only (README.md, "The Traefik overlay").
+if labels.get('traefik.http.routers.crmeb-next-https.tls.options') != 'legacy@file':
+    failures.append('with the overlay the https router does not use the TLS 1.2 options (legacy@file)')
 if 'server-internal-net' in (plain.get('networks') or {}):
     failures.append('without the overlay the edge is on server-internal-net')
 if any(key.startswith('traefik.') for key in (plain.get('labels') or {})):

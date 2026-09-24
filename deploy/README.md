@@ -289,6 +289,14 @@ The `web` (plain HTTP) router only redirects to HTTPS, permanently. It must neve
 the session cookies are `Secure` in production, so on `http://` a browser takes the sign-in
 response and drops its cookie, and the admin login appears to fail silently.
 
+The `websecure` router accepts TLS 1.2 as well as 1.3: WeChat's mini-program network stack on iOS
+does not speak TLS 1.3, so against a 1.3-only router every `wx.request` from an iPhone fails at the
+handshake and never reaches the edge (Android and browsers still work, which hides it). It names
+the TLS options `NEXT_TRAEFIK_TLS_OPTIONS`, default `legacy@file`: on this host the shared Traefik's
+`dynamic_conf/tls.yml` defaults to 1.3 only and defines `legacy` as 1.2 minimum with ECDHE + AEAD
+suites. A new host must define an options set like it, or Traefik will not serve the router. Check
+from outside with `curl --tls-max 1.2 -sI https://<NEXT_HOST>/` (expect `HTTP/2 200`).
+
 The overlay is a setting of the deployment, not a step someone remembers. Name it in
 `deployment.env`:
 
