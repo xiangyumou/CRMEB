@@ -2,6 +2,7 @@ import { Image, Text, View } from '@tarojs/components';
 
 import type { UserCardProps } from '@shop/contracts/decor/all-blocks';
 import type { LinkTarget } from '@shop/contracts/decor/link';
+import { BlockImage } from '../shared/block-image';
 import { cx, tapProps } from '../shared/css';
 import { BlockFrame } from '../shared/frame';
 import { ICONS } from '../shared/icons';
@@ -24,6 +25,7 @@ export function UserCard({
   personal,
   onLink,
   onIntent,
+  host,
 }: BlockProps<UserCardProps, undefined, PersonalSlots>) {
   const user = userSummaryIn(personal);
   const stats = user?.stats ?? null;
@@ -42,7 +44,13 @@ export function UserCard({
       className={cx(styles.body, props.background && styles.pictured)}
     >
       {props.background ? (
-        <Image className={styles.background} src={props.background} mode="aspectFill" />
+        <BlockImage
+          className={styles.background}
+          src={props.background}
+          width={750}
+          resolve={host?.resolveImage}
+          mode="aspectFill"
+        />
       ) : null}
       <View className={styles.identity} {...tapProps(tapIdentity || undefined)}>
         <Image className={styles.avatar} src={user?.avatarUrl || ICONS.avatar} mode="aspectFill" />

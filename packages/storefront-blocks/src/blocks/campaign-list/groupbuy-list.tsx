@@ -38,6 +38,7 @@ export function GroupbuyList({
       ) : (
         <CampaignCards
           layout={props.layout}
+          resolveImage={host?.resolveImage}
           cards={campaigns.map((campaign) => ({
             id: campaign.activityId,
             title: campaign.title,

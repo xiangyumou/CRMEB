@@ -1,8 +1,9 @@
-import { Image, Text, View } from '@tarojs/components';
+import { Text, View } from '@tarojs/components';
 
 import type { ArticleListProps } from '@shop/contracts/decor/all-blocks';
 import type { LinkTarget } from '@shop/contracts/decor/link';
 import type { ArticleSummary } from '@shop/contracts/decor/sources';
+import { BlockImage } from '../shared/block-image';
 import { cx, tapProps } from '../shared/css';
 import { BlockFrame } from '../shared/frame';
 import { ListHead } from '../shared/list-head';
@@ -65,9 +66,11 @@ export function ArticleList({
                 )}
               >
                 {card && article.coverImageUrl ? (
-                  <Image
+                  <BlockImage
                     className={styles.cover}
                     src={article.coverImageUrl}
+                    width={750}
+                    resolve={host?.resolveImage}
                     mode="aspectFill"
                     lazyLoad
                   />
@@ -80,9 +83,11 @@ export function ArticleList({
                   <Text className={styles.meta}>{meta}</Text>
                 </View>
                 {!card && article.coverImageUrl ? (
-                  <Image
+                  <BlockImage
                     className={styles.thumb}
                     src={article.coverImageUrl}
+                    width={360}
+                    resolve={host?.resolveImage}
                     mode="aspectFill"
                     lazyLoad
                   />

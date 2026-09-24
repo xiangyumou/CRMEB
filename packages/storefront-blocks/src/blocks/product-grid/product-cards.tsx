@@ -1,9 +1,11 @@
-import { Image, ScrollView, Text, View } from '@tarojs/components';
+import { ScrollView, Text, View } from '@tarojs/components';
 
 import type { ProductLayout } from '@shop/contracts/decor/constants';
 import type { LinkTarget } from '@shop/contracts/decor/link';
 import type { ProductSummary } from '@shop/contracts/decor/sources';
+import { BlockImage } from '../shared/block-image';
 import { cx, tapProps } from '../shared/css';
+import type { ImageResolver } from '../shared/types';
 import styles from './product-cards.module.scss';
 
 export interface ProductCardsProps {
@@ -14,6 +16,8 @@ export interface ProductCardsProps {
   showMarketPrice: boolean;
   showTag: boolean;
   onLink?: ((target: LinkTarget) => void) | undefined;
+  /** The host's picture resolver (`BlockHost.resolveImage`). */
+  resolveImage?: ImageResolver | undefined;
 }
 
 /** `"129.90"` → `["129", ".90"]`, so the yuan can be drawn larger than the fen. */
@@ -41,8 +45,11 @@ export function ProductCards({
   showMarketPrice,
   showTag,
   onLink,
+  resolveImage,
 }: ProductCardsProps) {
   if (products.length === 0) return <View className={styles.empty}>暂无商品</View>;
+  // Half the screen wide in the two-column grid; a third or less elsewhere.
+  const imageWidth = layout === 'grid2' ? 750 : 360;
   const cards = products.map((product) => {
     const [yuan, fen] = splitPrice(product.price);
     return (
@@ -55,7 +62,14 @@ export function ProductCards({
         {...tapProps(onLink ? () => onLink({ kind: 'product', id: product.id }) : undefined)}
       >
         <View className={styles.media}>
-          <Image className={styles.image} src={product.image} mode="aspectFill" lazyLoad />
+          <BlockImage
+            className={styles.image}
+            src={product.image}
+            width={imageWidth}
+            resolve={resolveImage}
+            mode="aspectFill"
+            lazyLoad
+          />
           {showTag && product.tag ? <Text className={styles.tag}>{product.tag}</Text> : null}
           {product.soldOut ? <View className={styles.soldOutMark}>已售罄</View> : null}
         </View>

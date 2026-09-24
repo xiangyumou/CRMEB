@@ -1,6 +1,7 @@
-import { Image, View } from '@tarojs/components';
+import { View } from '@tarojs/components';
 
 import type { HotspotImageProps } from '@shop/contracts/decor/all-blocks';
+import { BlockImage } from '../shared/block-image';
 import { tapProps } from '../shared/css';
 import { BlockFrame } from '../shared/frame';
 import type { BlockProps } from '../shared/types';
@@ -12,12 +13,20 @@ const pct = (value: number) => `${Math.round(value * 1000) / 1000}%`;
 /**
  * 热区图: the picture at full width (its own ratio), with invisible tap areas
  * laid over it in percent of its size — the same spots at any screen width.
+ * It loads lazily; WeChat starts it a few screens ahead of the viewport.
  */
-export function HotspotImage({ props, onLink }: BlockProps<HotspotImageProps>) {
+export function HotspotImage({ props, onLink, host }: BlockProps<HotspotImageProps>) {
   return (
     <BlockFrame type="hotspotImage" frame={props.style}>
       <View className={styles.stage}>
-        <Image className={styles.image} src={props.image} mode="widthFix" />
+        <BlockImage
+          className={styles.image}
+          src={props.image}
+          width={750}
+          resolve={host?.resolveImage}
+          mode="widthFix"
+          lazyLoad={!host?.canvas}
+        />
         {props.hotspots.map((spot, index) => {
           const link = spot.link;
           return (

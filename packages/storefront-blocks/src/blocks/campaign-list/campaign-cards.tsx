@@ -1,8 +1,10 @@
-import { Image, ScrollView, Text, View } from '@tarojs/components';
+import { ScrollView, Text, View } from '@tarojs/components';
 import type { ReactNode } from 'react';
 
 import type { CampaignListLayout } from '@shop/contracts/decor/constants';
+import { BlockImage } from '../shared/block-image';
 import { cx, tapProps } from '../shared/css';
+import type { ImageResolver } from '../shared/types';
 import { splitPrice } from '../product-grid/product-cards';
 import styles from './campaign-cards.module.scss';
 
@@ -32,9 +34,12 @@ export interface CampaignCard {
 export function CampaignCards({
   cards,
   layout,
+  resolveImage,
 }: {
   cards: readonly CampaignCard[];
   layout: CampaignListLayout;
+  /** The host's picture resolver (`BlockHost.resolveImage`). */
+  resolveImage?: ImageResolver | undefined;
 }) {
   const items = cards.map((card) => {
     const [yuan, fen] = splitPrice(card.price);
@@ -46,7 +51,14 @@ export function CampaignCards({
       <View key={card.id} className={styles.card} data-campaign={card.id} {...tapProps(card.onTap)}>
         <View className={styles.media}>
           {card.imageUrl ? (
-            <Image className={styles.image} src={card.imageUrl} mode="aspectFill" lazyLoad />
+            <BlockImage
+              className={styles.image}
+              src={card.imageUrl}
+              width={360}
+              resolve={resolveImage}
+              mode="aspectFill"
+              lazyLoad
+            />
           ) : null}
           {card.badge ? <Text className={styles.badge}>{card.badge}</Text> : null}
         </View>

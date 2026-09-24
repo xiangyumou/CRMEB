@@ -16,6 +16,7 @@ export function ProductGrid({
   props,
   data,
   onLink,
+  host,
 }: BlockProps<ProductGridProps, ProductGridData>) {
   return (
     <BlockFrame type="productGrid" frame={props.style}>
@@ -26,6 +27,7 @@ export function ProductGrid({
         showMarketPrice={props.showMarketPrice}
         showTag={props.showTag}
         onLink={onLink}
+        resolveImage={host?.resolveImage}
       />
     </BlockFrame>
   );

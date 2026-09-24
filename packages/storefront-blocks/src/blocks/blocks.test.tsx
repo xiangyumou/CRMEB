@@ -1,17 +1,19 @@
 import { fireEvent, screen } from '@testing-library/dom';
-import { version } from 'react';
+import { act, version } from 'react';
 import { version as domVersion } from 'react-dom';
 import { afterEach, describe, expect, inject, it, vi } from 'vitest';
 
 import {
   fixtureCarousel,
+  fixtureHotspotImage,
   fixtureImageCube,
   fixtureImageCubeRow,
   fixtureProductGrid,
   fixtureProducts,
 } from '../fixtures';
 import { cleanup, render } from '../test/render';
-import { BlockList, Carousel, ImageCube, ProductGrid } from './index';
+import { BlockList, Carousel, HotspotImage, ImageCube, ProductGrid } from './index';
+import { slidesToLoad } from './carousel/carousel';
 
 afterEach(cleanup);
 
@@ -64,6 +66,104 @@ describe('Carousel', () => {
     one.unmount();
     const off = render(<Carousel props={{ ...fixtureCarousel, indicator: 'none' }} />);
     expect(off.container.querySelector('.sbd-swiper__dots')).toBeNull();
+  });
+});
+
+describe('Carousel lazy slides', () => {
+  const fiveSlides = {
+    ...fixtureCarousel,
+    autoplay: true,
+    interval: 1000,
+    slides: [0, 1, 2, 3, 4].map((n) => ({ ...fixtureCarousel.slides[0]!, image: `/s${n}.jpg` })),
+  };
+  /** Which slides have their picture mounted, by index. */
+  const mounted = (container: HTMLElement) =>
+    [...container.querySelectorAll('.sbd-swiper-item')].map(
+      (slide) => slide.querySelector('img') !== null,
+    );
+
+  it('picks the slide shown and its two neighbours, wrapping around', () => {
+    expect(slidesToLoad(0, 5)).toEqual([0, 1, 4]);
+    expect(slidesToLoad(4, 5)).toEqual([4, 0, 3]);
+    expect(slidesToLoad(0, 1)).toEqual([0]);
+    expect(slidesToLoad(0, 0)).toEqual([]);
+  });
+
+  it('mounts a picture only once its slide is shown or next to it, and keeps it', () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(<Carousel props={fiveSlides} />);
+      // The slides keep their boxes; only the pictures wait.
+      expect(container.querySelectorAll('.sbd-swiper-item')).toHaveLength(5);
+      expect(mounted(container)).toEqual([true, true, false, false, true]);
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(mounted(container)).toEqual([true, true, true, false, true]);
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(mounted(container)).toEqual([true, true, true, true, true]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('mounts every slide in the editor canvas', () => {
+    const { container } = render(<Carousel props={fiveSlides} host={{ canvas: true }} />);
+    expect(mounted(container)).toEqual([true, true, true, true, true]);
+  });
+});
+
+describe('Block pictures', () => {
+  const resolveImage = (src: string, width?: 360 | 750) =>
+    width ? `https://api.test${src}@${width}` : `https://api.test${src}`;
+
+  it('load the copy the host resolves, and the original when the copy fails', () => {
+    const { container } = render(
+      <HotspotImage props={{ ...fixtureHotspotImage, image: '/h.jpg' }} host={{ resolveImage }} />,
+    );
+    const img = () => container.querySelector('img') as HTMLImageElement;
+    expect(img().getAttribute('src')).toBe('https://api.test/h.jpg@750');
+    act(() => {
+      fireEvent.error(img());
+    });
+    expect(img().getAttribute('src')).toBe('https://api.test/h.jpg');
+  });
+
+  it('load the stored URL as it is without a resolver', () => {
+    const { container } = render(
+      <HotspotImage props={{ ...fixtureHotspotImage, image: '/h.jpg' }} />,
+    );
+    expect(container.querySelector('img')?.getAttribute('src')).toBe('/h.jpg');
+  });
+
+  it('ask for the narrow copy in narrow spots', () => {
+    const cells = fixtureImageCubeRow.cells.map((cell, n) => ({ ...cell, image: `/r${n}.jpg` }));
+    const { container } = render(
+      <ImageCube props={{ ...fixtureImageCubeRow, cells }} host={{ resolveImage }} />,
+    );
+    const sources = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src'));
+    expect(sources).toEqual([
+      'https://api.test/r0.jpg@360',
+      'https://api.test/r1.jpg@360',
+      'https://api.test/r2.jpg@360',
+    ]);
+  });
+
+  it('load lazily on the storefront, eagerly in the editor canvas', () => {
+    const lazy = (host?: { canvas: boolean }) => {
+      const { container } = render(
+        <>
+          <ImageCube props={fixtureImageCube} host={host} />
+          <HotspotImage props={fixtureHotspotImage} host={host} />
+        </>,
+      );
+      return [...container.querySelectorAll('img')].map((img) => img.getAttribute('loading'));
+    };
+    expect(lazy()).toEqual(['lazy', 'lazy', 'lazy', 'lazy']);
+    cleanup();
+    expect(lazy({ canvas: true })).toEqual([null, null, null, null]);
   });
 });
 

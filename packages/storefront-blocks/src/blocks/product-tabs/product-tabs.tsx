@@ -21,6 +21,7 @@ export function ProductTabs({
   props,
   data,
   onLink,
+  host,
 }: BlockProps<ProductTabsProps, ProductTabsData>) {
   const [active, setActive] = useState(0);
   const current = Math.min(active, props.tabs.length - 1);
@@ -44,6 +45,7 @@ export function ProductTabs({
         showMarketPrice={props.showMarketPrice}
         showTag={props.showTag}
         onLink={onLink}
+        resolveImage={host?.resolveImage}
       />
     </BlockFrame>
   );
