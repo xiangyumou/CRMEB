@@ -108,13 +108,29 @@ export function openPrivacyContract(): void {
   Taro.openPrivacyContract({});
 }
 
-/** Whether an API error is WeChat refusing for want of privacy consent. */
+function errorText(error: unknown): string {
+  return typeof error === 'object' && error !== null && 'errMsg' in error
+    ? String((error as { errMsg: unknown }).errMsg)
+    : String(error);
+}
+
+/**
+ * Whether an API error is WeChat refusing because the shop's 用户隐私保护指引 on 公众平台 does not
+ * declare the API (`errno` 112, "api scope is not declared in the privacy agreement"). That is a
+ * setup gap no tap of the shopper's can fix, so it must not read as 「未同意隐私保护指引」.
+ */
+export function isPrivacyUndeclared(error: unknown): boolean {
+  const errno = (error as { errno?: unknown } | null)?.errno;
+  return errno === 112 || /not declared|errno.?112/i.test(errorText(error));
+}
+
+/** What the phone-number button says for `errno` 112; an SMS code still works. */
+export const PRIVACY_UNDECLARED_PHONE = '小程序暂未开通一键获取手机号，请使用短信验证码';
+
+/** Whether an API error is WeChat refusing for want of the shopper's privacy consent (`errno` 104). */
 export function isPrivacyRefusal(error: unknown): boolean {
-  const message =
-    typeof error === 'object' && error !== null && 'errMsg' in error
-      ? String((error as { errMsg: unknown }).errMsg)
-      : String(error);
-  return /privacy|errno.?(104|112)/i.test(message);
+  if (isPrivacyUndeclared(error)) return false;
+  return /privacy|errno.?104/i.test(errorText(error));
 }
 
 /** Tests only. */

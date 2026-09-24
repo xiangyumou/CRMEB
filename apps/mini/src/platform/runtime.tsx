@@ -11,6 +11,7 @@ import type {
   PhoneNumberButtonProps,
   SubscribeResult,
 } from './types';
+import { isPrivacyUndeclared, PRIVACY_UNDECLARED_PHONE } from './privacy';
 
 /**
  * The WeChat mini-program: the real `wx.*` APIs through Taro. This is the default module for
@@ -38,6 +39,9 @@ function PhoneNumberButton({ children, className, disabled, onResult }: PhoneNum
         const { code, errMsg: message } = event.detail as { code?: string; errMsg: string };
         const errno = (event.detail as { errno?: number }).errno;
         if (code) onResult({ ok: true, code });
+        else if (isPrivacyUndeclared({ errno, errMsg: message }))
+          // The shop's setup, not the shopper's refusal: 公众平台's 用户隐私保护指引 lacks 手机号.
+          onResult({ ok: false, reason: 'unavailable', message: PRIVACY_UNDECLARED_PHONE });
         else if (errno === 1400001 || /1400001/.test(message))
           onResult({
             ok: false,

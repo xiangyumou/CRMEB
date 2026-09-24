@@ -96,6 +96,7 @@ export const taroFake = {
   phoneNumberDetail: { code: 'fake-phone-code', errMsg: 'getPhoneNumber:ok' } as {
     code?: string;
     errMsg: string;
+    errno?: number;
   },
   /** What a tap on `<Button openType="chooseAvatar">` reports. */
   avatarDetail: { avatarUrl: 'wxfile://tmp/avatar.png', errMsg: 'chooseAvatar:ok' } as {

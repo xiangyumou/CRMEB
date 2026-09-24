@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { taroFake } from '@/test/taro-fake/taro';
+import { isPrivacyRefusal, PRIVACY_UNDECLARED_PHONE } from './privacy';
 import { platform } from './runtime';
 
 const jsapi = {
@@ -63,6 +64,22 @@ describe('weapp platform', () => {
       reason: 'denied',
       message: '已取消授权',
     });
+
+    // errno 112: the shop's 隐私保护指引 lacks 手机号 — not the shopper's refusal, and not English.
+    taroFake.phoneNumberDetail = {
+      errMsg: 'getPhoneNumber:fail api scope is not declared in the privacy agreement',
+      errno: 112,
+    };
+    fireEvent.click(screen.getByRole('button', { name: '手机号' }));
+    expect(onResult).toHaveBeenLastCalledWith({
+      ok: false,
+      reason: 'unavailable',
+      message: PRIVACY_UNDECLARED_PHONE,
+    });
+    expect(isPrivacyRefusal(taroFake.phoneNumberDetail)).toBe(false);
+    expect(
+      isPrivacyRefusal({ errMsg: 'getPhoneNumber:fail privacy permission is not authorized' }),
+    ).toBe(true);
   });
 
   it("opens WeChat's 确认收货 component with its own keys and maps how it ended", async () => {
