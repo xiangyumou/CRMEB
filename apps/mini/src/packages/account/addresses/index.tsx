@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { useInfiniteRouteQuery, useRouteMutation } from '@shop/api-client/react';
 import { useCityTree } from '@/data/cities';
+import { ADDRESS_READS } from '@/data/stale-reads';
 import { maskPhone } from '@/lib/format';
 import { navigate, platform } from '@/platform';
 import { LoginGate } from '@/session/login-card';
@@ -27,8 +28,6 @@ import {
 import { SubmitBar, errorMessage } from '../shared/form';
 import './index.scss';
 
-const INVALIDATE = ['user.addressList', 'user.defaultAddress', 'user.addressDetail'] as const;
-
 /**
  * 收货地址 (`addresses`, pages.md §2.6). 导入微信地址 at the top (C04; a refusal still leaves
  * 新增). 确认订单 picks its address in its own sheet (`features/checkout/address-sheet`), so
@@ -52,9 +51,9 @@ function AddressBook() {
     { enabled: signedIn },
   );
   const tree = useCityTree();
-  const create = useRouteMutation('user.addressCreate', { invalidate: INVALIDATE });
-  const remove = useRouteMutation('user.addressDelete', { invalidate: INVALIDATE });
-  const setDefault = useRouteMutation('user.addressSetDefault', { invalidate: INVALIDATE });
+  const create = useRouteMutation('user.addressCreate', { invalidate: ADDRESS_READS });
+  const remove = useRouteMutation('user.addressDelete', { invalidate: ADDRESS_READS });
+  const setDefault = useRouteMutation('user.addressSetDefault', { invalidate: ADDRESS_READS });
   const [importing, setImporting] = useState(false);
 
   async function importWechat() {
