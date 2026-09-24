@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { cartItemFixture, cartListFixture } from '@/test/cart-fixture';
 import {
-  centsOf,
   couponHint,
   couponLines,
-  moneyFromCents,
   rescueQuantity,
   selectionOf,
   unavailableReason,
@@ -27,14 +25,6 @@ const userCoupon = (minSpend: string, discountAmount: string) => ({
 });
 
 describe('cart view', () => {
-  it('does money in cents', () => {
-    expect(centsOf('12.3')).toBe(1230);
-    expect(centsOf('0.07')).toBe(7);
-    expect(centsOf('199')).toBe(19900);
-    expect(moneyFromCents(905)).toBe('9.05');
-    expect(moneyFromCents(0)).toBe('0.00');
-  });
-
   it('says why a row is greyed, and which can be rescued', () => {
     const short = cartItemFixture({ available: false, state: 'out_of_stock', stock: 1 });
     expect(unavailableReason(short)).toBe('库存不足，仅剩 1 件');

@@ -25,17 +25,9 @@ import { Price } from '@/ui/price';
 import { Sheet } from '@/ui/sheet';
 import { CellSkeleton } from '@/ui/skeleton';
 import { Stepper } from '@/ui/stepper';
+import { REFUND_READS } from '../shared/actions';
 import { fromCents, KIND_TEXT, lineEstimate, toCents } from '../shared/refund';
 import './index.scss';
-
-/** Reads a new request makes stale. */
-const REFUND_READS = [
-  'refund.myList',
-  'refund.applicableItems',
-  'order.detail',
-  'order.list',
-  'order.counts',
-] as const;
 
 const BLOCKED_TEXT: Record<string, string> = {
   REFUND_ALREADY_OPEN: '已有售后处理中',
