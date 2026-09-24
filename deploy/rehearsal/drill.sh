@@ -1421,7 +1421,7 @@ case_ship_locked() {
     }
     sleep 0.1
   done
-  before="$(tree_of "$ship_dir" | grep -v ' data/')"
+  before="$(tree_of "$ship_dir" | grep -v '^data/')"
   web_before="$(container_of web)"
   local code=0
   run_expect 4 "$workdir/ship-locked.log" ship "$ship_sha" || code=1
@@ -1432,7 +1432,7 @@ case_ship_locked() {
   [ "$code" -eq 0 ] || return 1
   check 'it says another release is running' grep -q 'another upgrade or rollback is running' "$workdir/ship-locked.log"
   check 'the rollback on the host says so too' grep -q 'another upgrade or rollback is running' "$workdir/rollback-locked.log"
-  check 'no shipped file changed' [ "$before" = "$(tree_of "$ship_dir" | grep -v ' data/')" ]
+  check 'no shipped file changed' [ "$before" = "$(tree_of "$ship_dir" | grep -v '^data/')" ]
   check 'the stack was not touched' [ "$(container_of web)" = "$web_before" ]
 }
 
