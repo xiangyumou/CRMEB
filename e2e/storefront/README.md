@@ -39,7 +39,7 @@ pnpm --filter @shop/e2e-storefront test
 - 假支付网关的 `appId` 用假小程序的 AppID，因为 `wechat_mini` 的支付记在小程序的 AppID 上
 - 手机上本该由微信完成的三件事交给网关控制面，页面通过 edge 上同源的 `/__e2e/mini/*` 调用：`login-code`（相当于 `wx.login`）、`phone-code`（相当于手机号授权按钮）、`request-payment`（相当于用户在支付弹窗里确认）。只有小程序模式的 edge 转发这些路径
 
-「手机上登录的是哪个微信用户」是测试数据：spec 在页面启动前写入 `localStorage['__shop_mp_emulation__']`（`src/mini.ts` 的 `wechatUser` / `holdPhone`）。设计、覆盖范围和真机检查清单见 `docs/mini/spikes/S4-e2e.md`。
+「手机上登录的是哪个微信用户」是测试数据：spec 在页面启动前写入 `localStorage['__shop_mp_emulation__']`（`src/mini.ts` 的 `wechatUser` / `holdPhone`）。默认这个用户已同意隐私保护指引；要测隐私弹窗，用 `newWechatUser({ privacy: 'undecided' })`，隐私接口前就会弹出真正的 `PrivacySheet`（`specs-mini/login.spec.ts`）。设计、覆盖范围和真机检查清单见 `docs/mini/spikes/S4-e2e.md`。
 
 两个客户端的端口、交接文件和库名互不相同（`CHECKOUT_ID` 对小程序另外派生，交接文件是 `shop-e2e-storefront-mini-<CHECKOUT_ID>.json`，库名默认 `shop_e2e_storefront_mini`），同一个检出里可以同时起两套栈。
 

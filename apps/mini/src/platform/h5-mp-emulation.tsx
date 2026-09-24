@@ -11,6 +11,7 @@ import type {
   SubscribeResult,
 } from './types';
 import type { WechatInvoiceTitle } from './invoice-title-map';
+import { needPrivacyAuthorization, type PrivacyApi } from './privacy';
 
 /**
  * "模拟小程序" (plan §1): the H5 build behaving, towards the server, exactly like the
@@ -27,6 +28,9 @@ import type { WechatInvoiceTitle } from './invoice-title-map';
  *   does after a real payment sheet; the page then polls `payment.status` as it would on a phone.
  * - `openOrderConfirm` (确认收货组件) asks the harness to mark the payment confirmed on the fake
  *   `api.weixin.qq.com`, which the server then reads through `get_order`.
+ * - Privacy (C04): with `privacy: 'undecided'` the first private API (the phone, avatar,
+ *   address and picture pickers here) raises `onNeedPrivacyAuthorization` as WeChat does, so the
+ *   app's own `PrivacySheet` asks; 拒绝 fails that call the way WeChat fails it.
  *
  * Which WeChat user is "holding the phone" is test data: the harness writes it to
  * `localStorage[EMULATION_STORAGE_KEY]` before the app starts. Without one, a random user is
@@ -62,7 +66,17 @@ export interface EmulatedWechatUser {
    * cancels. Default: a fixed company title (`invoice-title.h5.ts`).
    */
   invoiceTitle?: WechatInvoiceTitle | null | undefined;
+  /**
+   * Whether this WeChat user has agreed to the shop's 用户隐私保护指引. Default `agreed`.
+   * `undecided`: the first private API call raises the app's privacy sheet and waits for 同意 or
+   * 拒绝, as WeChat holds it; after 同意 no call asks again (kept in `PRIVACY_STORAGE_KEY`, as
+   * WeChat remembers it), after 拒绝 the next call asks again.
+   */
+  privacy?: 'agreed' | 'undecided' | undefined;
 }
+
+/** Where the emulated WeChat remembers this user's 同意 (the harness's key is rewritten per load). */
+export const PRIVACY_STORAGE_KEY = '__shop_mp_emulation_privacy__';
 
 const DEFAULT_ADDRESS: ChosenAddress = {
   name: '张三',
@@ -109,12 +123,47 @@ async function control<T>(action: string, body: unknown): Promise<T> {
   return (await response.json()) as T;
 }
 
+/** `<taro-button-core>` has no implicit role; say it is a button (e2e finds it by role). */
+const BUTTON_ROLE = { role: 'button' };
+
+/**
+ * WeChat's hold on a private API until the shopper has agreed to the privacy guide: raises
+ * `onNeedPrivacyAuthorization` (the app's listener, `needPrivacyAuthorization`) and resolves
+ * `true` on 同意, `false` on 拒绝. `exposureAuthorization` only says the sheet is showing.
+ */
+export function privacyGate(api: PrivacyApi): Promise<boolean> {
+  if ((emulatedUser().privacy ?? 'agreed') === 'agreed') return Promise.resolve(true);
+  if (window.localStorage.getItem(PRIVACY_STORAGE_KEY) === 'agreed') return Promise.resolve(true);
+  return new Promise((resolve) => {
+    needPrivacyAuthorization(
+      (option) => {
+        if (option.event === 'agree') {
+          window.localStorage.setItem(PRIVACY_STORAGE_KEY, 'agreed');
+          resolve(true);
+        } else if (option.event === 'disagree') {
+          resolve(false);
+        }
+      },
+      { referrer: api },
+    );
+  });
+}
+
+/** What WeChat answers a private API the shopper refused (`errno` 104). */
+const privacyRefused = (api: PrivacyApi) => `${api}:fail privacy permission is not authorized`;
+
 function PhoneNumberButton({ children, className, disabled, onResult }: PhoneNumberButtonProps) {
   return (
     <Button
+      {...BUTTON_ROLE}
       className={className ?? ''}
       disabled={disabled ?? false}
-      onClick={() => {
+      onClick={async () => {
+        if (!(await privacyGate('getPhoneNumber'))) {
+          // What the weapp button reports for this errMsg (runtime.tsx): not a denial.
+          onResult({ ok: false, reason: 'failed', message: privacyRefused('getPhoneNumber') });
+          return;
+        }
         const user = emulatedUser();
         control<{ code: string }>('phone-code', { phone: user.phone }).then(
           ({ code }) => onResult({ ok: true, code }),
@@ -134,7 +183,17 @@ function PhoneNumberButton({ children, className, disabled, onResult }: PhoneNum
 
 function AvatarButton({ children, className, onResult }: AvatarButtonProps) {
   return (
-    <Button className={className ?? ''} onClick={() => void generatedAvatar().then(onResult)}>
+    <Button
+      {...BUTTON_ROLE}
+      className={className ?? ''}
+      onClick={async () => {
+        if (!(await privacyGate('chooseAvatar'))) {
+          onResult({ ok: false, message: privacyRefused('chooseAvatar') });
+          return;
+        }
+        onResult(await generatedAvatar());
+      }}
+    >
       {children}
     </Button>
   );
@@ -166,12 +225,17 @@ export const emulationPlatform: MiniPlatform = {
     for (const id of templateIds) result[id] = answer;
     return Promise.resolve(result);
   },
-  chooseAddress() {
+  async chooseAddress() {
+    // Refused like cancelled: the weapp build returns `null` for both.
+    if (!(await privacyGate('chooseAddress'))) return null;
     const { address } = emulatedUser();
-    return Promise.resolve(address === undefined ? DEFAULT_ADDRESS : address);
+    return address === undefined ? DEFAULT_ADDRESS : address;
   },
   AvatarButton,
-  chooseImages: pickImages,
+  async chooseImages(count) {
+    if (!(await privacyGate('chooseMedia'))) throw new Error(privacyRefused('chooseMedia'));
+    return pickImages(count);
+  },
   uploadFile: uploadWithFetch,
   /**
    * WeChat's 确认收货 page, answered by the test data. Confirming there is between the shopper

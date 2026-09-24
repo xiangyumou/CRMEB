@@ -4,7 +4,7 @@ import { useAppConfig } from '@/app-config';
 import { cx } from '@/lib/cx';
 import { callPhone } from '@/platform';
 import type { ActionBarIcon } from './action-bar';
-import { Button, type ButtonLook } from './button';
+import { Button, H5_BUTTON_ROLE, type ButtonLook } from './button';
 import { toast } from './feedback';
 import { Pressable } from './pressable';
 import './contact-button.scss';
@@ -96,6 +96,7 @@ export function ContactArea({
     return (
       <TaroButton
         className={cx('shop-contact-area', className)}
+        {...H5_BUTTON_ROLE}
         openType="contact"
         sessionFrom={sessionFrom}
         ariaLabel={label}

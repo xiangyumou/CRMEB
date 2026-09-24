@@ -1,4 +1,4 @@
-import { emulatedUser } from './h5-mp-emulation';
+import { emulatedUser, privacyGate } from './h5-mp-emulation';
 import {
   fromWechatInvoiceTitle,
   type ChosenInvoiceTitle,
@@ -22,11 +22,13 @@ const DEFAULT_TITLE: WechatInvoiceTitle = {
  * `invoiceTitle` (`null` = the shopper cancels) or a fixed company title; the H5 preview has no
  * WeChat title book.
  */
-export function chooseInvoiceTitle(): Promise<ChosenInvoiceTitle | null> {
+export async function chooseInvoiceTitle(): Promise<ChosenInvoiceTitle | null> {
   if (process.env.TARO_APP_PLATFORM_EMULATION !== 'mp') {
-    return Promise.reject(new PlatformUnsupportedError('从微信导入发票抬头', 'h5-preview'));
+    throw new PlatformUnsupportedError('从微信导入发票抬头', 'h5-preview');
   }
+  // Refused like cancelled: the weapp build returns `null` for both.
+  if (!(await privacyGate('chooseInvoiceTitle'))) return null;
   const { invoiceTitle } = emulatedUser();
   const raw = invoiceTitle === undefined ? DEFAULT_TITLE : invoiceTitle;
-  return Promise.resolve(raw ? fromWechatInvoiceTitle(raw) : null);
+  return raw ? fromWechatInvoiceTitle(raw) : null;
 }

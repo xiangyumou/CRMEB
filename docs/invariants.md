@@ -1409,9 +1409,10 @@ The home page loads for a signed-in shopper: `GET /api/v1/diy/pages/home` on the
 
 ### SMOKE-004
 
-`GET /api/v1/profile` answers 200 after a sign-in: a password login on the uni-app's H5 build, the silent `wx.login` sign-in in the mini-program (which has no password login).
+`GET /api/v1/profile` answers 200 after a sign-in: a password login on the uni-app's H5 build; in the mini-program, a password login (the login page's 其他方式) and the silent `wx.login` sign-in.
 
 - `e2e/storefront/specs/login.spec.ts::password login reaches an authenticated screen`
+- `e2e/storefront/specs-mini/login.spec.ts::SMOKE-004: 密码登录 under 其他方式 reaches an authenticated screen, and a wrong password is its field's error`
 - `e2e/storefront/specs-mini/login.spec.ts::a WeChat user the shop knows is signed in on opening the app, with no login page`
 
 ### SMOKE-005

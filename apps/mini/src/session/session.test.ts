@@ -228,4 +228,41 @@ describe('session', () => {
       message: '微信服务暂不可用',
     });
   });
+
+  it('signs in with a password from a parked sign-in, as wechat-mini, without a bindToken', async () => {
+    const { serveApi, signInWithPassword, startSession, taroFake, useSession } = await load();
+    const seen = serveApi({
+      'POST /api/v1/auth/sessions/wechat-mini': () => ({ body: phoneRequired }),
+      'POST /api/v1/auth/sessions/password': () => ({
+        status: 201,
+        body: { token: 'pw1', expiresAt: '2026-10-23T00:00:00.000Z', user },
+      }),
+    });
+    await startSession();
+
+    await signInWithPassword('13900000000', 'secret-1');
+
+    expect(useSession.getState().session).toEqual({ status: 'signed-in', token: 'pw1' });
+    expect(taroFake.storage.get('shop.session.token')).toBe('pw1');
+    expect(seen[1]?.body).toEqual({ account: '13900000000', password: 'secret-1' });
+    expect(seen[1]?.headers['X-Client-Platform'] ?? seen[1]?.headers['x-client-platform']).toBe(
+      'wechat-mini',
+    );
+  });
+
+  it('leaves the session alone when the password is refused', async () => {
+    const { serveApi, signInWithPassword, useSession } = await load();
+    serveApi({
+      'POST /api/v1/auth/sessions/password': () => ({
+        status: 401,
+        body: { code: 'AUTH_INVALID_CREDENTIALS', message: '账号或密码不正确' },
+      }),
+    });
+    useSession.setState({ session: { status: 'signed-out' } });
+
+    await expect(signInWithPassword('u7', 'wrong')).rejects.toMatchObject({
+      code: 'AUTH_INVALID_CREDENTIALS',
+    });
+    expect(useSession.getState().session).toEqual({ status: 'signed-out' });
+  });
 });

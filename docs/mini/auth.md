@@ -83,6 +83,36 @@ token 默认 30 天有效（后台「登录保持天数」`sessionTtlDays`）。
 - 409 `AUTH_WECHAT_ALREADY_BOUND`：这个手机号的账号已经绑定了另一个小程序 openid。提示用户，不要自动重试。
 - 403 `USER_DISABLED`：账号已被禁用。
 
+## 密码登录（登录页「其他方式」）
+
+登录页在微信方式下方有「其他方式 · 密码登录」，任何状态都显示（包括 `phone-required`）。表单是「账号」（手机号或账号）和「密码」，
+协议仍须先勾选；「忘记密码」进找回密码页，「使用微信登录」回到微信方式。
+
+1. `POST /api/v1/auth/sessions/password`，body `{ account, password }`（账号去掉首尾空格）。
+2. 成功直接得到 `session`，保存 token，状态变为 `signed-in`；挂起的 `phone-required`（`bindToken`）就此丢弃。
+3. 401 `AUTH_INVALID_CREDENTIALS`（「账号或密码不正确」，账号不存在也是这句）显示在密码框下；这个 401 请求没带 token，不触发续期。
+   `AUTH_CAPTCHA_REQUIRED` / `AUTH_CAPTCHA_INVALID`：小程序没有滑块，提示「尝试次数较多，请稍后再试或使用短信验证码登录」。
+   其他错误（429、403 `USER_DISABLED`）直接提示 `message`。
+
+**不关联 openid。** `auth.passwordLogin` 不接受 `bindToken`（计划第 5 节「`auth.smsLogin`、`auth.passwordLogin` 改契约」那一行没有做），
+也没有「已登录后关联小程序 openid」的接口，所以密码登录不会让下次启动变成静默登录：
+
+- token 在 `sessionTtlDays` 内照常使用；
+- 到期后的 401 续期走 `wx.login`：这个 openid 没绑定过，就回到 `phone-required`（登录页）；已绑定到另一个账号时，会登录到**那个**账号。
+
+要让密码登录也绑定 openid，需要后端二选一：给 `auth.passwordLogin` 加可选 `bindToken`（校验密码后在 core 里关联身份），或加一个
+已登录调用的「关联小程序 openid」接口（body `{ code }`）。
+
+## 隐私保护指引
+
+`installPrivacyHandler` 注册 `wx.onNeedPrivacyAuthorization`：第一次调用隐私接口（手机号、头像、选地址、选图、发票抬头）前，
+微信回调它，页面上的 `<PrivacySheet>` 弹出；「同意」放行这次调用，「拒绝」让这次调用失败（`errMsg` 含
+`privacy permission is not authorized`）。登录页把这种失败提示为「未同意隐私保护指引，可改用短信验证码登录」，`bindToken` 不受影响，
+再点一次会再弹。
+
+H5「模拟小程序」模拟同一个流程：emulation 数据 `privacy: 'undecided'` 时，这几个接口先调同一个处理函数
+（`needPrivacyAuthorization`），同意后记在 `localStorage` 里；默认 `'agreed'`，不弹。真机上的行为不变。
+
 ## 已登录后再绑定手机号
 
 通过其他方式登录、还没有手机号的用户，在个人中心点「微信授权手机号」：`POST /api/v1/auth/phone/wechat-mini`，body

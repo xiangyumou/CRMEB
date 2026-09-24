@@ -32,7 +32,8 @@ export const PRIVACY_PURPOSES: Readonly<Record<PrivacyApi, { item: string; purpo
 /** The agree button's id: `resolve({ event: 'agree', buttonId })` must name the tapped button. */
 export const PRIVACY_AGREE_BUTTON_ID = 'privacy-agree';
 
-type Resolve = Parameters<Parameters<typeof Taro.onNeedPrivacyAuthorization>[0]>[0];
+/** The `resolve` WeChat hands the listener. */
+export type PrivacyResolve = Parameters<Parameters<typeof Taro.onNeedPrivacyAuthorization>[0]>[0];
 
 interface PrivacyPromptState {
   open: boolean;
@@ -47,7 +48,7 @@ export const usePrivacyPrompt = create<PrivacyPromptState>()(() => ({
 }));
 
 /** Every `resolve` WeChat handed us since the sheet opened; each is called exactly once. */
-let pending: Resolve[] = [];
+let pending: PrivacyResolve[] = [];
 let installed = false;
 
 function purposeOf(referrer: string | undefined): string | null {
@@ -56,25 +57,32 @@ function purposeOf(referrer: string | undefined): string | null {
 }
 
 /**
- * Registers the one `onNeedPrivacyAuthorization` listener (at launch). A private API called
- * before the shopper agreed is held by WeChat until we resolve; the sheet asks. A second call
- * while the sheet is up joins the first: one sheet, and each call's `resolve` runs once.
+ * The `onNeedPrivacyAuthorization` listener. A private API called before the shopper agreed is
+ * held by WeChat until we resolve; the sheet asks. A second call while the sheet is up joins the
+ * first: one sheet, and each call's `resolve` runs once. Exported for the H5 "模拟小程序"
+ * (`h5-mp-emulation.tsx`), which raises it the way WeChat does; nothing else calls it.
  */
+export function needPrivacyAuthorization(
+  resolve: PrivacyResolve,
+  eventInfo?: { referrer?: string } | undefined,
+): void {
+  pending.push(resolve);
+  if (usePrivacyPrompt.getState().open) return;
+  usePrivacyPrompt.setState({ open: true, purpose: purposeOf(eventInfo?.referrer) });
+  resolve({ event: 'exposureAuthorization' });
+}
+
+/** Registers the one `onNeedPrivacyAuthorization` listener (at launch). */
 export function installPrivacyHandler(): void {
   if (installed) return;
   installed = true;
   // C14: older base libraries have no such API; there the platform shows its own dialog.
   if (typeof Taro.onNeedPrivacyAuthorization !== 'function') return;
   if (typeof Taro.canIUse === 'function' && !Taro.canIUse('onNeedPrivacyAuthorization')) return;
-  Taro.onNeedPrivacyAuthorization((resolve, eventInfo) => {
-    pending.push(resolve);
-    if (usePrivacyPrompt.getState().open) return;
-    usePrivacyPrompt.setState({ open: true, purpose: purposeOf(eventInfo?.referrer) });
-    resolve({ event: 'exposureAuthorization' });
-  });
+  Taro.onNeedPrivacyAuthorization(needPrivacyAuthorization);
 }
 
-function settle(option: Parameters<Resolve>[0]): void {
+function settle(option: Parameters<PrivacyResolve>[0]): void {
   const resolvers = pending;
   pending = [];
   usePrivacyPrompt.setState({ open: false, purpose: null });
