@@ -56,6 +56,7 @@ describe('calling an operation', () => {
   it('fills the path and repeats array keys in the query', () => {
     expect(fillPath('/admin-api/roles/:id', { id: '3' })).toBe('/admin-api/roles/3');
     expect(() => fillPath('/admin-api/roles/:id', {})).toThrow(OperationError);
+    expect(() => fillPath('/admin-api/roles/:id', { id: '3', page: '2' })).toThrow(/page/);
     expect(toSearch({ page: 1, tag: ['a', 'b'], skip: undefined })).toBe('?page=1&tag=a&tag=b');
   });
 
@@ -81,6 +82,31 @@ describe('calling an operation', () => {
     expect((seen[0]?.init.headers as Record<string, string>).authorization).toBe('Bearer shp_x');
     expect(seen[0]?.init.body).toBe('{"values":{"icpNumber":"粤ICP备1号"}}');
     expect(result).toEqual({ ok: false, status: 422, data: { code: 'VALIDATION_FAILED' } });
+  });
+
+  it('refuses a body on a read, but lets an empty one through', async () => {
+    const seen: RequestInit[] = [];
+    const client = {
+      origin: 'https://shop.test',
+      token: 'shp_x',
+      fetch: (async (_url: string, init: RequestInit) => {
+        seen.push(init);
+        return new Response('{}', { headers: { 'content-type': 'application/json' } });
+      }) as typeof fetch,
+    };
+    await expect(callOperation(client, 'system.roleList', { body: { page: 1 } })).rejects.toThrow(
+      /GET/,
+    );
+    await expect(callOperation(client, 'system.roleList', { body: {} })).resolves.toMatchObject({
+      ok: true,
+    });
+    expect(seen[0]?.body).toBeUndefined();
+  });
+
+  it('knows every upload route by name', () => {
+    const uploads = listOperations().filter((op) => /multipart/i.test(op.summary));
+    expect(uploads.map((op) => op.id)).toEqual(['storage.attachmentUpload']);
+    expect(uploads.every((op) => op.multipart)).toBe(true);
   });
 
   it('refuses an unknown id and a file upload', async () => {

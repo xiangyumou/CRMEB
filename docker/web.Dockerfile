@@ -44,6 +44,10 @@ RUN corepack pnpm gen
 # step in the release.
 RUN corepack pnpm --filter @shop/web build
 
+# The `shop` CLI, served by `apps/web/app/downloads/[file]/route.ts`: built
+# from this commit, so its bundled operation list matches the routes here.
+RUN corepack pnpm --filter @shop/cli build
+
 # Next only emits `public/` into the standalone tree when the package has one.
 # `apps/web` has none today; create it so the runtime COPY is not conditional.
 RUN mkdir -p apps/web/public apps/web/.next/standalone/apps/web/public
@@ -70,6 +74,7 @@ WORKDIR /app
 COPY --from=build --chown=node:node /build/apps/web/.next/standalone/ ./
 COPY --from=build --chown=node:node /build/apps/web/.next/static/ ./apps/web/.next/static/
 COPY --from=build --chown=node:node /build/apps/web/public/ ./apps/web/public/
+COPY --from=build --chown=node:node /build/apps/cli/dist/shop.js ./apps/web/cli/shop.js
 COPY --chown=node:node docker/healthcheck/web.mjs /app/healthcheck.mjs
 
 # The uploads root is a volume in `deploy/compose.yml`. Creating it here,

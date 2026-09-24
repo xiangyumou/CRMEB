@@ -79,6 +79,18 @@ export function ApiTokensPage() {
           Studio、Cursor 等可以填请求头的客户端：新建一个个人令牌，请求头填{' '}
           <Typography.Text code>Authorization: Bearer shp_…</Typography.Text>。
         </Typography.Paragraph>
+        <Typography.Paragraph type="secondary" style={{ margin: '8px 0 0' }}>
+          命令行（Claude Code、Codex 等在终端里工作的助手也用它；需要 Node 24）：新建个人令牌，然后
+        </Typography.Paragraph>
+        <Typography.Paragraph style={{ marginBottom: 0 }}>
+          <Typography.Text code copyable>
+            {`curl -o shop.js ${origin}/downloads/shop.js`}
+          </Typography.Text>
+          <br />
+          <Typography.Text code copyable>
+            {`node shop.js login --origin ${origin} --token -`}
+          </Typography.Text>
+        </Typography.Paragraph>
       </Card>
 
       <Card

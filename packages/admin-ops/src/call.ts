@@ -1,4 +1,4 @@
-import { findRoute } from './catalog';
+import { findRoute, isMultipart } from './catalog';
 
 /**
  * Runs one operation against a shop over HTTP, as the admin the token names.
@@ -40,8 +40,20 @@ export class OperationError extends Error {
   }
 }
 
-/** `/admin-api/roles/:id` + `{ id: 3 }` → `/admin-api/roles/3`. */
+/**
+ * `/admin-api/roles/:id` + `{ id: 3 }` → `/admin-api/roles/3`. A key the path
+ * has no slot for is refused rather than dropped: it is almost always a query
+ * or body field put in the wrong place, and the call would otherwise run
+ * without it.
+ */
 export function fillPath(path: string, params: Record<string, unknown> = {}): string {
+  const names = [...path.matchAll(/:([A-Za-z0-9_]+)/g)].map((match) => match[1] as string);
+  const extra = Object.keys(params).filter((key) => !names.includes(key));
+  if (extra.length > 0) {
+    throw new OperationError(
+      `路径里没有参数 ${extra.join('、')}（这个操作的路径参数：${names.join('、') || '无'}）。筛选条件放 query，提交的内容放 body。`,
+    );
+  }
   return path.replace(/:([A-Za-z0-9_]+)/g, (_, name: string) => {
     const value = params[name];
     if (value === undefined || value === null || value === '') {
@@ -49,6 +61,15 @@ export function fillPath(path: string, params: Record<string, unknown> = {}): st
     }
     return encodeURIComponent(String(value));
   });
+}
+
+/** `undefined`, `null` and `{}` say nothing; some assistants send `{}` for every call. */
+function isEmptyBody(body: unknown): boolean {
+  return (
+    body === undefined ||
+    body === null ||
+    (typeof body === 'object' && !Array.isArray(body) && Object.keys(body).length === 0)
+  );
 }
 
 /** Arrays repeat the key (`?tag=a&tag=b`), which is what `handle()` turns back into an array. */
@@ -73,8 +94,11 @@ export async function callOperation(
 ): Promise<CallResult> {
   const route = findRoute(id);
   if (!route) throw new OperationError(`没有这个操作：${id}。先用搜索找到正确的 id。`);
-  if (/multipart/i.test(route.summary)) {
+  if (isMultipart(route.id)) {
     throw new OperationError(`${id} 需要上传文件，不能用 JSON 调用。`);
+  }
+  if (route.method === 'GET' && !isEmptyBody(input.body)) {
+    throw new OperationError(`${id} 是读取操作（GET），不接受 body；筛选条件请放 query。`);
   }
   const url = `${client.origin.replace(/\/+$/, '')}${fillPath(route.path, input.params)}${toSearch(input.query)}`;
   const sendsBody = route.method !== 'GET' && input.body !== undefined;

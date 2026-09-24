@@ -13,6 +13,8 @@ export default defineConfig({
   outDir: 'dist',
   clean: true,
   noExternal: [/./],
+  // Tells `freshness.ts` it is the built file, whose hash means something.
+  define: { __SHOP_CLI_BUNDLE__: 'true' },
   banner: {
     js: "#!/usr/bin/env node\nimport { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);",
   },

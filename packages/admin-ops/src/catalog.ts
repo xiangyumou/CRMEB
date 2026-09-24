@@ -49,6 +49,17 @@ export const DOMAIN_LABELS: Readonly<Record<string, string>> = {
   wechatOa: '微信公众号',
 };
 
+/**
+ * Operations whose body is `multipart/form-data` (a file), not JSON — named
+ * here rather than read off the summary, which is wording and may change.
+ * `admin-ops.test.ts` checks the list against the contracts.
+ */
+const MULTIPART = new Set(['storage.attachmentUpload']);
+
+export function isMultipart(id: string): boolean {
+  return MULTIPART.has(id);
+}
+
 export interface Operation {
   id: string;
   method: string;
@@ -81,7 +92,7 @@ function toOperation(route: AnyRouteDef): Operation {
     summary: route.summary,
     domain: domainOf(route),
     permission: route.permission ?? null,
-    multipart: /multipart/i.test(route.summary),
+    multipart: isMultipart(route.id),
   };
 }
 
