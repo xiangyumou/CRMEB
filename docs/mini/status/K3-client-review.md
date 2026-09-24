@@ -61,7 +61,7 @@ login return, guest browsing, copy). Updated at every commit.
    (replacing 收银台) → 查看订单 did `redirectTo(订单详情)`, leaving `[订单详情, 订单详情]`; 收银台's
    own 查看订单 did the same. `platform/nav.ts` `leaveFor(target)` (A3's `loginReturn` rule, now
    also behind `returnFromLogin`) goes back when the page underneath is that order, else replaces
-   as before. Tests on 收银台 and 支付结果.
+   as before. 评价's 返回订单 likewise. Tests on 收银台, 支付结果 and 评价.
 
 ## In progress
 
@@ -88,8 +88,8 @@ login return, guest browsing, copy). Updated at every commit.
   「该优惠券已被领完」, 「您已领取过该优惠券」).
 - 收货地址: 「已导入微信地址」 (旧 「已导入」). 申请开票: 「没有找到这个订单」 (旧 「订单不存在」).
   注销账号 result: 「回到首页」 (旧 「返回首页」).
-- 收银台 / 支付结果 查看订单, when 去支付 was tapped on that 订单详情: back to it (旧 a new copy of
-  it on top; 返回 then showed the same order again).
+- 收银台 / 支付结果 查看订单 and 评价 返回订单, when opened from that 订单详情: back to it (旧 a
+  new copy of it on top; 返回 then showed the same order again).
 
 ## Backend gaps
 

@@ -3,7 +3,7 @@ import { Text, View } from '@tarojs/components';
 import type { OrderDetail, StorefrontOrderItem } from '@shop/contracts/order/schemas';
 import { isApiError } from '@shop/api-client';
 import { useApiClient, useInvalidateRoutes, useRouteQuery } from '@shop/api-client/react';
-import { goBack, navigate, useRouteParams } from '@/platform';
+import { goBack, leaveFor, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
 import { Button } from '@/ui/button';
@@ -128,9 +128,8 @@ function ReviewForm({ orderId, only }: { orderId: string; only?: string | undefi
             variant="primary"
             size="lg"
             block
-            onClick={() =>
-              void navigate({ route: 'order', params: { id: orderId } }, { replace: true })
-            }
+            // Back to 订单详情 when 去评价 was tapped there, rather than a second copy of it.
+            onClick={() => void leaveFor({ route: 'order', params: { id: orderId } })}
           >
             返回订单
           </Button>

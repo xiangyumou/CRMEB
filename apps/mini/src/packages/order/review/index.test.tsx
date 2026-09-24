@@ -134,9 +134,19 @@ describe('评价商品', () => {
         body: { ...received, items: [orderItem('7001', { reviewed: true })] },
       }),
     });
+    taroFake.pageStack = [
+      { route: 'packages/order/detail/index', options: { id: '9001' } },
+      { route: 'packages/order/review/index', options: { orderId: '9001' } },
+    ];
     await renderPage(<ReviewPage />);
     await screen.findByText('已经评价过了');
     expect(screen.queryByRole('button', { name: '提交评价' })).toBeNull();
+
+    // 返回订单 goes back to the 订单详情 underneath rather than stacking a copy of it.
+    fireEvent.click(screen.getByRole('button', { name: '返回订单' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({ api: 'navigateBack', args: { delta: 1 } }),
+    );
   });
 
   it('writes only the line it was sent for', async () => {
