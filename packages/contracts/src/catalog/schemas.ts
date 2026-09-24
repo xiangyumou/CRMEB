@@ -1056,8 +1056,8 @@ export const storefrontCategoryNode = storefrontCategory.extend({
 export const storefrontCategoryTree = z.object({
   items: z.array(storefrontCategoryNode),
   /**
-   * Changes whenever any visible category does. The uni-app caches the tree and
-   * only refetches when this moves.
+   * Changes whenever any visible category does. A client may cache the tree
+   * and only refetch when this moves.
    */
   version: z.string(),
 });
@@ -1144,7 +1144,7 @@ export const searchHistoryResult = z.object({
 
 /**
  * One consistent fixture reused by every example, so the mock server tells the
- * uni-app and the admin a coherent story: product 1 is 「经典白T恤」, it has
+ * mini program and the admin a coherent story: product 1 is 「经典白T恤」, it has
  * two SKUs, it sits in category 7 and it carries label 3.
  */
 export const productCategoryExample: ProductCategory = {

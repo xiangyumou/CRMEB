@@ -249,7 +249,8 @@ export function nonceStr(): string {
  *
  * The signed message is `appId\ntimeStamp\nnonceStr\npackage\n` — four lines,
  * not the five of a request — and `signType` is `RSA`. Key spelling is WeChat's:
- * `apps/uni-app/utils/wechatPayment.js` forwards this object verbatim.
+ * the mini program (`apps/mini/src/platform/runtime.tsx`) forwards it to
+ * `wx.requestPayment` as is.
  */
 export function buildJsapiPayParams(args: {
   appId: string;

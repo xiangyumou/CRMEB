@@ -10,7 +10,7 @@ const rgb = (hex: string) => {
 };
 const WHITE = rgb('#FFFFFF');
 
-/** The old one-tap palettes (apps/uni-app/utils/theme.js) plus the new default. */
+/** The old uni-app's one-tap palettes plus the new default. */
 const PALETTES = ['#E93323', '#1DB0FC', '#42CA4D', '#FF448F', '#FE5C2D', '#E1251B'];
 
 function randomHex(seed: number): string {

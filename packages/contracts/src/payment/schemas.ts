@@ -90,9 +90,9 @@ export type StartPaymentBody = z.infer<typeof startPaymentBody>;
  * `chooseWXPay`.
  *
  * The key names are WeChat's, not ours — `timeStamp` really is camel-cased that
- * way and `package` really is a reserved word — because
- * `apps/uni-app/utils/wechatPayment.js` forwards this object verbatim to
- * `uni.requestPayment`. `signType` is `RSA` and only `RSA`: v2's MD5 is not
+ * way and `package` really is a reserved word — because the mini program
+ * (`apps/mini/src/platform/runtime.tsx`) forwards them as is to
+ * `wx.requestPayment`. `signType` is `RSA` and only `RSA`: v2's MD5 is not
  * supported.
  */
 export const jsapiPayParams = z.object({

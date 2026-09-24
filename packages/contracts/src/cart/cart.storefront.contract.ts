@@ -196,8 +196,8 @@ export const cartUpdateItem = defineRoute({
  * The same operation as `cart.updateItem`, on `PUT`.
  *
  * `wx.request` has no `PATCH`, so the mini-program cannot call `cart.updateItem`.
- * Same body, same service, same answers; the legacy uni-app keeps its `PATCH`
- * until it is retired.
+ * Same body, same service, same answers; `cart.updateItem` (`PATCH`) stays
+ * for a client that can send it.
  */
 export const cartUpdateItemPut = defineRoute({
   ...cartUpdateItem,

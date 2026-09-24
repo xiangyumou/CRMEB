@@ -9,7 +9,7 @@
  *    cover (or vice versa);
  *  - two examples of one route share a name (the mock server selects by name).
  *
- * Every route is a promise to the uni-app and the admin shell, both of which
+ * Every route is a promise to the mini program and the admin shell, both of which
  * can develop against the mock server before any handler exists — so an example
  * that does not parse is a broken promise, not a nit.
  *

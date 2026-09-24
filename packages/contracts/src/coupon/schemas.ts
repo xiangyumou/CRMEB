@@ -377,7 +377,7 @@ export type ClaimResult = z.infer<typeof claimResult>;
 
 /**
  * One consistent fixture reused by every example below, so the mock server
- * tells the uni-app and the admin a coherent story instead of five unrelated
+ * tells the mini program and the admin a coherent story instead of five unrelated
  * ones.
  */
 export const couponTemplateExample: CouponTemplateListItem = {

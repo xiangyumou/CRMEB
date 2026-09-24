@@ -131,7 +131,7 @@ export type UserAddress = z.infer<typeof userAddress>;
  * Create / update an address.
  *
  * The division *names* are required and the ids are optional, which is the
- * reverse of what a normalised design would ask for — but the uni-app picker
+ * reverse of what a normalised design would ask for — but a region picker
  * can return a hand-typed 海外 address with no division id, and refusing it
  * would make the shop unusable for exactly the customers who complain loudest.
  * The names are frozen at save time so renaming a district later does not

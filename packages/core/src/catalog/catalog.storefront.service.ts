@@ -38,8 +38,8 @@ import { pageBounds, platformOf, toProductCard } from './catalog.service';
  * The storefront menu.
  *
  * `version` is derived from the newest update plus the row count, so any
- * insert, edit, hide or delete moves it. The uni-app caches the tree and
- * refetches only when it changes. A key bumped by hand would be forgotten, and
+ * insert, edit, hide or delete moves it. A client may cache the tree and
+ * refetch only when it changes. A key bumped by hand would be forgotten, and
  * shoppers would see last month's menu until the cache expired.
  */
 export async function categoryTree(ctx: Ctx): Promise<{

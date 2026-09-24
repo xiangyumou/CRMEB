@@ -469,7 +469,7 @@ export type GroupbuyPoster = z.infer<typeof groupbuyPoster>;
 
 /**
  * One coherent fixture reused by every example, so the mock server tells the
- * uni-app and the admin a single story: activity 1 (三只松鼠坚果礼盒, three
+ * mini program and the admin a single story: activity 1 (三只松鼠坚果礼盒, three
  * seats, 拼团价 59.00 against 88.00), group 501 with two of three seats taken
  * by 小明 (leader) and 小红.
  */
