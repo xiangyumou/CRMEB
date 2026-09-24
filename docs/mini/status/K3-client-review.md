@@ -72,17 +72,57 @@ login return, guest browsing, copy). Updated at every commit.
 
 ## In progress
 
-- The rest of the review.
+- Nothing; reported.
 
 ## Pending
 
-- (filled in as the review goes)
+- The write-ups below, for a decision.
+
+## Checked, no defect found
+
+- **Money:** every client-side sum or split is in integer cents (`lib/money.ts`,
+  `features/cart/cart-view.ts`, `lib/order-price.ts`, the refund estimate); `Price` splits the
+  string, never parses a float. The few `Number(...)` uses compare with 0 or order two prices.
+- **Idempotency and double submits:** 提交订单 sends one key per 确认订单 page (kept across an
+  `ORDER_PRICE_CHANGED` retry; the server's replay returns the first order). Order, refund,
+  review, address, invoice and claim writes are guarded by an in-flight ref or a `loading`
+  (inert) button.
+- **Navigation:** no hand-built paths outside `platform/`; `navigate` switches tabs with
+  `switchTab`, and redirects instead of pushing at 10 pages; 确认订单 → 收银台 → 支付结果 → 订单详情
+  replace each other; 售后申请, 申请开票 and 搜索 replace too.
+- **States:** every list goes through `InfiniteList` (skeleton, empty, `ErrorBlock` with
+  重新加载, 加载失败，点击重试); every other read on a page has an `ErrorBlock` with `onRetry`.
+- **Countdowns and phases** read `serverNow()` (`Countdown`, 拼团 / 预售 phases, the decor host,
+  the 开屏 day).
+- **Timers and listeners:** all cleared on unmount (SMS countdown, 开屏, debounce, poll limit,
+  receipt grace, overlays, poster); `Countdown` was the one leak (item 6).
+- **Guest browsing:** every `auth: user` read outside a `LoginCard` is `enabled: signedIn`
+  (cart, cart count, search history, unread count); the rest sit inside `LoginCard`/`LoginGate`.
+  Every other login gate names its page as the redirect.
+
+## Written up, not changed
+
+1. **A double tap on a link opens the page twice.** 结算, 立即购买 or any card tapped twice
+   before the first `navigateTo` lands pushes two copies (two 确认订单 with the same draft; the
+   second shows 「没有待结算的商品」 after the first submits, so no double order). A guard in
+   `platform/nav.ts` `navigate` (the same URL pushed again within ~800 ms is dropped) would cover
+   every link, but touches every navigation and the unit fakes' timing: left for a decision, with
+   the full mini unit suite and `test:mini` to run after it.
+2. **Duplicate money helpers.** `features/cart/cart-view.ts` `centsOf` / `moneyFromCents` repeat
+   `lib/money.ts` `toCents` / `fromCents` (the cart's maps a malformed string to 0, lib's to
+   `NaN`). Cleanup: one module.
+3. **`aftersale/apply` keeps its own `REFUND_READS`** (without `refund.myDetail`, harmless for a
+   new request) beside `aftersale/shared/actions.ts`'s. Cleanup.
+4. **收银台 opened after the pay window closed** but before the auto-cancel job ran shows
+   「已结束」 with 微信支付 still active; the tap gets `PAYMENT_ORDER_EXPIRED` and then 「订单已关闭」.
+   Harmless; could check `payExpiresAt` against `serverNow()` on render.
+5. **`ErrorBlock`'s 登录 state has no button** unless the page passes `onLogin`, and none does.
+   Pages rely on `LoginCard`, so it only shows if a 401 escapes the session's renewal.
 
 ## Page-form changes (旧 → 新)
 
 - 我的: the order badges and totals are current every time the tab is shown (旧 up to 30 s old
   after a change made on another page).
-
 - 确认订单 / 收银台 / 支付结果: signing in by SMS on the page comes back to the page (旧 to 首页,
   losing the draft).
 - 首页 / 微页面 / 我的: a coupon claimed on another page shows as claimed when the shopper comes
@@ -97,6 +137,7 @@ login return, guest browsing, copy). Updated at every commit.
   注销账号 result: 「回到首页」 (旧 「返回首页」).
 - 收银台 / 支付结果 查看订单 and 评价 返回订单, when opened from that 订单详情: back to it (旧 a
   new copy of it on top; 返回 then showed the same order again).
+- 商品已下架 / 没有找到这个订单 / 页面不存在 show at once (旧 after a second request, ~1 s).
 
 ## Backend gaps
 
@@ -104,8 +145,18 @@ login return, guest browsing, copy). Updated at every commit.
 
 ## Open questions
 
-- None so far.
+- 我的 now asks for `decor.pageUserCenter` and the unread count on every show of the tab (as the
+  uni-app's `onShow` did): one request pair per visit. Fine, or only when marked stale?
+- The copy changes above (refused-claim wording, 回到首页) follow 领券中心 and the error states;
+  say if the other wording should win instead.
 
 ## Tests for the orchestrator to run
 
-- `e2e/storefront/specs-mini/account.spec.ts` (the 注销 journey clicks 「回到首页」 now).
+- `e2e/storefront/specs-mini/account.spec.ts`: the 注销 journey clicks 「回到首页」 now (edited).
+- The rest of `pnpm --filter @shop/e2e-storefront test:mini` once, since shared behaviour moved:
+  `orders.spec.ts` (评价 返回订单 now goes back), `shop-journey.spec.ts` (支付结果 查看订单),
+  `promo.spec.ts`, `coupons.spec.ts`, `decor.spec.ts`, `user-center.spec.ts` (claims mark the
+  decorated pages stale; 我的 refetches on show), `new-shopper-buys.spec.ts` (address → 确认订单).
+- Run here (targeted, `--maxWorkers=2`): the unit tests of every changed directory, 65 files,
+  344 tests, green; `pnpm --filter @shop/mini typecheck` and `lint` clean; `pnpm guards` 15/15;
+  `prettier --check` on the changed files clean.
