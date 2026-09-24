@@ -62,6 +62,7 @@ export const paidOrderFixture: ResponseOf<'order.detail'> = {
   id: '9001',
   orderNo: '202609201000000010123456',
   kind: 'normal',
+  groupbuyTeamId: null,
   status: 'paid',
   fulfillmentStatus: 'unfulfilled',
   refundStatus: 'none',
@@ -93,6 +94,8 @@ export const paidOrderFixture: ResponseOf<'order.detail'> = {
       refundedQuantity: 0,
       shippedQuantity: 0,
       adjustments: [],
+      reviewed: false,
+      reviewable: false,
     },
   ],
   receiver: {
