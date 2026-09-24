@@ -13,6 +13,7 @@ import { navigate, platform, showToast, storage, useLaunchContext } from '@/plat
  *                              └─ phone-required (bindToken, 10 min)
  *                                   ├─ 手机号快速登录 ─▶ POST …/wechat-mini/phone ─▶ token stored
  *                                   └─ 短信验证码 ─────▶ POST …/wechat-oa/phone ───▶ token stored
+ *   其他方式 · 密码登录 (any state) ──▶ POST /auth/sessions/password ──▶ token stored (openid not linked)
  *
  * Browsing never needs a session (C05): a page shows `<LoginCard>` where signed-in content
  * would be, and an action that needs one calls `requireLogin()` first. Nothing here navigates
@@ -189,6 +190,19 @@ export async function bindPhoneWithSms(phone: string, code: string): Promise<voi
   } catch (error) {
     await afterBindFailure(error, state.bindToken);
   }
+}
+
+/**
+ * 密码登录 (the login page's 其他方式, auth.md「密码登录」). Signs in to the account the
+ * password belongs to; a parked `phone-required` sign-in is dropped. The mini-program openid is
+ * **not** linked (`auth.passwordLogin` takes no `bindToken`), so this token lasts its own
+ * `sessionTtlDays` and a later renewal goes through `wx.login` again. Rejects with the server's
+ * error (wrong password, too many attempts…) and leaves the session as it was.
+ */
+export async function signInWithPassword(account: string, password: string): Promise<void> {
+  const result = await api.call('auth.passwordLogin', { body: { account, password } });
+  storage.set(TOKEN_KEY, result.token);
+  set({ status: 'signed-in', token: result.token });
 }
 
 /** Codes after which the parked sign-in is still good and the shopper can try again. */

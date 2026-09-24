@@ -10,6 +10,7 @@ import {
   startSession,
   useSession,
 } from '@/session/session';
+import { PasswordLoginForm } from '@/features/auth/password-login';
 import { AgreementCheck } from '@/ui/agreement-check';
 import { Button, buttonClassName } from '@/ui/button';
 import { CellGroup } from '@/ui/cell';
@@ -23,7 +24,8 @@ import './index.scss';
  * `requireLogin()` when the silent sign-in could not finish on its own: the shop wants a phone
  * number (快速登录, or an SMS code), the shopper signed out, or WeChat failed. Comes back to
  * `redirect` (a catalogue route, never a path) once signed in, going back when that is the page
- * under it (`loginReturn`); 暂不登录 just goes back.
+ * under it (`loginReturn`); 暂不登录 just goes back. 其他方式 holds 密码登录
+ * (`features/auth/password-login`), offered whatever the WeChat sign-in did.
  */
 export default function LoginPage() {
   const { redirect } = useRouteParams('login');
@@ -31,7 +33,7 @@ export default function LoginPage() {
   const config = useAppConfig();
   const [agreed, setAgreed] = useState(false);
   const [shake, setShake] = useState(0);
-  const [mode, setMode] = useState<'wechat' | 'sms'>('wechat');
+  const [mode, setMode] = useState<'wechat' | 'sms' | 'password'>('wechat');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState<string | undefined>();
@@ -83,7 +85,12 @@ export default function LoginPage() {
           <Text className="login__hint">登录后可以下单、查看订单和领取优惠券</Text>
         </View>
 
-        {session.status === 'phone-required' && mode === 'sms' ? (
+        {mode === 'password' ? (
+          <PasswordLoginForm
+            canSubmit={() => !needAgreement()}
+            onCancel={() => setMode('wechat')}
+          />
+        ) : session.status === 'phone-required' && mode === 'sms' ? (
           <View className="login__form">
             <CellGroup inset={false}>
               <SmsCodeField
@@ -155,6 +162,14 @@ export default function LoginPage() {
                 短信验证码登录
               </Button>
             ) : null}
+            {waiting ? null : (
+              <View className="login__other">
+                <Text className="login__other-title">其他方式</Text>
+                <Button variant="text" size="sm" onClick={() => setMode('password')}>
+                  密码登录
+                </Button>
+              </View>
+            )}
             <Button variant="text" size="sm" onClick={() => void goBack()}>
               暂不登录
             </Button>

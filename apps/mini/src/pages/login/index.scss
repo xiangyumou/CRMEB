@@ -61,6 +61,35 @@
     text-align: center;
   }
 
+  &__other {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: $space-5;
+  }
+
+  &__other-title {
+    display: flex;
+    align-items: center;
+    align-self: stretch;
+    gap: $space-4;
+    @include text($font-caption);
+    color: var(--color-text-tertiary);
+
+    &::before,
+    &::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--color-border);
+    }
+  }
+
+  &__links {
+    display: flex;
+    justify-content: space-between;
+  }
+
   &__agreement {
     margin-top: auto;
     padding: $space-7 $space-5 0;
