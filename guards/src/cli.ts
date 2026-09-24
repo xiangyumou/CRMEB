@@ -10,6 +10,7 @@
  *   pnpm --filter @shop/guards guards --quiet          only the summary and the failures
  */
 import { adminClient } from './checks/admin-client';
+import { apiCompat } from './checks/api-compat';
 import { bannedConstructs } from './checks/banned';
 import { contractsAndRoutes } from './checks/contracts';
 import { domains } from './checks/domains';
@@ -41,6 +42,7 @@ const CHECKS: readonly Check[] = [
   txPool,
   migrations,
   pipeline,
+  apiCompat,
   invariants,
 ];
 

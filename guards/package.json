@@ -6,6 +6,7 @@
   "scripts": {
     "guards": "tsx src/cli.ts",
     "mutations": "tsx scripts/mutations/run.ts",
+    "api-compat:refresh": "pnpm --filter @shop/contracts gen && tsx scripts/api-compat-refresh.ts",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test:unit": "vitest run --project unit",
