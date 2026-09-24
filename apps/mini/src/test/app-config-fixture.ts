@@ -48,6 +48,7 @@ export const appConfigFixture: AppConfig = {
     productReviews: true,
     productRecommendations: true,
     productServiceTags: true,
+    productPoster: true,
   },
   version: '1758500000000',
   serverTime: '2026-09-24T08:00:00.000+08:00',

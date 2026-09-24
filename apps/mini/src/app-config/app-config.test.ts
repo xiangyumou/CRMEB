@@ -5,7 +5,7 @@ import { appConfigFixture } from '@/test/app-config-fixture';
 import { serveApi } from '@/test/fake-api';
 import { taroFake } from '@/test/taro-fake/taro';
 import { useThemeStore } from '@/theme/store';
-import { APP_CONFIG_KEY, loadAppConfig, useAppConfigStore } from './app-config';
+import { APP_CONFIG_KEY, displayOf, loadAppConfig, useAppConfigStore } from './app-config';
 
 const config = appConfigFixture;
 
@@ -96,5 +96,23 @@ describe('app config', () => {
     });
     await loadAppConfig();
     expect(Math.abs(serverNow() - Date.parse(later))).toBeLessThan(5_000);
+  });
+});
+
+describe('页面显示 switches', () => {
+  it('reads each switch from the config', () => {
+    const display = { ...config.display, productReviews: false, productPoster: false };
+    expect(displayOf({ ...config, display })).toEqual(display);
+  });
+
+  it('shows everything a copy from an older server does not say', () => {
+    expect(displayOf(null).productPoster).toBe(true);
+    const { display: _dropped, ...older } = config;
+    expect(Object.values(displayOf(older as typeof config)).every(Boolean)).toBe(true);
+    const partial = { ...config, display: { categorySubcategories: false } };
+    expect(displayOf(partial as unknown as typeof config)).toMatchObject({
+      categorySubcategories: false,
+      productPoster: true,
+    });
   });
 });

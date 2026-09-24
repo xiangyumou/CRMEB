@@ -28,16 +28,20 @@ export function claimState(coupon: Claimable): CouponCardState {
 }
 
 /**
- * 领券 on 商品详情: the shop-wide coupons one can claim, as a row that opens a sheet of
- * `CouponCard`s with 领取.
- *
- * Only `all_products` coupons are shown: `coupon.claimableList` cannot be asked for a product's
- * coupons and does not say which products or categories a scoped coupon covers (a backend gap,
- * stream B status), so a scoped coupon could not be promised here.
+ * 领券 on 商品详情: the coupons one can claim that this product counts towards, as a row that
+ * opens a sheet of `CouponCard`s with 领取. The server narrows the list (`productId`, H4): the
+ * shop-wide ones, those naming the product, and those naming a category it is filed under
+ * (COUPON-009).
  */
-export function ProductCoupons({ redirect }: { redirect: StorefrontRoute }) {
+export function ProductCoupons({
+  productId,
+  redirect,
+}: {
+  productId: string;
+  redirect: StorefrontRoute;
+}) {
   const signedIn = useSignedIn();
-  const list = useRouteQuery('coupon.claimableList', { query: { pageSize: 20 } });
+  const list = useRouteQuery('coupon.claimableList', { query: { productId, pageSize: 20 } });
   const claim = useRouteMutation('coupon.claim', {
     invalidate: ['coupon.claimableList', 'coupon.myList'],
   });
@@ -53,7 +57,7 @@ export function ProductCoupons({ redirect }: { redirect: StorefrontRoute }) {
     void refetch();
   }, [signedIn, refetch]);
 
-  const coupons = (list.data?.items ?? []).filter((coupon) => coupon.scope === 'all_products');
+  const coupons = list.data?.items ?? [];
   if (coupons.length === 0) return null;
 
   const take = async (coupon: Claimable) => {

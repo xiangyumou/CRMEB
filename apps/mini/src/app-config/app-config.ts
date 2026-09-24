@@ -31,6 +31,31 @@ export function useAppConfig(): AppConfig | null {
   return useAppConfigStore((state) => state.config);
 }
 
+export type AppDisplay = AppConfig['display'];
+
+/** What the pages showed before the 页面显示 switches existed: everything. */
+const DISPLAY_SHOWN: AppDisplay = {
+  categorySubcategories: true,
+  productReviews: true,
+  productRecommendations: true,
+  productServiceTags: true,
+  productPoster: true,
+};
+
+/**
+ * The 页面显示 switches (`storefront-appearance`). A copy stored by an older build, or sent by
+ * an older server, may lack `display` or one of its keys: what is missing shows.
+ */
+export function displayOf(config: AppConfig | null): AppDisplay {
+  const display: Partial<AppDisplay> | undefined = config?.display;
+  return { ...DISPLAY_SHOWN, ...display };
+}
+
+/** `displayOf` the current app config. */
+export function useDisplay(): AppDisplay {
+  return displayOf(useAppConfig());
+}
+
 /** Hand a config to everything that reads it. */
 export function applyAppConfig(config: AppConfig, source: 'cache' | 'network'): void {
   useAppConfigStore.setState({ config, source });

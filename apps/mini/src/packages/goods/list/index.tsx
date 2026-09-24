@@ -37,8 +37,8 @@ const isPriceSort = (sort: ListSort) => sort === 'price-asc' || sort === 'price-
  * title follows the category or the keyword; 综合 / 销量 / 新品 / 价格 sort, a price filter,
  * two columns or one (remembered), and 加购 on each card.
  *
- * `couponId` (我的优惠券「去使用」) cannot narrow the list: the storefront API does not expose a
- * coupon's scope (a backend gap, stream B status), so it lists everything with a note.
+ * `couponId` (我的优惠券 / 领券中心「去使用」) is a coupon **template** id: the server lists the
+ * products that coupon covers (H4, COUPON-009).
  */
 export default function ProductList() {
   const params = useRouteParams('productList');
@@ -54,7 +54,15 @@ export default function ProductList() {
   const [layout, setLayout] = useState<Layout>(readLayout);
 
   const waitingForTree = Boolean(categoryId) && tree.isPending;
-  const query = listQuery({ categoryId, keyword, labelId, sort, price, tree: tree.data });
+  const query = listQuery({
+    categoryId,
+    keyword,
+    labelId,
+    couponId,
+    sort,
+    price,
+    tree: tree.data,
+  });
   const products = useInfiniteRouteQuery(
     'catalog.productList',
     { query },
@@ -144,11 +152,6 @@ export default function ProductList() {
           </Pressable>
         </View>
       </View>
-      {couponId ? (
-        <Text className="goods-list__note">
-          优惠券的适用范围以结算页为准，结算时会自动为你选择可用的券
-        </Text>
-      ) : null}
       <View className="goods-list__body">
         <InfiniteList
           key={JSON.stringify(query)}

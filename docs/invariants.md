@@ -1781,16 +1781,21 @@ A save is refused whole when the schema rejects a value or the group does not de
 
 ### SYS-015
 
-The `storefront-appearance` group answers a fresh install with every field defaulted (the contract's `appAppearanceDefaults`), always yields exactly the four fixed tabs — 首页, 分类, 购物车, 我的 — in that order, falls back to the default label when one is blanked, serves a blank accent colour as `null` (the client then uses the primary colour), and refuses any colour that is not `#RRGGBB` (and a radius off the scale, and an over-long label) whole, writing nothing. Its 页面显示 switches (`display`: 分类 second-level categories, 商品详情 reviews, 为你推荐 and service tags) all default to shown — what those pages showed before the switches — and each turns off alone.
+The `storefront-appearance` group answers a fresh install with every field defaulted (the contract's `appAppearanceDefaults`), always yields exactly the four fixed tabs — 首页, 分类, 购物车, 我的 — in that order, falls back to the default label when one is blanked, serves a blank accent colour as `null` (the client then uses the primary colour), and refuses any colour that is not `#RRGGBB` (and a radius off the scale, and an over-long label) whole, writing nothing. Its 页面显示 switches (`display`: 分类 second-level categories, 商品详情 reviews, 为你推荐, service tags and the product poster) all default to shown — what those pages showed before the switches — and each turns off alone; with the poster switched off 商品详情's share sheet offers no 生成海报 but still sends to a WeChat friend.
 
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > answers a fresh install with every appearance default`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > shows every optional part of 分类 and 商品详情 until the operator switches one off`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > offers the product poster until the operator switches it off`
+- `apps/web/app/api/v1/app/config.int.test.ts::SYS-015 — the product poster switch over HTTP > offers the poster on a fresh install and stops once the operator switches it off`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > serves the theme and the tab bar the operator saved`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > serves the accent colour, and a blanked one as none`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > falls back to the default label when the operator blanks one`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > refuses <label>, and writes nothing`
 - `packages/contracts/src/system/app.schemas.test.ts::SYS-015 — hexColor > refuses <label>`
 - `packages/contracts/src/system/app.schemas.test.ts::SYS-015 — appearance defaults > are a valid appearance, with the four fixed tabs in order`
+- `packages/contracts/src/system/app.schemas.test.ts::SYS-015 — display defaults > show every optional part, the product poster included`
+- `apps/mini/src/pages/product/index.test.tsx::商品详情 > SYS-015 — hides 评价, 为你推荐 and 服务 when the shop switched them off`
+- `apps/mini/src/pages/product/index.test.tsx::商品详情 > SYS-015 — offers no poster when the shop switched product posters off, still shares to a friend`
 
 ### SYS-016
 

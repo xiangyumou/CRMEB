@@ -90,6 +90,11 @@ export class ProductPage {
     return shown(this.page).locator('#product-name');
   }
 
+  /** The price at the top of the page (the low end of a multi-spec product's range). */
+  summaryPrice(): Locator {
+    return shown(this.page).locator('.product__price-row .shop-price').first();
+  }
+
   /** The bar's 加入购物车 / 立即购买. */
   barButton(label: '加入购物车' | '立即购买'): Locator {
     return shown(this.page).locator('.shop-action-bar').getByText(label, { exact: true });

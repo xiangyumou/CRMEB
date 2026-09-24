@@ -46,14 +46,6 @@
     color: var(--color-text);
   }
 
-  &__note {
-    display: block;
-    padding: $space-3 $space-5;
-    background: var(--color-primary-soft);
-    @include text($font-caption);
-    color: var(--color-primary-text);
-  }
-
   &__body {
     padding: $space-4;
   }

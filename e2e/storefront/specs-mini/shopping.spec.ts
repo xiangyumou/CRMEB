@@ -56,6 +56,9 @@ test('the 规格 sheet prices the picked SKU and adds that one to the cart', asy
   const shopper = await returningShopper(page, wechatUser, shop, playwright);
   const product = new ProductPage(page);
   await product.open(shop.fixtures.multiSpecProductId);
+  // The price range ¥59–¥65: the top of the page shows where it starts, the sheet reaches both ends.
+  await expect(product.summaryPrice()).toContainText('59');
+  await expect(product.summaryPrice()).not.toContainText('65');
 
   await product.openSpecs();
   await product.specValue('黑').click();

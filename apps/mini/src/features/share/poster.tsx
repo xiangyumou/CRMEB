@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { create } from 'zustand';
+import { useDisplay } from '@/app-config';
 import { requireLogin } from '@/session/session';
 import { PosterSheet, type PosterSubject as PosterContent } from './poster-sheet';
 
@@ -8,14 +9,17 @@ import { PosterSheet, type PosterSubject as PosterContent } from './poster-sheet
  * `PosterHost` with what the poster shows; the host opens `PosterSheet` (canvas 2D, 小程序码,
  * 保存到相册) for that subject. 拼团进度 renders `PosterSheet` itself.
  *
- * `posterAvailable` is the shop's switch for product posters. `app/config` has no such setting
- * yet (a backend gap), so it is a constant here: posters are on. A poster carries the product
- * picture (the shopper may leave it out), its name and price, and the 小程序码; never anything
- * about the shopper.
+ * `useProductPosterEnabled` is the shop's switch for product posters (小程序外观 → 页面显示
+ * 「允许生成商品海报」, `app/config.display.productPoster`, on by default). Off, 商品详情 offers
+ * no 生成海报; sharing to a WeChat friend stays. The 拼团 invite poster is not covered by it.
+ * A poster carries the product picture (the shopper may leave it out), its name and price, and
+ * the 小程序码; never anything about the shopper.
  */
 export type PosterSubject = { kind: 'product'; id: string };
 
-export const posterAvailable: boolean = true;
+export function useProductPosterEnabled(): boolean {
+  return useDisplay().productPoster;
+}
 
 const usePosterRequest = create<{ open: PosterSubject | null }>()(() => ({ open: null }));
 
