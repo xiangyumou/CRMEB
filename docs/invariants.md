@@ -1143,6 +1143,22 @@ A customer event names the mini-program page it opens as a route-catalogue key a
 - `packages/core/src/notification/notification.int.test.ts::fan-out > seeds the template from the registry and writes the in-app message — NOTIF-006`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::shopper notifications > tells every paid member 拼团成功 when the team fills, on every channel switched on — NOTIF-006`
 
+### NOTIF-007
+
+A message says what its sender carried: every placeholder of an event's default wording, link and route is a variable the event declares, and every sender fills the variables that wording uses. The fulfilment notices (发货, 确认收货, 订单完成) read the order number, the amount and the parcel's carrier, tracking number or courier from the order domain when the handler runs, so an effect recorded with ids only — every row already in the ledger — is told in full, a tracking number corrected before the send is the corrected one, and a parcel cancelled first is not announced. 发货 is one message per parcel. A placeholder that still renders blank is logged with the event's code.
+
+- `packages/core/src/notification/notification.registry.test.ts::NOTIF-007 — an event’s wording names only the variables it declares > declares every placeholder its default title, body, link and route use`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > tells the buyer the order number, the carrier and the tracking number of an express parcel`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > reads the facts when the handler runs, so a row that carries ids only is told in full`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > tells a buyer whose order ships in two parcels about each of them`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > says 商家配送 and the courier for a parcel the shop delivers itself`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > says the goods were handed over for an automatic virtual delivery`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > does not announce a parcel cancelled before the dispatcher reached it`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > names the order in 确认收货`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the order hooks carry what their wording names > gives 支付成功 its payment time and 退款到账 its refund number`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the order hooks carry what their wording names > leaves no placeholder of the order events’ default wording blank`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — an old ledger row > is told in full when it carries nothing but the order id`
+
 ### USER-010
 
 An SMS verification code is spent exactly once: two concurrent verifications of one code produce one sign-in and one refusal, and a wrong code burns an attempt.

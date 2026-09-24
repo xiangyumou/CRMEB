@@ -175,13 +175,22 @@ export function registerBuiltInNotificationEvents(): void {
     {
       code: 'order_shipped',
       name: '订单发货通知',
-      description: '订单发货后通知买家。虚拟商品自动发货也走这里',
+      description: '订单发货后通知买家，分批发货时每个包裹一条。虚拟商品自动发货也走这里',
       audience: 'user',
-      variables: [...ORDER_VARS, 'company', 'trackingNo'],
+      // `company` / `trackingNo` are a courier's; `deliveryInfo` reads right for
+      // 快递, 商家配送 and 虚拟发货 alike, so the default wording uses it.
+      variables: [
+        ...ORDER_VARS,
+        'company',
+        'trackingNo',
+        'courierName',
+        'courierPhone',
+        'deliveryInfo',
+      ],
       channels: [...USER_CHANNELS],
       defaults: {
         title: '您的订单已发货',
-        body: '订单 {{orderNo}} 已由 {{company}} 发出，运单号 {{trackingNo}}。',
+        body: '订单 {{orderNo}} 已发货，{{deliveryInfo}}。',
       },
       link: '/orders/{{orderId}}',
       route: ORDER_ROUTE,

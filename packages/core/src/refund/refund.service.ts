@@ -707,6 +707,7 @@ export async function settleRefundSucceeded(
     userId: row.userId,
     at: now,
     refundId,
+    refundNo: row.refundNo,
     refundedAmount: amount,
     partial: !full,
   });
