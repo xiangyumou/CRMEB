@@ -16,9 +16,8 @@ export function orderEntryLink(key: OrderEntryKey): LinkTarget {
     case 'unpaid':
     case 'unshipped':
     case 'unreceived':
-      return { kind: 'route', to: { route: 'orderList', params: { tab: key } } };
     case 'unreviewed':
-      return { kind: 'route', to: { route: 'myReviews', params: {} } };
+      return { kind: 'route', to: { route: 'orderList', params: { tab: key } } };
     case 'aftersale':
       return { kind: 'route', to: { route: 'refundList', params: {} } };
   }

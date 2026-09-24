@@ -92,7 +92,7 @@ describe('OrderEntry', () => {
     expect(onLink).toHaveBeenLastCalledWith(route('refundList'));
     fireEvent.click(screen.getByText('全部订单'));
     expect(onLink).toHaveBeenLastCalledWith(route('orderList'));
-    expect(orderEntryLink('unreviewed')).toEqual(route('myReviews'));
+    expect(orderEntryLink('unreviewed')).toEqual(route('orderList', { tab: 'unreviewed' }));
   });
 });
 

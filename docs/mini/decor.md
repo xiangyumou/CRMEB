@@ -103,7 +103,7 @@
   - 组件大小由微信决定：宽度撑满，最小 300px，高 84px，样式不能改。
   - 后台画布上显示的是一段说明，不是组件本身。
 - **视频**：小程序用 Taro 的 `<Video>`（带控件、`contain`、居中播放按钮），默认不自动播放。开启自动播放后，小程序会自动播放；浏览器（H5 和后台画布的 DOM 实现）只在静音时才允许自动播放。画布里和有弹层时显示封面，不挂载播放器。
-- **个人中心的角标**：`orderCounts` 取自订单域的 `order.counts`（`aftersale` = 退款中）。`unreviewed`（待评价）= `order.counts.unreviewed`（H4，ORDER-010：已收货或已完成、且至少有一行商品还能评价的订单）；schema 里仍是可选字段，旧服务端不返回时不显示角标。这个入口目前仍跳 `myReviews`，等「我的订单」有待评价 tab 后改跳 `orderList { tab: 'unreviewed' }`。
+- **个人中心的角标**：`orderCounts` 取自订单域的 `order.counts`（`aftersale` = 退款中）。`unreviewed`（待评价）= `order.counts.unreviewed`（H4，ORDER-010：已收货或已完成、且至少有一行商品还能评价的订单）；schema 里仍是可选字段，旧服务端不返回时不显示角标。这个入口跳「我的订单」的待评价 tab（`orderList { tab: 'unreviewed' }`）。
 
 ### 2.4 宿主要做的事（host wrappers）
 
