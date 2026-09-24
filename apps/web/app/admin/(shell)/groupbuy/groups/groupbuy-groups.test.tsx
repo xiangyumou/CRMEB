@@ -23,14 +23,18 @@ import { GroupbuyGroupsPage } from './groupbuy-groups';
  * name into it — `handle()` writes the audit row.
  */
 
-function stubApi(): StubCall[] {
+/** The example team is 2 / 3. */
+const fullTeam = { ...groupbuyGroupExample, seatsTaken: groupbuyGroupExample.seatsTotal };
+
+function stubApi(team = groupbuyGroupExample): StubCall[] {
   return stubRoutes([
     on(groupbuyAdminGroupDetail, groupbuyGroupDetailExample),
-    on(groupbuyAdminGroupList, { items: [groupbuyGroupExample], total: 1, page: 1, pageSize: 20 }),
+    on(groupbuyAdminGroupList, { items: [team], total: 1, page: 1, pageSize: 20 }),
     on(groupbuyAdminGroupComplete, {
       ...groupbuyGroupDetailExample,
+      seatsTaken: groupbuyGroupDetailExample.seatsTotal,
       status: 'succeeded',
-      virtuallyFilled: true,
+      virtuallyFilled: false,
     }),
   ]);
 }
@@ -56,8 +60,18 @@ describe('拼团列表', () => {
     expect(calls[0]?.url).toContain('/admin-api/groupbuy-groups?');
   });
 
-  it('keeps 立即成团 behind its own permission atom', async () => {
+  it('does not offer 立即成团 on a team that is not full', async () => {
+    // The server refuses it (GROUPBUY_VIRTUAL_FILL_DISABLED): no 虚拟成团.
     stubApi();
+    renderAdmin(<GroupbuyGroupsPage />, { identity: allPermissions });
+
+    await screen.findByText('三人成团 · 坚果礼盒');
+    expect(screen.getByText('2 / 3')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '立即成团' })).not.toBeInTheDocument();
+  });
+
+  it('keeps 立即成团 behind its own permission atom', async () => {
+    stubApi(fullTeam);
     renderAdmin(<GroupbuyGroupsPage />, {
       identity: { ...testIdentity, permissions: ['groupbuy:group:read'] },
     });
@@ -81,8 +95,8 @@ describe('拼团列表', () => {
     expect(within(drawer).getAllByText('团长').length).toBeGreaterThan(0);
   });
 
-  it('completes a team through the completion sub-resource', async () => {
-    const calls = stubApi();
+  it('completes a full team through the completion sub-resource', async () => {
+    const calls = stubApi(fullTeam);
     renderAdmin(<GroupbuyGroupsPage />, { identity: allPermissions });
     await screen.findByText('三人成团 · 坚果礼盒');
 

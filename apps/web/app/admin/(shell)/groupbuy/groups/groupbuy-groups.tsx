@@ -39,7 +39,11 @@ import {
  *
  * **A seat means a paid order.** An unpaid order holds nothing: it reserved
  * stock, it did not join the team. That is why a team can read 1/3 while three
- * orders exist, and why 立即成团 on such a team succeeds with one real buyer.
+ * orders exist.
+ *
+ * 立即成团 is offered only on a team whose seats are all taken. 虚拟成团 is off
+ * for good, so the server refuses an under-filled team
+ * (`GROUPBUY_VIRTUAL_FILL_DISABLED`); a button that can only fail is not shown.
  */
 export function GroupbuyGroupsPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -120,7 +124,7 @@ export function GroupbuyGroupsPage() {
                 <Button type="link" size="small" onClick={() => setDetailId(row.id)}>
                   详情
                 </Button>
-                {row.status === 'forming' ? (
+                {row.status === 'forming' && row.seatsTaken >= row.seatsTotal ? (
                   <Can permission="groupbuy:group:complete">
                     <Button type="link" size="small" onClick={() => completeModal.show(row)}>
                       立即成团
