@@ -513,9 +513,9 @@ const siteAsset = z.string().nullable();
 export const sitePublicConfig = z.object({
   name: siteText,
   /**
-   * Four slots, because the app renders four different logos: the header
-   * (`App.vue`), the sign-in form (`pages/users/login`), the square icon a
-   * share card uses, and the browser favicon on H5.
+   * Four slots, because a storefront renders four different logos: the
+   * header, the sign-in form, the square icon a share card uses, and the
+   * browser favicon on H5.
    */
   logo: z.object({
     main: siteAsset,
@@ -577,7 +577,7 @@ export const sitePublicConfig = z.object({
     phone: z.string().nullable(),
     qrcodeUrl: siteAsset,
   }),
-  /** `pages/guide`'s splash. `enabled: false` means go straight to the home page. */
+  /** The launch splash. `enabled: false` means go straight to the home page. */
   splashAd: z.object({
     enabled: z.boolean(),
     imageUrl: siteAsset,
@@ -623,7 +623,7 @@ export const sitePublicConfigExample: SitePublicConfig = {
   splashAd: {
     enabled: true,
     imageUrl: '/uploads/site/2026/09/a91f22.png',
-    link: '/pages/goods_details/index?id=12',
+    link: '/pages/product/index?id=12',
     seconds: 3,
   },
   version: '1758500000000',

@@ -1691,10 +1691,10 @@ Every contract has a route file that exports its method, and every route file is
 
 ### SHARE-001
 
-`GET /api/v1/share/mini-codes` accepts only route-catalogue keys marked `miniCode`, and the code it answers opens exactly `storefrontRouteDef(key).path` with `encodeScene(route)` as the scene, which `decodeScene` reads back. The params are validated against the key before anything is looked up or minted: params that do not fit (an `id` on `home`, none on `product`) are `VALIDATION_FAILED` with no WeChat call and no row. It shares `/wechat/mini-qrcodes`'s `(page, scene)` cache, so one pair is minted once whichever endpoint asked first.
+`GET /api/v1/share/mini-codes` accepts only route-catalogue keys marked `miniCode`, and the code it answers opens exactly `storefrontRouteDef(key).path` with `encodeScene(route)` as the scene, which `decodeScene` reads back. The params are validated against the key before anything is looked up or minted: params that do not fit (an `id` on `home`, none on `product`) are `VALIDATION_FAILED` with no WeChat call and no row. A pair is minted once and served from the `(page, scene)` cache afterwards.
 
 - `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > takes the page from the catalogue and the scene from encodeScene — SHARE-001`
-- `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > shares the (page, scene) cache with the legacy endpoint — SHARE-001`
+- `packages/core/src/wechat/wechat.mini-code.int.test.ts::the (page, scene) cache > asks WeChat once for a pair and serves every later caller from the cache`
 - `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > refuses params that do not fit the key, without calling WeChat — SHARE-001`
 - `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > refuses a key the catalogue does not mark miniCode — SHARE-001`
 - `e2e/storefront/specs-mini/share.spec.ts::SHARE-001: a 小程序码 opens the product, activity, coupon or decor page it was made for`
@@ -1709,11 +1709,10 @@ A 拼团 poster points at the team page from the route catalogue, not at a hand-
 
 ### SHARE-003
 
-The version a 小程序码 opens (`env_version`) is `wechat-mini.codeEnvVersion` — `release` unless an operator picks `trial` or `develop` — for both the catalogue endpoint and the legacy one, and codes are cached per version: a code minted for one version is never served while the setting names another, and switching back reuses the earlier code without calling WeChat.
+The version a 小程序码 opens (`env_version`) is `wechat-mini.codeEnvVersion` — `release` unless an operator picks `trial` or `develop` — and codes are cached per version: a code minted for one version is never served while the setting names another, and switching back reuses the earlier code without calling WeChat.
 
 - `packages/core/src/wechat/wechat.mini-code.int.test.ts::SHARE-003 — the version a code opens comes from config > asks for release by default`
 - `packages/core/src/wechat/wechat.mini-code.int.test.ts::SHARE-003 — the version a code opens comes from config > asks for the configured version, and caches per version`
-- `packages/core/src/wechat/wechat.mini-code.int.test.ts::SHARE-003 — the version a code opens comes from config > keeps the legacy endpoint on the same rule`
 
 ### SYS-001
 

@@ -3,11 +3,7 @@ import {
   storefrontRoute,
   storefrontRouteDef,
 } from '@shop/contracts/system/storefront-routes';
-import type {
-  MiniCodeQuery,
-  MiniCodeResult,
-  ShareMiniCodeQuery,
-} from '@shop/contracts/wechat/schemas';
+import type { MiniCodeResult, ShareMiniCodeQuery } from '@shop/contracts/wechat/schemas';
 import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { enforce, fixedWindow } from '../kernel/rate-limit';
@@ -47,9 +43,6 @@ import * as repo from './wechat.mini-code.repo';
  * contains a colon, so the two never collide, and a rolled-back image simply
  * never looks those rows up.
  */
-
-/** WeChat's own limit on `scene`, in bytes. */
-export const SCENE_MAX_BYTES = 32;
 
 /** Where the generated PNGs live under the storage root. */
 const DIRECTORY = 'wechat-mini-code';
@@ -103,24 +96,6 @@ async function miniConfigured(ctx: Ctx): Promise<boolean> {
 }
 
 /**
- * The URL of the code for this page and scene, generating it if nobody has.
- *
- * The scene is re-checked here even though the contract's schema has already
- * refused an over-long one: the limit is WeChat's, in **bytes**, and a domain
- * that trusts its caller to have parsed the input is a domain that breaks the
- * first time somebody calls it from a job.
- */
-export async function miniCodeUrl(ctx: Ctx, query: MiniCodeQuery): Promise<MiniCodeResult> {
-  const scene = query.scene.trim();
-  if (scene === '' || Buffer.byteLength(scene, 'utf8') > SCENE_MAX_BYTES) {
-    throw new DomainError('VALIDATION_FAILED', {
-      details: [{ field: 'scene', message: `scene 最长 ${SCENE_MAX_BYTES} 字节` }],
-    });
-  }
-  return mintOrReuse(ctx, { page: query.page, scene });
-}
-
-/**
  * The code for a route-catalogue key: `GET /api/v1/share/mini-codes`.
  *
  * The page is the catalogue's and the scene is `encodeScene`'s, so a caller
@@ -171,7 +146,7 @@ async function mintOrReuse(
   const result = await getWechatClient(ctx).callBytes('mini', {
     method: 'POST',
     path: '/wxa/getwxacodeunlimit',
-    // `check_path: false` — the page is on this system's own allow-list and a
+    // `check_path: false` — the page is the route catalogue's own and a
     // shop generating a poster before the version carrying that page is
     // published is a normal Tuesday, not an error worth failing the share on.
     body: { page: key.page, scene, check_path: false, env_version: env },

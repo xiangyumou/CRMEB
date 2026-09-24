@@ -6,7 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { wechatMiniConfig } from '../system';
 import { resetWechatTokenFlight } from './wechat.client';
 import { wechatConfig } from './wechat.config';
-import { miniCodeUrl } from './wechat.mini-code.service';
+import { shareMiniCodeUrl } from './wechat.mini-code.service';
 
 /**
  * Two shoppers share the same product in the same millisecond.
@@ -26,8 +26,7 @@ let oa: FakeOaServer;
 const storage = memoryStorage(() => new Date('2026-06-01T00:00:00.000Z'));
 
 const NOW = '2026-06-01T00:00:00.000Z';
-const PAGE = 'pages/activity/goods_combination_details/index';
-const SCENE = 'pid=88';
+const TEAM = { route: 'groupbuyTeam', id: '88' } as const;
 
 beforeAll(async () => {
   harness = await createTestCtx({ now: NOW, storage });
@@ -61,8 +60,8 @@ describe('two callers, one pair', () => {
     const second = forkTestCtx(harness, { storage });
 
     const [a, b] = await Promise.all([
-      miniCodeUrl(first, { page: PAGE, scene: SCENE }),
-      miniCodeUrl(second, { page: PAGE, scene: SCENE }),
+      shareMiniCodeUrl(first, TEAM),
+      shareMiniCodeUrl(second, TEAM),
     ]);
 
     expect(a.url).toBe(b.url);

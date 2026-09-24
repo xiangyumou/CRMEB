@@ -165,12 +165,19 @@ B：删除加落地页；C：删表）不再采用。
 
 ### 2.6 写死的旧小程序路径和旧小程序码接口
 
-- [ ] `MINI_CODE_PAGES` 和 `miniCodePage`（`packages/contracts/src/wechat/schemas.ts`）。
-- [ ] `wechat.miniCode`：`GET /api/v1/wechat/mini-qrcodes`（`wechat.storefront.contract.ts`、
-      `apps/web/app/api/v1/wechat/mini-qrcodes/route.ts`），以及 `system.attachment.contract.ts`、`wechat.share.contract.ts` 注释中的引用。
+- [x] `MINI_CODE_PAGES` 和 `miniCodePage`（`packages/contracts/src/wechat/schemas.ts`）。
+      （C1：连同只为它们存在的 `miniCodeQuery`、`miniCodeScene` 和 core 的 `miniCodeUrl`、`SCENE_MAX_BYTES` 一起删。）
+- [x] `wechat.miniCode`：`GET /api/v1/wechat/mini-qrcodes`（`wechat.storefront.contract.ts`、
+      `apps/web/app/api/v1/wechat/mini-qrcodes/route.ts`），以及 `wechat.share.contract.ts` 注释中的引用
+      （`system.attachment.contract.ts` 已在 2.4 随 `system.attachmentDataUrl` 删除）。
       `wechat_mini_codes` 缓存表保留（新接口 `share/mini-codes` 和落地页也用它）。
-- [ ] `packages/core/src/diy/link.service.ts`、`page_links` 的读取随 2.3 删除；[pages.md](pages.md) 第 4.2、4.3 节列出的
+      （C1：缓存、拒绝、限额、并发四组测试原来走 `miniCodeUrl`，已改走 `shareMiniCodeUrl`；只测旧接口的
+      「scene 超过 32 字节」「与旧接口共用缓存」「旧接口也按版本」三条删除，SHARE-001、SHARE-003 的陈述相应改写。）
+- [x] `packages/core/src/diy/link.service.ts`、`page_links` 的读取随 2.3 删除；[pages.md](pages.md) 第 4.2、4.3 节列出的
       默认数据和契约示例里的旧路径一并清掉。
+      （C1：4.2 的默认数据随 2.3 删除；4.3 的契约示例改为新路径——开屏广告、拼团横幅、`user.recordVisit`。
+      `site.config.ts` 的 `splashLink`、`groupbuy.config.ts` 的 `banners[].link` 改成 `LinkTarget` 不是删除，不在 C1 范围；
+      测试里故意用旧路径的断言（旧值仍能读出、`linkTarget` 拒绝旧路径）保留。）
 
 ### 2.7 通知的旧 `link` 和 `wechatMini.page`
 
