@@ -94,5 +94,4 @@ SHOP_E2E_REUSE=1 SHOP_E2E_CLIENT=mini pnpm exec playwright test specs-mini/login
 热栈的端口和交接文件按工作目录区分，不同 worktree 的热栈互不可见。改了 `apps/mini` 或服务端代码后要重启
 热栈。旧 uni-app 的套件是同一个包的 `test`（`specs/`），切换时删除（[cutover.md](cutover.md)）。
 
-CI（`.github/workflows/ci.yml`）的 `storefront-e2e` 任务跑 `test`，`storefront-e2e-mini` 任务跑 `test:mini`，
-各自跑完整个目录。
+CI（`.github/workflows/ci.yml`）的 `storefront-e2e` 任务跑 `test`（切换之后就是小程序的 `specs-mini/`），跑完整个目录。
