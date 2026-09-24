@@ -441,12 +441,17 @@ B：删除加落地页；C：删表）不再采用。
 
 ### 5.1 什么时候做什么
 
-- [ ] **动手删除之前**：在 `storefront/mini` 上跑 `pnpm guards`，`api-compat` 不应打印任何 `[breaking, report-only]`。
+- [x] **动手删除之前**：在 `storefront/mini` 上跑 `pnpm guards`，`api-compat` 不应打印任何 `[breaking, report-only]`。
       有的话说明基线过时了，先 `api-compat:refresh --unreleased` 单独提交一次，让下一步的清单只含本次的删除。
-- [ ] **第 2 节的删除都做完之后**（第 1 节第 1 步的最后一个提交）：用这次要上传的版本号跑
+- [x] **第 2 节的删除都做完之后**（第 1 节第 1 步的最后一个提交）：用这次要上传的版本号跑
       `api-compat:refresh --release <版本号>`。核对它打印出的「原谅」清单**只包含** 2.3–2.6 节列出的接口（旧装修、
       辅助接口含 `site/config`、店员、`wechat/mini-qrcodes`），没有一条是新小程序调用的；清单写进提交说明。
       你已同意按这个办法处理切换时的删除。
+      （C1：删除前 `api-compat` 为 0 条；删完后以 `--release 1.0.0` 刷新，原谅 51 条：`/api/v1/diy/*` 8 条、
+      辅助接口 5 条（`attachments/base64`、`cart/items/decrements`、`catalog/categories/version`、`catalog/skus/{skuCode}`、
+      `site/config`）、`/api/v1/staff/*` 36 条、`wechat/mini-qrcodes` 1 条，外加 `POST /api/v1/uploads` 的
+      `purpose` 不再接受 `staff`（店员上传分支，2.5）。新小程序不调用其中任何一条（`apps/mini` 类型检查通过）。
+      刷新后 `api-compat` 对 release 1.0.0 为 0 条。）
 - [ ] **审核被拒、修改后重新提交，且 `/api/v1` 有改动**：版本号没有发布过，就用**同一个版本号**再刷一次，清单同样要逐条核对。
 - [ ] **之后每次发布小程序**：先按 device-check 第 9 节改版本号，再 `api-compat:refresh --release <新版本号>`，
       清单应该为空；不为空说明有破坏性改动混了进来，要么改回去，要么确认旧版本已不再使用（微信后台「版本管理」里
