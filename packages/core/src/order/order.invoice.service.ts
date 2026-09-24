@@ -10,6 +10,7 @@ import type {
 import { requireAdminId, requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId } from '../kernel/ids';
+import { Money } from '../kernel/money';
 import * as fulfilRepo from './order.fulfil.repo';
 import { requireOrderRef } from './order.ref';
 import * as repo from './order.repo';
@@ -141,6 +142,12 @@ const asDate = (value: string | undefined): Date | undefined =>
  * money that came back is a tax problem, and an invoice for money that never
  * arrived is a different one.
  */
+/** Paid, less every refund that has succeeded. */
+function invoiceableAmount(order: { paidAmount: string | null; refundedAmount: string }): Money {
+  if (order.paidAmount === null) return Money.ZERO;
+  return Money.parse(order.paidAmount).sub(Money.parse(order.refundedAmount)).clampToZero();
+}
+
 export async function request(
   ctx: Ctx,
   params: { id: string },
@@ -170,6 +177,12 @@ export async function request(
         details: { status: order.status, refundStatus: order.refundStatus },
       });
     }
+    const amount = invoiceableAmount(order);
+    if (!amount.isPositive()) {
+      throw new DomainError('ORDER_INVOICE_NOT_REQUESTABLE', {
+        details: { status: order.status, refundStatus: order.refundStatus },
+      });
+    }
 
     try {
       const invoice = await fulfilRepo.insertInvoice(tx, {
@@ -187,7 +200,7 @@ export async function request(
         bankName: body.bankName ?? null,
         bankAccount: body.bankAccount ?? null,
         // What the buyer actually paid, less anything already refunded.
-        amount: order.paidAmount,
+        amount: amount.toString(),
         remark: body.remark ?? null,
       });
 
@@ -306,12 +319,23 @@ export async function adminIssue(
   await ctx.withTx(async (tx) => {
     const row = await fulfilRepo.findInvoice(tx, invoiceId);
     if (!row) throw new DomainError('ORDER_INVOICE_NOT_FOUND');
+    // The amount frozen at the request is re-read here: a refund that landed
+    // in between is money the shop no longer has, and it must not be on the
+    // invoice. The order row is locked so a refund cannot land mid-issue.
+    const order = await repo.lockOrder(tx, row.orderId);
+    const amount = order ? invoiceableAmount(order) : Money.ZERO;
+    if (!amount.isPositive()) {
+      throw new DomainError('ORDER_INVOICE_NOT_ACTIONABLE', {
+        details: { status: row.status, refundStatus: order?.refundStatus ?? null },
+      });
+    }
 
     const moved = await fulfilRepo.transitionInvoice(tx, {
       invoiceId,
       from: ['requested'],
       to: 'issued',
       set: {
+        amount: amount.toString(),
         invoiceNumber: body.invoiceNumber,
         issuedAt: now,
         issuedByAdminId: adminId,

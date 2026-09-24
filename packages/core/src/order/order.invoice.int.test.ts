@@ -248,6 +248,22 @@ describe('申请开票', () => {
     expect(listed.items[0]?.orderSummary?.productName).toBe('改过名的商品');
   });
 
+  it('is for what the buyer kept, not what they first paid', async () => {
+    const placed = await paidOrder();
+    // A partial refund has already gone back: 20.00 of the 60.00.
+    await harness.ctx.db
+      .update(orders)
+      .set({ refundedAmount: '20.00', refundStatus: 'partially_refunded' })
+      .where(eq(orders.id, placed.orderId));
+
+    const invoice = await order.orderInvoices.request(
+      as(placed.userId),
+      { id: String(placed.orderId) },
+      header,
+    );
+    expect(invoice.amount).toBe('40.00');
+  });
+
   it('refuses an order nobody has paid for', async () => {
     const placed = await placeOrder();
     await expect(
@@ -420,6 +436,40 @@ describe('the operator', () => {
       (entry) => entry.changeType === 'invoice_issued',
     );
     expect(log).toMatchObject({ operatorKind: 'admin', operatorAdminId: adminId });
+  });
+
+  it('issues for what is left when a refund lands after the request', async () => {
+    const { adminId, placed, invoiceId } = await requested();
+    await harness.ctx.db
+      .update(orders)
+      .set({ refundedAmount: '15.50', refundStatus: 'partially_refunded' })
+      .where(eq(orders.id, placed.orderId));
+
+    const issued = await order.orderInvoices.adminIssue(
+      asAdmin(adminId),
+      { id: invoiceId },
+      { invoiceNumber: 'FP-20260601-0002' },
+    );
+    expect(issued.amount).toBe('44.50');
+  });
+
+  it('refuses to issue once the whole order has been refunded', async () => {
+    const { adminId, placed, invoiceId } = await requested();
+    await harness.ctx.db
+      .update(orders)
+      .set({ refundedAmount: '60.00', refundStatus: 'refunded', status: 'refunded' })
+      .where(eq(orders.id, placed.orderId));
+
+    await expect(
+      order.orderInvoices.adminIssue(
+        asAdmin(adminId),
+        { id: invoiceId },
+        { invoiceNumber: 'FP-20260601-0003' },
+      ),
+    ).rejects.toMatchObject({ code: 'ORDER_INVOICE_NOT_ACTIONABLE' });
+    expect(
+      (await order.orderInvoices.adminDetail(asAdmin(adminId), { id: invoiceId })).status,
+    ).toBe('requested');
   });
 
   it('refuses to issue the same invoice twice', async () => {
