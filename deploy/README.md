@@ -475,18 +475,23 @@ sets `+x` on directories only, so no uploaded file becomes executable.
 ## What the edge sends to `web`
 
 The edge proxies `/` (exactly), `/admin`, `/admin-api`, `/api`, `/scan-upload` and
-`/_next/static/` to `web`, and `/readyz` to the app's `/api/v1/readyz`. It serves `/uploads/` and
-the verification files (next section) itself. Every other path is a `302` to `/` with a relative
-`Location: /`: an old H5 or share link lands on the landing page, which shows the shop's name and
-the 小程序码. There is no storefront on the web; the shop is the WeChat mini-program. The landing
-page keeps the root layout's `noindex`.
+`/_next/static/` to `web`, and `/readyz` to the app's `/api/v1/readyz`. It also proxies exactly
+`/favicon.ico`, `/icon.svg` and `/robots.txt`, which `web` answers from `apps/web/app`: the icon
+every page links (the admin's too) and a `robots.txt` of `User-agent: *` / `Disallow: /`. It serves
+`/uploads/` and the verification files (next section) itself. Every other path is a `302` to `/`
+with a relative `Location: /`: an old H5 or share link lands on the landing page, which shows the
+shop's name and the 小程序码. There is no storefront on the web; the shop is the WeChat
+mini-program. The landing page keeps the root layout's `noindex`, and `robots.txt` says the same to
+crawlers.
 
 So a Next page the edge does not proxy never 404s: it turns into that redirect, which is easy to
 miss. A new page or route handler under `apps/web/app` outside those prefixes therefore needs a
 location in `docker/edge/nginx.conf`, with the same `X-Real-IP` and `X-Forwarded-For` handling as
-the others. The drill case `edge/proxies-every-page-route` requests every page route (`/`
-included) and one route handler per top-level path through the real edge, and fails on any that
-comes back as the edge's redirect to `/`.
+the others. So does a new file-convention icon (an `apple-icon.png`, say): it is not a page, and
+the edge proxies only the icon paths it names. The drill case `edge/proxies-every-page-route`
+requests every page route (`/` included) and one route handler per top-level path through the real
+edge, and fails on any that comes back as the edge's redirect to `/`; it also requires
+`/favicon.ico` and every icon linked from `/` and `/admin/login` to come back as an image.
 
 ## Domain verification files
 
@@ -514,8 +519,8 @@ No restart is needed: nginx reads the file on each request. Then add the domain 
 keep the admin's 微信小程序 → 业务域名 list the same (CLIENT-002). The file must be readable by
 everyone (`644`): nginx's workers are not the host user. A name that is not there is a `404`, not
 the redirect, and a `.txt` anywhere but the root is not served from the directory. Leave the file
-in place: WeChat may check it again. The same directory would serve a `robots.txt` if one were put
-there; none is, and `/robots.txt` is a 404.
+in place: WeChat may check it again. `/robots.txt` is the one name never served from the
+directory: `web` answers it, and a `robots.txt` put there is ignored.
 
 ## Health and readiness
 
@@ -594,8 +599,8 @@ starts and does no work, a readiness gate that finds a table missing, a rollback
 is not there, a successful upgrade and rollback, the same with an overlay configured (a stand-in
 for `compose.traefik.yml` on a stand-in network, never the real one), a release with nothing to
 migrate (with a probe measuring the longest gap in answers), one that changes only the Compose
-files, one with a new migration, a Next page the edge would not proxy, and a verification file
-placed in the mounted directory. Its `ship/` cases run
+files, one with a new migration, a Next page or icon the edge would not proxy, and a verification file
+placed in the mounted directory (and a `robots.txt` there, which must lose to `web`'s). Its `ship/` cases run
 `ship.sh` with `SHIP_HOST=local` into a directory of their own, against a stand-in `gh`: a red CI,
 a dry run, a fresh directory, a release that drops a file, and the forwarded commands. They ship
 `HEAD`, so commit first.
