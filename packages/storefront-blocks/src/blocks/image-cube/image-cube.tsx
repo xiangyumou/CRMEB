@@ -34,7 +34,7 @@ function BoxCell({ cell, className, onLink, host }: CellProps) {
         <BlockImage
           className={styles.fill}
           src={cell.image}
-          width={750}
+          width={960}
           resolve={host?.resolveImage}
           mode="aspectFill"
           lazyLoad={!host?.canvas}
@@ -72,7 +72,7 @@ export function ImageCube({ props, onLink, host }: BlockProps<ImageCubeProps>) {
                 <BlockImage
                   className={styles.rowImage}
                   src={cell.image}
-                  width={count === 2 ? 750 : 360}
+                  width={count === 2 ? 960 : 480}
                   resolve={host?.resolveImage}
                   mode="widthFix"
                   lazyLoad={!host?.canvas}

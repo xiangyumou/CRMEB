@@ -45,7 +45,7 @@ export type BlockIntent =
  *   above every view, so the 视频 block unmounts its player (which stops it)
  *   and shows the poster until the overlay closes (design.md §2.6).
  * - `resolveImage`: turns a stored picture URL into the one to load. `width`
- *   asks for the server's smaller copy (360 or 750 px wide) where one exists;
+ *   asks for the server's smaller copy (480 or 960 px wide) where one exists;
  *   without it, the original. The mini-program resolves `/uploads/…` against
  *   the API origin and derives the copy's URL; without it (the editor) a block
  *   loads the stored URL as it is. A block always falls back to the original
@@ -60,7 +60,7 @@ export interface BlockHost {
 }
 
 /** The two copy widths a block may ask for; see `BlockHost.resolveImage`. */
-export type BlockImageWidth = 360 | 750;
+export type BlockImageWidth = 480 | 960;
 export type ImageResolver = (src: string, width?: BlockImageWidth) => string;
 
 /**

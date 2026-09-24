@@ -47,7 +47,7 @@ export function UserCard({
         <BlockImage
           className={styles.background}
           src={props.background}
-          width={750}
+          width={960}
           resolve={host?.resolveImage}
           mode="aspectFill"
         />

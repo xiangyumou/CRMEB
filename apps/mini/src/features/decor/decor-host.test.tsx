@@ -325,7 +325,7 @@ describe('DecorPage host (decor.md §2.4)', () => {
       expect(screen.getByTestId('native-video')).toBeTruthy();
     });
 
-    it("loads a block picture's 750 px copy, and the original when the copy is missing", async () => {
+    it("loads a block picture's 960 px copy, and the original when the copy is missing", async () => {
       const upload = `/uploads/decor/2026/09/${HASH}.jpg`;
       await draw(
         pageOf([
@@ -340,7 +340,7 @@ describe('DecorPage host (decor.md §2.4)', () => {
       );
       const img = () =>
         document.querySelector('[data-block="hotspotImage"] img') as HTMLImageElement;
-      expect(img().getAttribute('src')).toBe(upload.replace(/\.jpg$/, '.w750.jpg'));
+      expect(img().getAttribute('src')).toBe(upload.replace(/\.jpg$/, '.w960.jpg'));
       fireEvent.error(img());
       expect(img().getAttribute('src')).toBe(upload);
     });

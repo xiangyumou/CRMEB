@@ -34,7 +34,7 @@ export function Video({ props, host }: BlockProps<VideoProps>) {
               <BlockImage
                 className={styles.poster}
                 src={props.poster}
-                width={750}
+                width={960}
                 resolve={host?.resolveImage}
                 mode="aspectFill"
               />

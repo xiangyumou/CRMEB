@@ -12,7 +12,7 @@ import * as repo from './storage.repo';
 import { resolveStorage } from './storage.service';
 
 /**
- * Image variants: a 360 px and a 750 px wide copy of every uploaded JPEG, PNG
+ * Image variants: a 480 px and a 960 px wide copy of every uploaded JPEG, PNG
  * and WebP, stored next to the original under a name the client can derive
  * (`@shop/contracts/storage/image-variants`), so a product card downloads a few
  * dozen kilobytes instead of the merchant's 3 MB photo.

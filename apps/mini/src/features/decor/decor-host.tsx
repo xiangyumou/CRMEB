@@ -44,11 +44,11 @@ export function useDecorRenderIntent(sessionFrom: string): RenderIntent {
 
 /**
  * `BlockHost.resolveImage` for the mini-program: a stored `/uploads/…` path against the API
- * origin (a block drew it as it was before, which loads nothing here), and the server's 360 or
- * 750 px copy where one exists.
+ * origin (a block drew it as it was before, which loads nothing here), and the server's 480 or
+ * 960 px copy where one exists.
  */
 export const resolveDecorImage: ImageResolver = (src, width) =>
-  (width === undefined ? assetUrl(src) : imageUrl(src, width === 360 ? 'small' : 'medium')) ?? src;
+  (width === undefined ? assetUrl(src) : imageUrl(src, width === 480 ? 'small' : 'medium')) ?? src;
 
 export interface DecorHost {
   host: BlockHost;

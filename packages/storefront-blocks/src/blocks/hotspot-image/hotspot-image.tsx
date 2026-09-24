@@ -22,7 +22,7 @@ export function HotspotImage({ props, onLink, host }: BlockProps<HotspotImagePro
         <BlockImage
           className={styles.image}
           src={props.image}
-          width={750}
+          width={960}
           resolve={host?.resolveImage}
           mode="widthFix"
           lazyLoad={!host?.canvas}
