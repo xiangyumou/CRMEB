@@ -19,11 +19,21 @@
 
 ## In progress
 
-- 合并检查清单（结果见最终报告）。
+- 无。
 
 ## Pending
 
 - 无。
+
+## 合并检查清单（2026-09-24）
+
+- `pnpm exec prettier --check .`：通过
+- `pnpm exec turbo run typecheck lint build`：35/35 通过
+- `pnpm exec turbo run test:unit --concurrency=2`：16/16 通过
+- `pnpm guards`：通过
+- `pnpm --filter ./e2e/storefront test:mini`：43 条 42 条通过，外加 `coupons.spec.ts` 预售那条预期失败（`test.fail`，J1 在修）；全量跑时
+  SMOKE-004 的「登录」按钮定位器同时匹配到「使用微信登录」，加 `exact` 修好后单跑 `login.spec.ts` 7/7 通过
+- 没有改 core 包，不需要 int 测试
 
 ## Page-form changes
 
