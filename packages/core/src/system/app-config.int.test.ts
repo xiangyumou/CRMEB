@@ -14,7 +14,6 @@ import { DomainError } from '../kernel/errors';
 import { wechatOaStorefront } from '../wechat-oa';
 import { appConfigGet, appConfigSourceGroups, subscribeScenesOf } from './app-config.service';
 import { configSave, describeGroup } from './config.service';
-import { siteConfigGet } from './site.service';
 import './index';
 // The bootstrap every request runs: without it neither `wechat-oa` nor `user`
 // has registered its reader, and this would test a process no deployment runs.
@@ -27,7 +26,7 @@ import '../domains.gen';
  * SYS-015 — the appearance group answers with every field defaulted, serves
  *           what the operator saved, and refuses a colour that is not `#RRGGBB`.
  * SYS-016 — a save to any source group drops the cache and moves `version` at
- *           once, and the values it shares with `siteConfigGet` agree with it.
+ *           once, and it serves the site's values the operator saved.
  */
 
 let harness: TestCtx;
@@ -298,7 +297,7 @@ describe('SYS-016 — one payload, always current', () => {
     expect((await appConfigGet(anonymous())).auth.wechatRequiresPhone).toBe(false);
   });
 
-  it('agrees with siteConfigGet on every value the two share', async () => {
+  it('serves the site values the operator saved', async () => {
     await save('site', {
       siteName: '示例商城',
       logo: '/uploads/a.png',
@@ -312,28 +311,15 @@ describe('SYS-016 — one payload, always current', () => {
     await save('wechat-mini', { enabled: true, contactType: 'mini-program' });
 
     const app = await appConfigGet(anonymous());
-    const site = await siteConfigGet(anonymous());
-    const { wechatRequiresPhone: _ignored, ...appAuth } = app.auth;
-    expect({
-      name: app.name,
-      logo: app.logo,
-      share: app.share,
-      support: app.support,
-      auth: appAuth,
-      payments: app.payments,
-      splashAd: { ...app.splashAd, link: null },
-    }).toEqual({
-      name: site.name,
-      logo: site.logo,
-      share: site.share,
-      support: site.support,
-      auth: site.auth,
-      payments: site.payments,
-      // The one deliberate difference: the tap is a LinkTarget here (SYS-020).
-      splashAd: { ...site.splashAd, link: null },
+    expect(app).toMatchObject({
+      name: '示例商城',
+      logo: { main: '/uploads/a.png', login: null, square: '/uploads/sq.png', favicon: null },
+      share: { title: '好货不贵', synopsis: '', image: '/uploads/share.png' },
+      support: { kind: 'mini-program', phone: '400-000-0000', qrcodeUrl: null },
+      auth: { wechatOa: false, wechatMini: false, phone: false },
+      payments: { wechat: false },
+      splashAd: { enabled: true, imageUrl: '/uploads/adv.png', link: null },
     });
-    expect(app.support.kind).toBe('mini-program');
-    expect(app.splashAd.enabled).toBe(true);
   });
 });
 
