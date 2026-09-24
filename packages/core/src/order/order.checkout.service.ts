@@ -322,11 +322,13 @@ async function buildDraft(
 
   // A marketing contributor learns which activity the shopper picked from the
   // same `kindMeta` the kind handler gets, plus `kind` so it can refuse to fire
-  // on an ordinary order.
+  // on an ordinary order. `kindMeta` goes first: nothing in it may overrule
+  // `kind` or the coupon, or an ordinary order carrying
+  // `kindMeta: {kind: 'groupbuy', activityId}` is priced at the group price.
   const adjustments = await gatherAdjustments(ctx, db, userId, lines, userCouponId, {
+    ...(input.kindMeta as Record<string, string | undefined> | undefined),
     couponId: input.userCouponId ?? undefined,
     kind: input.kind,
-    ...(input.kindMeta as Record<string, string | undefined> | undefined),
   });
   const discount = splitAdjustments(lines, adjustments);
   const itemsAmount = goodsTotalOf(lines);
