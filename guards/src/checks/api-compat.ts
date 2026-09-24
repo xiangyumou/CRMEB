@@ -23,10 +23,9 @@ import { apiBaselineFile, openapiFile, rel } from '../lib/paths';
 
 /**
  * **The switch.** `false`: a breaking change is printed as a note and the
- * check passes (report-only, until the first mini-program release). `true`:
- * a breaking change fails `pnpm guards`. Flipped in the same commit that
- * refreshes the baseline with `--release` for the first release
- * (docs/mini/cutover.md §5).
+ * check passes (report-only). `true`: a breaking change fails `pnpm guards`.
+ * It stays `false` through the first mini-program release; whether and when
+ * to flip it is decided after that release (docs/mini/cutover.md §5).
  */
 export const ENFORCED = false;
 

@@ -15,7 +15,7 @@
 | [wechat-compliance.md](wechat-compliance.md) | 微信平台规则 C01–C18 各自落在哪里，以及需要运营或老板在公众平台办理的事项                                      |
 | [device-check.md](device-check.md)           | 微信开发者工具和真机检查：e2e 看不到的东西（WXML、原生组件、真实的微信接口）                                   |
 | [e2e-coverage.md](e2e-coverage.md)           | 旧 uni-app 的 e2e 场景、SMOKE 规则、必测旅程 → 新小程序的 spec，以及还缺什么                                   |
-| [cutover.md](cutover.md)                     | 切换清单：删什么、暂时不删什么、公众平台上的操作、回滚                                                         |
+| [cutover.md](cutover.md)                     | 切换清单（一次发布）：当天的顺序、删什么和改什么、删表迁移、兼容基线、公众平台上的操作、回退                   |
 | [spikes/](spikes/)                           | 技术预研报告：S1 Taro、S2 api-client、S3 装修、S4 e2e「模拟小程序」                                            |
 | [status/](status/)                           | 每个开发流的状态记录和截图                                                                                     |
 
