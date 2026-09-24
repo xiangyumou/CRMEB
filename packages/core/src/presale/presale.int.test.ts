@@ -1420,7 +1420,7 @@ describe('shopper notifications', () => {
       `您预订的「${title}」已付款 ¥59.00，将于 2026-06-17 起发货。`,
     );
     expect(messages[0]?.data).toMatchObject({
-      link: `/pages/goods/order_details/index?order_id=${orderNo}`,
+      route: { route: 'order', params: { id: String(orderId) } },
     });
 
     const sends = oa.callsTo('/cgi-bin/message/template/send');
@@ -1428,7 +1428,6 @@ describe('shopper notifications', () => {
     expect(sends[0]?.body).toEqual({
       touser: 'oa-presale-1',
       template_id: 'TPL_OA_PRESALE',
-      url: `https://shop.example.test/pages/goods/order_details/index?order_id=${orderNo}`,
       data: { keyword1: { value: orderNo }, keyword2: { value: '2026-06-17' } },
     });
     expect(sms.calls).toEqual([

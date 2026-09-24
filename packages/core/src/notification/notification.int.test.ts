@@ -207,10 +207,8 @@ describe('fan-out', () => {
     const [message] = await messagesFor('userId', userId);
     expect(message).toMatchObject({ code: 'order_paid', audience: 'user', title: '支付成功' });
     expect(message?.content).toBe('订单 SO11 已支付 ¥99.00，我们会尽快发货。');
-    expect(message?.data).toMatchObject({
-      link: '/orders/11',
-      route: { route: 'order', params: { id: '11' } },
-    });
+    expect(message?.data).toMatchObject({ route: { route: 'order', params: { id: '11' } } });
+    expect(message?.data).not.toHaveProperty('link');
     expect(message?.readAt).toBeNull();
   });
 

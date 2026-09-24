@@ -181,14 +181,17 @@ B：删除加落地页；C：删表）不再采用。
 
 ### 2.7 通知的旧 `link` 和 `wechatMini.page`
 
-- [ ] 事件定义里的 `link`（`packages/core/src/notification/notification.registry.ts`、
+- [x] 事件定义里的 `link`（`packages/core/src/notification/notification.registry.ts`、
       `packages/core/src/groupbuy/groupbuy.notifications.ts`、`packages/core/src/presale/presale.notifications.ts`），只留 `route`。
-- [ ] `wechatMiniChannelConfig.page`（`packages/contracts/src/notification/schemas.ts`），后台
+- [x] `wechatMiniChannelConfig.page`（`packages/contracts/src/notification/schemas.ts`），后台
       `apps/web/app/admin/(shell)/notification/templates/notification-templates.tsx` 中 `['channels', 'wechatMini', 'page']`
       字段，`packages/core/src/notification/notification.send.ts` 中 `subscribePage` 的旧值回退。已保存的配置里多出的
       `page` 键在读取时忽略即可，不必迁移。
-- [ ] 公众号模板消息（`sendWechatOa`）的链接原来回退到事件的 `link`；删掉之后只剩后台配置的 `linkUrl`。没有公众号，
+- [x] 公众号模板消息（`sendWechatOa`）的链接原来回退到事件的 `link`；删掉之后只剩后台配置的 `linkUrl`。没有公众号，
       这个渠道不会被用到，不另做处理（HANDOFF 第 6 节「不改」）。
+      （C1 结果：用户事件的 `link` 全部删除，后台事件（订单、售后、库存、支付异常、小程序交易）的 `link` 是后台铃铛的
+      跳转路径，保留；注册时对带 `link` 的用户事件直接报错（NOTIF-006 加了一条测试）。站内信 `data` 里不再有 `link`。
+      后台「通知管理」的「小程序页面」输入框删除。）
 
 ### 2.8 守卫
 

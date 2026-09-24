@@ -55,9 +55,10 @@ export interface NotificationEvent {
   /** Default in-app wording, used to seed the row the first time it is read. */
   defaults: { title: string; body: string };
   /**
-   * Where tapping the message goes on the web: an H5 or admin path, `{{…}}`
-   * substituted like the body. The 公众号 template message's `url` and the
-   * admin bell use it; a customer event keeps it for the legacy H5 storefront.
+   * Admin events only: the admin path the bell opens, `{{…}}` substituted like
+   * the body. A customer event opens its `route` instead; the old H5 `link` on
+   * customer events was deleted at the cutover, so a 公众号 template message
+   * links only to the `linkUrl` an operator configured.
    */
   link?: string;
   /**
@@ -100,6 +101,9 @@ export function registerNotificationEvents(events: readonly NotificationEvent[])
     }
     if (event.audience === 'admin' && !event.permission) {
       throw new Error(`notification event "${event.code}" 是后台通知，必须声明 permission`);
+    }
+    if (event.audience === 'user' && event.link !== undefined) {
+      throw new Error(`notification event "${event.code}" 是用户通知，用 route 而不是 link`);
     }
     if (event.route) {
       const key = storefrontRouteKey.safeParse(event.route.route);
@@ -155,7 +159,6 @@ export function registerBuiltInNotificationEvents(): void {
       variables: [...ORDER_VARS],
       channels: [...USER_CHANNELS],
       defaults: { title: '订单提交成功', body: '订单 {{orderNo}} 已提交，应付 ¥{{amount}}。' },
-      link: '/orders/{{orderId}}',
       route: ORDER_ROUTE,
     },
     {
@@ -169,7 +172,6 @@ export function registerBuiltInNotificationEvents(): void {
         title: '支付成功',
         body: '订单 {{orderNo}} 已支付 ¥{{amount}}，我们会尽快发货。',
       },
-      link: '/orders/{{orderId}}',
       route: ORDER_ROUTE,
     },
     {
@@ -192,7 +194,6 @@ export function registerBuiltInNotificationEvents(): void {
         title: '您的订单已发货',
         body: '订单 {{orderNo}} 已发货，{{deliveryInfo}}。',
       },
-      link: '/orders/{{orderId}}',
       route: ORDER_ROUTE,
     },
     {
@@ -203,7 +204,6 @@ export function registerBuiltInNotificationEvents(): void {
       variables: [...ORDER_VARS],
       channels: [...USER_CHANNELS],
       defaults: { title: '确认收货成功', body: '订单 {{orderNo}} 已确认收货，感谢您的购买。' },
-      link: '/orders/{{orderId}}',
       route: ORDER_ROUTE,
     },
     {
@@ -214,7 +214,6 @@ export function registerBuiltInNotificationEvents(): void {
       variables: [...ORDER_VARS],
       channels: [...USER_CHANNELS],
       defaults: { title: '订单已完成', body: '订单 {{orderNo}} 已完成，期待再次为您服务。' },
-      link: '/orders/{{orderId}}',
       route: ORDER_ROUTE,
     },
     {
@@ -225,7 +224,6 @@ export function registerBuiltInNotificationEvents(): void {
       variables: [...ORDER_VARS, 'reason'],
       channels: [...USER_CHANNELS],
       defaults: { title: '订单已取消', body: '订单 {{orderNo}} 已取消。' },
-      link: '/orders/{{orderId}}',
       route: ORDER_ROUTE,
     },
     {
@@ -239,7 +237,6 @@ export function registerBuiltInNotificationEvents(): void {
         title: '订单金额已修改',
         body: '订单 {{orderNo}} 的金额由 ¥{{oldAmount}} 改为 ¥{{amount}}，请重新支付。',
       },
-      link: '/orders/{{orderId}}',
       route: ORDER_ROUTE,
     },
     {
@@ -250,7 +247,6 @@ export function registerBuiltInNotificationEvents(): void {
       variables: [...ORDER_VARS, 'expiresAt'],
       channels: [...USER_CHANNELS],
       defaults: { title: '订单待付款', body: '订单 {{orderNo}} 还未付款，请尽快完成支付。' },
-      link: '/orders/{{orderId}}',
       route: ORDER_ROUTE,
     },
     {
@@ -261,7 +257,6 @@ export function registerBuiltInNotificationEvents(): void {
       variables: ['refundId', 'refundNo', 'orderNo', 'amount'],
       channels: [...USER_CHANNELS],
       defaults: { title: '退款申请已提交', body: '退款单 {{refundNo}} 已提交，我们会尽快处理。' },
-      link: '/refunds/{{refundId}}',
       route: REFUND_ROUTE,
     },
     {
@@ -275,7 +270,6 @@ export function registerBuiltInNotificationEvents(): void {
         title: '退款申请已通过',
         body: '退款单 {{refundNo}} 已通过审核，退款将原路返回。',
       },
-      link: '/refunds/{{refundId}}',
       route: REFUND_ROUTE,
     },
     {
@@ -286,7 +280,6 @@ export function registerBuiltInNotificationEvents(): void {
       variables: ['refundId', 'refundNo', 'orderNo', 'reason'],
       channels: [...USER_CHANNELS],
       defaults: { title: '退款申请未通过', body: '退款单 {{refundNo}} 未通过审核：{{reason}}。' },
-      link: '/refunds/{{refundId}}',
       route: REFUND_ROUTE,
     },
     {
@@ -297,7 +290,6 @@ export function registerBuiltInNotificationEvents(): void {
       variables: ['refundId', 'refundNo', 'orderNo', 'amount'],
       channels: [...USER_CHANNELS],
       defaults: { title: '退款已到账', body: '退款单 {{refundNo}} 的 ¥{{amount}} 已原路退回。' },
-      link: '/refunds/{{refundId}}',
       route: REFUND_ROUTE,
     },
     {

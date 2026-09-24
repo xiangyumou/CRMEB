@@ -1189,11 +1189,12 @@ Rendering cannot lose a message: an unknown placeholder renders empty rather tha
 
 ### NOTIF-006
 
-A customer event names the mini-program page it opens as a route-catalogue key and a `{{…}}` params template, and registration refuses a key the catalogue does not mark `notify`. The template is filled first and validated second: a valid result is stored on the in-app message as `data.route` and is the subscribe message's `page` (`toMiniPath`), overriding the deprecated hand-typed page; a result that does not validate sends no destination rather than a wrong one.
+A customer event names the mini-program page it opens as a route-catalogue key and a `{{…}}` params template, and registration refuses a key the catalogue does not mark `notify`, and a web `link` on a customer event. The template is filled first and validated second: a valid result is stored on the in-app message as `data.route` and is the subscribe message's `page` (`toMiniPath`) — there is no hand-typed page, and a customer event carries no web `link`; a result that does not validate sends no destination rather than a wrong one.
 
 - `packages/core/src/notification/notification.render.test.ts::renderRoute > fills the params in first, then validates the route — NOTIF-006`
 - `packages/core/src/notification/notification.render.test.ts::renderRoute > answers null rather than a wrong destination when a variable is missing — NOTIF-006`
 - `packages/core/src/notification/notification.render.test.ts::renderRoute > refuses at registration a route the catalogue does not let a message open — NOTIF-006`
+- `packages/core/src/notification/notification.render.test.ts::renderRoute > refuses at registration a web link on a customer event — NOTIF-006`
 - `packages/core/src/notification/notification.int.test.ts::fan-out > seeds the template from the registry and writes the in-app message — NOTIF-006`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::shopper notifications > tells every paid member 拼团成功 when the team fills, on every channel switched on — NOTIF-006`
 
