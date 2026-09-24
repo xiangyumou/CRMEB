@@ -7,6 +7,8 @@ import { hideLoading, showLoading, showModal, showToast } from '@/platform';
  */
 export const toast = {
   text: (message: string): void => showToast(message),
+  /** A sentence the shopper has to read, not just notice (two lines): 3 s. */
+  long: (message: string): void => showToast(message, 3000),
   success: (message: string): void => showToast(message),
   loading: (message = '加载中'): void => showLoading(message),
   hide: (): void => hideLoading(),

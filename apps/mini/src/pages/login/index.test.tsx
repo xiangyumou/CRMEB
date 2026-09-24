@@ -73,6 +73,37 @@ describe('登录 · 其他方式 · 密码登录', () => {
     expect(leaves()).toBe(before);
   });
 
+  it('tells the shopper, once on the page they were going to, when this WeChat belongs to another account', async () => {
+    const seen = serveApi({
+      'POST /api/v1/auth/sessions/password': (body) =>
+        (body as { bindToken?: string }).bindToken
+          ? rejected('AUTH_WECHAT_ALREADY_BOUND', '该微信已绑定其他账号', 409)
+          : { status: 201, body: session },
+    });
+    await openPasswordForm();
+    fireEvent.click(screen.getByRole('checkbox', { name: '我已阅读并同意用户协议和隐私政策' }));
+    type('账号', '13800138000');
+    type('密码', 'secret-1');
+    fireEvent.click(screen.getByRole('button', { name: '登录' }));
+
+    const hint = '此微信已关联其他账号，本账号需用密码登录';
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'showToast',
+        args: expect.objectContaining({ title: hint, duration: 3000 }),
+      }),
+    );
+    // Signed in without the link (H6), and the hint comes after leaving, not on this page.
+    expect(seen).toHaveLength(2);
+    const apis = taroFake.calls.map((call) => call.api);
+    const left = apis.findIndex((api) => api === 'switchTab' || api === 'reLaunch');
+    const shown = taroFake.calls.findIndex(
+      (call) => call.api === 'showToast' && (call.args as { title?: string }).title === hint,
+    );
+    expect(left).toBeGreaterThanOrEqual(0);
+    expect(shown).toBeGreaterThan(left);
+  });
+
   it('says a wrong password on the password field, and stays parked for WeChat', async () => {
     serveApi({
       'POST /api/v1/auth/sessions/password': () =>
