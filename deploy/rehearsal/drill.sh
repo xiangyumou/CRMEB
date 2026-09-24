@@ -719,7 +719,9 @@ route_url() {
 # a Next page left out of `nginx.conf` does not 404: it quietly turns into a
 # 302 to `/`. Every page route — `/` included, which must be answered by `web`
 # itself — and one route handler per top-level path is requested through the
-# real edge, and none may come back as that redirect.
+# real edge, and none may come back as that redirect. The icons are not page
+# files, so they are checked as the browser finds them: `/favicon.ico`, and
+# every icon link on the landing page and the admin's login page.
 case_edge_proxies_every_page() {
   ensure_deployed || return 1
   local app="$repo_root/apps/web/app" file url prefix response status location
@@ -763,12 +765,42 @@ case_edge_proxies_every_page() {
   done < <(find "$app" -type f -regextype posix-extended \
     -regex '.*/(page|route)\.(tsx|ts|jsx|js|mdx)' | sort)
   check "$checked route(s) reach web through the edge" [ "$checked" -gt 0 ]
+
+  check '/favicon.ico is an image from web' edge_serves_image /favicon.ico
+  local page href links
+  for page in / /admin/login; do
+    links="$(curl -fsS --max-time 30 "http://127.0.0.1:$edge_port$page" 2>/dev/null |
+      grep -oiE '<link[^>]*rel="(shortcut )?(icon|apple-touch-icon)"[^>]*>' |
+      sed -nE 's/.*href="([^"]*)".*/\1/p' | sed 's/&amp;/\&/g')" || links=''
+    check "$page links an icon" [ -n "$links" ]
+    while IFS= read -r href; do
+      [ -n "$href" ] || continue
+      case "$href" in /*) ;; *) href="/${href#*://*/}" ;; esac
+      check "$page's icon $href is an image from web" edge_serves_image "$href"
+    done <<<"$links"
+  done
+}
+
+# Whether text $2 has a line that is $1, ignoring case.
+has_line() { printf '%s\n' "$2" | grep -qix -- "$1"; }
+
+# 200 and an `image/…` type through the edge: neither the redirect to `/`
+# (a 302) nor the landing page itself (HTML).
+edge_serves_image() {
+  local response
+  response="$(curl -sS --max-time 10 -o /dev/null -w '%{http_code} %{content_type}' \
+    "http://127.0.0.1:$edge_port$1" 2>/dev/null)" || return 1
+  case "$response" in '200 image/'*) return 0 ;; esac
+  note "$1 answered '$response'"
+  return 1
 }
 
 # The WeChat domain-verification files: `/<name>.txt` at the root comes from the
 # read-only mount (`NEXT_DOMAIN_VERIFICATION_DIR`, which this drill points into
 # its own workdir), byte for byte; a name that is not there is a 404, not the
 # landing-page redirect; nothing outside the plain-name pattern reaches it.
+# `/robots.txt` is the one root-level `.txt` it never serves: `web` answers it,
+# even with a `robots.txt` placed in the directory.
 case_edge_serves_verification_files() {
   ensure_deployed || return 1
   local dir edge_id name="drill_${RANDOM}${RANDOM}" body base="http://127.0.0.1:$edge_port"
@@ -786,6 +818,15 @@ case_edge_serves_verification_files() {
     [ "$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' "$base/${name}-missing.txt")" = '404' ]
   check 'a nested .txt is not served from the directory' \
     [ "$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' "$base/x/$name.txt")" = '302' ]
+  printf 'drill placed robots\n' >"$dir/robots.txt"
+  chmod 644 "$dir/robots.txt"
+  body="$(curl -fsS --max-time 10 "$base/robots.txt" 2>/dev/null)" || body=''
+  # The placed file has no `Disallow` line: finding one proves `web` answered.
+  check '/robots.txt comes from web (Disallow: /), not the directory' \
+    has_line 'disallow: /' "$body"
+  check '/robots.txt is text/plain' \
+    sh -c "curl -fsS --max-time 10 -o /dev/null -w '%{content_type}' '$base/robots.txt' | grep -qi '^text/plain'"
+  rm -f "$dir/robots.txt"
   # `docker exec` runs as root, so only the read-only mount can refuse this.
   edge_id="$(compose ps -q edge)"
   if docker exec "$edge_id" touch /srv/domain-verification/drill-write 2>/dev/null; then

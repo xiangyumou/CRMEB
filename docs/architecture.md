@@ -353,6 +353,9 @@ and `pnpm --filter @shop/e2e-storefront test`; the rest only a real phone can sh
 - `/healthz` answers from nginx; `/readyz` proxies to the application's `/api/v1/readyz`.
 - `= /` (the landing page, `apps/web/app/page.tsx`), `^/(admin|admin-api|api|scan-upload)(/|$)`
   and `/_next/static/` go to `web`; `/admin-api/notifications/stream` goes unbuffered, for SSE.
+- `= /favicon.ico`, `= /icon.svg` and `= /robots.txt` go to `web`, which answers them from
+  `apps/web/app` (`favicon.ico`, `icon.svg`, `robots.ts`: `Disallow: /`). Exact matches, so
+  `/robots.txt` never reaches the verification-file rule below.
 - `^~ /uploads/` serves the uploads volume read-only; anything that could execute is refused.
 - `^/[A-Za-z0-9_-]+\.txt$` serves the WeChat domain-verification files from a read-only mount
   (`deploy/README.md`, "Domain verification files").
