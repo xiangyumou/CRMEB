@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
@@ -74,5 +75,28 @@ describe('我的', () => {
     act(() => signIn());
     expect(await screen.findByText('小林')).toBeTruthy();
     expect(seen.filter((r) => r.key === 'GET /api/v1/pages/user-center')).toHaveLength(2);
+  });
+
+  it('asks for the counts again every time it is shown, even within the 30 s staleTime', async () => {
+    signIn();
+    const seen = serveApi({
+      'GET /api/v1/pages/user-center': () => ({ body: userCenter(true) }),
+      'GET /api/v1/my-messages/unread-count': () => ({ body: { unread: 0 } }),
+    });
+    // The app's own freshness window: a read younger than 30 s is not stale.
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: 30_000 } },
+    });
+    await renderPage(<Me />, client);
+    expect(await screen.findByText('小林')).toBeTruthy();
+    const pageReads = () => seen.filter((r) => r.key === 'GET /api/v1/pages/user-center').length;
+    expect(pageReads()).toBe(1);
+
+    // Paid on another page a moment later, then back on 我的: the 待付款 badge must move.
+    act(() => taroFake.showPage());
+    await waitFor(() => expect(pageReads()).toBe(2));
+    expect(
+      seen.filter((r) => r.key === 'GET /api/v1/my-messages/unread-count').length,
+    ).toBeGreaterThanOrEqual(2);
   });
 });

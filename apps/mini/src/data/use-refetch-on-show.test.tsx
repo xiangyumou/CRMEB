@@ -6,7 +6,7 @@ import { testQueryClient } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
 import { useRefetchOnShow } from './use-refetch-on-show';
 
-function setup(staleTime: number) {
+function setup(staleTime: number, options: { always?: boolean } = {}) {
   let fetches = 0;
   const client = testQueryClient();
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -14,7 +14,7 @@ function setup(staleTime: number) {
   );
   const hook = renderHook(
     () => {
-      useRefetchOnShow(['greeting']);
+      useRefetchOnShow(['greeting'], options);
       return useQuery({
         queryKey: ['greeting'],
         queryFn: async () => `hello ${++fetches}`,
@@ -45,5 +45,14 @@ describe('useRefetchOnShow', () => {
       await Promise.resolve();
     });
     expect(fetches()).toBe(1);
+  });
+
+  it('refetches a fresh query too when asked to on every show', async () => {
+    const { hook, fetches } = setup(60_000, { always: true });
+    await waitFor(() => expect(hook.result.current.data).toBe('hello 1'));
+    expect(fetches()).toBe(1);
+
+    act(() => taroFake.showPage());
+    await waitFor(() => expect(hook.result.current.data).toBe('hello 2'));
   });
 });

@@ -20,15 +20,17 @@ const ROUTE = { route: 'me', params: {} } as const;
  * 我的 (tab `me`, custom navigation bar, pages.md §2.1): the 个人中心 the operator decorated
  * (`decor.pageUserCenter`, the built-in one when none is), drawn by the decor renderer. A guest sees the same page with
  * 「登录/注册」 in the user card. Refetched when the shopper signs in or out, on every show
- * (order counts move) and on pull-down.
+ * (order counts move; not only once stale) and on pull-down.
  */
 export default function Me() {
   useTabPage('me');
   const signedIn = useSignedIn();
   const page = useRouteQuery('decor.pageUserCenter', {});
   const unread = useRouteQuery('notification.myUnreadCount', {}, { enabled: signedIn });
-  useRefetchOnShow(routeKey('decor.pageUserCenter'));
-  useRefetchOnShow(routeKey('notification.myUnreadCount'));
+  // Every show, fresh or not: the counts on this page move with a payment, a receipt, a
+  // refund, a review or a claim made on another page, and the server's own changes (shipped).
+  useRefetchOnShow(routeKey('decor.pageUserCenter'), { always: true });
+  useRefetchOnShow(routeKey('notification.myUnreadCount'), { always: true });
   usePullToRefresh(() => Promise.all([page.refetch(), signedIn ? unread.refetch() : null]));
 
   // Signing in does not clear the cache (signing out does): the guest's page must go.
