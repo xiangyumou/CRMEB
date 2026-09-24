@@ -1,7 +1,3 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import { hashPassword } from '@shop/core/auth';
 import { adminProductCreate, adminCategoryCreate } from '@shop/core/catalog';
 import {
@@ -13,7 +9,6 @@ import {
   designate as designateDecor,
   publish as publishDecor,
 } from '@shop/core/decor';
-import { createPage, diyConfig, savePageContent, setHomePage } from '@shop/core/diy';
 import { paymentConfig } from '@shop/core/payment';
 import { templates as shippingTemplates } from '@shop/core/shipping';
 import { addressCreate } from '@shop/core/user';
@@ -34,65 +29,25 @@ import { ctxFor } from './stack';
 import type { SeededUser } from './stack-file';
 
 /**
- * Everything the eight journeys need to already exist, and nothing else.
+ * Everything the journeys need to already exist, and nothing else.
  *
  * The same rule `@shop/e2e-admin`'s seed follows applies here, mirrored: a
- * product, a coupon template, a DIY page are made through the services that
- * back the admin console, because *creating* them is not what any of the
- * eight journeys is about — the journeys start from a shop that is already
+ * product, a coupon template, a decorated 首页 are made through the services
+ * that back the admin console, because *creating* them is not what any of the
+ * journeys is about — the journeys start from a shop that is already
  * open. A group-buy team mid-flight or a paid order is different: nothing a
  * shopper does *before* the journey starts should itself be exercising the
  * code the journey exists to test, so those are direct inserts, exactly as
  * `groupbuy.int.test.ts` and `presale.checkout.int.test.ts` arrange them.
  *
  * Nothing here configures SMS or Aliyun; the payment/wechat config this seed
- * writes points at the fake gateway `scripts/serve.ts` starts, never at a
- * real WeChat endpoint.
+ * writes points at the fakes `scripts/serve.ts` starts, never at a real
+ * WeChat endpoint.
  */
 
 const PASSWORD = 'e2e-Passw0rd!';
 
-const FIXTURES = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  '..',
-  'packages',
-  'contracts',
-  'src',
-  'diy',
-  '__fixtures__',
-);
-
-function valueOf(fileName: string): unknown {
-  const row = JSON.parse(readFileSync(path.join(FIXTURES, fileName), 'utf8')) as {
-    value: unknown;
-  };
-  return typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
-}
-
-function pageValueOf(fileName: string): Record<string, unknown> {
-  return valueOf(fileName) as Record<string, unknown>;
-}
-
-/**
- * The DOM id `subpackage/diyComponents/pageDesign.vue` gives every visible
- * component of a page (`<view :id="item.id">`) — what journey 1 looks for to
- * prove each one was rendered. `pageFoot` is the tab bar, drawn by
- * `pageFooter` with no such wrapper.
- */
-function renderedComponentIds(content: Record<string, unknown>): string[] {
-  const ids: string[] = [];
-  for (const [key, component] of Object.entries(content)) {
-    if (!component || typeof component !== 'object') continue;
-    const { name, id, isHide } = component as { name?: unknown; id?: unknown; isHide?: unknown };
-    if (typeof name !== 'string' || name === 'pageFoot' || isHide === true) continue;
-    ids.push(typeof id === 'string' ? id : `id${key}`);
-  }
-  return ids;
-}
-
-// A 1x1 PNG, so every image the DIY renderer and the product pages try to
+// A 1x1 PNG, so every image the decorated pages and the product pages try to
 // load resolves offline with no console error.
 const E2E_IMAGE_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
@@ -119,20 +74,10 @@ export interface SeedResult {
     primaryAddressId: number;
     secondaryAddressId: number;
     expressCompanyId: number;
-    diyHomePageId: number;
-    /** The mini-program's 首页 (页面装修 v2); the uni-app never reads it. */
+    /** The mini-program's 首页 (店铺装修). */
     decorHomeId: number;
     division: { provinceId: string; cityId: string; districtId: string };
-    diyPages: SeededDiyPage[];
   };
-}
-
-/** A page seeded from one of the production DIY fixtures. */
-export interface SeededDiyPage {
-  fixture: string;
-  id: number;
-  kind: 'home' | 'micro';
-  componentIds: string[];
 }
 
 export async function seedE2E(options: {
@@ -145,12 +90,11 @@ export async function seedE2E(options: {
   gatewayApiUrl: string;
   baseUrl: string;
   /**
-   * The mini-program suite only: sign-in through the fake `api.weixin.qq.com`
-   * (`startFakeOaServer`). The mini app id is the gateway's `appId`, which the
+   * Sign-in through the fake `api.weixin.qq.com` (`startFakeOaServer`). The mini app id is the gateway's `appId`, which the
    * serve script made equal to the fake's mini app id, because WeChat Pay
    * charges a mini-program payment to the mini-program's own app id.
    */
-  miniProgram?: { appSecret: string; apiBaseUrl: string };
+  miniProgram: { appSecret: string; apiBaseUrl: string };
 }): Promise<SeedResult> {
   const parts = ctxFor(options);
   const { ctx, db } = parts;
@@ -171,22 +115,18 @@ export async function seedE2E(options: {
       apiBaseUrl: options.gatewayApiUrl,
       payExpiryMinutes: 30,
     });
-    // The shop's own name, logo and copyright (journey 8) — distinct from
+    // The shop's own name, logo and copyright (`app-config.spec.ts`) — distinct from
     // every bundled default, so a page that ignores site config shows it.
     await ctx.config.set(siteConfig, { ...SITE });
     await ctx.config.set(wechatConfig, {
       miniAppId: options.gateway.keys.appId,
       oaAppId: options.gateway.keys.appId,
-      ...(options.miniProgram && {
-        miniAppSecret: options.miniProgram.appSecret,
-        apiBaseUrl: options.miniProgram.apiBaseUrl,
-      }),
+      miniAppSecret: options.miniProgram.appSecret,
+      apiBaseUrl: options.miniProgram.apiBaseUrl,
     });
-    if (options.miniProgram) {
-      // 小程序登录 is off until an operator turns it on; the shop keeps the
-      // default 「微信登录需绑定手机号」, so a new shopper meets phone-required.
-      await ctx.config.set(wechatMiniConfig, { enabled: true, name: 'E2E 小程序' });
-    }
+    // 小程序登录 is off until an operator turns it on; the shop keeps the
+    // default 「微信登录需绑定手机号」, so a new shopper meets phone-required.
+    await ctx.config.set(wechatMiniConfig, { enabled: true, name: 'E2E 小程序' });
 
     await db
       .insert(expressCompanies)
@@ -559,35 +499,7 @@ export async function seedE2E(options: {
       isEnabled: true,
     });
 
-    // The six DIY fixtures captured from a production shop. Three are pages:
-    // prod-6 is the home page (journeys 1 and 8), prod-7 and prod-8 are
-    // published as micro pages so journey 1 can render their components too.
-    // The other three are settings: prod-3 and prod-4 are the 分类页 /
-    // 个人中心 版式 picks `diyConfig` holds; prod-2 (一键换色) is not seeded.
-    const diyPages: SeededDiyPage[] = [];
-    for (const [fixture, kind, name] of [
-      ['prod-6.json', 'home', '首页'],
-      ['prod-7.json', 'micro', '模板'],
-      ['prod-8.json', 'micro', '旧首页'],
-    ] as const) {
-      const content = pageValueOf(fixture);
-      const page = await createPage(ctx, { name, kind, title: name });
-      await savePageContent(ctx, { id: page.id, content, publish: true });
-      if (kind === 'home') await setHomePage(ctx, { id: page.id });
-      diyPages.push({
-        fixture,
-        id: Number(page.id),
-        kind,
-        componentIds: renderedComponentIds(content),
-      });
-    }
-    await ctx.config.set(diyConfig, {
-      categoryLayout: Number(valueOf('prod-3.json')),
-      userCenterLayout: Number(valueOf('prod-4.json')),
-    });
-
-    // The mini-program's 首页 is a 页面装修 v2 document, not a legacy DIY page:
-    // a search bar, a 分类 entry into the E2E category, and that category's
+    // The mini-program's 首页, a 店铺装修 document: a search bar, a 分类 entry into the E2E category, and that category's
     // products — what the mini journeys start from.
     const decorHome = await createDecorDocument(ctx, {
       kind: 'home',
@@ -615,10 +527,8 @@ export async function seedE2E(options: {
         primaryAddressId: Number(primaryAddress.id),
         secondaryAddressId: Number(secondaryAddress.id),
         expressCompanyId: Number(courier!.id),
-        diyHomePageId: diyPages[0]!.id,
         decorHomeId: Number(decorHome.id),
         division,
-        diyPages,
       },
     };
   } finally {

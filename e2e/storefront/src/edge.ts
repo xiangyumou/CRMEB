@@ -7,18 +7,17 @@ import { pipeline } from 'node:stream/promises';
 /**
  * The edge, in one process.
  *
- * `docker/edge/nginx.conf` puts three surfaces behind one port, and this
- * mirrors it: the uni-app H5 build as a history-mode SPA at `/`, the `web`
- * container at `/admin`, `/admin-api`, `/api` and `/_next`, and the uploads
- * directory as inert bytes at `/uploads/`.
+ * `docker/edge/nginx.conf` puts the `web` container at `/admin`, `/admin-api`,
+ * `/api` and `/_next`, and the uploads directory as inert bytes at
+ * `/uploads/`. This mirrors those, and serves the mini-program's "模拟小程序"
+ * H5 build (`src/h5.ts`) as a history-mode SPA at `/`: production never
+ * serves that build, but the suite needs a page on the same origin as the
+ * API, as the WeChat build's requests are to its one configured origin.
  *
- * Why an edge at all, rather than pointing Playwright at `next start` and
- * letting it serve the bundle: on H5 the storefront computes its API origin
- * from `window.location` (`apps/uni-app/config/app.js`), so the bundle and
- * the API have to share an origin or every request is cross-origin and the
- * suite would be testing a deployment nobody ships. Production solves that
- * with nginx; a hundred lines of `node:http` solves it here without asking the
- * suite to run a container it would then have to build.
+ * Why an edge at all, rather than pointing Playwright at `next start`: the
+ * bundle and the API have to share an origin or every request is
+ * cross-origin. A hundred lines of `node:http` solves it here without asking
+ * the suite to run a container it would then have to build.
  *
  * What is deliberately *not* mirrored: TLS, gzip, the SSE buffering rules and
  * the cache lifetimes. None of them changes what a spec can observe, and each
@@ -58,14 +57,14 @@ const PROXIED = /^\/(admin|admin-api|api|scan-upload|_next)(\/|$)/;
 
 export interface EdgeOptions {
   port: number;
-  /** The H5 build — `apps/uni-app/dist/dev/h5`. */
+  /** The H5 build — `apps/mini/dist/h5-mp-emulation`. */
   root: string;
   /** Where uploads land. Served as inert bytes at `/uploads/`. */
   uploadsDir: string;
   /** `next start`'s origin. */
   upstream: string;
   /**
-   * The mini-program suite only: the gateway control-plane's origin
+   * The gateway control-plane's origin
    * (`gateway-control.ts`). `/__e2e/mini/*` on the edge goes to its
    * `/mini/*`, which is how the "模拟小程序" build gets its `wx.login` and
    * `getPhoneNumber` codes and completes `requestPayment`

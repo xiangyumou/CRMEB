@@ -1483,23 +1483,20 @@ PostgreSQL `jsonb` reorders the keys inside a node; the guarantee that survives 
 
 ### SMOKE-002
 
-The DIY home's product lists load on the real stack with no console error and no failed request — the uni-app's DIY home, and in the mini-program a 装修 v2 page's product list.
+A decorated page's blocks, product lists included, load in the mini-program on the real stack with no console error and no failed request.
 
-- `e2e/storefront/specs/home-category-product.spec.ts::the DIY home page renders every fixture component with no console error`
 - `e2e/storefront/specs-mini/decor.spec.ts::a page published in the admin shows each of its blocks in order, and follows the next publish`
 
 ### SMOKE-003
 
-The home page loads for a signed-in shopper: `GET /api/v1/diy/pages/home` on the uni-app's H5 build, `GET /api/v1/pages/home` in the mini-program.
+The mini-program's home page (`GET /api/v1/pages/home`) loads for a signed-in shopper.
 
-- `e2e/storefront/specs/home-category-product.spec.ts::the DIY home page renders every fixture component with no console error`
 - `e2e/storefront/specs-mini/shop-journey.spec.ts::a shopper goes from 首页 through 分类 and the cart to a paid order`
 
 ### SMOKE-004
 
-`GET /api/v1/profile` answers 200 after a sign-in: a password login on the uni-app's H5 build; in the mini-program, a password login (the login page's 其他方式) and the silent `wx.login` sign-in.
+`GET /api/v1/profile` answers 200 after a sign-in in the mini-program: a password login (the login page's 其他方式) and the silent `wx.login` sign-in.
 
-- `e2e/storefront/specs/login.spec.ts::password login reaches an authenticated screen`
 - `e2e/storefront/specs-mini/login.spec.ts::SMOKE-004: 密码登录 under 其他方式 reaches an authenticated screen, and a wrong password is its field's error`
 - `e2e/storefront/specs-mini/login.spec.ts::a WeChat user the shop knows is signed in on opening the app, with no login page`
 
@@ -1507,7 +1504,6 @@ The home page loads for a signed-in shopper: `GET /api/v1/diy/pages/home` on the
 
 An order is created `pending_payment`, paid through the cashier with the worker running, and read back `paid`.
 
-- `e2e/storefront/specs/cart-checkout-pay.spec.ts::a shopper pays an order at the cashier and the order is paid`
 - `e2e/storefront/specs-mini/new-shopper-buys.spec.ts::a new WeChat user signs in, binds a phone, buys a product and pays`
 
 ### SMOKE-006

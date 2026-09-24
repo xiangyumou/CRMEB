@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
-    "test:mini": "SHOP_E2E_CLIENT=mini playwright test",
     "test:ui": "playwright test --ui",
     "serve": "tsx scripts/serve.ts",
     "typecheck": "tsc -p tsconfig.json",

@@ -2,41 +2,31 @@ import { defineConfig } from '@playwright/test';
 
 import { DEVICE } from './src/device';
 
-import { BASE_URL, CLIENT, REUSE } from './src/stack-file';
+import { BASE_URL, REUSE } from './src/stack-file';
 
 /**
- * Storefront end-to-end suite: the uni-app H5 build in a mobile browser.
+ * Storefront end-to-end suite: the mini-program's "模拟小程序" H5 build
+ * (`apps/mini`, `build:h5:mp-emulation`) in a mobile browser, with the fake
+ * `api.weixin.qq.com` answering `wx.login` / `getPhoneNumber` and the fake
+ * WeChat Pay gateway answering `requestPayment` (docs/mini/spikes/S4-e2e.md).
  *
  * One command, from the repository root:
  *
  *     pnpm --filter @shop/e2e-storefront test
  *
  * `webServer` is `scripts/serve.ts`, mirroring `@shop/e2e-admin`'s: the whole
- * stack — Postgres, Redis, the fake WeChat Pay gateway and its control-plane
- * bridge, the seed, the H5 build, `next start` and the worker — comes up
- * inside one script so `SIGINT` tears all of it down together, and so the
- * containers exist before Playwright's own `globalSetup` would have run.
+ * stack — Postgres, Redis, the fakes and their control-plane bridge, the seed,
+ * the H5 build, `next start` and the worker — comes up inside one script so
+ * `SIGINT` tears all of it down together, and so the containers exist before
+ * Playwright's own `globalSetup` would have run.
  *
  * `workers: 1`, for the same reason as the admin suite: every journey shares
  * one database and one Redis, so a group-buy team one spec opens must still
- * be there when the next spec's process reads it. The suite proves eight
- * user journeys work end to end, not that they can be run concurrently.
- *
- * The one project is a mobile Chromium emulation, not desktop: `manifest.json`
- * has no separate mobile-web build — the H5 bundle *is* what a phone browser
- * gets — and `config/app.js`'s `clientPlatform()` derives the platform from
- * `navigator.userAgent`, so the emulated device's UA is what makes the app
- * behave as H5 rather than assume a manual header would.
- */
-/**
- * `SHOP_E2E_CLIENT` (`src/stack-file.ts`) picks the storefront, and with it
- * the one project that runs: `mobile-chromium` over `specs/` for the uni-app
- * (the default), `mini-h5` over `specs-mini/` for the Taro mini-program's
- * "模拟小程序" build (`pnpm --filter @shop/e2e-storefront test:mini`). One
- * stack serves one client, so the two never run in one invocation.
+ * be there when the next spec's process reads it. The suite proves the
+ * journeys work end to end, not that they can be run concurrently.
  */
 export default defineConfig({
-  testDir: CLIENT === 'mini' ? './specs-mini' : './specs',
+  testDir: './specs-mini',
   outputDir: './test-results',
   fullyParallel: false,
   workers: 1,
@@ -58,19 +48,12 @@ export default defineConfig({
     video: 'off',
   },
   projects: [
-    CLIENT === 'mini'
-      ? {
-          // The same phone. The emulation build does not look at the UA: it
-          // says `wechat-mini` because it was built to.
-          name: 'mini-h5',
-          use: { ...DEVICE },
-        }
-      : {
-          // Chromium only, mobile viewport: these journeys assert what a shopper
-          // on a phone browser sees, not cross-browser rendering.
-          name: 'mobile-chromium',
-          use: { ...DEVICE },
-        },
+    {
+      // A phone. The emulation build does not look at the UA: it says
+      // `wechat-mini` because it was built to.
+      name: 'mini-h5',
+      use: { ...DEVICE },
+    },
   ],
   webServer: {
     command: 'pnpm exec tsx scripts/serve.ts',
