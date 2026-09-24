@@ -26,6 +26,8 @@
  *   the review team flags dynamic code);
  * - any script does not parse as ES2018, the target in babel.config.js (the WeChat runtime
  *   does not transpile node_modules for us; `es6: false` in project.config.json);
+ * - a module that creates a zustand store is copied into several sub-packages (`sub-common`), so
+ *   each has its own state;
  * - app.json lists a page or sub-package that is not in the output;
  * - any file carries a 32-hex-digit token (the shape of an AppSecret or a payment key; those live
  *   only in the server's config) that is not the name of a chunk in the output, or the output holds a miniprogram-ci upload key
@@ -252,8 +254,39 @@ for (const file of files.filter((candidate) => candidate.rel.endsWith('.js'))) {
 // only a phone would show the ReferenceError. AbortController / AbortSignal are provided by the
 // build (config/index.ts, src/platform/abort-controller.ts); any bare one left is a crash.
 // A name after `.`, a quote or a word character, or before `:`, is a property, not the global.
-const MISSING_GLOBALS =
-  /(?<![\w$.'"`])(AbortController|AbortSignal|TextEncoder|TextDecoder|structuredClone|DOMException)\b(?!\s*:)/g;
+// Not listed: the names Taro's build swaps for its own partial versions (`URLSearchParams`,
+// `URL`, `window`, `document`, `navigator`, `location`, `requestAnimationFrame`…), which leave
+// no bare name here, and `fetch`, `setImmediate`, `MessageChannel` and `globalThis`, which the
+// libraries mention behind a `typeof` check. The source is linted for all of them
+// (apps/mini/eslint.config.mjs, `no-restricted-globals`).
+const MISSING_GLOBALS = new RegExp(
+  `(?<![\\w$.'"\`])(${[
+    'AbortController',
+    'AbortSignal',
+    'TextEncoder',
+    'TextDecoder',
+    'structuredClone',
+    'DOMException',
+    'localStorage',
+    'sessionStorage',
+    'btoa',
+    'atob',
+    'Headers',
+    'FormData',
+    'Blob',
+    'FileReader',
+    'XMLHttpRequest',
+    'WebSocket',
+    'IntersectionObserver',
+    'ResizeObserver',
+    'matchMedia',
+    'getComputedStyle',
+    'queueMicrotask',
+    'crypto',
+    'Buffer',
+  ].join('|')})\\b(?!\\s*:)`,
+  'g',
+);
 for (const file of files.filter((candidate) => candidate.rel.endsWith('.js'))) {
   const source = fs.readFileSync(path.join(dist, file.rel), 'utf8');
   for (const match of source.matchAll(MISSING_GLOBALS)) {
@@ -348,6 +381,21 @@ if (statsFresh) {
     const inMain = module.files.some(
       (file) => packageOf(file) === 'main' && !file.startsWith('sub-common/'),
     );
+    // A copy per sub-package is a store per sub-package: state one sets, another never sees
+    // (确认订单 in order handing an address to 编辑地址 in account). Hand such state over
+    // through storage or keep its module in the main package.
+    if (
+      !inMain &&
+      module.files.some((file) => file.startsWith('sub-common/')) &&
+      !normalized.includes('/node_modules/') &&
+      /\.[cm]?[jt]sx?$/.test(normalized) &&
+      fs.existsSync(module.path) &&
+      /from\s+['"]zustand['"]/.test(fs.readFileSync(module.path, 'utf8'))
+    ) {
+      failures.push(
+        `store copied into sub-packages ${(module.usedBy ?? []).join(', ')}: ${shown} (each gets its own copy of the state)`,
+      );
+    }
     if (inMain) {
       const owner = ownerOf(normalized);
       mainBytesByOwner.set(owner, (mainBytesByOwner.get(owner) ?? 0) + module.size);

@@ -3,6 +3,13 @@
 How a change gets in. Read [conventions.md](conventions.md) first;
 [architecture.md](architecture.md) explains where things live.
 
+## Before each commit
+
+`pnpm install` points git at `.githooks/`, whose `pre-commit` checks the staged files in a few
+seconds: Prettier, ESLint package by package, and, when the mini-program or a package it compiles
+from source is touched, the `mini`, `mini-styles` and `banned` guards. It reads the working tree,
+so stage whole files. It is a first net, not the checklist below.
+
 ## The merge checklist
 
 Run from the repository root. Every step must pass; a step that cannot run is reported as not run,

@@ -38,23 +38,24 @@ to it (below). The last line is the count:
 
 ## The checks
 
-| name            | asserts                                                                                                                                                                                         |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `domains`       | every domain in `domains.gen.ts` is imported by name, so its registrations really run                                                                                                           |
-| `contracts`     | contract ⇄ route file, both ways, and the folder's `[param]` is the contract's `:param` (ROUTE-001)                                                                                             |
-| `route-hygiene` | `dynamic = 'force-dynamic'` everywhere; `ctx.audit(target)` on every admin write                                                                                                                |
-| `permissions`   | every route and menu atom is declared; every declared atom is used                                                                                                                              |
-| `admin-client`  | no hand-built `/admin-api/…` URL and no raw `fetch()` outside the api seam                                                                                                                      |
-| `fixtures`      | a web test that stubs the API answers through `respondWith`, so every fixture is parsed by its contract                                                                                         |
-| `mini`          | the Taro mini-program: pages ⇄ `app.config.ts` ⇄ route catalogue, the platform seam, no NutUI, privacy, committed config, no upload key or AppSecret                                            |
-| `retired`       | no feature the shop does not have comes back as an identifier or a URL token (CORE-002)                                                                                                         |
-| `banned`        | no `eval`, `new Function`, `child_process`, `dangerouslySetInnerHTML`; the core clock lint rule is still an error; `eval` / `new Function` also in the mini-program and its two shared packages |
-| `secrets`       | no secret config field can leave through a response schema                                                                                                                                      |
-| `tx-pool`       | no `ctx.config.get(` / `ctx.db` / `ctx.withTx(` inside a function that takes a `tx`, `Tx` or `DbOrTx` (STAB-001)                                                                                |
-| `migrations`    | every destructive statement in `packages/db/migrations` carries `-- destructive: approved` (OPS-007)                                                                                            |
-| `pipeline`      | `ci.yml` publishes through `publish-release.sh`, never promotes, and keeps its guards, soak and admin e2e gates (REL-*)                                                                         |
-| `api-compat`    | the storefront API (`/api/v1/**` in the generated OpenAPI) only grows against `baselines/storefront-api.json`, the surface the released mini-program uses; report-only until the first release  |
-| `invariants`    | every rule in `docs/invariants.md` cites a test that exists, and every rule a test title names exists                                                                                           |
+| name            | asserts                                                                                                                                                                                              |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `domains`       | every domain in `domains.gen.ts` is imported by name, so its registrations really run                                                                                                                |
+| `contracts`     | contract ⇄ route file, both ways, and the folder's `[param]` is the contract's `:param` (ROUTE-001)                                                                                                  |
+| `route-hygiene` | `dynamic = 'force-dynamic'` everywhere; `ctx.audit(target)` on every admin write                                                                                                                     |
+| `permissions`   | every route and menu atom is declared; every declared atom is used                                                                                                                                   |
+| `admin-client`  | no hand-built `/admin-api/…` URL and no raw `fetch()` outside the api seam                                                                                                                           |
+| `fixtures`      | a web test that stubs the API answers through `respondWith`, so every fixture is parsed by its contract                                                                                              |
+| `mini`          | the Taro mini-program: pages ⇄ `app.config.ts` ⇄ route catalogue, the platform seam, no NutUI, privacy, committed config, no upload key or AppSecret                                                 |
+| `mini-styles`   | the mini-program's `.scss` uses only what WXSS and the iOS 12 WebView accept: no `*`, `:is/:where/:has/:hover/:focus-visible`, `@supports`, HTML tag or attribute selectors, `aspect-ratio`, `inset` |
+| `retired`       | no feature the shop does not have comes back as an identifier or a URL token (CORE-002)                                                                                                              |
+| `banned`        | no `eval`, `new Function`, `child_process`, `dangerouslySetInnerHTML`; the core clock lint rule is still an error; `eval` / `new Function` also in the mini-program and its two shared packages      |
+| `secrets`       | no secret config field can leave through a response schema                                                                                                                                           |
+| `tx-pool`       | no `ctx.config.get(` / `ctx.db` / `ctx.withTx(` inside a function that takes a `tx`, `Tx` or `DbOrTx` (STAB-001)                                                                                     |
+| `migrations`    | every destructive statement in `packages/db/migrations` carries `-- destructive: approved` (OPS-007)                                                                                                 |
+| `pipeline`      | `ci.yml` publishes through `publish-release.sh`, never promotes, and keeps its guards, soak and admin e2e gates (REL-*)                                                                              |
+| `api-compat`    | the storefront API (`/api/v1/**` in the generated OpenAPI) only grows against `baselines/storefront-api.json`, the surface the released mini-program uses; report-only until the first release       |
+| `invariants`    | every rule in `docs/invariants.md` cites a test that exists, and every rule a test title names exists                                                                                                |
 
 ## The allow-lists
 

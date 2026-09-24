@@ -18,6 +18,7 @@ import { fixtures } from './checks/fixtures';
 import { invariants } from './checks/invariants';
 import { migrations } from './checks/migrations';
 import { miniCheck } from './checks/mini';
+import { miniStyles } from './checks/mini-styles';
 import { permissions } from './checks/permissions';
 import { pipeline } from './checks/pipeline';
 import { retiredFeatures } from './checks/retired';
@@ -34,6 +35,7 @@ const CHECKS: readonly Check[] = [
   adminClient,
   fixtures,
   miniCheck,
+  miniStyles,
   retiredFeatures,
   bannedConstructs,
   secretsNeverLeak,

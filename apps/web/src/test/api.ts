@@ -21,7 +21,10 @@ import { configureApi } from '@/admin/api/config';
  *     key the contract does not declare, which is how a dropped field lingers;
  *   - `respondWithError(status, body)` does the same for the error envelope;
  *   - `stubRoutes([...])` wires a set of `on(route, reply)` answers into the
- *     client, matching on method and path, and records every call.
+ *     client, matching on method and path, and records every call — and parses
+ *     each JSON request body with `route.body`, the way the server would, so a
+ *     form that sends what the contract refuses fails its test instead of
+ *     passing until the server answers 422.
  *
  * `pnpm guards fixtures` keeps this the only way: a test that stubs `fetch`
  * does not build a `Response` by hand.
@@ -74,6 +77,24 @@ function strayKeys(sent: unknown, kept: unknown, at: string[] = []): string[] {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * The request side of `checkFixture`: what the component sent, parsed as the
+ * server parses it. A key the contract does not declare fails too — the server
+ * drops it without a word, so a form that still sends a retired field would
+ * otherwise go on "saving" it forever.
+ */
+function checkRequestBody(schema: z.ZodType, value: unknown, what: string): string | null {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) {
+    return `request body for ${what} does not match its contract:\n${describeIssues(parsed.error.issues)}`;
+  }
+  const stray = strayKeys(value, parsed.data);
+  if (stray.length > 0) {
+    return `request body for ${what} carries keys its contract does not declare:\n${stray.map((key) => `  - ${key}`).join('\n')}`;
+  }
+  return null;
 }
 
 function checkFixture(schema: z.ZodType, value: unknown, what: string): void {
@@ -254,6 +275,17 @@ export function stubRoutes(stubs: readonly RouteStub[]): StubCall[] {
         code: 'TEST_UNSTUBBED',
         message: `no stub answers ${method} ${path}`,
       });
+    }
+    // A multipart upload is not JSON and its schema is the server's to apply
+    // to the parts; every other body is checked as the server would check it.
+    const bodySchema = stub.route.body as z.ZodType | undefined;
+    if (bodySchema !== undefined && !(init?.body instanceof FormData)) {
+      const failure = checkRequestBody(bodySchema, call.body, stub.route.id);
+      if (failure !== null) {
+        fixtureFailures.push(failure);
+        // What the server would say, so the component is not led further on.
+        return respondWithError(422, { code: 'VALIDATION_FAILED', message: failure });
+      }
     }
     return stub.answer(call);
   }

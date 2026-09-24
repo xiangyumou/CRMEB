@@ -16,7 +16,8 @@
     "test:int": "turbo run test:int",
     "guards": "turbo run guards",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
   },
   "devDependencies": {
     "prettier": "^3.9.8",

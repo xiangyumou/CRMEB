@@ -73,7 +73,9 @@ export class MiniAbortController {
   }
 }
 
-const native = globalThis as {
+// `typeof` first: iOS 12.0/12.1's JavaScriptCore has no `globalThis`, and a bare read would throw.
+// eslint-disable-next-line no-restricted-globals -- read only behind the typeof check
+const native = (typeof globalThis === 'object' ? globalThis : {}) as {
   AbortController?: typeof MiniAbortController;
   AbortSignal?: typeof MiniAbortSignal;
 };

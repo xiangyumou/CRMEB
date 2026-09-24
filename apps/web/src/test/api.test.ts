@@ -36,6 +36,27 @@ const widgetDelete = defineRoute({
   examples: [{ name: 'ok', params: { id: '1' }, response: undefined }],
 });
 
+const widgetRename = defineRoute({
+  id: 'test.widgetRename',
+  method: 'PUT',
+  path: '/admin-api/widgets/:id',
+  auth: 'admin',
+  permission: 'test:widget:write',
+  summary: '改名',
+  tags: ['test'],
+  params: z.object({ id }),
+  body: z.object({ name: z.string().min(1) }),
+  response: widget,
+  examples: [
+    {
+      name: 'ok',
+      params: { id: '1' },
+      body: { name: 'b' },
+      response: { id: '1', name: 'b', note: null },
+    },
+  ],
+});
+
 afterEach(() => {
   resetApiConfig();
   // These tests provoke failures on purpose; do not let `setup.ts` report them.
@@ -113,5 +134,39 @@ describe('stubRoutes', () => {
       status: 0,
     });
     expect(takeFixtureFailures()).toEqual([expect.stringContaining('- note:')]);
+  });
+
+  describe('request bodies', () => {
+    const renamed = { id: '1', name: 'b', note: null };
+
+    it('passes a body the contract accepts through to the stub', async () => {
+      const calls = stubRoutes([on(widgetRename, renamed)]);
+      await expect(
+        callRoute(widgetRename, { params: { id: '1' }, body: { name: 'b' } }),
+      ).resolves.toEqual(renamed);
+      expect(calls[0]?.body).toEqual({ name: 'b' });
+      expect(takeFixtureFailures()).toEqual([]);
+    });
+
+    it('fails the test, and answers 422, when the body breaks the contract', async () => {
+      stubRoutes([on(widgetRename, renamed)]);
+      await expect(
+        callRoute(widgetRename, { params: { id: '1' }, body: { name: '' } }),
+      ).rejects.toMatchObject({ status: 422 });
+      expect(takeFixtureFailures()).toEqual([
+        expect.stringMatching(/request body for test\.widgetRename does not match[\s\S]*- name:/),
+      ]);
+    });
+
+    it('fails the test when the body carries a key the contract does not declare', async () => {
+      stubRoutes([on(widgetRename, renamed)]);
+      const body = { name: 'b', retiredCode: 'x' } as { name: string };
+      await expect(callRoute(widgetRename, { params: { id: '1' }, body })).rejects.toMatchObject({
+        status: 422,
+      });
+      expect(takeFixtureFailures()).toEqual([
+        expect.stringMatching(/does not declare:\n {2}- retiredCode/),
+      ]);
+    });
   });
 });
