@@ -291,11 +291,15 @@ response and drops its cookie, and the admin login appears to fail silently.
 
 The `websecure` router accepts TLS 1.2 as well as 1.3: WeChat's mini-program network stack on iOS
 does not speak TLS 1.3, so against a 1.3-only router every `wx.request` from an iPhone fails at the
-handshake and never reaches the edge (Android and browsers still work, which hides it). It names
-the TLS options `NEXT_TRAEFIK_TLS_OPTIONS`, default `legacy@file`: on this host the shared Traefik's
-`dynamic_conf/tls.yml` defaults to 1.3 only and defines `legacy` as 1.2 minimum with ECDHE + AEAD
-suites. A new host must define an options set like it, or Traefik will not serve the router. Check
-from outside with `curl --tls-max 1.2 -sI https://<NEXT_HOST>/` (expect `HTTP/2 200`).
+handshake and never reaches the edge (Android and browsers still work, which hides it). The router
+uses the TLS options `NEXT_TRAEFIK_TLS_OPTIONS`, default `default`: Traefik's own default set, which
+on this host the shared Traefik's `dynamic_conf/tls.yml` defines as 1.2 minimum with ECDHE + AEAD
+suites. A new host's Traefik must allow 1.2 in its `default`. Do not give the router a set of its
+own instead: when a connection's SNI is not the router's host (a browser reusing a connection, a
+proxy, a client without SNI), Traefik compares the two hosts' option sets and answers `421
+Misdirected Request` if they differ, which took the admin down once. Check from outside with
+`curl --tls-max 1.2 -sI https://<NEXT_HOST>/` and, without SNI,
+`curl -skI -H 'Host: <NEXT_HOST>' https://<host IP>/` (expect `HTTP/2 200` from both).
 
 The overlay is a setting of the deployment, not a step someone remembers. Name it in
 `deployment.env`:
