@@ -52,6 +52,10 @@ Nothing.
 Nothing in scope. The edge wiring, the Dockerfile and the drill changes are cutover work (release B)
 and are written down in cutover.md §2.10.
 
+> Note (2026-09-24, L3): the A/B/C release split was dropped; the cutover is one release and
+> cutover.md §2.10 is part of it. The `ENFORCED` switch stays `false` at the first release (HANDOFF §6
+> item 7).
+
 ## Page-form changes
 
 None in the mini-program. `/` on the web container changed: it now shows the shopper landing page

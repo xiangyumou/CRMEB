@@ -48,6 +48,8 @@ mini citations in `docs/invariants.md`, the mini sections of `architecture.md` /
   `MINI_CODE_PAGES` + `/wechat/mini-qrcodes`, notification `link` + `wechatMini.page` with the
   OA template-message decision, the `uniapp` guard, CI, edge `/` → landing); what not to drop;
   公众平台 actions by release; rollback.
+  _Note (2026-09-24, L3): the user chose a single release; cutover.md was rewritten accordingly
+  and no longer has releases A/B/C or the OA template-message decision (there is no 公众号)._
 
 - CI: both storefront jobs run their whole testDir (`test` → `specs/`, `test:mini` →
   `specs-mini/`); stale timing comments in `storefront-e2e-mini` fixed. actionlint is not
