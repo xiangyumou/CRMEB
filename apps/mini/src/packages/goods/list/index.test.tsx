@@ -36,6 +36,17 @@ describe('商品列表', () => {
     expect(lists(seen)).toEqual([{ pageSize: '20', page: '1', categoryIds: '12,121' }]);
   });
 
+  it('lists the products a coupon covers, by its template id', async () => {
+    taroFake.routerParams = { couponId: '3' };
+    const seen = serveApi(routes);
+
+    await renderPage(<ProductList />);
+
+    expect(await screen.findByText('柔雾丝绒礼盒')).toBeTruthy();
+    expect(lists(seen)).toEqual([{ pageSize: '20', page: '1', couponId: '3' }]);
+    expect(screen.queryByText(/适用范围/)).toBeNull();
+  });
+
   it('sorts, flips the price order and filters by price', async () => {
     taroFake.routerParams = { keyword: '礼盒' };
     const seen = serveApi(routes);

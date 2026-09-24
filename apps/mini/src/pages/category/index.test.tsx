@@ -48,6 +48,23 @@ describe('分类', () => {
     });
   });
 
+  it('hides the subcategories when the shop switched 显示二级类目 off', async () => {
+    useAppConfigStore.setState({
+      config: {
+        ...appConfigFixture,
+        display: { ...appConfigFixture.display, categorySubcategories: false },
+      },
+    });
+    const seen = serveApi({ ...tree, ...products });
+    await renderPage(<Category />);
+
+    expect(await screen.findByText('柔雾丝绒礼盒')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: '礼盒' })).toBeNull();
+    // The products still cover the whole subtree.
+    const list = seen.find((request) => request.key === 'GET /api/v1/catalog/products');
+    expect(list?.query.categoryIds).toBe('1,11,12,121');
+  });
+
   it('switches level-1 category from the rail', async () => {
     const seen = serveApi({ ...tree, ...products });
     await renderPage(<Category />);

@@ -62,6 +62,8 @@ export interface ListInput {
   categoryId?: string | undefined;
   keyword?: string | undefined;
   labelId?: string | undefined;
+  /** A coupon template id: the products it covers. */
+  couponId?: string | undefined;
   sort: ListSort;
   price: PriceRange;
   /** The category tree, when loaded: a category lists its whole subtree. */
@@ -82,6 +84,7 @@ export function listQuery(input: ListInput): ListQuery {
   }
   if (input.keyword) query.keyword = input.keyword;
   if (input.labelId) query.labelId = input.labelId;
+  if (input.couponId) query.couponId = input.couponId;
   if (input.sort !== 'default') Object.assign(query, SORTS[input.sort]);
   const price = normalisePrice(input.price);
   if (price.from) query.priceFrom = price.from;

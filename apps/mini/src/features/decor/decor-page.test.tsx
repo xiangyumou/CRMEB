@@ -54,6 +54,8 @@ const page = (personal: ResolvedPage['personal'] = null): ResolvedPage =>
     ],
   });
 
+const reload = () => undefined;
+
 const withSupport = (support: AppConfig['support']) =>
   useAppConfigStore.setState({ config: { ...appConfigFixture, support }, source: 'network' });
 
@@ -64,7 +66,9 @@ describe('DecorPage', () => {
   });
 
   it('wraps 联系客服 in WeChat’s contact button, with the page as the session source', async () => {
-    await renderPage(<DecorPage page={page()} route={{ route: 'page', params: { id: '7' } }} />);
+    await renderPage(
+      <DecorPage page={page()} route={{ route: 'page', params: { id: '7' } }} reload={reload} />,
+    );
 
     const contact = screen.getByRole('button', { name: '联系客服' });
     expect(contact.getAttribute('data-open-type')).toBe('contact');
@@ -72,10 +76,10 @@ describe('DecorPage', () => {
     expect(screen.getByText('七天无理由退换')).toBeTruthy();
   });
 
-  it('makes 联系客服 a call when the shop has a hotline, and a note when it has nothing', async () => {
+  it('makes 联系客服 a call when the shop has a hotline, and leaves the cell empty when it has nothing', async () => {
     withSupport({ kind: 'phone', phone: '400-000-0000', qrcodeUrl: null });
     const { unmount } = await renderPage(
-      <DecorPage page={page()} route={{ route: 'home', params: {} }} />,
+      <DecorPage page={page()} route={{ route: 'home', params: {} }} reload={reload} />,
     );
     fireEvent.click(screen.getByRole('button', { name: '拨打客服电话 400-000-0000' }));
     expect(taroFake.calls).toContainEqual({
@@ -85,12 +89,11 @@ describe('DecorPage', () => {
     unmount();
 
     withSupport(null as unknown as AppConfig['support']);
-    await renderPage(<DecorPage page={page()} route={{ route: 'home', params: {} }} />);
-    fireEvent.click(screen.getByRole('button', { name: '联系客服' }));
-    expect(taroFake.calls).toContainEqual({
-      api: 'showToast',
-      args: expect.objectContaining({ title: '暂未开通在线客服' }),
-    });
+    await renderPage(
+      <DecorPage page={page()} route={{ route: 'home', params: {} }} reload={reload} />,
+    );
+    expect(screen.queryByText('联系客服')).toBeNull();
+    expect(screen.getByText('收货地址')).toBeTruthy();
   });
 
   it('sends a signed-out shopper from 我的卡片 to login, coming back to this page', async () => {
@@ -106,7 +109,9 @@ describe('DecorPage', () => {
         },
       }),
     });
-    await renderPage(<DecorPage page={page()} route={{ route: 'home', params: {} }} />);
+    await renderPage(
+      <DecorPage page={page()} route={{ route: 'home', params: {} }} reload={reload} />,
+    );
 
     fireEvent.click(screen.getByText('登录 / 注册'));
 
@@ -136,6 +141,7 @@ describe('DecorPage', () => {
           },
         })}
         route={{ route: 'home', params: {} }}
+        reload={reload}
       />,
     );
 

@@ -118,8 +118,8 @@ describe('商品详情', () => {
     });
   });
 
-  it('shows the group-buy entry and only shop-wide coupons', async () => {
-    serve();
+  it('asks for this product’s activities and coupons, and shows them', async () => {
+    const seen = serve();
     await renderPage(<ProductPage />);
 
     fireEvent.click(await screen.findByRole('link', { name: '拼团 ¥49.00，2 人团' }));
@@ -127,10 +127,76 @@ describe('商品详情', () => {
       api: 'navigateTo',
       args: { url: '/packages/promo/groupbuy-detail/index?id=7' },
     });
+    for (const key of ['GET /api/v1/groupbuy/activities', 'GET /api/v1/presale/activities']) {
+      expect(seen.find((r) => r.key === key)?.query).toEqual({ productId: '12', pageSize: '1' });
+    }
 
+    // The server narrows the coupons to those the product counts towards (COUPON-009).
     fireEvent.click(await screen.findByRole('link', { name: '领取优惠券' }));
     expect(screen.getByText('全场满减券')).toBeTruthy();
-    expect(screen.queryByText('指定商品券')).toBeNull();
+    expect(screen.getByText('指定商品券')).toBeTruthy();
+    expect(seen.find((r) => r.key === 'GET /api/v1/coupons')?.query).toMatchObject({
+      productId: '12',
+    });
+  });
+
+  it('shows no group-buy bar for an activity the shopper cannot buy', async () => {
+    serve({
+      'GET /api/v1/groupbuy/activities': () => ({
+        body: {
+          ...empty,
+          items: [
+            {
+              activityId: '7',
+              productId: '12',
+              title: '两人拼',
+              intro: null,
+              imageUrl: null,
+              price: '49.00',
+              originalPrice: '59.00',
+              seatsRequired: 2,
+              stock: 0,
+              sales: 10,
+              startAt: '2026-09-01T00:00:00+08:00',
+              endAt: '2026-12-01T00:00:00+08:00',
+              formingGroups: 0,
+              canBuy: false,
+            },
+          ],
+          total: 1,
+        },
+      }),
+    });
+    await renderPage(<ProductPage />);
+    await screen.findByText('柔雾丝绒礼盒', { selector: '#product-name' });
+    await screen.findByRole('link', { name: '领取优惠券' });
+    expect(screen.queryByRole('link', { name: /拼团/ })).toBeNull();
+  });
+
+  it('SYS-015 — hides 评价, 为你推荐 and 服务 when the shop switched them off', async () => {
+    useAppConfigStore.setState({
+      config: {
+        ...appConfigFixture,
+        display: {
+          ...appConfigFixture.display,
+          productReviews: false,
+          productRecommendations: false,
+          productServiceTags: false,
+        },
+      },
+    });
+    const seen = serve();
+    await renderPage(<ProductPage />);
+    await screen.findByText('柔雾丝绒礼盒', { selector: '#product-name' });
+    await screen.findByRole('link', { name: '领取优惠券' });
+
+    expect(screen.queryByText('评价 (2)')).toBeNull();
+    expect(screen.queryByText('隐私发货')).toBeNull();
+    expect(document.getElementById('product-recommended')).toBeNull();
+    expect(seen.some((r) => r.key === 'GET /api/v1/catalog/products/12/reviews')).toBe(false);
+    expect(seen.some((r) => r.key === 'GET /api/v1/catalog/products')).toBe(false);
+    // The rest of the page stays.
+    expect(screen.getByText('礼盒图文详情')).toBeTruthy();
   });
 
   it('asks a guest to log in at 加入购物车, coming back to the product', async () => {
@@ -291,6 +357,25 @@ describe('商品详情', () => {
       route: 'product',
       id: '12',
     });
+  });
+
+  it('SYS-015 — offers no poster when the shop switched product posters off, still shares to a friend', async () => {
+    useAppConfigStore.setState({
+      config: {
+        ...appConfigFixture,
+        display: { ...appConfigFixture.display, productPoster: false },
+      },
+    });
+    const seen = serve();
+    await signIn();
+    await renderPage(<ProductPage />);
+    await screen.findByText('柔雾丝绒礼盒', { selector: '#product-name' });
+    fireEvent.click(screen.getByRole('button', { name: '分享' }));
+
+    expect(await screen.findByRole('button', { name: '发送给微信好友' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '生成分享海报' })).toBeNull();
+    expect(screen.queryByText('生成海报')).toBeNull();
+    expect(seen.some((r) => r.key === 'GET /api/v1/share/mini-codes')).toBe(false);
   });
 
   it('asks a guest to log in before drawing a poster', async () => {

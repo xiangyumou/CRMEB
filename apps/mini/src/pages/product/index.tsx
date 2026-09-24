@@ -3,6 +3,7 @@ import { Button as TaroButton, Swiper, SwiperItem, Text, View } from '@tarojs/co
 import { isApiError, type ResponseOf } from '@shop/api-client';
 import { useRouteMutation, useRouteQuery } from '@shop/api-client/react';
 import { RichText as RichTextBlock, type RichTextProps } from '@shop/storefront-blocks';
+import { useDisplay } from '@/app-config';
 import { useCartCount } from '@/data/cart';
 import { useRecordVisit } from '@/data/visits';
 import { useCheckoutDraft } from '@/features/checkout/draft';
@@ -11,7 +12,7 @@ import { ProductCoupons } from '@/features/product/product-coupons';
 import { ReviewItem } from '@/features/product/review-item';
 import { SkuSheet, type SkuAction } from '@/features/product/sku-sheet';
 import { initialSelection, selectionText, specsOf } from '@/features/product/sku-select';
-import { PosterHost, openPoster, posterAvailable } from '@/features/share/poster';
+import { PosterHost, openPoster, useProductPosterEnabled } from '@/features/share/poster';
 import { assetUrl } from '@/lib/asset-url';
 import { navigate, previewImages, useRouteParams, useShare } from '@/platform';
 import { requireLogin } from '@/session/session';
@@ -52,8 +53,8 @@ const descriptionProps = (html: string): RichTextProps => ({
  * off-shelf or deleted product answers 404 (`catalog.productDetail` never returns one), shown
  * as 「商品已下架」.
  *
- * `app/config` has no switches yet for 评价 / 推荐 / 服务 on this page (a backend gap): all three
- * show.
+ * `app/config.display` (小程序外观 → 页面显示) switches 评价, 为你推荐, 服务 and 生成海报 off;
+ * each shows by default.
  */
 export default function ProductPage() {
   const { id = '' } = useRouteParams('product');
@@ -110,6 +111,8 @@ function Detail({ product }: { product: Product }) {
   const cartCount = useCartCount();
   const contact = useContactIcon(sessionFromOf('product', product.id));
   const activities = useProductActivities(product.id);
+  const display = useDisplay();
+  const posterEnabled = useProductPosterEnabled();
   const addItem = useRouteMutation('cart.addItem', { invalidate: ['cart.list', 'cart.count'] });
   const favoriteAdd = useRouteMutation('catalog.favoriteAdd');
   const favoriteRemove = useRouteMutation('catalog.favoriteRemove');
@@ -260,7 +263,7 @@ function Detail({ product }: { product: Product }) {
       ) : null}
 
       <View className="product__cells">
-        <ProductCoupons redirect={route} />
+        <ProductCoupons productId={product.id} redirect={route} />
         <Cell
           title="已选"
           label={`选择规格，${chosenText}`}
@@ -268,7 +271,7 @@ function Detail({ product }: { product: Product }) {
           onClick={() => void openSku(canCart ? ['cart', 'buy'] : ['buy'])}
           disabled={soldOut}
         />
-        {product.protections.length > 0 ? (
+        {display.productServiceTags && product.protections.length > 0 ? (
           <Cell
             title="服务"
             label="查看服务说明"
@@ -289,7 +292,7 @@ function Detail({ product }: { product: Product }) {
         ) : null}
       </View>
 
-      <Reviews product={product} />
+      {display.productReviews ? <Reviews product={product} /> : null}
 
       <Card title="商品详情" className="product__description" id="product-description">
         {product.descriptionHtml.trim() ? (
@@ -299,7 +302,7 @@ function Detail({ product }: { product: Product }) {
         )}
       </Card>
 
-      <Recommended productId={product.id} />
+      {display.productRecommendations ? <Recommended productId={product.id} /> : null}
 
       <ActionBar icons={icons}>
         {soldOut ? (
@@ -361,7 +364,7 @@ function Detail({ product }: { product: Product }) {
             <Icon name="message" />
             <Text>微信好友</Text>
           </TaroButton>
-          {posterAvailable ? (
+          {posterEnabled ? (
             <Pressable
               label="生成分享海报"
               className="product__share-option"
@@ -376,7 +379,7 @@ function Detail({ product }: { product: Product }) {
           ) : null}
         </View>
       </Sheet>
-      {posterAvailable ? (
+      {posterEnabled ? (
         <PosterHost
           subject={{ kind: 'product', id: product.id }}
           content={{

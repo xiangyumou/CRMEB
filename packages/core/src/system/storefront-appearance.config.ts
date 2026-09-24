@@ -76,6 +76,7 @@ export const storefrontAppearanceConfig = defineConfigGroup({
     showProductReviews: z.boolean().default(appDisplayDefaults.productReviews),
     showProductRecommendations: z.boolean().default(appDisplayDefaults.productRecommendations),
     showProductServiceTags: z.boolean().default(appDisplayDefaults.productServiceTags),
+    showProductPoster: z.boolean().default(appDisplayDefaults.productPoster),
   }),
   ui: {
     primaryColor: {
@@ -177,6 +178,13 @@ export const storefrontAppearanceConfig = defineConfigGroup({
       type: 'switch',
       section: '页面显示',
       order: 63,
+    },
+    showProductPoster: {
+      label: '允许生成商品海报',
+      type: 'switch',
+      help: '关闭后商品详情的分享面板不再提供「生成海报」，仍可分享给微信好友',
+      section: '页面显示',
+      order: 64,
     },
   },
 });

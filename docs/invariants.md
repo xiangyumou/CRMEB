@@ -1782,16 +1782,21 @@ A save is refused whole when the schema rejects a value or the group does not de
 
 ### SYS-015
 
-The `storefront-appearance` group answers a fresh install with every field defaulted (the contract's `appAppearanceDefaults`), always yields exactly the four fixed tabs — 首页, 分类, 购物车, 我的 — in that order, falls back to the default label when one is blanked, serves a blank accent colour as `null` (the client then uses the primary colour), and refuses any colour that is not `#RRGGBB` (and a radius off the scale, and an over-long label) whole, writing nothing. Its 页面显示 switches (`display`: 分类 second-level categories, 商品详情 reviews, 为你推荐 and service tags) all default to shown — what those pages showed before the switches — and each turns off alone.
+The `storefront-appearance` group answers a fresh install with every field defaulted (the contract's `appAppearanceDefaults`), always yields exactly the four fixed tabs — 首页, 分类, 购物车, 我的 — in that order, falls back to the default label when one is blanked, serves a blank accent colour as `null` (the client then uses the primary colour), and refuses any colour that is not `#RRGGBB` (and a radius off the scale, and an over-long label) whole, writing nothing. Its 页面显示 switches (`display`: 分类 second-level categories, 商品详情 reviews, 为你推荐, service tags and the product poster) all default to shown — what those pages showed before the switches — and each turns off alone; with the poster switched off 商品详情's share sheet offers no 生成海报 but still sends to a WeChat friend.
 
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > answers a fresh install with every appearance default`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > shows every optional part of 分类 and 商品详情 until the operator switches one off`
+- `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > offers the product poster until the operator switches it off`
+- `apps/web/app/api/v1/app/config.int.test.ts::SYS-015 — the product poster switch over HTTP > offers the poster on a fresh install and stops once the operator switches it off`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > serves the theme and the tab bar the operator saved`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > serves the accent colour, and a blanked one as none`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > falls back to the default label when the operator blanks one`
 - `packages/core/src/system/app-config.int.test.ts::SYS-015 — 小程序外观 > refuses <label>, and writes nothing`
 - `packages/contracts/src/system/app.schemas.test.ts::SYS-015 — hexColor > refuses <label>`
 - `packages/contracts/src/system/app.schemas.test.ts::SYS-015 — appearance defaults > are a valid appearance, with the four fixed tabs in order`
+- `packages/contracts/src/system/app.schemas.test.ts::SYS-015 — display defaults > show every optional part, the product poster included`
+- `apps/mini/src/pages/product/index.test.tsx::商品详情 > SYS-015 — hides 评价, 为你推荐 and 服务 when the shop switched them off`
+- `apps/mini/src/pages/product/index.test.tsx::商品详情 > SYS-015 — offers no poster when the shop switched product posters off, still shares to a friend`
 
 ### SYS-016
 
@@ -2262,7 +2267,7 @@ The public part of a page is cached per revision (`decor:page:rev:<id>`, `DECOR_
 
 ### DECOR-015
 
-Per-shopper state — coupons claimed / claimable, and what a block declares with `personal` (the 订单入口 counts, the 用户卡片 nickname, avatar and coupon / favourite / history totals, the 新人券 the shopper still holds) — is resolved only when a shopper's session comes with the request, for that shopper, is never part of the cached page (which keeps only _which_ state to fetch), and is `null` for a guest or an admin. A lookup that fails costs its slot, never the page.
+Per-shopper state — coupons claimed / claimable, and what a block declares with `personal` (the 订单入口 counts, the 用户卡片 nickname, avatar and coupon / favourite / history totals, the 新人券 the shopper still holds) — is resolved only when a shopper's session comes with the request, for that shopper, is never part of the cached page (which keeps only _which_ state to fetch), and is `null` for a guest or an admin. A lookup that fails costs its slot, never the page. The mini-program never stands in for that layer: after a claim it fetches the page again instead of changing the button itself.
 
 - `packages/core/src/decor/decor.int.test.ts::per-shopper state — DECOR-015 > DECOR-015: with a session the page carries the coupon state of that shopper; without one, none`
 - `packages/core/src/decor/decor.int.test.ts::per-shopper state — DECOR-015 > DECOR-015: the cached public page holds nothing per shopper`
@@ -2273,6 +2278,7 @@ Per-shopper state — coupons claimed / claimable, and what a block declares wit
 - `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-015: 优惠券 claim state is each shopper’s own, and never in the cached page`
 - `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-015: 新人券 shows a guest the templates, and a shopper only the 新人券 they still hold`
 - `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-015: a live 新人券 block is cached without anyone’s wallet`
+- `apps/mini/src/features/decor/decor-host.test.tsx::DecorPage host (decor.md §2.4) > claimCoupon > DECOR-015 — claims for a shopper, says so, and reloads the page rather than flipping the button`
 
 ### DECOR-016
 

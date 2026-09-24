@@ -31,8 +31,8 @@ const isTab = (value: string | undefined): value is WalletTab =>
 
 /**
  * 我的优惠券 (`myCoupons { state? }`, pages.md §2.5): 可使用 / 已使用 / 已过期. 去使用 opens the
- * product list for the coupon (`productList { couponId }`, the coupon's template id); the list
- * cannot narrow to the coupon yet (a backend gap), so it notes that instead. Needs a session.
+ * product list for the coupon (`productList { couponId }`: the coupon's **template** id, never
+ * the wallet row's `id`), which lists the products it covers. Needs a session.
  */
 export default function MyCouponsPage() {
   const { state } = useRouteParams('myCoupons');

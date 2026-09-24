@@ -81,6 +81,14 @@ export default function CheckoutPage() {
 
 const yuanOrFree = (amount: string) => (Number(amount) === 0 ? '免运费' : `¥${amount}`);
 
+/** The presale ship time, from the preview (`shipAfterDays`, H4; `null` from an older server). */
+function presaleNote(shipAfterDays: number | null): string {
+  if (shipAfterDays === null) return '预售商品：发货时间以活动说明为准';
+  return shipAfterDays > 0
+    ? `预售商品：付款后 ${shipAfterDays} 天内发货`
+    : '预售商品：付款后尽快发货';
+}
+
 function Checkout({ draft }: { draft: CheckoutDraft }) {
   const setDraft = useCheckoutDraft((state) => state.setDraft);
   const [addressId, setAddressId] = useState<string | undefined>(undefined);
@@ -113,11 +121,6 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
   const preview = withCoupon ? priced.data : base.data;
   const settling = (lines !== null && coupons.isPending) || (couponId !== null && priced.isPending);
 
-  const presale = useRouteQuery(
-    'presale.detail',
-    { params: { id: draft.kind === 'presale' ? draft.kindMeta.activityId : '' } },
-    { enabled: draft.kind === 'presale', staleTime: 5 * 60_000 },
-  );
   const cities = useCityTree(sheet === 'address');
 
   const addAddress = useRouteMutation('user.addressCreate', {
@@ -251,11 +254,7 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
       <Card className="checkout__card" id="checkout-lines">
         {draft.kind === 'presale' ? (
           <Text className="checkout__kind-note" id="checkout-presale-note">
-            {presale.data
-              ? presale.data.shipAfterDays > 0
-                ? `预售商品：付款后 ${presale.data.shipAfterDays} 天内发货`
-                : '预售商品：付款后尽快发货'
-              : '预售商品：发货时间以活动说明为准'}
+            {presaleNote(preview.shipAfterDays)}
           </Text>
         ) : draft.kind === 'groupbuy' ? (
           <Text className="checkout__kind-note">拼团商品：支付后邀请好友参团，成团后发货</Text>

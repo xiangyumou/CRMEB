@@ -89,6 +89,11 @@ export const appDisplay = z.object({
   productRecommendations: z.boolean(),
   /** 商品详情: the 服务 row and its sheet. */
   productServiceTags: z.boolean(),
+  /**
+   * 商品详情: 生成海报 in the share sheet. Off hides the poster only; sending
+   * the page to a WeChat friend stays. The 拼团 invite poster is not covered.
+   */
+  productPoster: z.boolean(),
 });
 export type AppDisplay = z.infer<typeof appDisplay>;
 
@@ -97,6 +102,7 @@ export const appDisplayDefaults: AppDisplay = {
   productReviews: true,
   productRecommendations: true,
   productServiceTags: true,
+  productPoster: true,
 };
 
 /** Template ids, deduplicated, in the operator's order; `[]` when none are set. */
@@ -288,7 +294,7 @@ export const appPublicConfigExample: AppPublicConfig = {
       ],
     },
   },
-  display: { ...appDisplayDefaults, productRecommendations: false },
+  display: { ...appDisplayDefaults, productRecommendations: false, productPoster: false },
   version: '1758500000000',
   serverTime: '2026-09-24T08:00:00.000+08:00',
 };

@@ -189,6 +189,7 @@ async function buildAppConfig(ctx: Ctx): Promise<CachedAppConfig> {
       productReviews: appearance.showProductReviews,
       productRecommendations: appearance.showProductRecommendations,
       productServiceTags: appearance.showProductServiceTags,
+      productPoster: appearance.showProductPoster,
     },
     version,
   };

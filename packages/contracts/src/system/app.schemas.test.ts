@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { subscribeScene } from '../wechat-oa/schemas';
 import {
   appAppearanceDefaults,
+  appDisplayDefaults,
   appPublicConfig,
   appSubscribeScene,
   appTabKey,
@@ -49,6 +50,14 @@ describe('SYS-015 — appearance defaults', () => {
       },
     };
     expect(appPublicConfig.shape.appearance.safeParse(appearance).success).toBe(false);
+  });
+});
+
+describe('SYS-015 — display defaults', () => {
+  it('show every optional part, the product poster included', () => {
+    const parsed = appPublicConfig.shape.display.parse(appDisplayDefaults);
+    expect(parsed.productPoster).toBe(true);
+    expect(Object.values(parsed).every(Boolean)).toBe(true);
   });
 });
 

@@ -34,7 +34,7 @@ describe('我的优惠券', () => {
     useSession.setState({ session: { status: 'signed-in', token: 't' } });
   });
 
-  it('opens on 可使用 and sends 去使用 to the product list for the coupon', async () => {
+  it('opens on 可使用 and sends 去使用 to the product list for the coupon template, not the wallet row', async () => {
     const seen = serve();
     await renderPage(<MyCouponsPage />);
     fireEvent.click(await screen.findByRole('button', { name: '去使用 满减券' }));

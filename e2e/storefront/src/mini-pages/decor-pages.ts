@@ -38,14 +38,15 @@ export interface DecorDraft {
   draftVersion: string;
 }
 
-/** 新建页面 (a 微页面) with `document` as its draft; not published. */
+/** 新建页面 (a 微页面, or a `home` page) with `document` as its draft; not published. */
 export async function createDecorPage(
   adminApi: APIRequestContext,
   name: string,
   document: ReturnType<typeof decorDocument>,
+  kind: 'custom' | 'home' = 'custom',
 ): Promise<DecorDraft> {
   const response = await adminApi.post('/admin-api/decor/documents', {
-    data: { kind: 'custom', name, document },
+    data: { kind, name, document },
   });
   expect(response.status(), await response.text()).toBe(201);
   return (await response.json()) as DecorDraft;
@@ -89,6 +90,41 @@ export async function decorPreviewToken(
   return ((await response.json()) as { previewToken: string }).previewToken;
 }
 
+/** 设为首页: `documentId` (a published `home` page) becomes the shop's 首页. */
+export async function designateDecorHome(
+  adminApi: APIRequestContext,
+  documentId: string | number,
+): Promise<void> {
+  const response = await adminApi.put('/admin-api/decor/designations/home', {
+    data: { documentId: String(documentId) },
+  });
+  expect(response.status(), await response.text()).toBe(200);
+}
+
+/** 新建优惠券: a hand-claimed, shop-wide ¥`amount` coupon, one per shopper, 30 days. */
+export async function createClaimableCoupon(
+  adminApi: APIRequestContext,
+  name: string,
+  amount: string,
+): Promise<string> {
+  const response = await adminApi.post('/admin-api/coupons', {
+    data: {
+      name,
+      scope: 'all_products',
+      claimMode: 'manual',
+      status: 'active',
+      discountAmount: amount,
+      minSpend: '0.00',
+      validityMode: 'days_after_claim',
+      validDays: 30,
+      isUnlimitedSupply: true,
+      perUserLimit: 1,
+    },
+  });
+  expect(response.status(), await response.text()).toBe(201);
+  return ((await response.json()) as { id: string }).id;
+}
+
 /** Saves some values of a 系统设置 group; the rest of the group keeps what it had. */
 export async function saveConfig(
   adminApi: APIRequestContext,
@@ -128,5 +164,23 @@ export class MicroPage {
     return this.blocks().evaluateAll((nodes) =>
       nodes.map((node) => node.getAttribute('data-block') ?? ''),
     );
+  }
+}
+
+/** 首页 (tab `home`), drawn from whatever page is designated. */
+export class DecorHomePage {
+  constructor(private readonly page: Page) {}
+
+  async open(): Promise<void> {
+    await openFresh(this.page, miniRoute('pages/index/index'));
+  }
+
+  block(type: string): Locator {
+    return shown(this.page).locator(`[data-block="${type}"]`);
+  }
+
+  /** One ticket of an 优惠券 block; `data-action` says what it offers (claim / again / use / gone). */
+  couponTicket(templateId: string): Locator {
+    return shown(this.page).locator(`[data-coupon="${templateId}"]`);
   }
 }

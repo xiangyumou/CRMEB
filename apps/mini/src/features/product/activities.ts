@@ -13,13 +13,14 @@ const LONG = { staleTime: 5 * 60_000 } as const;
 /**
  * The 拼团 / 预售 activities a product is in, for the entry bars on 商品详情.
  *
- * Neither list takes a `productId` filter and the product detail does not name its activities
- * (a backend gap, stream B status), so both lists are read (one page of 100, cached for five
- * minutes, shared by every product page) and filtered here.
+ * Each list is asked for this product's live activities (`productId`, H4) and one card is
+ * enough: the page shows at most one bar per kind. A card the shopper cannot buy (sold out,
+ * not started) shows no bar.
  */
 export function useProductActivities(productId: string): ProductActivity[] {
-  const groupbuys = useRouteQuery('groupbuy.list', { query: { pageSize: 100 } }, LONG);
-  const presales = useRouteQuery('presale.list', { query: { pageSize: 100 } }, LONG);
+  const query = { productId, pageSize: 1 };
+  const groupbuys = useRouteQuery('groupbuy.list', { query }, LONG);
+  const presales = useRouteQuery('presale.list', { query }, LONG);
   const out: ProductActivity[] = [];
   for (const card of groupbuys.data?.items ?? []) {
     if (card.productId !== productId || !card.canBuy) continue;

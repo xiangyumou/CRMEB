@@ -52,7 +52,7 @@ export default function Me() {
         ) : page.isError ? (
           <ErrorBlock error={page.error} onRetry={() => void page.refetch()} />
         ) : (
-          <DecorPage page={page.data} route={ROUTE} />
+          <DecorPage page={page.data} route={ROUTE} reload={() => page.refetch()} />
         )}
         {unreadCount > 0 ? (
           <Pressable

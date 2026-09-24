@@ -77,7 +77,11 @@ export default function MicroPage() {
           <ErrorBlock error={page.error} onRetry={() => void page.refetch()} />
         )
       ) : (
-        <DecorPage page={page.data} route={{ route: 'page', params: { id } }} />
+        <DecorPage
+          page={page.data}
+          route={{ route: 'page', params: { id } }}
+          reload={() => page.refetch()}
+        />
       )}
     </PageShell>
   );

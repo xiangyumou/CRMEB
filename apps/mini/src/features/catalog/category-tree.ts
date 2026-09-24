@@ -1,5 +1,5 @@
 import type { ResponseOf } from '@shop/api-client';
-import type { AppConfig } from '@/app-config';
+import { displayOf, type AppConfig } from '@/app-config';
 
 export type CategoryTree = ResponseOf<'catalog.categoryTree'>;
 export type TopCategory = CategoryTree['items'][number];
@@ -41,10 +41,7 @@ export function categoryName(items: readonly Node[], id: string): string | null 
   return null;
 }
 
-/**
- * 分类「显示二级类目」 (pages.md §2.1). `app/config` does not carry the switch yet (a backend
- * gap, stream B status): until it does, level 2 shows whenever a category has children.
- */
-export function showsSubcategories(_config: AppConfig | null): boolean {
-  return true;
+/** 分类「显示二级类目」 (pages.md §2.1): `app/config.display.categorySubcategories`. */
+export function showsSubcategories(config: AppConfig | null): boolean {
+  return displayOf(config).categorySubcategories;
 }

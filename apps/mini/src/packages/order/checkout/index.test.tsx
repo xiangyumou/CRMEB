@@ -204,16 +204,16 @@ describe('确认订单', () => {
       'POST /api/v1/checkout/preview': () => ({
         body: previewFixture({
           customFormFields: [{ key: 'words', label: '刻字内容', type: 'text', required: true }],
+          shipAfterDays: 7,
         }),
       }),
       'POST /api/v1/user-coupons/applicable': () => ({ body: { subtotal: '118.00', items: [] } }),
-      'GET /api/v1/presale/activities/5': () => ({
-        body: { activityId: '5', shipAfterDays: 7 },
-      }),
     });
     await open({ ...buyNow, kind: 'presale', kindMeta: { activityId: '5' } });
 
     expect(await screen.findByText('预售商品：付款后 7 天内发货')).toBeTruthy();
+    // The preview carries the ship time: the presale activity is not read.
+    expect(seen.some((r) => r.key.startsWith('GET /api/v1/presale/'))).toBe(false);
     await ready();
     fireEvent.click(submitButton());
     expect(taroFake.calls).toContainEqual({
