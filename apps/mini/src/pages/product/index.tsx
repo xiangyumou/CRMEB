@@ -10,6 +10,12 @@ import { useCheckoutDraft } from '@/features/checkout/draft';
 import { useProductActivities } from '@/features/product/activities';
 import { ProductCoupons } from '@/features/product/product-coupons';
 import { ReviewItem } from '@/features/product/review-item';
+import {
+  RECOMMENDED_INPUT,
+  RECOMMENDED_STALE_TIME,
+  firstReviewsInput,
+  usePrefetchProductReads,
+} from '@/features/product/secondary-reads';
 import { SkuSheet, type SkuAction } from '@/features/product/sku-sheet';
 import { initialSelection, selectionText, specsOf } from '@/features/product/sku-select';
 import { PosterHost, openPoster, useProductPosterEnabled } from '@/features/share/poster';
@@ -63,6 +69,8 @@ export default function ProductPage() {
     { params: { id } },
     { enabled: id !== '' },
   );
+  // 拼团 / 预售, 领券, 评价 and 为你推荐 need only the id: asked for now, not after the product.
+  usePrefetchProductReads(id);
   useRecordVisit('product');
   useShare(id ? { route: 'product', params: { id } } : null, {
     title: product.data?.name,
@@ -401,11 +409,9 @@ function Detail({ product }: { product: Product }) {
 
 function Reviews({ product }: { product: Product }) {
   const summary = product.reviewSummary;
-  const first = useRouteQuery(
-    'catalog.productReviews',
-    { params: { id: product.id }, query: { pageSize: 2 } },
-    { enabled: summary.total > 0 },
-  );
+  const first = useRouteQuery('catalog.productReviews', firstReviewsInput(product.id), {
+    enabled: summary.total > 0,
+  });
   const open = () => void navigate({ route: 'productReviews', params: { productId: product.id } });
   return (
     <Card
@@ -435,11 +441,9 @@ function Reviews({ product }: { product: Product }) {
 }
 
 function Recommended({ productId }: { productId: string }) {
-  const list = useRouteQuery(
-    'catalog.productList',
-    { query: { feature: 'recommended', pageSize: 7 } },
-    { staleTime: 5 * 60_000 },
-  );
+  const list = useRouteQuery('catalog.productList', RECOMMENDED_INPUT, {
+    staleTime: RECOMMENDED_STALE_TIME,
+  });
   const items = (list.data?.items ?? []).filter((item) => item.id !== productId).slice(0, 6);
   if (items.length === 0) return null;
   return (

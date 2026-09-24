@@ -1,4 +1,5 @@
 import { useRouteQuery } from '@shop/api-client/react';
+import { ACTIVITY_STALE_TIME, activityListInput } from './secondary-reads';
 
 export interface ProductActivity {
   kind: 'groupbuy' | 'presale';
@@ -8,7 +9,7 @@ export interface ProductActivity {
   note: string;
 }
 
-const LONG = { staleTime: 5 * 60_000 } as const;
+const LONG = { staleTime: ACTIVITY_STALE_TIME } as const;
 
 /**
  * The 拼团 / 预售 activities a product is in, for the entry bars on 商品详情.
@@ -18,9 +19,9 @@ const LONG = { staleTime: 5 * 60_000 } as const;
  * not started) shows no bar.
  */
 export function useProductActivities(productId: string): ProductActivity[] {
-  const query = { productId, pageSize: 1 };
-  const groupbuys = useRouteQuery('groupbuy.list', { query }, LONG);
-  const presales = useRouteQuery('presale.list', { query }, LONG);
+  const input = activityListInput(productId);
+  const groupbuys = useRouteQuery('groupbuy.list', input, LONG);
+  const presales = useRouteQuery('presale.list', input, LONG);
   const out: ProductActivity[] = [];
   for (const card of groupbuys.data?.items ?? []) {
     if (card.productId !== productId || !card.canBuy) continue;

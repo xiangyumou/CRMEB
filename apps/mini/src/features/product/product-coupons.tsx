@@ -10,6 +10,7 @@ import { CouponCard, couponValidity, type CouponCardState } from '@/ui/coupon-ca
 import { toast } from '@/ui/feedback';
 import { Sheet } from '@/ui/sheet';
 import { Tag } from '@/ui/tag';
+import { claimableInput } from './secondary-reads';
 import './product-coupons.scss';
 
 type Claimable = ResponseOf<'coupon.claimableList'>['items'][number];
@@ -42,7 +43,7 @@ export function ProductCoupons({
   redirect: StorefrontRoute;
 }) {
   const signedIn = useSignedIn();
-  const list = useRouteQuery('coupon.claimableList', { query: { productId, pageSize: 20 } });
+  const list = useRouteQuery('coupon.claimableList', claimableInput(productId));
   const claim = useClaimCoupon();
   const [open, setOpen] = useState(false);
   const [claiming, setClaiming] = useState<string | null>(null);

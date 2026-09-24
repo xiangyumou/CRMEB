@@ -13,7 +13,7 @@ import {
   skuMatrixFixture,
 } from '@/test/catalog-fixture';
 import { FIRST_CATEGORY_KEY } from '@/features/catalog/first-category';
-import { serveApi } from '@/test/fake-api';
+import { holdRequests, serveApi } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
 import Category from './index';
@@ -24,20 +24,6 @@ const products = {
     body: pageOf([cardFixture(), cardFixture({ id: '31', name: '温感按摩油', price: '39.00' })]),
   }),
 };
-
-/**
- * Holds every answer to `path` until `release()`: what went out while it was pending shows
- * which requests ran side by side.
- */
-function holdRoute(path: string) {
-  const answer = taroFake.onRequest;
-  const waiting: Array<() => void> = [];
-  taroFake.onRequest = (option) =>
-    option.url.split('?')[0]?.endsWith(path)
-      ? new Promise((resolve) => waiting.push(() => resolve(answer(option))))
-      : answer(option);
-  return { release: () => waiting.splice(0).forEach((go) => go()) };
-}
 
 const listRequests = (seen: ReturnType<typeof serveApi>) =>
   seen.filter((r) => r.key === 'GET /api/v1/catalog/products').map((r) => r.query.categoryIds);
@@ -118,7 +104,7 @@ describe('分类', () => {
   it('on a cold open, asks for the first category’s products while the tree is on its way', async () => {
     taroFake.storage.set(FIRST_CATEGORY_KEY, '["1","11","12","121"]');
     const seen = serveApi({ ...tree, ...products });
-    const held = holdRoute('/api/v1/catalog/categories');
+    const held = holdRequests('/api/v1/catalog/categories');
     // The app's 30 s staleTime: a list just fetched is not asked for again on mount.
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: 30_000 } },
@@ -150,7 +136,7 @@ describe('分类', () => {
     taroFake.storage.set(FIRST_CATEGORY_KEY, '["1","11","12","121"]');
     const seen = serveApi({ ...tree, ...products });
     await navigate({ route: 'category', params: { categoryId: '2' } });
-    const held = holdRoute('/api/v1/catalog/categories');
+    const held = holdRequests('/api/v1/catalog/categories');
     await renderPage(<Category />);
     await Promise.resolve();
     expect(listRequests(seen)).toEqual([]);

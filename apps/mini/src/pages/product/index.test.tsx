@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useAppConfigStore } from '@/app-config';
@@ -5,7 +6,7 @@ import { useCheckoutDraft } from '@/features/checkout/draft';
 import { startSession, useSession } from '@/session/session';
 import { appConfigFixture } from '@/test/app-config-fixture';
 import { cardFixture, pageOf, productDetailFixture, reviewFixture } from '@/test/catalog-fixture';
-import { serveApi, type FakeReply } from '@/test/fake-api';
+import { holdRequests, serveApi, type FakeReply } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
 import { routeQueryKey } from '@shop/api-client/react';
 import { taroFake } from '@/test/taro-fake/taro';
@@ -99,7 +100,9 @@ describe('商品详情', () => {
     await renderPage(<ProductPage />);
 
     expect(await screen.findByText('柔雾丝绒礼盒', { selector: '#product-name' })).toBeTruthy();
-    expect(screen.getByText('已售 128')).toBeTruthy();
+    // 为你推荐 may already be there too (asked for beside the product), with its own 已售.
+    const summary = document.querySelector('.product__summary') as HTMLElement;
+    expect(within(summary).getByText('已售 128')).toBeTruthy();
     expect(screen.getByText('评价 (2)')).toBeTruthy();
     expect(await screen.findByText('包装很严实，质感不错。')).toBeTruthy();
     expect(screen.getByText('礼盒图文详情')).toBeTruthy();
@@ -139,6 +142,53 @@ describe('商品详情', () => {
     expect(seen.find((r) => r.key === 'GET /api/v1/coupons')?.query).toMatchObject({
       productId: '12',
     });
+  });
+
+  it('asks for the activities, coupons, reviews and recommendations while the product is on its way', async () => {
+    const seen = serve();
+    const held = holdRequests('/api/v1/catalog/products/12');
+    // The app's 30 s staleTime: what the prefetch brought is not asked for again on mount.
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: 30_000 } },
+    });
+    await renderPage(<ProductPage />, client);
+
+    const secondary = [
+      'GET /api/v1/groupbuy/activities',
+      'GET /api/v1/presale/activities',
+      'GET /api/v1/coupons',
+      'GET /api/v1/catalog/products/12/reviews',
+      'GET /api/v1/catalog/products',
+    ];
+    await waitFor(() => expect(seen.map((r) => r.key)).toEqual(expect.arrayContaining(secondary)));
+    expect(screen.getByText('', { selector: '#product-loading' })).toBeTruthy();
+
+    held.release();
+    expect(await screen.findByRole('link', { name: '拼团 ¥49.00，2 人团' })).toBeTruthy();
+    expect(await screen.findByText('包装很严实，质感不错。')).toBeTruthy();
+    expect(await screen.findByText('温感按摩油')).toBeTruthy();
+    expect(screen.getByRole('link', { name: '领取优惠券' })).toBeTruthy();
+    // Each asked for once: the sections read what the prefetch brought.
+    for (const key of secondary) expect(seen.filter((r) => r.key === key)).toHaveLength(1);
+  });
+
+  it('keeps the page up when the secondary reads fail', async () => {
+    const down = () => ({ status: 500, body: { code: 'INTERNAL', message: '服务器开小差了' } });
+    serve({
+      'GET /api/v1/groupbuy/activities': down,
+      'GET /api/v1/presale/activities': down,
+      'GET /api/v1/coupons': down,
+      'GET /api/v1/catalog/products/12/reviews': down,
+      'GET /api/v1/catalog/products': down,
+    });
+    await renderPage(<ProductPage />);
+
+    expect(await screen.findByText('柔雾丝绒礼盒', { selector: '#product-name' })).toBeTruthy();
+    expect(screen.getByText('评价 (2)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '立即购买' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /拼团/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: '领取优惠券' })).toBeNull();
+    expect(document.getElementById('product-recommended')).toBeNull();
   });
 
   it('shows no group-buy bar for an activity the shopper cannot buy', async () => {
@@ -329,6 +379,28 @@ describe('商品详情', () => {
     });
     await renderPage(<ProductPage />);
     expect(await screen.findByText('商品已下架')).toBeTruthy();
+  });
+
+  it('says a product is gone even though its secondary reads went out first', async () => {
+    const seen = serve({
+      'GET /api/v1/catalog/products/12': () => ({
+        status: 404,
+        body: { code: 'CATALOG_PRODUCT_NOT_FOUND', message: '商品不存在' },
+      }),
+      'GET /api/v1/catalog/products/12/reviews': () => ({
+        status: 404,
+        body: { code: 'CATALOG_PRODUCT_NOT_FOUND', message: '商品不存在' },
+      }),
+    });
+    const held = holdRequests('/api/v1/catalog/products/12');
+    await renderPage(<ProductPage />);
+    await waitFor(() =>
+      expect(seen.some((r) => r.key === 'GET /api/v1/groupbuy/activities')).toBe(true),
+    );
+
+    held.release();
+    expect(await screen.findByText('商品已下架')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /拼团/ })).toBeNull();
   });
 
   it('records the visit and shares the product', async () => {
