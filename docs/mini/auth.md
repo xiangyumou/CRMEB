@@ -40,12 +40,18 @@ token 默认 30 天有效（后台「登录保持天数」`sessionTtlDays`）。
 
 1. 丢掉本地 token。
 2. 重新 `wx.login()`，调 `POST /api/v1/auth/sessions/wechat-mini`（就是「启动」那一步）。
-3. 拿到 `signed-in` 就把原请求重放**一次**；拿到 `phone-required` 就去绑定手机号页面。
+3. 拿到 `signed-in`，并且是**原来那个账号**，就把原请求重放**一次**；拿到 `phone-required` 就去绑定手机号页面。
 4. 续期本身失败（再次 401 或其他错误）不要循环重试，停在登录页。
+5. 续期登录到的是**另一个账号**（AUTH-010）：不重放。`wx.login` 登录的是持有本机 openid 的账号，它可能不是会话过期的那个
+   （例如密码登录时关联被拒，openid 属于别人）。这时新会话立即吊销（`DELETE /api/v1/auth/sessions/current`，带新 token）、
+   不保存，回到未登录（`signed-out`），原请求的 401 照常抛给调用方，然后打开登录页，提示「登录已过期，请重新登录」。
+   原会话属于哪个账号不知道时（本地只有 token、没有账号 id，即 AUTH-010 之前存下的 token）同样处理。
 
 要点：
 
-- 同一时刻多个请求一起 401 时，只发一次续期，其他请求等它的结果。
+- 同一时刻多个请求一起 401 时，只发一次续期，其他请求等它的结果：同一个账号都重放，换了账号都不重放，登录页只打开一次。
+- 登录成功时把账号 id 和 token 一起存下（`shop.session.user`），续期后据此比较。一个请求带的 token 已被别的请求续期换掉时，
+  只在当前 token 属于同一账号时用它重放。
 - 续期只签发新 token，不会让这个用户在其他设备上的会话失效。
 - 被禁用的账号续期会得到 403 `USER_DISABLED`，这时提示联系客服，不要再试。
 - 同一个 IP 在 10 分钟内连续提交 20 个被微信判为无效的 `code` 后，这个接口会返回 429 `RATE_LIMITED`（`details.retryAfterMs`
@@ -98,7 +104,8 @@ token 默认 30 天有效（后台「登录保持天数」`sessionTtlDays`）。
    其他错误（429、403 `USER_DISABLED`）直接提示 `message`。
 
 **关联 openid（AUTH-009）。** 密码登录时关联了 openid，会话到期（或被「退出所有设备」吊销）后的 401 续期走 `wx.login`，
-静默回到**同一个**账号，和其他登录方式一样。
+静默回到**同一个**账号，和其他登录方式一样。关联被拒、openid 属于别的账号时，续期不会换成那个账号继续操作：
+不重放、回到登录页（AUTH-010，见「401：续期」）。
 
 只有关联本身被拒时，密码登录才会因 `bindToken` 失败，这时不签发会话：
 
@@ -106,7 +113,8 @@ token 默认 30 天有效（后台「登录保持天数」`sessionTtlDays`）。
 - 409 `AUTH_WECHAT_ALREADY_BOUND`：这个 openid 已属于别的账号，或这个账号已经绑定了另一个小程序 openid（和短信方式的冲突相同）。
 
 这两种情况密码本身是对的，客户端（`signInWithPassword`）去掉 `bindToken` 再提交一次，照常登录但不关联 openid：token 在
-`sessionTtlDays` 内照常使用，到期后的续期回到 `phone-required`（登录页），或登录到这个 openid 已绑定的那个账号。
+`sessionTtlDays` 内照常使用，到期后的续期回到 `phone-required`（登录页）；续期碰到这个 openid 已绑定的另一个账号时，
+不登录到那个账号，回到登录页（AUTH-010）。
 不在 `phone-required` 时（例如退出后）没有 `bindToken`，同样不关联。
 
 ## 隐私保护指引
@@ -139,6 +147,9 @@ H5「模拟小程序」模拟同一个流程：emulation 数据 `privacy: 'undec
 - AUTH-008：已知 openid 静默续期：同一账号、`registered: false`、有效期为 `sessionTtlDays` 的新 token，不创建任何行，不影响其他会话；被禁用的账号不续期。
 - AUTH-009：密码登录带 `bindToken` 时，密码正确才关联 openid，之后的 `wx.login` 续期回到同一账号；密码错误不关联也不用掉 `bindToken`；
   冲突与短信方式相同（`AUTH_WECHAT_ALREADY_BOUND`），不签发会话；不带 `bindToken` 不关联任何东西。
+- AUTH-010：401 续期只以发出请求的那个账号重放；续期登录到另一个账号（或原账号未知）时吊销新会话、回到未登录、不重放，
+  登录页只打开一次并提示「登录已过期，请重新登录」。
 
 对应的测试在 `packages/core/src/user/storefront-auth.int.test.ts` 的 `mini-program session renewal`（AUTH-006～008）和
-`password login that finishes a parked mini sign-in`（AUTH-009）中。
+`password login that finishes a parked mini sign-in`（AUTH-009）中；AUTH-010 是客户端规则，测试在
+`apps/mini/src/session/session.test.ts` 和 `e2e/storefront/specs-mini/login.spec.ts`。

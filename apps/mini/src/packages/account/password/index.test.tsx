@@ -11,7 +11,7 @@ const type = (label: string, value: string) =>
 
 const miniLogin = {
   status: 'signed-in',
-  session: { token: 't2', expiresAt: '2026-10-23T00:00:00.000Z', user: {} },
+  session: { token: 't2', expiresAt: '2026-10-23T00:00:00.000Z', user: { id: '7' } },
   registered: false,
   bindToken: null,
   bindTokenExpiresInSec: null,

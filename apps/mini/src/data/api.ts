@@ -12,8 +12,11 @@ export const CLIENT_VERSION = process.env.TARO_APP_VERSION || '0.0.0';
 
 interface AuthHooks {
   getToken: () => string | null;
-  /** Sign in again after a 401; the new token or `null`. */
-  renew: () => Promise<string | null>;
+  /**
+   * After a request sent with `sent` met a 401: the token to send it again with (renewing the
+   * session if needed), or `null` to let the 401 stand (session.ts `renewFor`).
+   */
+  renew: (sent: string) => Promise<string | null>;
   onUnauthorized: () => void;
 }
 
@@ -46,8 +49,7 @@ export function authHooks(): Readonly<AuthHooks> {
 export const api = createApiClient({
   baseUrl: platform.api.baseUrl,
   transport: renewingTransport(serverClockTransport(platform.api.transport), {
-    currentToken: () => auth.getToken(),
-    renew: () => auth.renew(),
+    renew: (sent) => auth.renew(sent),
   }),
   platform: platform.api.clientPlatform,
   clientVersion: CLIENT_VERSION,

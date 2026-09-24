@@ -40,7 +40,7 @@ export async function uploadImage(
   const token = hooks.getToken();
   let response = await send(token);
   if (response.status === 401 && token) {
-    const renewed = await hooks.renew();
+    const renewed = await hooks.renew(token);
     if (renewed) response = await send(renewed);
   }
   const payload = parse(response.body);

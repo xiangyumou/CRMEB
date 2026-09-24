@@ -1,10 +1,14 @@
 import type { ResponseOf } from '@shop/api-client';
-import { TOKEN_KEY, useSession } from '@/session/session';
+import { TOKEN_KEY, USER_KEY, useSession } from '@/session/session';
 import { taroFake } from './taro-fake/taro';
 
-/** A signed-in shopper, as a stored token would leave the app (no wx.login, no request). */
+/**
+ * A signed-in shopper, as a stored token would leave the app (no wx.login, no request): the
+ * token of account 7 (`profileFixture`), its account stored beside it.
+ */
 export function signIn(token = 't1'): void {
   taroFake.storage.set(TOKEN_KEY, token);
+  taroFake.storage.set(USER_KEY, '7');
   useSession.setState({ session: { status: 'signed-in', token } });
 }
 

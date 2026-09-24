@@ -759,6 +759,18 @@ A password sign-in that carries a parked WeChat sign-in's `bindToken` links that
 - `packages/core/src/user/storefront-auth.int.test.ts::password login that finishes a parked mini sign-in > AUTH-009 — links nothing without a bind token`
 - `e2e/storefront/specs-mini/login.spec.ts::SMOKE-004: 密码登录 under 其他方式 reaches an authenticated screen, and a wrong password is its field's error`
 
+### AUTH-010
+
+The mini-program replays a request that met a 401 only as the account that sent it. A renewal's `wx.login` signs in to whichever account holds the phone's openid; when that is not the account whose session ended — or that account is unknown (a token stored without its account) — the new session is revoked and not stored, the shopper is signed out, every request that shared the renewal keeps its 401 (a write goes out once, as its sender), and the login page opens once with「登录已过期，请重新登录」. A request whose token went stale is replayed with the current token only if it is the same account's. The same account replays exactly as before.
+
+- `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > replays a write as the same account, and opens no login page`
+- `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > sends a write once when WeChat signs in to another account: signed out, that session revoked, the 401 raised, the login page opened with a hint`
+- `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > gives every request that failed alongside the same answer: one wx.login, none replayed, one login page`
+- `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > replays nothing after renewing a token stored with no account beside it`
+- `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > does not replay a stale token's request with another account's session, nor renew for it`
+- `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > undoes another account the same way for 修改密码, which leaves the page itself`
+- `e2e/storefront/specs-mini/login.spec.ts::AUTH-010: a write that meets an ended password session is not replayed as the account this phone's WeChat belongs to, and the shopper is back at the login page`
+
 ## Fulfilment, the order console and invoices
 
 ### FULFILL-001
