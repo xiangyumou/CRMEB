@@ -414,6 +414,15 @@ The export is one row per SKU, reports truncation honestly rather than silently 
 - `apps/web/app/admin/(shell)/catalog/products/product-list.test.tsx::商品列表 > exports the current tab as a CSV the browser writes`
 - `apps/web/app/admin/(shell)/catalog/products/product-list.test.tsx::hides every write action from a read-only admin`
 
+### CAT-018
+
+A shopper's review pictures must each be a live image our own storage holds — what `POST /api/v1/uploads` returned, or a library image — the same rule as the avatar (USER-019). A link to another server is refused with `CATALOG_REVIEW_IMAGE_NOT_ALLOWED` before anything is checked or written: a review is public, and a foreign picture could change after WeChat checked it or log every shopper who opens the product.
+
+- `packages/core/src/catalog/catalog.int.test.ts::reviews > CAT-018 — review pictures come from our own storage > takes a picture our uploads stored`
+- `packages/core/src/catalog/catalog.int.test.ts::reviews > CAT-018 — review pictures come from our own storage > refuses a link to somebody else’s server, and writes nothing`
+
+## Cart and order creation
+
 ### RISK-B1-001
 
 An off-shelf or deleted product refuses the order instead of being quietly dropped from the lines, and its cart row stays visible with a reason so the shopper can act on it.

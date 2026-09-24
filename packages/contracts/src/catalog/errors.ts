@@ -81,6 +81,12 @@ export const catalogErrors = defineErrors({
    * one code — telling a stranger which of the three it was leaks order data.
    */
   CATALOG_REVIEW_NOT_ALLOWED: { status: 409, message: '该订单暂时不能评价' },
+  /**
+   * A review picture that is not an image our own storage holds — what
+   * `POST /api/v1/uploads` returned (CAT-018). A link to another server is
+   * refused, as the avatar is (USER-019).
+   */
+  CATALOG_REVIEW_IMAGE_NOT_ALLOWED: { status: 422, message: '请上传评价图片后再提交' },
   /** Replying twice. The reply is an edit after that, not a second reply. */
   CATALOG_REVIEW_ALREADY_REPLIED: { status: 409, message: '该评价已经回复过了' },
 

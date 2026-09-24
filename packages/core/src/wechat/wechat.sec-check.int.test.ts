@@ -453,6 +453,12 @@ describe('pictures are checked after the fact, by push', () => {
   const IMAGE = '/uploads/review/2026/06/01/a.png';
   const OTHER = '/uploads/review/2026/06/01/b.png';
 
+  // A review picture must be one our storage holds (CAT-018).
+  beforeEach(async () => {
+    await storeAttachment(IMAGE);
+    await storeAttachment(OTHER);
+  });
+
   async function submittedChecks(reviewId: string) {
     await drainEffects(harness.ctx);
     return listMediaChecks(harness.ctx.db, 'review_image', Number(reviewId));
