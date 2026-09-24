@@ -179,14 +179,17 @@ B：删除加落地页；C：删表）不再采用。
 
 ### 2.9 CI（`.github/workflows/ci.yml`）
 
-- [ ] 文件头注释里的「the uni-app storefront」。
-- [ ] `storefront-e2e` 任务（uni-app 的 `npm ci`、`uni-app unit tests`、`test`）删除；`storefront-e2e-mini` 改名为
+- [x] 文件头注释里的「the uni-app storefront」。
+- [x] `storefront-e2e` 任务（uni-app 的 `npm ci`、`uni-app unit tests`、`test`）删除；`storefront-e2e-mini` 改名为
       `storefront-e2e`，跑合并后的 `test`。
-- [ ] `images` 任务：删除 uni-app 的 `actions/setup-node`（npm 缓存指向 `apps/uni-app/package-lock.json`）、
+- [x] `images` 任务：删除 uni-app 的 `actions/setup-node`（npm 缓存指向 `apps/uni-app/package-lock.json`）、
       「Build the H5 storefront」「Resolve the H5 bundle」两步，edge 步骤的 `build-args: H5_DIST=…` 和「the storefront
       from `apps/uni-app/`」注释，「Release summary」里 `storefront in the edge image` 那一行。落地页由 `web` 回答
       （见 2.10），edge 镜像不再带任何前端产物。
-- [ ] `REL-*` 规则和 `pipeline` 守卫若提到这些步骤，同步修改（改完跑 `pnpm guards`）。
+- [x] `REL-*` 规则和 `pipeline` 守卫若提到这些步骤，同步修改（改完跑 `pnpm guards`）。
+
+（C2，`status/C2-cutover-infra.md`）：`pipeline` 守卫和 `REL-*` 规则都不提这些步骤，没有改；`pnpm guards` 通过。
+`storefront-e2e` 跑的是 `test`，要和 C1 的 2.2（`test:mini` 并入 `test`）一起合入才对。
 
 ### 2.10 edge：`/` 改为落地页
 
@@ -199,7 +202,7 @@ B：删除加落地页；C：删表）不再采用。
 
 - [ ] **部署前确认**（只读）：生产上后台「小程序设置」已启用、AppID 和 AppSecret 已填、「小程序码打开的版本」是
       「正式版」。小程序码在正式版发布之前扫不开（3.3）；这段时间没有顾客，落地页照常显示码，不另做处理。
-- [ ] `docker/edge/nginx.conf`，一处不多一处不少：
+- [x] `docker/edge/nginx.conf`，一处不多一处不少：
 
   ```diff
    # The `edge` server block: static H5, the shared uploads volume, and a proxy to
@@ -277,19 +280,26 @@ B：删除加落地页；C：删表）不再采用。
   （页面是 `force-dynamic`）。落地页不需要别的静态文件：样式内联，Next 的运行时在已经代理的 `/_next/static/` 下，
   小程序码图片在 `/uploads/` 下。
 
-- [ ] **店铺域名本身要配成「业务域名」**（C12，web-view 打开本店网页；用户 2026-09-24 已定要加）：改完之后根目录的任何文件都会 302，
+- [x] **店铺域名本身要配成「业务域名」**（C12，web-view 打开本店网页；用户 2026-09-24 已定要加）：改完之后根目录的任何文件都会 302，
       微信的校验文件 `/<文件名>.txt` 放不上去。那就在同一个提交里按 wechat-compliance.md C12 的建议加一段
       `location ~ ^/[A-Za-z0-9_-]+\.txt$`，从一个只读挂载目录提供，并在 `deploy/README.md` 写明放置方法。
-- [ ] `docker/edge/Dockerfile`：删除 `ARG H5_DIST=docker/edge/h5-placeholder`、`FROM` 下面的 `ARG H5_DIST`、
+- [x] `docker/edge/Dockerfile`：删除 `ARG H5_DIST=docker/edge/h5-placeholder`、`FROM` 下面的 `ARG H5_DIST`、
       `COPY ${H5_DIST}/ /srv/h5/` 和文件头关于 H5 的说明（镜像只剩 nginx 配置）；删除 `docker/edge/h5-placeholder/`；
       `Dockerfile.dockerignore` 删去 `!apps/uni-app/dist` 和关于 uni-app 的注释。
-- [ ] `deploy/rehearsal/drill.sh` 的 `case_edge_proxies_every_page`（第 722 行起）：「没有被代理」的判据从「回答等于
+- [x] `deploy/rehearsal/drill.sh` 的 `case_edge_proxies_every_page`（第 722 行起）：「没有被代理」的判据从「回答等于
       storefront 的 `index.html`」改为「回答是 302、`Location` 为 `/`」；去掉跳过 `/` 的那一行
       （`[ "$url" != '/' ] || continue`）和第 715–721 行注释里「`/` is the storefront's on purpose」——`/` 现在也必须由
       `web` 回答；开头取 `index.html` 的那段删除。
-- [ ] `deploy/README.md`：服务表 `edge` 一行（第 11 行「the H5 storefront at `/`」）、第 136–138 行关于
+- [x] `deploy/README.md`：服务表 `edge` 一行（第 11 行「the H5 storefront at `/`」）、第 136–138 行关于
       `storefront in the edge image` 和 `placeholder` 的说明、「What the edge sends to `web`」一节（第 476 行起）。
-- [ ] `e2e/storefront` 不受影响（它用自己的 Node 版 edge，`src/edge.ts`，根目录是小程序的模拟构建）。
+- [x] `e2e/storefront` 不受影响（它用自己的 Node 版 edge，`src/edge.ts`，根目录是小程序的模拟构建）。
+
+（C2 已做，`status/C2-cutover-infra.md`；演练**没有跑**，第 1 节第 2 步由协调者跑。）与上面的 diff 相比多了三处：
+`location /` 里加了 `absolute_redirect off`，`Location` 就是 `/`，不会被 nginx 拼成 `http://<host>/` 再绕一次 Traefik 的
+https 跳转；校验文件目录是 `deploy/compose.yml` 里 edge 的只读绑定挂载
+`${NEXT_DOMAIN_VERIFICATION_DIR:-./data/domain-verification}:/srv/domain-verification:ro`，`shop upgrade` 在目录不存在时
+建好（755），免得 Docker 以 root 建；演练多了一个用例 `edge/serves-verification-files`。`deploy/README.md` 新增
+「Domain verification files」一节写放置方法。「部署前确认」一项是对生产的只读检查，留给发布当天。
 
 ### 2.11 迁移：删旧表（同一次发布）
 
