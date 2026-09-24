@@ -37,8 +37,11 @@
   }
 
   // Sliding in (or out): nothing inside takes a touch (see `Sheet`). The sheet itself still
-  // does, so a quick tap on it does not reach the mask and close it.
-  &--entering > * {
+  // does, so a quick tap on it does not reach the mask and close it. Named parts, not `> *`:
+  // WXSS rejects the universal selector.
+  &--entering &__header,
+  &--entering &__body,
+  &--entering &__footer {
     pointer-events: none;
   }
 
