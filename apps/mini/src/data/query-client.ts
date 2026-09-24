@@ -4,7 +4,19 @@ import {
   focusManager,
   onlineManager,
 } from '@tanstack/react-query';
+import { isApiError } from '@shop/api-client';
 import { onAppVisibility, onNetworkReachability } from '@/platform';
+
+/**
+ * One more try for a read that failed on the way (no network, a 5xx), none for an answer
+ * that will not change: a 404 (商品已下架, 订单不存在) or another 4xx shows its state at once
+ * instead of after a second request and the retry delay. A 401 is renewed and replayed by the
+ * session's transport before it gets here.
+ */
+export function retryRead(failures: number, error: unknown): boolean {
+  if (failures >= 1) return false;
+  return !(isApiError(error) && error.status >= 400 && error.status < 500);
+}
 
 export function createQueryClient(): QueryClient {
   return new QueryClient({
@@ -13,7 +25,7 @@ export function createQueryClient(): QueryClient {
         // A mini-program page stays mounted under the ones pushed on top of it; a short
         // staleTime keeps "back" from refetching everything while still refreshing on return.
         staleTime: 30_000,
-        retry: 1,
+        retry: retryRead,
       },
     },
   });

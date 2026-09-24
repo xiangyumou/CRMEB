@@ -63,6 +63,11 @@ login return, guest browsing, copy). Updated at every commit.
    also behind `returnFromLogin`) goes back when the page underneath is that order, else replaces
    as before. 评价's 返回订单 likewise. Tests on 收银台, 支付结果 and 评价.
 
+9. **A 404 waited for a second request.** The query client retried every failed read once,
+   so 商品已下架 / 没有找到这个订单 / 页面不存在 appeared only after a second 404 and the retry
+   delay (~1 s). `data/query-client.ts` `retryRead` retries a network failure or a 5xx once and
+   no 4xx. Test in `query-client.test.ts`.
+
 ## In progress
 
 - The rest of the review.
