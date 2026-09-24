@@ -858,6 +858,27 @@ export async function softDeleteInvoiceTitlesOf(
   return result.affected;
 }
 
+/**
+ * 注销: the WeChat identities and the address book go outright. Nothing
+ * references either by id (orders keep their own receiver snapshot), and a
+ * soft delete would keep exactly the personal data 注销 promises to remove —
+ * while a kept identity would tie the openid to the anonymised row forever.
+ */
+export async function releaseIdentitiesAndAddresses(
+  tx: Tx,
+  userId: number,
+): Promise<{ identities: number; addresses: number }> {
+  const identities = await tx
+    .delete(wechatIdentities)
+    .where(eq(wechatIdentities.userId, userId))
+    .returning({ id: wechatIdentities.id });
+  const addresses = await tx
+    .delete(userAddresses)
+    .where(eq(userAddresses.userId, userId))
+    .returning({ id: userAddresses.id });
+  return { identities: identities.length, addresses: addresses.length };
+}
+
 /** Clear the current default. Called before setting a new one, in the same transaction. */
 export async function clearDefaultInvoiceTitle(
   tx: Tx,

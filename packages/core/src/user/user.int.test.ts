@@ -5,7 +5,8 @@ import type {
 } from '@shop/contracts/user/schemas';
 import { admins } from '@shop/db/schema/auth';
 import { attachments } from '@shop/db/schema/storage';
-import { users } from '@shop/db/schema/user';
+import { userAddresses, users } from '@shop/db/schema/user';
+import { wechatIdentities } from '@shop/db/schema/wechat';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -433,6 +434,51 @@ describe('account cancellation', () => {
     // the same person can register again tomorrow.
     expect(row!.account).toMatch(/^del_[0-9a-f]{16}$/);
     expect(row!.passwordVersion).toBeGreaterThan(user.passwordVersion);
+  });
+
+  /**
+   * 注销 has to let go of the WeChat identity — otherwise the same openid finds
+   * the anonymised row on its next sign-in and is refused as disabled forever —
+   * and has to take the address book with it, which is personal data too.
+   */
+  it('releases the WeChat identities and deletes the address book', async () => {
+    const user = await makeUser();
+    await harness.ctx.db.insert(wechatIdentities).values([
+      { userId: user.id, platform: 'mini', openid: `o-mini-${user.id}` },
+      { userId: user.id, platform: 'oa', openid: `o-oa-${user.id}` },
+    ]);
+    await harness.ctx.db.insert(userAddresses).values({
+      userId: user.id,
+      receiverName: '张三',
+      receiverPhone: '13800000000',
+      provinceName: '广东省',
+      cityName: '深圳市',
+      detail: '某路 1 号',
+    });
+    const other = await makeUser();
+    await harness.ctx.db
+      .insert(wechatIdentities)
+      .values({ userId: other.id, platform: 'mini', openid: `o-mini-${other.id}` });
+
+    const request = await service.requestCancellation(asUser(user.id), {});
+    await admin.adminApproveCancellation(asAdmin(), { id: request.id }, {});
+
+    expect(
+      await harness.ctx.db
+        .select()
+        .from(wechatIdentities)
+        .where(eq(wechatIdentities.userId, user.id)),
+    ).toEqual([]);
+    expect(
+      await harness.ctx.db.select().from(userAddresses).where(eq(userAddresses.userId, user.id)),
+    ).toEqual([]);
+    // Nobody else's identity goes with it.
+    expect(
+      await harness.ctx.db
+        .select()
+        .from(wechatIdentities)
+        .where(eq(wechatIdentities.userId, other.id)),
+    ).toHaveLength(1);
   });
 
   it('frees the phone number for a fresh registration', async () => {

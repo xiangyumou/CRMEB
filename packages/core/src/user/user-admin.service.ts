@@ -478,6 +478,9 @@ export async function adminApproveCancellation(
     // A company name, 税号 and bank account are not the customer's to keep
     // after 注销; issued invoices keep their own frozen copy.
     await repo.softDeleteInvoiceTitlesOf(tx, { userId: request.userId, now: ctx.clock.now() });
+    // The openid must be free to register afresh, and the addresses are the
+    // customer's personal data.
+    await repo.releaseIdentitiesAndAddresses(tx, request.userId);
     return request.userId;
   });
   const revoked = await revokeSessions(ctx, userId);
