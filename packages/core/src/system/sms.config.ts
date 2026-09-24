@@ -88,6 +88,7 @@ export const smsConfig = defineConfigGroup({
       section: '腾讯云',
       visibleWhen: TENCENT,
       order: 20,
+      help: '腾讯云控制台「短信 → 应用管理 → 应用列表」中的 SDKAppID（1400 开头）',
     },
     tencentSecretId: {
       label: 'SecretId',
@@ -95,6 +96,7 @@ export const smsConfig = defineConfigGroup({
       section: '腾讯云',
       visibleWhen: TENCENT,
       order: 21,
+      help: '建议用只授权 QcloudSMSFullAccess 的 CAM 子用户密钥',
     },
     tencentSecretKey: {
       label: 'SecretKey',
@@ -110,6 +112,7 @@ export const smsConfig = defineConfigGroup({
       section: '腾讯云',
       visibleWhen: TENCENT,
       order: 23,
+      help: '审核通过的签名内容，不带【】',
     },
     tencentRegion: {
       label: '地域',
@@ -117,9 +120,16 @@ export const smsConfig = defineConfigGroup({
       section: '腾讯云',
       visibleWhen: TENCENT,
       order: 24,
+      help: '留空即 ap-guangzhou',
     },
 
-    templateVerifyCode: { label: '验证码模板 ID', type: 'text', section: '模板', order: 30 },
+    templateVerifyCode: {
+      label: '验证码模板 ID',
+      type: 'text',
+      section: '模板',
+      order: 30,
+      help: '模板只含验证码一个变量：阿里云写 ${code}，腾讯云写 {1}',
+    },
     templateOrderPaid: { label: '支付成功模板 ID', type: 'text', section: '模板', order: 31 },
     templateOrderShipped: { label: '发货提醒模板 ID', type: 'text', section: '模板', order: 32 },
 

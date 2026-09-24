@@ -1,7 +1,13 @@
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { smsConfig } from '../system';
 import { canonicalQuery, createAliyunSmsSender, percentEncode, signatureFor } from './sms-aliyun';
+import {
+  createTencentSmsSender,
+  tc3Authorization,
+  tc3CanonicalRequest,
+  tc3StringToSign,
+} from './sms-tencent';
 import { fakeSmsSender } from './sms.fake';
 import { nullSmsSender } from './sms.port';
 import { smsProviderConfigured } from './sms.service';
@@ -192,19 +198,163 @@ describe('smsProviderConfigured', () => {
     }
   });
 
-  it('is false for 不启用, and for Tencent however complete (declared, not implemented)', () => {
+  it('is false for 不启用', () => {
     expect(smsProviderConfigured(config({ ...ALIYUN, provider: 'none' }))).toBe(false);
     expect(smsProviderConfigured(config({}))).toBe(false);
-    expect(
-      smsProviderConfigured(
-        config({
-          provider: 'tencent',
-          tencentAppId: '1400000000',
-          tencentSecretId: 'id',
-          tencentSecretKey: 'key',
-          tencentSignName: '示例商城',
-        }),
-      ),
-    ).toBe(false);
+  });
+
+  const TENCENT = {
+    provider: 'tencent',
+    tencentAppId: '1400000000',
+    tencentSecretId: 'id',
+    tencentSecretKey: 'key',
+    tencentSignName: '示例商城',
+  };
+
+  it('is true for Tencent with its SdkAppId, SecretId, SecretKey and sign name', () => {
+    expect(smsProviderConfigured(config(TENCENT))).toBe(true);
+  });
+
+  it('is false while any of the four is blank', () => {
+    for (const key of ['tencentAppId', 'tencentSecretId', 'tencentSecretKey', 'tencentSignName']) {
+      expect(smsProviderConfigured(config({ ...TENCENT, [key]: '' }))).toBe(false);
+    }
+  });
+});
+
+describe('TC3-HMAC-SHA256 (Tencent Cloud)', () => {
+  const body = '{"PhoneNumberSet":["+8613800138000"]}';
+  const bodyHash = createHash('sha256').update(body).digest('hex');
+  // 2026-09-22T01:02:03Z; 16:02 the day before would give the wrong date in UTC+8.
+  const timestamp = 1790038923;
+
+  it('builds the canonical request from lowercase signed headers and the body hash', () => {
+    expect(tc3CanonicalRequest(body)).toBe(
+      [
+        'POST',
+        '/',
+        '',
+        'content-type:application/json; charset=utf-8',
+        'host:sms.tencentcloudapi.com',
+        'x-tc-action:sendsms',
+        '',
+        'content-type;host;x-tc-action',
+        bodyHash,
+      ].join('\n'),
+    );
+  });
+
+  it('scopes the string to sign to the UTC date of the timestamp', () => {
+    expect(new Date(timestamp * 1000).toISOString()).toBe('2026-09-22T01:02:03.000Z');
+    const canonicalHash = createHash('sha256').update(tc3CanonicalRequest(body)).digest('hex');
+    expect(tc3StringToSign(body, timestamp)).toBe(
+      `TC3-HMAC-SHA256\n${timestamp}\n2026-09-22/sms/tc3_request\n${canonicalHash}`,
+    );
+  });
+
+  it('signs with the key chained over TC3<key> → date → sms → tc3_request', () => {
+    const step = (key: string | Buffer, value: string) =>
+      createHmac('sha256', key).update(value).digest();
+    const signingKey = step(step(step('TC3secret', '2026-09-22'), 'sms'), 'tc3_request');
+    const signature = createHmac('sha256', signingKey)
+      .update(tc3StringToSign(body, timestamp))
+      .digest('hex');
+    expect(tc3Authorization(body, timestamp, 'AKIDtest', 'secret')).toBe(
+      `TC3-HMAC-SHA256 Credential=AKIDtest/2026-09-22/sms/tc3_request, SignedHeaders=content-type;host;x-tc-action, Signature=${signature}`,
+    );
+  });
+});
+
+describe('createTencentSmsSender', () => {
+  const options = {
+    sdkAppId: '1400000000',
+    secretId: 'AKIDtest',
+    secretKey: 'secret',
+    signName: '示例商城',
+    region: 'ap-guangzhou',
+    now: () => new Date('2026-09-22T01:02:03.456Z'),
+  };
+  const message = { phone: '13800138000', templateId: '123456', params: { code: '012345' } };
+
+  it('POSTs a signed SendSms with the +86 number and positional template params', async () => {
+    let seen: { url: string; init: RequestInit } | undefined;
+    const sender = createTencentSmsSender({
+      ...options,
+      fetchImpl: async (url, init) => {
+        seen = { url: String(url), init: init ?? {} };
+        return new Response(
+          JSON.stringify({
+            Response: { SendStatusSet: [{ Code: 'Ok', SerialNo: 'serial-1' }], RequestId: 'r' },
+          }),
+        );
+      },
+    });
+
+    expect(await sender.send(message)).toEqual({ ok: true, messageId: 'serial-1' });
+    expect(seen?.url).toBe('https://sms.tencentcloudapi.com/');
+    const body = String(seen?.init.body);
+    expect(JSON.parse(body)).toEqual({
+      PhoneNumberSet: ['+8613800138000'],
+      SmsSdkAppId: '1400000000',
+      SignName: '示例商城',
+      TemplateId: '123456',
+      TemplateParamSet: ['012345'],
+    });
+    const headers = seen?.init.headers as Record<string, string>;
+    expect(headers['X-TC-Action']).toBe('SendSms');
+    expect(headers['X-TC-Version']).toBe('2021-01-11');
+    expect(headers['X-TC-Region']).toBe('ap-guangzhou');
+    // Seconds, and the same seconds the signature was made over.
+    expect(headers['X-TC-Timestamp']).toBe('1790038923');
+    expect(headers.Authorization).toBe(tc3Authorization(body, 1790038923, 'AKIDtest', 'secret'));
+  });
+
+  it('turns a request-level error into a result', async () => {
+    const sender = createTencentSmsSender({
+      ...options,
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            Response: { Error: { Code: 'AuthFailure.SignatureFailure', Message: 'bad' } },
+          }),
+        ),
+    });
+    expect(await sender.send(message)).toEqual({
+      ok: false,
+      providerCode: 'AuthFailure.SignatureFailure',
+      error: 'bad',
+    });
+  });
+
+  it("turns the number's own refusal into a result", async () => {
+    const sender = createTencentSmsSender({
+      ...options,
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            Response: {
+              SendStatusSet: [
+                { Code: 'FailedOperation.TemplateIncorrectOrUnapproved', Message: 'x' },
+              ],
+            },
+          }),
+        ),
+    });
+    expect(await sender.send(message)).toMatchObject({
+      ok: false,
+      providerCode: 'FailedOperation.TemplateIncorrectOrUnapproved',
+    });
+  });
+
+  it('turns a transport failure into a result too', async () => {
+    const sender = createTencentSmsSender({
+      ...options,
+      fetchImpl: () => Promise.reject(new Error('ECONNRESET')),
+    });
+    expect(await sender.send(message)).toEqual({
+      ok: false,
+      providerCode: 'TRANSPORT',
+      error: 'ECONNRESET',
+    });
   });
 });

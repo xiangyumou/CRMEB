@@ -4,6 +4,7 @@ import type { Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fixedWindow } from '../kernel/rate-limit';
 import { createAliyunSmsSender } from './sms-aliyun';
+import { createTencentSmsSender } from './sms-tencent';
 import {
   getSmsSenderOverride,
   nullSmsSender,
@@ -40,16 +41,26 @@ type SmsConfigValues = z.infer<typeof smsConfig.schema>;
  *
  * `resolveSender`'s rule, extracted so `GET /api/v1/app/config` can say
  * whether 手机号登录 works without a second copy of it to drift: Aliyun with
- * its key id, key secret and sign name all filled in. `none` and Tencent
- * (declared, not implemented — see below) are not.
+ * its key id, key secret and sign name all filled in, or Tencent with its
+ * SdkAppId, SecretId, SecretKey and sign name. `none` is not.
  */
 export function smsProviderConfigured(config: SmsConfigValues): boolean {
-  return (
-    config.provider === 'aliyun' &&
-    config.aliyunAccessKeyId !== '' &&
-    config.aliyunAccessKeySecret !== '' &&
-    config.aliyunSignName !== ''
-  );
+  if (config.provider === 'aliyun') {
+    return (
+      config.aliyunAccessKeyId !== '' &&
+      config.aliyunAccessKeySecret !== '' &&
+      config.aliyunSignName !== ''
+    );
+  }
+  if (config.provider === 'tencent') {
+    return (
+      config.tencentAppId !== '' &&
+      config.tencentSecretId !== '' &&
+      config.tencentSecretKey !== '' &&
+      config.tencentSignName !== ''
+    );
+  }
+  return false;
 }
 
 /**
@@ -62,14 +73,14 @@ export async function smsSenderUsable(ctx: Ctx): Promise<boolean> {
   return smsProviderConfigured(await ctx.config.get(smsConfig));
 }
 
-/** Aliyun and Tencent are both in the config group; only Aliyun is implemented. */
+/** The provider the `sms` group names, or `nullSmsSender` while it is incomplete. */
 export async function resolveSender(ctx: Ctx): Promise<SmsSender> {
   const registered = getSmsSenderOverride();
   if (registered) return registered;
 
   const config = await ctx.config.get(smsConfig);
+  if (!smsProviderConfigured(config)) return nullSmsSender;
   if (config.provider === 'aliyun') {
-    if (!smsProviderConfigured(config)) return nullSmsSender;
     return createAliyunSmsSender({
       accessKeyId: config.aliyunAccessKeyId,
       accessKeySecret: config.aliyunAccessKeySecret,
@@ -78,12 +89,14 @@ export async function resolveSender(ctx: Ctx): Promise<SmsSender> {
       now: () => ctx.clock.now(),
     });
   }
-  // Tencent Cloud is declared in the config group but has no implementation
-  // here: nobody on this project has an account to test one against, and a
-  // signing routine that has never talked to the real endpoint is a liability
-  // dressed as a feature. `nullSmsSender` refuses loudly instead of failing at
-  // 3am on a release.
-  return nullSmsSender;
+  return createTencentSmsSender({
+    sdkAppId: config.tencentAppId,
+    secretId: config.tencentSecretId,
+    secretKey: config.tencentSecretKey,
+    signName: config.tencentSignName,
+    region: config.tencentRegion || 'ap-guangzhou',
+    now: () => ctx.clock.now(),
+  });
 }
 
 export interface SendCodeOptions {

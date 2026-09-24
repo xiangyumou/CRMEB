@@ -39,6 +39,7 @@ export {
 } from './sms.port';
 
 export { createAliyunSmsSender, type AliyunSmsOptions } from './sms-aliyun';
+export { createTencentSmsSender, type TencentSmsOptions } from './sms-tencent';
 export { fakeSmsSender, type FakeSmsSender } from './sms.fake';
 
 export {
