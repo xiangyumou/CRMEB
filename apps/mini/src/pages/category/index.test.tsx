@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useAppConfigStore } from '@/app-config';
 import { navigate } from '@/platform';
@@ -11,6 +12,7 @@ import {
   singleSkuMatrix,
   skuMatrixFixture,
 } from '@/test/catalog-fixture';
+import { FIRST_CATEGORY_KEY } from '@/features/catalog/first-category';
 import { serveApi } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
@@ -22,6 +24,23 @@ const products = {
     body: pageOf([cardFixture(), cardFixture({ id: '31', name: '温感按摩油', price: '39.00' })]),
   }),
 };
+
+/**
+ * Holds every answer to `path` until `release()`: what went out while it was pending shows
+ * which requests ran side by side.
+ */
+function holdRoute(path: string) {
+  const answer = taroFake.onRequest;
+  const waiting: Array<() => void> = [];
+  taroFake.onRequest = (option) =>
+    option.url.split('?')[0]?.endsWith(path)
+      ? new Promise((resolve) => waiting.push(() => resolve(answer(option))))
+      : answer(option);
+  return { release: () => waiting.splice(0).forEach((go) => go()) };
+}
+
+const listRequests = (seen: ReturnType<typeof serveApi>) =>
+  seen.filter((r) => r.key === 'GET /api/v1/catalog/products').map((r) => r.query.categoryIds);
 
 describe('分类', () => {
   beforeEach(() => {
@@ -87,6 +106,59 @@ describe('分类', () => {
 
     const tab = await screen.findByRole('tab', { name: '精选好物' });
     expect(tab.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('remembers the first category’s subtree for the next cold open', async () => {
+    serveApi({ ...tree, ...products });
+    await renderPage(<Category />);
+    expect(await screen.findByText('柔雾丝绒礼盒')).toBeTruthy();
+    expect(taroFake.storage.get(FIRST_CATEGORY_KEY)).toBe('["1","11","12","121"]');
+  });
+
+  it('on a cold open, asks for the first category’s products while the tree is on its way', async () => {
+    taroFake.storage.set(FIRST_CATEGORY_KEY, '["1","11","12","121"]');
+    const seen = serveApi({ ...tree, ...products });
+    const held = holdRoute('/api/v1/catalog/categories');
+    // The app's 30 s staleTime: a list just fetched is not asked for again on mount.
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: 30_000 } },
+    });
+    await renderPage(<Category />, client);
+
+    // The list went out before the tree answered.
+    await waitFor(() => expect(listRequests(seen)).toEqual(['1,11,12,121']));
+    expect(screen.queryByRole('tab')).toBeNull();
+
+    held.release();
+    expect(await screen.findByText('柔雾丝绒礼盒')).toBeTruthy();
+    // The page's list is the one already asked for: no second request.
+    expect(listRequests(seen)).toEqual(['1,11,12,121']);
+  });
+
+  it('shows the fresh tree’s first category when the remembered one has changed', async () => {
+    taroFake.storage.set(FIRST_CATEGORY_KEY, '["1","11"]');
+    const seen = serveApi({ ...tree, ...products });
+    await renderPage(<Category />);
+
+    expect(await screen.findByText('柔雾丝绒礼盒')).toBeTruthy();
+    // One unused guess, then the list the tree calls for.
+    await waitFor(() => expect(listRequests(seen)).toEqual(['1,11', '1,11,12,121']));
+    expect(taroFake.storage.get(FIRST_CATEGORY_KEY)).toBe('["1","11","12","121"]');
+  });
+
+  it('guesses nothing when opened on a category outside the remembered one', async () => {
+    taroFake.storage.set(FIRST_CATEGORY_KEY, '["1","11","12","121"]');
+    const seen = serveApi({ ...tree, ...products });
+    await navigate({ route: 'category', params: { categoryId: '2' } });
+    const held = holdRoute('/api/v1/catalog/categories');
+    await renderPage(<Category />);
+    await Promise.resolve();
+    expect(listRequests(seen)).toEqual([]);
+
+    held.release();
+    const tab = await screen.findByRole('tab', { name: '新品' });
+    expect(tab.getAttribute('aria-selected')).toBe('true');
+    await waitFor(() => expect(listRequests(seen)).toEqual(['2']));
   });
 
   it('says so when the shop has no categories', async () => {

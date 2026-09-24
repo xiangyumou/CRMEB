@@ -1,6 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from '@tarojs/components';
-import { useInfiniteRouteQuery, useRouteQuery } from '@shop/api-client/react';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  infiniteRouteQueryOptions,
+  routeQueryKey,
+  useApiClient,
+  useInfiniteRouteQuery,
+  useRouteQuery,
+} from '@shop/api-client/react';
 import { useTabPage } from '@/app-shell/tab-page';
 import { useAppConfig } from '@/app-config';
 import { useQuickAdd } from '@/features/cart/quick-add';
@@ -10,6 +17,7 @@ import {
   topLevelOf,
   type TopCategory,
 } from '@/features/catalog/category-tree';
+import { recallFirstCategory, rememberFirstCategory } from '@/features/catalog/first-category';
 import { assetUrl } from '@/lib/asset-url';
 import { cx } from '@/lib/cx';
 import { navigate, scrollPageToTop, useShare } from '@/platform';
@@ -24,6 +32,9 @@ import { SearchBar } from '@/ui/search-bar';
 import { ProductCardSkeleton, Skeleton } from '@/ui/skeleton';
 import './index.scss';
 
+/** What a level-1 category's product list asks for: its whole subtree. */
+const productsOf = (categoryIds: string[]) => ({ query: { categoryIds, pageSize: 20 } });
+
 /**
  * 分类 (tab `category { categoryId? }`, design.md §5 版式 F): level-1 categories on the left;
  * on the right the category's banner, its level-2 grid (each opens 商品列表) and the products
@@ -33,6 +44,21 @@ import './index.scss';
 export default function Category() {
   const params = useTabPage('category');
   const config = useAppConfig();
+  const queryClient = useQueryClient();
+  const api = useApiClient();
+  // A cold open: start the first category's list, as the tree had it last time, while the
+  // tree loads (the list needs the tree's subtree ids and would otherwise wait a round trip).
+  const [guess] = useState(() =>
+    queryClient.getQueryData(routeQueryKey('catalog.categoryTree'))
+      ? null
+      : guessedCategory(params.categoryId),
+  );
+  useEffect(() => {
+    if (!guess) return;
+    void queryClient.prefetchInfiniteQuery(
+      infiniteRouteQueryOptions(api, 'catalog.productList', productsOf(guess)),
+    );
+  }, [guess, queryClient, api]);
   const tree = useRouteQuery('catalog.categoryTree', undefined, { staleTime: 5 * 60_000 });
   const [picked, setPicked] = useState<string | null>(null);
   const [lastParam, setLastParam] = useState(params.categoryId);
@@ -50,6 +76,10 @@ export default function Category() {
   useShare(current ? { route: 'category', params: { categoryId: current.id } } : null, {
     title: current?.name,
   });
+  const firstIds = items[0] ? subtreeIds(items[0]).join(',') : '';
+  useEffect(() => {
+    if (firstIds) rememberFirstCategory(firstIds.split(','));
+  }, [firstIds]);
 
   return (
     <PageShell title="分类" bg="surface">
@@ -101,11 +131,19 @@ export default function Category() {
   );
 }
 
+/**
+ * The ids to start a list for before the tree arrives: the first category's, unless the page
+ * was opened on a category outside it (a DIY link or a share).
+ */
+function guessedCategory(linked: string | undefined): string[] | null {
+  const ids = recallFirstCategory();
+  if (!ids || (linked && !ids.includes(linked))) return null;
+  return ids;
+}
+
 function Pane({ top, showSub }: { top: TopCategory; showSub: boolean }) {
   const quick = useQuickAdd({ route: 'category', params: { categoryId: top.id } });
-  const products = useInfiniteRouteQuery('catalog.productList', {
-    query: { categoryIds: subtreeIds(top), pageSize: 20 },
-  });
+  const products = useInfiniteRouteQuery('catalog.productList', productsOf(subtreeIds(top)));
   const banner = assetUrl(top.bannerUrl);
   return (
     <>
