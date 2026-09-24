@@ -12,16 +12,23 @@ import {
 } from './admin-session.store';
 import { captchaRequired, getCaptchaVerifier } from './captcha';
 import { insertAudit } from './audit.repo';
-import { hashPassword, verifyPassword, type PasswordAlgo } from './password';
+import {
+  fitsBcrypt,
+  hashPassword,
+  verifyAgainstNothing,
+  verifyPassword,
+  type PasswordAlgo,
+} from './password';
 import { effectivePermissions } from './rbac';
 
 /**
  * Admin sign-in.
  *
- * The throttle is **per account, not per IP**: every request arrives through
- * one shared reverse proxy, so an IP bucket would either be useless (one IP for
- * everybody) or a self-inflicted outage. Five wrong passwords parks that
- * account for fifteen minutes; a correct password clears the counter.
+ * The throttle counts the account and the account-at-this-address
+ * (`throttleKeys`): five wrong passwords park that address for fifteen
+ * minutes, fifty from anywhere park the account. The address is the edge's
+ * `X-Real-IP`, which the client cannot choose. A correct password clears the
+ * address's counter.
  *
  * A wrong account and a wrong password return the same error and take a
  * similar amount of work, so the endpoint does not enumerate accounts.
@@ -29,7 +36,13 @@ import { effectivePermissions } from './rbac';
 
 export interface AdminAuthOptions {
   sessionTtlMs?: number;
+  /** Wrong tries from one address before that address is parked. */
   maxAttempts?: number;
+  /**
+   * Wrong tries from every address together before the account itself is
+   * parked. Only counted when the address is known.
+   */
+  accountCeiling?: number;
   attemptWindowMs?: number;
   /** Lowered to 4 in tests; pure-JS bcrypt at cost 10 is ~250ms. */
   bcryptCost?: number;
@@ -38,6 +51,7 @@ export interface AdminAuthOptions {
 const DEFAULTS = {
   sessionTtlMs: DEFAULT_ADMIN_SESSION_TTL_MS,
   maxAttempts: 5,
+  accountCeiling: 50,
   attemptWindowMs: 15 * 60 * 1000,
 } as const;
 
@@ -79,6 +93,7 @@ export class AdminAuthService {
     this.options = {
       sessionTtlMs: options.sessionTtlMs ?? DEFAULTS.sessionTtlMs,
       maxAttempts: options.maxAttempts ?? DEFAULTS.maxAttempts,
+      accountCeiling: options.accountCeiling ?? DEFAULTS.accountCeiling,
       attemptWindowMs: options.attemptWindowMs ?? DEFAULTS.attemptWindowMs,
       bcryptCost: options.bcryptCost ?? 10,
     };
@@ -88,8 +103,20 @@ export class AdminAuthService {
     });
   }
 
-  private throttleKey(account: string): string {
-    return `admin:login:fail:${account.trim().toLowerCase()}`;
+  /**
+   * The caller's counter, and the account's.
+   *
+   * Counting only the account let anyone park the super admin for fifteen
+   * minutes with five wrong passwords. With the address known, five wrong
+   * tries park that address; the account is parked only when tries from
+   * everywhere reach `accountCeiling` — a distributed guess, not a nuisance.
+   * Without an address (a dev server, a test) there is only the account.
+   */
+  private throttleKeys(account: string, ip: string | null | undefined) {
+    const subject = `admin:login:fail:${account.trim().toLowerCase()}`;
+    return ip
+      ? { caller: `${subject}:${ip}`, account: subject }
+      : { caller: subject, account: null };
   }
 
   /**
@@ -102,7 +129,7 @@ export class AdminAuthService {
   async login(ctx: Ctx, input: LoginInput, meta?: LoginMeta): Promise<LoginResult> {
     const seen: { adminId: number | null } = { adminId: null };
     try {
-      const result = await this.attempt(ctx, input, seen);
+      const result = await this.attempt(ctx, input, seen, meta?.ip ?? null);
       await this.recordOutcome(ctx, input.account, seen.adminId, 'success', 200, null, meta);
       return result;
     } catch (error) {
@@ -154,12 +181,13 @@ export class AdminAuthService {
     ctx: Ctx,
     input: LoginInput,
     seen: { adminId: number | null },
+    ip: string | null,
   ): Promise<LoginResult> {
     const account = input.account.trim();
-    const key = this.throttleKey(account);
+    const keys = this.throttleKeys(account, ip);
 
     const throttle = await fixedWindow(ctx.redis, {
-      key,
+      key: keys.caller,
       limit: this.options.maxAttempts,
       windowMs: this.options.attemptWindowMs,
       nowMs: ctx.clock.nowMs(),
@@ -168,6 +196,19 @@ export class AdminAuthService {
       throw new DomainError('AUTH_TOO_MANY_ATTEMPTS', {
         details: { retryAfterMs: throttle.retryAfterMs },
       });
+    }
+    if (keys.account) {
+      const ceiling = await fixedWindow(ctx.redis, {
+        key: keys.account,
+        limit: this.options.accountCeiling,
+        windowMs: this.options.attemptWindowMs,
+        nowMs: ctx.clock.nowMs(),
+      });
+      if (!ceiling.allowed) {
+        throw new DomainError('AUTH_TOO_MANY_ATTEMPTS', {
+          details: { retryAfterMs: ceiling.retryAfterMs },
+        });
+      }
     }
 
     const verifier = getCaptchaVerifier();
@@ -180,7 +221,9 @@ export class AdminAuthService {
 
     const admin = await adminRepo.findByAccount(ctx.db, account);
     if (!admin) {
-      // Same error, same shape as a wrong password: no account enumeration.
+      // Same error, same shape and the same bcrypt work as a wrong password:
+      // no account enumeration.
+      await verifyAgainstNothing(input.password, this.options.bcryptCost);
       throw new DomainError('AUTH_INVALID_CREDENTIALS');
     }
     seen.adminId = admin.id;
@@ -197,7 +240,7 @@ export class AdminAuthService {
     if (admin.status !== 1) throw new DomainError('AUTH_ACCOUNT_DISABLED');
 
     const now = ctx.clock.now();
-    if (verified.needsUpgrade) {
+    if (verified.needsUpgrade && fitsBcrypt(input.password)) {
       const upgraded = await hashPassword(input.password, this.options.bcryptCost);
       await adminRepo.upgradePasswordHash(ctx.db, admin.id, {
         fromHash: admin.passwordHash,
@@ -223,7 +266,9 @@ export class AdminAuthService {
       ctx.clock.nowMs(),
     );
 
-    await resetFixedWindow(ctx.redis, key);
+    // The account's counter is left alone: a guesser's progress is not wiped
+    // by the owner signing in.
+    await resetFixedWindow(ctx.redis, keys.caller);
     await adminRepo.touchLastLogin(ctx.db, admin.id, now);
     ctx.logger.info({ adminId: admin.id, account: admin.account }, 'admin login');
 

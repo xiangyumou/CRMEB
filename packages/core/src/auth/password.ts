@@ -53,12 +53,41 @@ export async function verifyPassword(
   if (algo === 'md5') {
     return { ok: verifyMd5Legacy(plain, hash), needsUpgrade: verifyMd5Legacy(plain, hash) };
   }
+  // bcrypt reads 72 bytes and ignores the rest; no stored password is longer
+  // (`assertPasswordShape`), so a longer one is simply not it.
+  if (!fitsBcrypt(plain)) return { ok: false, needsUpgrade: false };
   try {
     return { ok: await bcrypt.compare(plain, hash), needsUpgrade: false };
   } catch {
     // A malformed hash must read as "wrong password", not as a 500.
     return { ok: false, needsUpgrade: false };
   }
+}
+
+const nothingHashes = new Map<number, Promise<string>>();
+
+/**
+ * One bcrypt comparison that always fails, for a sign-in whose account does
+ * not exist: without it that answer comes back in a few milliseconds and a
+ * wrong password in hundreds, and the difference lists the accounts.
+ */
+export async function verifyAgainstNothing(
+  plain: string,
+  cost: number = DEFAULT_BCRYPT_COST,
+): Promise<false> {
+  let hash = nothingHashes.get(cost);
+  if (!hash) {
+    hash = bcrypt.hash('no account has this password', cost);
+    nothingHashes.set(cost, hash);
+  }
+  const against = await hash;
+  await bcrypt.compare(plain, against).catch(() => false);
+  return false;
+}
+
+/** Whether bcrypt would read all of it. */
+export function fitsBcrypt(plain: string): boolean {
+  return Buffer.byteLength(plain, 'utf8') <= 72;
 }
 
 /** Constant-time compare of `md5(plain)` against a stored 32-char hex digest. */
@@ -78,7 +107,7 @@ export function assertPasswordShape(plain: string): void {
   if (typeof plain !== 'string' || plain.length === 0) {
     throw new TypeError('密码不能为空');
   }
-  if (Buffer.byteLength(plain, 'utf8') > 72) {
+  if (!fitsBcrypt(plain)) {
     throw new TypeError('密码过长（bcrypt 上限 72 字节）');
   }
 }

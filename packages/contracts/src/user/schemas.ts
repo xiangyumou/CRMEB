@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { clientPlatform, id, instant, pageQuery, paged, sortQuery } from '../_conventions/common';
+import {
+  clientPlatform,
+  id,
+  instant,
+  newPassword,
+  pageQuery,
+  paged,
+  sortQuery,
+} from '../_conventions/common';
 import {
   invoiceHeaderInput,
   invoiceHeaderType,
@@ -434,7 +442,7 @@ export type AdminUserForm = z.infer<typeof adminUserForm>;
  */
 export const adminUserCreateBody = adminUserForm.extend({
   phone: phoneNumber,
-  password: z.string().min(6).max(64).optional(),
+  password: newPassword(6).optional(),
 });
 export type AdminUserCreateBody = z.infer<typeof adminUserCreateBody>;
 
@@ -481,7 +489,7 @@ export type AdminUserStatusBody = z.infer<typeof adminUserStatusBody>;
  * a reset is what support does when an account is suspected stolen.
  */
 export const adminUserPasswordBody = z.object({
-  password: z.string().min(6).max(64),
+  password: newPassword(6),
 });
 export type AdminUserPasswordBody = z.infer<typeof adminUserPasswordBody>;
 

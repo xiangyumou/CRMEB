@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { id, instant, pageQuery, paged, sortQuery } from '../_conventions/common';
+import { id, instant, newPassword, pageQuery, paged, sortQuery } from '../_conventions/common';
 
 /**
  * Shapes shared by the `system` routes: admins, roles, the permission tree, the
@@ -70,7 +70,7 @@ export const adminForm = z.object({
     .max(64)
     .regex(/^[A-Za-z0-9_.-]+$/, '账号只能包含字母、数字、下划线、点和横线'),
   name: z.string().trim().min(1, '请填写姓名').max(64),
-  password: z.string().min(8, '密码至少 8 位').max(128).optional(),
+  password: newPassword(8, '密码至少 8 位').optional(),
   phone: z
     .string()
     .trim()
@@ -88,7 +88,7 @@ export type AdminStatusBody = z.infer<typeof adminStatusBody>;
 
 /** An operator resetting somebody else's password. Their sessions all die. */
 export const adminPasswordBody = z.object({
-  password: z.string().min(8, '密码至少 8 位').max(128),
+  password: newPassword(8, '密码至少 8 位'),
 });
 export type AdminPasswordBody = z.infer<typeof adminPasswordBody>;
 
@@ -153,8 +153,8 @@ export type ProfileForm = z.infer<typeof profileForm>;
 export const profilePasswordBody = z
   .object({
     currentPassword: z.string().min(1, '请输入当前密码').max(128),
-    newPassword: z.string().min(8, '新密码至少 8 位').max(128),
-    confirmPassword: z.string().min(8).max(128),
+    newPassword: newPassword(8, '新密码至少 8 位'),
+    confirmPassword: newPassword(8),
   })
   .refine((v) => v.newPassword === v.confirmPassword, {
     message: '两次输入的新密码不一致',

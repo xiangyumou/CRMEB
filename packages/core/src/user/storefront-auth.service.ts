@@ -21,7 +21,7 @@ import type {
 } from '@shop/contracts/auth/storefront-schemas';
 import type { Tx } from '@shop/db';
 import { captchaRequired, getCaptchaVerifier } from '../auth/captcha';
-import { hashPassword, verifyPassword } from '../auth/password';
+import { hashPassword, verifyAgainstNothing, verifyPassword } from '../auth/password';
 import { UserSessionService } from '../auth/user-session.service';
 import * as coupon from '../coupon';
 import { DAY } from '../kernel/clock';
@@ -245,7 +245,11 @@ export async function passwordLogin(
   // A missing account, a WeChat-only account with no password, and a wrong
   // password are one error with one shape. `AUTH_PASSWORD_NOT_SET` exists for
   // the *signed-in* 修改密码 screen, where the account is already known.
-  if (!user || user.passwordHash === null) throw new DomainError('AUTH_INVALID_CREDENTIALS');
+  // The same bcrypt work either way, so the timing does not list the accounts.
+  if (!user || user.passwordHash === null) {
+    await verifyAgainstNothing(body.password);
+    throw new DomainError('AUTH_INVALID_CREDENTIALS');
+  }
 
   const verified = await verifyPassword(
     body.password,

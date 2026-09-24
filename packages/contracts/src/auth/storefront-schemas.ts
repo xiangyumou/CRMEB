@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { instant } from '../_conventions/common';
+import { instant, newPassword } from '../_conventions/common';
 import { userProfile, userProfileExample, type UserProfile } from '../user/schemas';
 
 /**
@@ -120,7 +120,7 @@ export type SmsLoginResult = z.infer<typeof smsLoginResult>;
 export const registerBody = z.object({
   phone: phoneNumber,
   code: smsCode,
-  password: z.string().min(6).max(64),
+  password: newPassword(6),
   nickname: z.string().min(1).max(64).optional(),
 });
 export type RegisterBody = z.infer<typeof registerBody>;
@@ -128,7 +128,7 @@ export type RegisterBody = z.infer<typeof registerBody>;
 export const resetPasswordBody = z.object({
   phone: phoneNumber,
   code: smsCode,
-  password: z.string().min(6).max(64),
+  password: newPassword(6),
 });
 export type ResetPasswordBody = z.infer<typeof resetPasswordBody>;
 
@@ -144,7 +144,7 @@ export const changePasswordBody = z
   .object({
     oldPassword: z.string().min(1).max(128).optional(),
     code: smsCode.optional(),
-    password: z.string().min(6).max(64),
+    password: newPassword(6),
   })
   .superRefine((value, ctx) => {
     if (!value.oldPassword && !value.code) {

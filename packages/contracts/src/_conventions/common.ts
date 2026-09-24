@@ -26,6 +26,23 @@ export const idList = z
  */
 export const money = z.string().regex(/^(0|[1-9]\d{0,9})\.\d{2}$/, '金额格式不正确');
 
+/**
+ * A password being set. bcrypt reads 72 bytes and ignores the rest, so core
+ * refuses anything longer rather than let two long passwords be one secret.
+ * The limit is checked here, in bytes, so that is a 422 with a reason and not
+ * a 500 — 24 汉字 is already 72 bytes.
+ */
+export function newPassword(min: number, message?: string) {
+  return z
+    .string()
+    .min(min, message)
+    .max(72)
+    .refine(
+      (value) => new TextEncoder().encode(value).length <= 72,
+      '密码过长（最多 72 字节，约 24 个汉字）',
+    );
+}
+
 /** Instants are ISO-8601 with offset. Stored as timestamptz. */
 export const instant = z.iso.datetime({ offset: true });
 

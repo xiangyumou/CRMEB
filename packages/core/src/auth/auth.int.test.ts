@@ -200,6 +200,57 @@ describe('the per-account login throttle', () => {
   });
 });
 
+describe('the throttle when the caller’s address is known', () => {
+  const FROM_A = { ip: '203.0.113.1' };
+  const FROM_B = { ip: '203.0.113.2' };
+
+  it('parks the guesser, not the account: the admin at another address still gets in', async () => {
+    await seedAdmin({ isSuper: true });
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await auth
+        .login(harness.ctx, { account: 'admin', password: 'nope' }, FROM_A)
+        .catch(() => undefined);
+    }
+    await expect(
+      auth.login(harness.ctx, { account: 'admin', password: PASSWORD }, FROM_A),
+    ).rejects.toMatchObject({ code: 'AUTH_TOO_MANY_ATTEMPTS' });
+    await expect(
+      auth.login(harness.ctx, { account: 'admin', password: PASSWORD }, FROM_B),
+    ).resolves.toMatchObject({ profile: { account: 'admin' } });
+  });
+
+  it('still parks the account once guesses from many addresses add up', async () => {
+    const ceilinged = new AdminAuthService(harness.ctx, {
+      bcryptCost: BCRYPT_COST,
+      accountCeiling: 8,
+    });
+    await seedAdmin();
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      await ceilinged
+        .login(harness.ctx, { account: 'admin', password: 'nope' }, { ip: `198.51.100.${attempt}` })
+        .catch(() => undefined);
+    }
+    await expect(
+      ceilinged.login(harness.ctx, { account: 'admin', password: PASSWORD }, FROM_B),
+    ).rejects.toMatchObject({ code: 'AUTH_TOO_MANY_ATTEMPTS' });
+  });
+});
+
+describe('an unknown account', () => {
+  it('costs a bcrypt comparison too, so the answer’s timing does not tell', async () => {
+    // Cost 12 makes one comparison ~250ms or more even on a fast machine; a
+    // lookup that finds nothing and returns is a few milliseconds.
+    const slow = new AdminAuthService(harness.ctx, { bcryptCost: 12 });
+    await slow.login(harness.ctx, { account: 'nobody', password: PASSWORD }).catch(() => undefined);
+
+    const started = performance.now();
+    await expect(
+      slow.login(harness.ctx, { account: 'nobody-else', password: PASSWORD }),
+    ).rejects.toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' });
+    expect(performance.now() - started).toBeGreaterThan(100);
+  });
+});
+
 describe('the captcha hook', () => {
   it('is skipped while nothing is registered', async () => {
     await seedAdmin();
