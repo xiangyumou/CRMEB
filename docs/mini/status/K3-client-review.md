@@ -39,6 +39,8 @@ login return, guest browsing, copy). Updated at every commit.
    - 支付成功 drops `groupbuy.groupDetail` / `groupbuy.myGroups` (the seat is taken) with the
      order reads.
    - 商品详情 收藏 / 取消收藏 drop `catalog.favoriteList` (我的收藏 may be under the page).
+   - 评价 drops `catalog.productReviews` / `catalog.productReviewSummary` too: a published
+     review shows on 商品评价 and 商品详情 at once.
    - 搜索 asks for the history on every visit (`refetchOnMount: 'always'`): the last search added
      to it on the server, and the 30 s cache showed the list without it.
 

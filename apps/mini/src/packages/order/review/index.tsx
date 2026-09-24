@@ -177,7 +177,15 @@ function ReviewForm({ orderId, only }: { orderId: string; only?: string | undefi
     } finally {
       setOutcomes((all) => ({ ...all, ...done }));
       setSubmitting(false);
-      if (Object.keys(done).length > 0) void invalidate(...ORDER_READS, 'catalog.myReviews');
+      // A published review shows on the product at once (商品评价, 商品详情's first two).
+      if (Object.keys(done).length > 0) {
+        void invalidate(
+          ...ORDER_READS,
+          'catalog.myReviews',
+          'catalog.productReviews',
+          'catalog.productReviewSummary',
+        );
+      }
     }
   };
 
