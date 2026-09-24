@@ -47,6 +47,9 @@
 
 云端环境说明（本地不适用，记下备查）：容器是 Node 22，装了 Node 24 + pnpm 12.5.1；没有 Docker，集成测试和 e2e 用本机 PostgreSQL 16 + Redis 7（`SHOP_TEST_PG_URL` / `SHOP_TEST_REDIS_URL`）。**复用一个 Redis 跑两次 e2e 时，第二次必须先 `FLUSHALL`**，否则缓存的微信配置指向上一次假微信服务的端口，所有小程序登录都会 503。本地用 Testcontainers 不会遇到。
 
+**本地复查（2026-09-24，B1、L1、L2、L3 合入之后）：** 全套通过。turbo 45/45；test:int core 1563、web 331；prettier、check:examples（461）、guards（16 项 0 失败，api-compat 0 破坏）通过；后台 e2e 50/50；uni-app `npm test` 477 通过（32 跳过）、重新 `build:h5` 后旧 storefront e2e 34/34；`test:mini` 46/46。
+注意：e2e 判断 uni-app H5 是否过期只看源码时间，只改 `package.json` / lock 时不会重建，要手动 `npm ci && npm run build:h5`。
+
 ## 4. 接下来要做的
 
 1. **本地跑一次全套检查**（`docs/contributing.md` 的合并清单），重点是云端没跑的：旧 uni-app 的 storefront e2e、后台 e2e（`master` 并进来的 `fd66e30` 改了后台表单的 422 显示，`55d8796` 删了 uni-app 的 flyio），以及登录页修复之后的全套 `test:mini`。
