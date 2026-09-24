@@ -82,7 +82,11 @@ function ProductPicker(props: {
 }
 
 export function ArticlesPage() {
-  const drawer = useFormModal<AdminArticleListItem>();
+  // The list row carries no body, so the drawer loads the article it edits —
+  // and mounts the form only once it has it.
+  const drawer = useFormModal<AdminArticleListItem, typeof cmsArticleDetail>({
+    detail: { route: cmsArticleDetail, params: (row) => ({ id: row.id }) },
+  });
   const editing = drawer.record;
 
   const categories = useRouteQuery(cmsCategoryList, { query: {} });
@@ -90,13 +94,6 @@ export function ArticlesPage() {
     value: item.id,
     label: item.depth === 1 ? `└ ${item.title}` : item.title,
   }));
-
-  // The list row carries no body, so the drawer loads the article it edits.
-  const detail = useRouteQuery(
-    cmsArticleDetail,
-    { params: { id: editing?.id ?? '0' } },
-    { enabled: drawer.open && editing !== undefined },
-  );
 
   const setStatus = useRouteMutation(cmsArticleSetStatus, {
     invalidate: [cmsArticleList],
@@ -284,7 +281,7 @@ export function ArticlesPage() {
         ]}
         initialValues={
           editing
-            ? detail.data
+            ? undefined
             : {
                 status: 'draft',
                 sortOrder: 0,

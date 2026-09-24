@@ -1,7 +1,6 @@
 'use client';
 
 import { Button, Typography, message } from 'antd';
-import { useState } from 'react';
 import {
   systemRoleCreate,
   systemRoleDelete,
@@ -10,11 +9,16 @@ import {
   systemRoleSetStatus,
   systemRoleUpdate,
 } from '@shop/contracts/system/system.role.contract';
-import { roleForm, type RoleForm, type RoleListItem } from '@shop/contracts/system/schemas';
+import {
+  roleForm,
+  type RoleDetail,
+  type RoleForm,
+  type RoleListItem,
+} from '@shop/contracts/system/schemas';
 
 import { useRouteMutation, useRouteQuery } from '@/admin/api/hooks';
 import { ConfirmButton } from '@/admin/kit/confirm-button';
-import { ModalForm } from '@/admin/kit/form/modal-form';
+import { ModalForm, useFormModal } from '@/admin/kit/form/modal-form';
 import type { FieldSpec } from '@/admin/kit/form/types';
 import { PageContainer } from '@/admin/kit/page-container';
 import { StatusTag } from '@/admin/kit/status-tag';
@@ -42,13 +46,23 @@ const ENABLED = {
  * 已失效 ones the tree no longer declares).
  */
 export function RolesPage() {
-  const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
-  const [creating, setCreating] = useState(false);
+  // The form mounts only once the detail has arrived: seeded from an empty
+  // read, a save would blank the name and revoke every grant.
+  const modal = useFormModal<RoleListItem, typeof systemRoleDetail>({
+    detail: {
+      route: systemRoleDetail,
+      params: (row) => ({ id: row.id }),
+      select: formValuesOf,
+    },
+  });
+  const editing = modal.record;
 
+  // The same request the form loads (one cache entry); the picker also needs
+  // the 已失效 atoms, which are not a form value. The dialog reports a failure.
   const detail = useRouteQuery(
     systemRoleDetail,
     editing ? { params: { id: editing.id } } : undefined,
-    { enabled: editing !== null },
+    { enabled: editing !== undefined, presentError: false },
   );
 
   const setStatus = useRouteMutation(systemRoleSetStatus, {
@@ -83,12 +97,6 @@ export function RolesPage() {
     },
   ];
 
-  const open = creating || editing !== null;
-  const close = () => {
-    setCreating(false);
-    setEditing(null);
-  };
-
   return (
     <PageContainer subTitle="一个身份就是一组权限；修改权限或停用身份会让持有者重新登录">
       <CrudTable
@@ -107,7 +115,7 @@ export function RolesPage() {
         ]}
         toolbar={
           <Can permission="system:role:write">
-            <Button type="primary" onClick={() => setCreating(true)}>
+            <Button type="primary" onClick={() => modal.show()}>
               新建身份
             </Button>
           </Can>
@@ -151,11 +159,7 @@ export function RolesPage() {
             render: (row) => (
               <>
                 <Can permission="system:role:write">
-                  <Button
-                    type="link"
-                    size="small"
-                    onClick={() => setEditing({ id: row.id, name: row.name })}
-                  >
+                  <Button type="link" size="small" onClick={() => modal.show(row)}>
                     编辑
                   </Button>
                   <Button
@@ -192,27 +196,14 @@ export function RolesPage() {
       />
 
       <ModalForm
-        open={open}
-        onClose={close}
+        {...modal.props}
         title={editing ? `编辑身份：${editing.name}` : '新建身份'}
         width={820}
         schema={roleForm}
         fields={fields}
-        // Remounting on the record keeps the picker from showing the previous
-        // role's grants for a frame while the detail request is in flight.
+        // A fresh form per record, so nothing of the previous role lingers.
         key={editing?.id ?? 'new'}
-        initialValues={
-          editing
-            ? detail.data
-              ? {
-                  name: detail.data.name,
-                  ...(detail.data.remark === null ? {} : { remark: detail.data.remark }),
-                  enabled: detail.data.enabled,
-                  permissions: detail.data.permissions,
-                }
-              : undefined
-            : { enabled: true, permissions: [] }
-        }
+        initialValues={editing ? undefined : { enabled: true, permissions: [] }}
         route={editing ? systemRoleUpdate : systemRoleCreate}
         toInput={(values) =>
           editing ? { params: { id: editing.id }, body: values } : { body: values }
@@ -224,4 +215,14 @@ export function RolesPage() {
       />
     </PageContainer>
   );
+}
+
+/** The detail as the form's values; a `null` remark is an absent key. */
+function formValuesOf(role: RoleDetail) {
+  return {
+    name: role.name,
+    ...(role.remark === null ? {} : { remark: role.remark }),
+    enabled: role.enabled,
+    permissions: role.permissions,
+  };
 }

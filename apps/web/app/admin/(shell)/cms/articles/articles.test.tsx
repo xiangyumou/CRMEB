@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { catalogAdminProductList } from '@shop/contracts/catalog/catalog.product.admin.contract';
@@ -17,6 +17,7 @@ import type {
 
 import { resetApiConfig } from '@/admin/api/config';
 import { on, stubRoutes, type StubCall } from '@/test/api';
+import { withStubAssets } from '@/test/asset-source';
 import { renderAdmin, testIdentity } from '@/test/render';
 
 import { ArticlesPage } from './articles';
@@ -127,6 +128,20 @@ describe('文章管理', () => {
       expect(flip?.url).toContain('/admin-api/cms/articles/101/status');
       expect(flip?.body).toEqual({ status: 'hidden' });
     });
+  });
+
+  it('opens 编辑 on the loaded article, not an empty form', async () => {
+    stubApi();
+    renderAdmin(withStubAssets(<ArticlesPage />), { identity: writer });
+    await screen.findByText('双十一活动说明');
+
+    await userEvent.click(screen.getByRole('button', { name: '编辑' }));
+
+    // The detail answers after the drawer opens; a form seeded at mount would
+    // stay empty and a save would blank the article.
+    const drawer = await screen.findByRole('dialog');
+    expect(await within(drawer).findByDisplayValue('双十一活动说明')).toBeInTheDocument();
+    expect(within(drawer).getByDisplayValue('运营部')).toBeInTheDocument();
   });
 
   it('keeps 删除 on its own atom, which write alone does not grant', async () => {

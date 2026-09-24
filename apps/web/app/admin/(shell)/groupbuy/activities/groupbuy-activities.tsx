@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Drawer, Modal, Skeleton, Typography } from 'antd';
+import { Button, Drawer, Typography } from 'antd';
 import Link from 'next/link';
 import { useState } from 'react';
 import {
@@ -19,9 +19,9 @@ import {
   type GroupbuyActivityOrder,
 } from '@shop/contracts/groupbuy/schemas';
 
-import { useRouteMutation, useRouteQuery } from '@/admin/api/hooks';
+import { useRouteMutation } from '@/admin/api/hooks';
 import { ConfirmButton } from '@/admin/kit/confirm-button';
-import { ModalForm } from '@/admin/kit/form/modal-form';
+import { ModalForm, useFormModal } from '@/admin/kit/form/modal-form';
 import { PageContainer } from '@/admin/kit/page-container';
 import {
   actionsColumn,
@@ -58,8 +58,16 @@ import {
  *    price change is a price change and `sales` survives it.
  */
 export function GroupbuyActivitiesPage() {
-  const [editing, setEditing] = useState<{ id: string; title: string } | null>(null);
-  const [creating, setCreating] = useState(false);
+  // The form mounts only once the detail has arrived: seeded from the list row
+  // it would have an empty 规格 list, and the save would wipe every per-SKU price.
+  const modal = useFormModal<GroupbuyActivityListItem, typeof groupbuyAdminActivityDetail>({
+    detail: {
+      route: groupbuyAdminActivityDetail,
+      params: (row) => ({ id: row.id }),
+      select: formValuesOf,
+    },
+  });
+  const editing = modal.record;
   const [ordersOf, setOrdersOf] = useState<GroupbuyActivityListItem | null>(null);
 
   const setStatus = useRouteMutation(groupbuyAdminActivitySetStatus, {
@@ -85,7 +93,7 @@ export function GroupbuyActivitiesPage() {
         ]}
         toolbar={
           <Can permission="groupbuy:activity:write">
-            <Button type="primary" onClick={() => setCreating(true)}>
+            <Button type="primary" onClick={() => modal.show()}>
               新建拼团活动
             </Button>
           </Can>
@@ -152,11 +160,7 @@ export function GroupbuyActivitiesPage() {
             render: (row) => (
               <>
                 <Can permission="groupbuy:activity:write">
-                  <Button
-                    type="link"
-                    size="small"
-                    onClick={() => setEditing({ id: row.id, title: row.title })}
-                  >
+                  <Button type="link" size="small" onClick={() => modal.show(row)}>
                     编辑
                   </Button>
                   <Button
@@ -197,76 +201,23 @@ export function GroupbuyActivitiesPage() {
         ]}
       />
 
-      {creating ? <CreateActivityModal onClose={() => setCreating(false)} /> : null}
-      {editing ? (
-        <EditActivityModal id={editing.id} title={editing.title} onClose={() => setEditing(null)} />
-      ) : null}
+      <ModalForm
+        {...modal.props}
+        title={editing ? `编辑：${editing.title}` : '新建拼团活动'}
+        width={960}
+        columns={2}
+        schema={groupbuyActivityForm}
+        fields={groupbuyActivityFields}
+        route={editing ? groupbuyAdminActivityUpdate : groupbuyAdminActivityCreate}
+        toInput={(values) =>
+          editing ? { params: { id: editing.id }, body: values } : { body: values }
+        }
+        invalidate={[groupbuyAdminActivityList, groupbuyAdminActivityDetail]}
+        successMessage={editing ? '已保存' : '已创建'}
+      />
 
       <ActivityOrdersDrawer activity={ordersOf} onClose={() => setOrdersOf(null)} />
     </PageContainer>
-  );
-}
-
-function CreateActivityModal({ onClose }: { onClose: () => void }) {
-  return (
-    <ModalForm
-      open
-      onClose={onClose}
-      title="新建拼团活动"
-      width={960}
-      columns={2}
-      schema={groupbuyActivityForm}
-      fields={groupbuyActivityFields}
-      route={groupbuyAdminActivityCreate}
-      toInput={(values) => ({ body: values })}
-      invalidate={[groupbuyAdminActivityList]}
-      successMessage="已创建"
-    />
-  );
-}
-
-/**
- * The edit dialog is mounted only once the detail has arrived.
- *
- * `ModalForm` seeds antd's form from `initialValues` when it mounts, so a form
- * opened before the read resolves would keep its empty 规格 list and the save
- * would wipe every per-SKU price. The skeleton is the honest version of that
- * half-second.
- */
-function EditActivityModal({
-  id,
-  title,
-  onClose,
-}: {
-  id: string;
-  title: string;
-  onClose: () => void;
-}) {
-  const detail = useRouteQuery(groupbuyAdminActivityDetail, { params: { id } });
-
-  if (!detail.data) {
-    return (
-      <Modal open title={`编辑：${title}`} width={960} footer={null} onCancel={onClose}>
-        <Skeleton active paragraph={{ rows: 8 }} />
-      </Modal>
-    );
-  }
-
-  return (
-    <ModalForm
-      open
-      onClose={onClose}
-      title={`编辑：${detail.data.title}`}
-      width={960}
-      columns={2}
-      schema={groupbuyActivityForm}
-      fields={groupbuyActivityFields}
-      initialValues={formValuesOf(detail.data)}
-      route={groupbuyAdminActivityUpdate}
-      toInput={(values) => ({ params: { id }, body: values })}
-      invalidate={[groupbuyAdminActivityList, groupbuyAdminActivityDetail]}
-      successMessage="已保存"
-    />
   );
 }
 
