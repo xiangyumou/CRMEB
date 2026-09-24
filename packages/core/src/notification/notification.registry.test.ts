@@ -1,8 +1,12 @@
 import { beforeAll, describe, expect, it } from 'vitest';
+// Test-only: each domain's event declarations, without the domain itself (its
+// `index.ts` would pull in its services and repositories for a pure check).
+/* eslint-disable boundaries/core-cross-domain */
 import { registerGroupbuyNotificationEvents } from '../groupbuy/groupbuy.notifications';
 import { registerPaymentNotificationEvents } from '../payment/payment.notifications';
 import { registerPresaleNotificationEvents } from '../presale/presale.notifications';
 import { registerRefundNotificationEvents } from '../refund/refund.notifications';
+/* eslint-enable boundaries/core-cross-domain */
 import { allNotificationEvents, registerBuiltInNotificationEvents } from './notification.registry';
 import { placeholdersIn } from './notification.render';
 
