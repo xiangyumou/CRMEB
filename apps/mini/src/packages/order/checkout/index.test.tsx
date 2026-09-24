@@ -259,3 +259,20 @@ describe('确认订单', () => {
     await waitFor(() => expect(previews).toBeGreaterThan(before));
   });
 });
+
+describe('确认订单 — signing in on the page', () => {
+  it('sends the SMS login back to 确认订单, where the draft still is', async () => {
+    useCheckoutDraft.setState({ draft: buyNow });
+    useSession.setState({ session: { status: 'phone-required', bindToken: 'b' } });
+    await renderPage(<CheckoutPage />);
+    fireEvent.click(screen.getByRole('button', { name: '短信验证码登录' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'navigateTo',
+        args: {
+          url: `/pages/login/index?redirect=${encodeURIComponent('{"route":"checkout","params":{}}')}`,
+        },
+      }),
+    );
+  });
+});

@@ -139,3 +139,19 @@ describe('收银台', () => {
     expect(await screen.findByText('订单已关闭')).toBeTruthy();
   });
 });
+
+describe('收银台 — signing in on the page', () => {
+  it('sends the SMS login back to this order’s 收银台', async () => {
+    taroFake.routerParams = { orderId: '9' };
+    useSession.setState({ session: { status: 'phone-required', bindToken: 'b' } });
+    await renderPage(<CashierPage />);
+    fireEvent.click(screen.getByRole('button', { name: '短信验证码登录' }));
+    const redirect = '{"route":"cashier","params":{"orderId":"9"}}';
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'navigateTo',
+        args: { url: `/pages/login/index?redirect=${encodeURIComponent(redirect)}` },
+      }),
+    );
+  });
+});

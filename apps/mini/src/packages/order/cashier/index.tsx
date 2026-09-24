@@ -29,7 +29,7 @@ export default function CashierPage() {
   const { orderId = '' } = useRouteParams('cashier');
   return (
     <PageShell title="收银台" withBar>
-      <LoginCard reason="登录后即可支付">
+      <LoginCard reason="登录后即可支付" redirect={{ route: 'cashier', params: { orderId } }}>
         {orderId === '' ? <Empty title="没有指定订单" /> : <Cashier orderId={orderId} />}
       </LoginCard>
     </PageShell>

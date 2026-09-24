@@ -25,7 +25,10 @@ export default function PayResultPage() {
   const { orderId = '', outTradeNo = '' } = useRouteParams('payResult');
   return (
     <PageShell title="支付结果">
-      <LoginCard reason="登录后查看支付结果">
+      <LoginCard
+        reason="登录后查看支付结果"
+        redirect={{ route: 'payResult', params: { orderId, outTradeNo } }}
+      >
         {outTradeNo === '' ? (
           <Empty title="没有支付单号" />
         ) : (

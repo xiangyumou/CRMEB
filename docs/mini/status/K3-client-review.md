@@ -14,6 +14,12 @@ login return, guest browsing, copy). Updated at every commit.
    `useRefetchOnShow(key, { always: true })` refetches them on every show. Tests: 我的
    (`pages/me/index.test.tsx`, with the app's 30 s staleTime), `use-refetch-on-show.test.tsx`.
 
+2. **登录 from 确认订单, 收银台 and 支付结果 came back to 首页.** Their `LoginCard` named no
+   `redirect`, so 短信验证码登录 fell back to home (`parseLoginRedirect` → `home`): the checkout
+   draft, the order being paid and the payment being confirmed were left behind. They now name
+   their own route (`checkout`; `cashier { orderId }`; `payResult { orderId, outTradeNo }`), and
+   the login page goes back to them (A3's `loginReturn`). Tests on the three pages.
+
 ## In progress
 
 - The rest of the review.
@@ -26,6 +32,9 @@ login return, guest browsing, copy). Updated at every commit.
 
 - 我的: the order badges and totals are current every time the tab is shown (旧 up to 30 s old
   after a change made on another page).
+
+- 确认订单 / 收银台 / 支付结果: signing in by SMS on the page comes back to the page (旧 to 首页,
+  losing the draft).
 
 ## Backend gaps
 

@@ -72,7 +72,8 @@ export default function CheckoutPage() {
   }
   return (
     <PageShell title="确认订单" withBar>
-      <LoginCard reason="登录后即可结算">
+      {/* 登录 comes back here: the draft is still in memory. */}
+      <LoginCard reason="登录后即可结算" redirect={{ route: 'checkout', params: {} }}>
         <Checkout draft={draft} />
       </LoginCard>
     </PageShell>

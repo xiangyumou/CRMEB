@@ -113,3 +113,20 @@ describe('支付结果', () => {
     expect(await screen.findByText('正在确认支付结果，请稍候')).toBeTruthy();
   });
 });
+
+describe('支付结果 — signing in on the page', () => {
+  it('sends the SMS login back to this payment’s result', async () => {
+    taroFake.routerParams = { orderId: '9', outTradeNo: 'P9' };
+    useSession.setState({ session: { status: 'phone-required', bindToken: 'b' } });
+    serve('paid');
+    await renderPage(<PayResultPage />);
+    fireEvent.click(screen.getByRole('button', { name: '短信验证码登录' }));
+    const redirect = '{"route":"payResult","params":{"orderId":"9","outTradeNo":"P9"}}';
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'navigateTo',
+        args: { url: `/pages/login/index?redirect=${encodeURIComponent(redirect)}` },
+      }),
+    );
+  });
+});
