@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { EMULATION_STORAGE_KEY, emulatedUser, emulationPlatform } from './h5-mp-emulation';
+import {
+  EMULATION_STORAGE_KEY,
+  PRIVACY_STORAGE_KEY,
+  emulatedUser,
+  emulationPlatform,
+  privacyGate,
+} from './h5-mp-emulation';
+import { agreePrivacy, disagreePrivacy, resetPrivacyForTest, usePrivacyPrompt } from './privacy';
 
 const jsapi = {
   appId: 'wxmini',
@@ -95,6 +102,53 @@ describe('h5-mp-emulation platform', () => {
     );
     await expect(emulationPlatform.openOrderConfirm(target)).resolves.toEqual({
       kind: 'cancelled',
+    });
+  });
+
+  describe('privacy (onNeedPrivacyAuthorization, C04)', () => {
+    const holdPhone = (privacy?: 'agreed' | 'undecided') =>
+      window.localStorage.setItem(
+        EMULATION_STORAGE_KEY,
+        JSON.stringify({ openid: 'o', phone: '13900000003', ...(privacy ? { privacy } : {}) }),
+      );
+    afterEach(() => resetPrivacyForTest());
+
+    it('never asks a user who has agreed (the default)', async () => {
+      holdPhone();
+      await expect(emulationPlatform.chooseAddress()).resolves.toMatchObject({ city: '广州市' });
+      expect(usePrivacyPrompt.getState().open).toBe(false);
+    });
+
+    it('holds the first private call on the app’s sheet until 同意, then asks no more', async () => {
+      holdPhone('undecided');
+      const address = emulationPlatform.chooseAddress();
+      await vi.waitFor(() =>
+        expect(usePrivacyPrompt.getState()).toEqual({ open: true, purpose: '快速填写收货地址' }),
+      );
+
+      agreePrivacy();
+      await expect(address).resolves.toMatchObject({ city: '广州市' });
+      expect(window.localStorage.getItem(PRIVACY_STORAGE_KEY)).toBe('agreed');
+      await expect(privacyGate('getPhoneNumber')).resolves.toBe(true);
+      expect(usePrivacyPrompt.getState().open).toBe(false);
+    });
+
+    it('fails only the call the shopper refused, and asks again next time', async () => {
+      holdPhone('undecided');
+      const address = emulationPlatform.chooseAddress();
+      await vi.waitFor(() => expect(usePrivacyPrompt.getState().open).toBe(true));
+      disagreePrivacy();
+      await expect(address).resolves.toBeNull();
+
+      const pictures = emulationPlatform.chooseImages(1);
+      await vi.waitFor(() =>
+        expect(usePrivacyPrompt.getState()).toEqual({ open: true, purpose: '上传图片' }),
+      );
+      disagreePrivacy();
+      await expect(pictures).rejects.toThrow(
+        'chooseMedia:fail privacy permission is not authorized',
+      );
+      expect(window.localStorage.getItem(PRIVACY_STORAGE_KEY)).toBeNull();
     });
   });
 });

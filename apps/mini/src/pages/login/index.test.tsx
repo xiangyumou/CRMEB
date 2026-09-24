@@ -107,3 +107,27 @@ describe('登录 · 其他方式 · 密码登录', () => {
     expect(screen.queryByLabelText('账号')).toBeNull();
   });
 });
+
+describe('登录 · 手机号快速登录', () => {
+  it('says what a refused privacy sheet means, in Chinese, and stays parked', async () => {
+    useSession.setState({ session: { status: 'phone-required', bindToken: 'bind-1' } });
+    taroFake.phoneNumberDetail = {
+      errMsg: 'getPhoneNumber:fail privacy permission is not authorized',
+    };
+    const seen = serveApi({});
+    await renderPage(<LoginPage />);
+    fireEvent.click(screen.getByRole('checkbox', { name: '我已阅读并同意用户协议和隐私政策' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: '手机号快速登录' }));
+
+    expect(taroFake.calls).toContainEqual({
+      api: 'showToast',
+      args: expect.objectContaining({ title: '未同意隐私保护指引，可改用短信验证码登录' }),
+    });
+    expect(seen).toHaveLength(0);
+    expect(useSession.getState().session).toEqual({
+      status: 'phone-required',
+      bindToken: 'bind-1',
+    });
+  });
+});

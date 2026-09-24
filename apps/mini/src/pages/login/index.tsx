@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react';
 import { Image, Text, View } from '@tarojs/components';
 import { useAppConfig } from '@/app-config';
 import { assetUrl } from '@/lib/asset-url';
-import { goBack, parseLoginRedirect, platform, returnFromLogin, useRouteParams } from '@/platform';
+import {
+  goBack,
+  isPrivacyRefusal,
+  parseLoginRedirect,
+  platform,
+  returnFromLogin,
+  useRouteParams,
+} from '@/platform';
 import {
   bindPhone,
   bindPhoneWithSms,
@@ -18,6 +25,9 @@ import { toast } from '@/ui/feedback';
 import { PageShell } from '@/ui/page-shell';
 import { SmsCodeField } from '@/ui/sms-code-field';
 import './index.scss';
+
+/** The privacy sheet's 拒绝 before 手机号快速登录 (WeChat's errMsg is English). */
+const PRIVACY_REFUSED = '未同意隐私保护指引，可改用短信验证码登录';
 
 /**
  * 登录 (`login { redirect? }`, docs/mini/auth.md, design.md §5 G). Reached from
@@ -123,7 +133,8 @@ export default function LoginPage() {
                   onResult={(result) => {
                     if (!result.ok) {
                       if (result.reason === 'unavailable') setMode('sms');
-                      if (result.reason !== 'denied') toast.text(result.message);
+                      if (isPrivacyRefusal(result.message)) toast.text(PRIVACY_REFUSED);
+                      else if (result.reason !== 'denied') toast.text(result.message);
                       return;
                     }
                     bindPhone(result.code).catch((error: unknown) =>

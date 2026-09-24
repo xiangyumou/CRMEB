@@ -44,6 +44,12 @@ export interface EmulatedWechatUser {
     bankName: string;
     bankAccount: string;
   } | null;
+  /**
+   * Whether this WeChat user has agreed to the shop's 用户隐私保护指引. Default `agreed`.
+   * `undecided`: the first private API (手机号, 头像, 地址, 图片, 发票抬头) raises the app's
+   * privacy sheet, as `onNeedPrivacyAuthorization` does on a phone, and waits for 同意 / 拒绝.
+   */
+  privacy?: 'agreed' | 'undecided';
   /** How the subscribe-message dialog is answered, for every template. Default `accept`. */
   subscribe?: 'accept' | 'reject';
   /**
