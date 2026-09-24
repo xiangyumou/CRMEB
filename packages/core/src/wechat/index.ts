@@ -162,7 +162,7 @@ export {
  * Wires the domain into the platform; called once per process from the gen'd
  * bootstrap, like `registerPaymentDomain()`.
  *
- * `GET /api/v1/site/config` tells the app which WeChat sign-in to offer.
+ * `GET /api/v1/app/config` tells the app which WeChat sign-in to offer.
  * Announced from here, not read from there: `system` may not import `wechat`.
  * Not run at import, because this module is reached from inside `system`'s own
  * import graph (via `payment`) before `system` has finished evaluating. A

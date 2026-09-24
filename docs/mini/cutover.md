@@ -135,10 +135,13 @@ B：删除加落地页；C：删表）不再采用。
 | `system.siteConfigGet`                            | `GET /api/v1/site/config`                |
 | `diy.layout`、`diy.navigation`、`diy.pageVersion` | 随 2.3 一起删                            |
 
-- [ ] 删契约、路由文件、只为它们存在的 service 函数和测试。
-- [ ] `system.siteConfigGet` 已由 `app/config` 取代；小程序、后台都不调用它，没有公众号 H5 页面要照顾。删之前对
+- [x] 删契约、路由文件、只为它们存在的 service 函数和测试。
+- [x] `system.siteConfigGet` 已由 `app/config` 取代；小程序、后台都不调用它，没有公众号 H5 页面要照顾。删之前对
       `packages/core/src/system/site.service.ts` 的 `siteConfigGet` `grep` 一遍调用方（落地页、`app/config` 若复用则
       保留函数，只删路由和契约）；SYS-020 的陈述和测试标题里提到 `site/config`，要一起改。
+      （C1 结果：`app/config` 复用 `site.service.ts` 的 `paymentsOf`、`authOf`、`supportOf` 和两个探针注册表；
+      `siteConfigGet` 本身只剩测试在用——`system.int.test.ts` 通过它断言探针和密钥规则，SYS-016 拿它对照——所以保留函数、
+      不再从 `@shop/core/system` 导出，只删了路由、契约和 `apps/web/app/api/v1/site/config.int.test.ts`。）
 
 ### 2.5 店员接口（计划第 10 节第 3 项：你已同意）
 

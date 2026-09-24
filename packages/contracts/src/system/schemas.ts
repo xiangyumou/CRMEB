@@ -626,43 +626,6 @@ export const sitePublicConfigExample: SitePublicConfig = {
 };
 
 // ---------------------------------------------------------------------------
-// 图片转 base64
-// ---------------------------------------------------------------------------
-
-/**
- * One image, by URL, that the server is asked to fetch on the caller's behalf.
- *
- * A relative path is the normal case and the preferred one: `/uploads/…` is
- * unambiguously ours, so there is nothing for the server to adjudicate. An
- * absolute URL is accepted too — the app sometimes holds one — but only when
- * its host is this deployment's, which is what the service checks.
- *
- * 255 characters, the same ceiling every stored asset URL has.
- */
-export const attachmentDataUrlBody = z.object({
-  url: z.string().min(1).max(255),
-});
-export type AttachmentDataUrlBody = z.infer<typeof attachmentDataUrlBody>;
-
-/**
- * `data:image/png;base64,…`.
- *
- * The whole image, inline, which is the point: the canvas that draws a 海报
- * cannot read pixels from a cross-origin `<image>`, so the bytes have to arrive
- * in the document. Capped at 2 MB of source, so the response is about 2.7 MB at
- * worst.
- */
-export const attachmentDataUrl = z.object({
-  dataUrl: z.string(),
-});
-export type AttachmentDataUrl = z.infer<typeof attachmentDataUrl>;
-
-export const attachmentDataUrlExample: AttachmentDataUrl = {
-  dataUrl:
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-};
-
-// ---------------------------------------------------------------------------
 // dashboard header
 // ---------------------------------------------------------------------------
 

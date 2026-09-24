@@ -1844,14 +1844,14 @@ The `storefront-appearance` group answers a fresh install with every field defau
 
 ### SYS-016
 
-A save to any group `GET /api/v1/app/config` is built from drops its cache and moves its `version` (the weak `ETag`) at once, a save to any other group does not, and a caller holding the current version gets a bodyless 304. The values it shares with `GET /api/v1/site/config` and with `GET /api/v1/wechat/subscribe-templates` are built by the same code and agree with them.
+A save to any group `GET /api/v1/app/config` is built from drops its cache and moves its `version` (the weak `ETag`) at once, a save to any other group does not, and a caller holding the current version gets a bodyless 304. The values it shares with `siteConfigGet` (`system/site.service.ts`; its route `GET /api/v1/site/config` was deleted at the cutover) and with `GET /api/v1/wechat/subscribe-templates` are built by the same code and agree with them.
 
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > is built from exactly the groups that drop its cache`
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > drops the cache and moves the version when <label> is saved`
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > leaves the cache alone when a group it does not read is saved`
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > carries the same subscribe ids as GET /wechat/subscribe-templates, all four scenes`
 - `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > says whether a first WeChat sign-in will ask for a phone`
-- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > agrees with GET /site/config on every value the two share`
+- `packages/core/src/system/app-config.int.test.ts::SYS-016 — one payload, always current > agrees with siteConfigGet on every value the two share`
 - `apps/web/app/api/v1/app/config.int.test.ts::GET /api/v1/app/config — conditional > answers a caller holding the current version with a bodyless 304`
 - `apps/web/app/api/v1/app/config.int.test.ts::GET /api/v1/app/config — conditional > sends the new settings once the <label> group is saved`
 
@@ -1890,9 +1890,9 @@ The mini-program opens a `webview` link in its web-view only when the URL is htt
 
 ### SYS-020
 
-The mini-program's splash (`app/config.splashAd.link`) is a `LinkTarget`: the stored `site.splashLinkTarget`, else the legacy `splashLink` as a `webview` link when it is an https URL, else `null`; a legacy uni-app path is never guessed at, and `site/config` keeps serving the legacy string unchanged.
+The mini-program's splash (`app/config.splashAd.link`) is a `LinkTarget`: the stored `site.splashLinkTarget`, else the legacy `splashLink` as a `webview` link when it is an https URL, else `null`; a legacy uni-app path is never guessed at.
 
-- `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > serves the stored LinkTarget, while site/config keeps the legacy path`
+- `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > serves the stored LinkTarget ahead of the legacy path`
 - `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > falls back to an https legacy link as a web-view, and to none for a uni-app path`
 - `packages/core/src/system/app-config.int.test.ts::SYS-020 — the splash taps through a LinkTarget > refuses a LinkTarget that does not parse, and writes nothing`
 

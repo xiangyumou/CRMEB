@@ -13,7 +13,6 @@
  * | `GET /admin-api/system/config-groups` | `configGroupList` |
  * | `GET/PUT /admin-api/system/config/:group` | `configGet` / `configSave` |
  * | `GET /api/v1/agreements/:key` | `agreementGet` |
- * | `GET /api/v1/site/config` | `siteConfigGet` |
  * | `GET /api/v1/app/config` | `appConfigGet` |
  * | `GET /admin-api/dashboard/header` | `dashboardHeader` |
  * | worker `system.pruneAuditLogs` | `pruneAuditLogs` |
@@ -89,8 +88,8 @@ export { mapConfig } from './map.config';
  */
 export { isTrustedHost, publicOrigin, siteConfig } from './site.config';
 /**
- * `GET /api/v1/site/config` — every "what did the operator type into that box"
- * read the app needs at start-up, as one public payload.
+ * The site's public settings: the builders `GET /api/v1/app/config` is made
+ * from (the old `GET /api/v1/site/config` route was deleted at the cutover).
  *
  * `registerSitePaymentMethod` is how a gateway says it is usable *without*
  * `system` importing it: this domain is a sink and must import none, or
@@ -104,7 +103,6 @@ export {
   registerSitePaymentMethod,
   resetSiteAuthMethods,
   resetSitePaymentMethods,
-  siteConfigGet,
   siteConfigSourceGroups,
   type SiteAuthMethod,
   type SiteAuthMethodSource,
@@ -130,12 +128,6 @@ export {
   storefrontAppearanceConfig,
   type StorefrontAppearanceConfig,
 } from './storefront-appearance.config';
-/**
- * `POST /api/v1/attachments/base64` — an attachment endpoint that lives here
- * because "is this URL ours?" is answered by `site.config.ts`, and `system` may
- * import `storage` while `storage` may not import `system`.
- */
-export { attachmentDataUrl } from './attachment.service';
 export { smsConfig } from './sms.config';
 export { wechatMiniConfig, type MiniCodeEnvVersion } from './wechat-mini.config';
 export { wechatOaConfig } from './wechat-oa.config';

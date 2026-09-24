@@ -158,7 +158,6 @@ export type { AutoReviewResult } from './catalog.review.service';
 
 export {
   categoryTree,
-  categoryVersion,
   clearSearchHistory,
   favoriteAdd,
   favoriteAddBatch,
@@ -174,7 +173,6 @@ export {
   productSkus,
   pruneBrowseHistory,
   searchHistory,
-  skuPrice,
 } from './catalog.storefront.service';
 
 /**

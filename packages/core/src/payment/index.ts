@@ -143,7 +143,7 @@ export function registerPaymentDomain(): void {
   registerMiniTradeNotificationEvents();
   // A notification naming another merchant is told to an operator.
   registerPaymentNotificationEvents();
-  // `GET /api/v1/site/config` tells the app which pay buttons to draw. It is
+  // `GET /api/v1/app/config` tells the app which pay buttons to draw. It is
   // announced from here, not read from there: `system` is the domain every
   // other one imports, so an edge back into `payment` would be a cycle — one
   // that breaks `notification`'s effect handler registration. A boolean crosses

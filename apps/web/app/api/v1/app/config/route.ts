@@ -11,7 +11,7 @@ import { handle } from '../../../../../src/server';
  * A caller holding the current version gets a bodyless 304. The version is the
  * newest save across every config group the payload is built from
  * (`appConfigSourceGroups`), so any save that can change the answer moves it.
- * Weak, like `site/config`: the JSON is rebuilt per request.
+ * Weak: the JSON is rebuilt per request.
  */
 export const GET = handle(systemAppConfigGet, async (ctx) => {
   const config = await system.appConfigGet(ctx);

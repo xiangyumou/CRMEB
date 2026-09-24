@@ -54,20 +54,6 @@ export const systemErrors = defineErrors({
    * `details` carries `{ keys }`.
    */
   CONFIG_FIELD_READ_ONLY: { status: 422, message: '该配置项由部署环境决定，不能在后台修改' },
-
-  /**
-   * `POST /api/v1/attachments/base64` was given a URL it will not fetch: a host
-   * that is not this deployment's, a name that resolves to a private or
-   * metadata address, a non-`http(s)` scheme, a redirect to any of those, a
-   * body over the 2 MB cap, or bytes that are not an image.
-   *
-   * **One code for all of them, deliberately.** The endpoint fetches a URL the
-   * caller supplies; an endpoint that distinguished "host not allowed" from
-   * "connection refused" would be a network scanner with a shop attached. The
-   * reason is in the server log, where an operator can read it and a caller
-   * cannot.
-   */
-  ATTACHMENT_URL_NOT_ALLOWED: { status: 422, message: '该图片地址不可用' },
 });
 
 export type SystemErrorCode = keyof typeof systemErrors;

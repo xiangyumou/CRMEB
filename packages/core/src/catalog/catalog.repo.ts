@@ -268,9 +268,9 @@ export async function moveSubtree(
 }
 
 /**
- * A cheap version token for the storefront tree.
+ * A cheap version token for the storefront tree (its `version` and `ETag`).
  *
- * The uni-app caches the tree and refetches only when this moves. It is derived
+ * A client refetches only when this moves. It is derived
  * rather than a key an operator has to remember to bump: newest update plus row
  * count, so any insert, edit or delete changes it and nothing has to be
  * maintained.

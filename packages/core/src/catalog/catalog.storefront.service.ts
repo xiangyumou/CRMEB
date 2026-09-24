@@ -83,18 +83,6 @@ export async function categoryTree(ctx: Ctx): Promise<{
   };
 }
 
-/**
- * The version alone.
- *
- * One aggregate over `product_categories` instead of the whole tree, for the
- * revalidation the storefront does on every cold start. It is the same string
- * `categoryTree` returns, from the same repo function, so the two can never
- * disagree about whether the menu moved.
- */
-export async function categoryVersion(ctx: Ctx): Promise<{ version: string }> {
-  return { version: await repo.categoryVersion(ctx.db) };
-}
-
 // ---------------------------------------------------------------------------
 // products
 // ---------------------------------------------------------------------------
@@ -282,46 +270,6 @@ export async function productSkus(
       values: entry.values.map((value) => ({ value: value.value, imageUrl: value.imageUrl })),
     })),
     skus: skus.map(toStorefrontSku),
-  };
-}
-
-/**
- * Live price and stock for one variant, by its opaque code.
- *
- * The cart holds `skuCode`, not `skuId`, so this is the poll that keeps an
- * open cart page honest about a price change or a sell-out. It goes through
- * the on-shelf check like everything else: a variant of a product taken down
- * becomes a 404 here, and the cart shows it as unavailable.
- */
-export async function skuPrice(
-  ctx: Ctx,
-  input: { skuCode: string },
-): Promise<{
-  productId: string;
-  sku: {
-    id: string;
-    skuCode: string;
-    specText: string;
-    price: string;
-    originalPrice: string | null;
-    stock: number;
-  };
-}> {
-  const sku = await repo.findSkuByCode(ctx.db, input.skuCode);
-  if (!sku || !sku.isVisible) throw new DomainError('CATALOG_SKU_NOT_FOUND');
-  const product = await repo.findSellableProduct(ctx.db, sku.productId);
-  if (!product) throw new DomainError('CATALOG_SKU_NOT_FOUND');
-
-  return {
-    productId: String(sku.productId),
-    sku: {
-      id: String(sku.id),
-      skuCode: sku.skuCode,
-      specText: sku.specText,
-      price: sku.price,
-      originalPrice: sku.originalPrice,
-      stock: sku.stock,
-    },
   };
 }
 

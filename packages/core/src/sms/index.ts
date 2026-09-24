@@ -54,7 +54,7 @@ export {
  * Wires the domain into the platform; called once per process from the gen'd
  * bootstrap, like `registerPaymentDomain()`.
  *
- * 手机号登录 on `GET /api/v1/site/config` is offered exactly when
+ * 手机号登录 on `GET /api/v1/app/config` is offered exactly when
  * `resolveSender` would return a sender that can deliver. `system` may not
  * import this domain back, so the probe is handed over rather than looked up.
  */

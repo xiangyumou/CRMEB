@@ -18,7 +18,6 @@ import {
   storefrontProduct,
   storefrontProductExample,
   storefrontProductListQuery,
-  storefrontSkuExample,
 } from './schemas';
 
 /**
@@ -71,33 +70,6 @@ export const catalogCategoryTree = defineRoute({
       },
     },
   ],
-});
-
-/**
- * "Has the category tree changed?" in two fields.
- *
- * The uni-app caches the whole tree on the device and revalidates it on every
- * cold start, because the 分类 tab must paint instantly. Without this route it
- * had to fetch the tree — tens of kilobytes, on mobile data — and throw it away
- * to learn one string.
- *
- * `version` is exactly the one `catalog.categoryTree` carries: `max(updated_at)`
- * in whole seconds, a dash, and the visible-category count, so any insert, edit,
- * hide or delete moves it. Both routes also send it as an `ETag`.
- *
- * `GET /api/v1/catalog/categories` also answers 304 to a matching
- * `If-None-Match`, which covers "I want the tree if it moved" in one round
- * trip; this route is for a client that only wants to know.
- */
-export const catalogCategoryVersion = defineRoute({
-  id: 'catalog.categoryVersion',
-  method: 'GET',
-  path: '/api/v1/catalog/categories/version',
-  auth: 'public',
-  summary: '商品分类版本号',
-  tags: ['catalog'],
-  response: z.object({ version: z.string() }),
-  examples: [{ name: 'ok', response: { version: '1742534400-17' } }],
 });
 
 export const catalogProductList = defineRoute({
@@ -198,49 +170,6 @@ export const catalogProductSkus = defineRoute({
         specMode: true,
         specs: storefrontProductExample.specs,
         skus: storefrontProductExample.skus,
-      },
-    },
-  ],
-});
-
-/**
- * The live price and stock of one SKU, for the detail page to refresh after a
- * spec change without re-fetching the whole product.
- */
-export const catalogSkuPrice = defineRoute({
-  id: 'catalog.skuPrice',
-  method: 'GET',
-  path: '/api/v1/catalog/skus/:skuCode',
-  auth: 'public',
-  summary: '规格实时价格与库存',
-  tags: ['catalog'],
-  params: z.object({ skuCode: z.string().min(1).max(32) }),
-  response: z.object({
-    productId: id,
-    sku: z.object({
-      id,
-      skuCode: z.string(),
-      specText: z.string(),
-      price: storefrontProduct.shape.price,
-      originalPrice: storefrontProduct.shape.originalPrice,
-      stock: z.number().int().min(0),
-    }),
-  }),
-  errors: ['CATALOG_SKU_NOT_FOUND'],
-  examples: [
-    {
-      name: 'ok',
-      params: { skuCode: 'SKU7K3M9QX2' },
-      response: {
-        productId: '1',
-        sku: {
-          id: storefrontSkuExample.id,
-          skuCode: storefrontSkuExample.skuCode,
-          specText: storefrontSkuExample.specText,
-          price: storefrontSkuExample.price,
-          originalPrice: storefrontSkuExample.originalPrice,
-          stock: storefrontSkuExample.stock,
-        },
       },
     },
   ],

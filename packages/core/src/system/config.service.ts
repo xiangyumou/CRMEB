@@ -249,12 +249,12 @@ export async function configSave(
   // `set` validates the *whole* merged group, so a patch that would leave the
   // group invalid is refused rather than half-written.
   await ctx.config.set(def, patch as never, { updatedBy: adminIdOrNull(ctx) });
-  // The storefront's `GET /api/v1/site/config` is a 60-second Redis cache over
-  // three of these groups; saving one of them drops it so the operator sees
-  // their change in the app now rather than within the minute.
+  // The site payload (`siteConfigGet`) is a 60-second Redis cache over a few of
+  // these groups; saving one of them drops it.
   await invalidateSiteConfigCache(ctx, def.group);
   // Same for the mini-program's `GET /api/v1/app/config`, which has its own
-  // cache over a wider set of groups (`appConfigSourceGroups`).
+  // cache over a wider set of groups (`appConfigSourceGroups`), so the operator
+  // sees their change in the app now rather than within the minute.
   await invalidateAppConfigCache(ctx, def.group);
   ctx.logger.info(
     { group: def.group, keys: Object.keys(patch).filter((k) => !secrets.has(k)) },
