@@ -19,6 +19,8 @@
  *   a test fixture or test tooling, or an admin route (`/admin-api`, `*.admin*` route ids);
  * - a module in the main package is reached only from sub-package pages (Taro moves those into
  *   the sub-packages; one left in the main package costs every cold start);
+ * - any script uses a browser global the WeChat runtime lacks (`AbortController`, `TextEncoder`…)
+ *   that the build does not provide;
  * - any stylesheet has a universal selector (`*`; WeChat's WXSS compiler rejects it);
  * - any script contains `new Function(` or `eval(` (WeChat's JSCore on iOS refuses them, and
  *   the review team flags dynamic code);
@@ -238,6 +240,22 @@ for (const file of files.filter((candidate) => candidate.rel.endsWith('.js'))) {
     failures.push(
       `${file.rel}: not ES2018 (${message}): …${context}… (add the dependency to compile.include)`,
     );
+  }
+}
+
+// --- browser globals the WeChat runtime lacks ----------------------------------------------
+// A phone's mini-program runtime has none of these; WeChat DevTools and the H5 e2e build do, so
+// only a phone would show the ReferenceError. AbortController / AbortSignal are provided by the
+// build (config/index.ts, src/platform/abort-controller.ts); any bare one left is a crash.
+// A name after `.`, a quote or a word character, or before `:`, is a property, not the global.
+const MISSING_GLOBALS =
+  /(?<![\w$.'"`])(AbortController|AbortSignal|TextEncoder|TextDecoder|structuredClone|DOMException)\b(?!\s*:)/g;
+for (const file of files.filter((candidate) => candidate.rel.endsWith('.js'))) {
+  const source = fs.readFileSync(path.join(dist, file.rel), 'utf8');
+  for (const match of source.matchAll(MISSING_GLOBALS)) {
+    const at = match.index ?? 0;
+    const context = source.slice(Math.max(0, at - 60), at + 40).replace(/\s+/g, ' ');
+    failures.push(`${file.rel}: ${match[1]}, which the WeChat runtime lacks: …${context}…`);
   }
 }
 

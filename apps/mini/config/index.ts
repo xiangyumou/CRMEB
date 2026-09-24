@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig, type UserConfigExport } from '@tarojs/cli';
+import { ProvidePlugin } from 'webpack';
 import { BundleStatsPlugin } from './bundle-stats';
 import devConfig from './dev';
 import { GlobalObjectPlugin } from './global-object-plugin';
@@ -104,6 +105,23 @@ function webpackChain(chain: Chain) {
   chain.resolve.modules.add('node_modules').add(path.join(appRoot, 'node_modules'));
 }
 
+/**
+ * The WeChat runtime has no `AbortController` and TanStack Query makes one per fetch; every
+ * module that uses the global gets src/platform/abort-controller.ts instead (weapp only: H5 has
+ * the browser's). scripts/size-report.mjs fails a weapp build that still has a bare one.
+ */
+const abortPolyfill = path.join(appRoot, 'src/platform/abort-controller.ts');
+
+function miniWebpackChain(chain: Chain) {
+  webpackChain(chain);
+  chain.plugin('abort-controller').use(ProvidePlugin, [
+    {
+      AbortController: [abortPolyfill, 'AbortController'],
+      AbortSignal: [abortPolyfill, 'AbortSignal'],
+    },
+  ]);
+}
+
 // https://docs.taro.zone/docs/next/config
 export default defineConfig<'webpack5'>(async (merge) => {
   const baseConfig: UserConfigExport<'webpack5'> = {
@@ -146,7 +164,7 @@ export default defineConfig<'webpack5'>(async (merge) => {
     },
     cache: { enable: false },
     mini: {
-      webpackChain,
+      webpackChain: miniWebpackChain,
       compile: { include: compileInclude },
       // Modules used only by one sub-package move into that sub-package instead of the main
       // package's common chunk (the main package has a 2 MB hard limit).
