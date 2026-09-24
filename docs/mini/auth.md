@@ -44,7 +44,7 @@ token 默认 30 天有效（后台「登录保持天数」`sessionTtlDays`）。
 4. 续期本身失败（再次 401 或其他错误）不要循环重试，停在登录页。
 5. 续期登录到的是**另一个账号**（AUTH-010）：不重放。`wx.login` 登录的是持有本机 openid 的账号，它可能不是会话过期的那个
    （例如密码登录时关联被拒，openid 属于别人）。这时新会话立即吊销（`DELETE /api/v1/auth/sessions/current`，带新 token）、
-   不保存，回到未登录（`signed-out`），原请求的 401 照常抛给调用方，然后打开登录页，提示「登录已过期，请重新登录」。
+   不保存，回到未登录（`signed-out`），原请求的 401 照常抛给调用方，然后打开登录页，登录页在店名下方显示「登录已过期，请重新登录」（一行文字，不是 toast：失败请求的调用方同时会弹自己的错误 toast，会把它顶掉），登录或离开登录页后消失。
    原会话属于哪个账号不知道时（本地只有 token、没有账号 id，即 AUTH-010 之前存下的 token）同样处理。
 
 要点：
@@ -148,7 +148,7 @@ H5「模拟小程序」模拟同一个流程：emulation 数据 `privacy: 'undec
 - AUTH-009：密码登录带 `bindToken` 时，密码正确才关联 openid，之后的 `wx.login` 续期回到同一账号；密码错误不关联也不用掉 `bindToken`；
   冲突与短信方式相同（`AUTH_WECHAT_ALREADY_BOUND`），不签发会话；不带 `bindToken` 不关联任何东西。
 - AUTH-010：401 续期只以发出请求的那个账号重放；续期登录到另一个账号（或原账号未知）时吊销新会话、回到未登录、不重放，
-  登录页只打开一次并提示「登录已过期，请重新登录」。
+  登录页只打开一次并在页面上显示「登录已过期，请重新登录」。
 
 对应的测试在 `packages/core/src/user/storefront-auth.int.test.ts` 的 `mini-program session renewal`（AUTH-006～008）和
 `password login that finishes a parked mini sign-in`（AUTH-009）中；AUTH-010 是客户端规则，测试在

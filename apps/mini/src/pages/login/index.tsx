@@ -13,9 +13,11 @@ import {
 import {
   bindPhone,
   bindPhoneWithSms,
+  clearSessionNotice,
   sendLoginSms,
   startSession,
   useSession,
+  useSessionNotice,
 } from '@/session/session';
 import { PasswordLoginForm } from '@/features/auth/password-login';
 import { AgreementCheck } from '@/ui/agreement-check';
@@ -32,7 +34,9 @@ const PRIVACY_REFUSED = '未同意隐私保护指引，可改用短信验证码�
 /**
  * 登录 (`login { redirect? }`, docs/mini/auth.md, design.md §5 G). Reached from
  * `requireLogin()` when the silent sign-in could not finish on its own: the shop wants a phone
- * number (快速登录, or an SMS code), the shopper signed out, or WeChat failed. Comes back to
+ * number (快速登录, or an SMS code), the shopper signed out, or WeChat failed. Also opened by
+ * the session when a renewal reached another account (AUTH-010), whose notice replaces the hint
+ * under the shop's name. Comes back to
  * `redirect` (a catalogue route, never a path) once signed in, going back when that is the page
  * under it (`loginReturn`); 暂不登录 just goes back. 其他方式 holds 密码登录
  * (`features/auth/password-login`), offered whatever the WeChat sign-in did.
@@ -40,6 +44,10 @@ const PRIVACY_REFUSED = '未同意隐私保护指引，可改用短信验证码�
 export default function LoginPage() {
   const { redirect } = useRouteParams('login');
   const session = useSession((state) => state.session);
+  // Why the session sent the shopper here (a renewal that reached another account, AUTH-010),
+  // until they sign in or leave.
+  const notice = useSessionNotice((state) => state.notice);
+  useEffect(() => clearSessionNotice, []);
   const config = useAppConfig();
   const [agreed, setAgreed] = useState(false);
   const [shake, setShake] = useState(0);
@@ -96,7 +104,11 @@ export default function LoginPage() {
             <View className="login__logo login__logo--blank" />
           )}
           {name ? <Text className="login__name">{name}</Text> : null}
-          <Text className="login__hint">登录后可以下单、查看订单和领取优惠券</Text>
+          {notice ? (
+            <Text className="login__hint login__hint--notice">{notice}</Text>
+          ) : (
+            <Text className="login__hint">登录后可以下单、查看订单和领取优惠券</Text>
+          )}
         </View>
 
         {mode === 'password' ? (

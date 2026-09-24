@@ -355,14 +355,8 @@ describe('AUTH-010 — a request that met a 401 is replayed only as the account 
     );
   }
 
-  function toasts(calls: { api: string; args: unknown }[]) {
-    return calls
-      .filter((call) => call.api === 'showToast')
-      .map((call) => (call.args as { title: string }).title);
-  }
-
   it('replays a write as the same account, and opens no login page', async () => {
-    const { serveApi, startSession, taroFake, useSession } = await expiredAs7();
+    const { serveApi, startSession, taroFake, useSession, useSessionNotice } = await expiredAs7();
     const seen = serveApi({
       'POST /api/v1/cart/items': () =>
         seen.at(-1)?.headers['Authorization'] === 'Bearer a-fresh' ? added : unauthenticated,
@@ -381,10 +375,11 @@ describe('AUTH-010 — a request that met a 401 is replayed only as the account 
     expect(useSession.getState().session).toEqual({ status: 'signed-in', token: 'a-fresh' });
     expect(taroFake.storage.get('shop.session.user')).toBe('7');
     expect(loginPages(taroFake.calls)).toEqual([]);
+    expect(useSessionNotice.getState().notice).toBeNull();
   });
 
   it('sends a write once when WeChat signs in to another account: signed out, that session revoked, the 401 raised, the login page opened with a hint', async () => {
-    const { serveApi, startSession, taroFake, useSession } = await expiredAs7();
+    const { serveApi, startSession, taroFake, useSession, useSessionNotice } = await expiredAs7();
     const seen = serveApi({
       'POST /api/v1/cart/items': () => unauthenticated,
       'POST /api/v1/auth/sessions/wechat-mini': () => ({ body: signedIn('b-token', other) }),
@@ -400,8 +395,9 @@ describe('AUTH-010 — a request that met a 401 is replayed only as the account 
     expect(useSession.getState().session).toEqual({ status: 'signed-out' });
     expect(taroFake.storage.has('shop.session.token')).toBe(false);
     expect(taroFake.storage.has('shop.session.user')).toBe(false);
-    await vi.waitFor(() => expect(toasts(taroFake.calls)).toEqual(['登录已过期，请重新登录']));
-    expect(loginPages(taroFake.calls)).toHaveLength(1);
+    await vi.waitFor(() => expect(loginPages(taroFake.calls)).toHaveLength(1));
+    // What the login page says, set before it opens (not a toast the failed call's own replaces).
+    expect(useSessionNotice.getState().notice).toBe('登录已过期，请重新登录');
     // The other account's new session is ended, not kept.
     const revoked = seen.filter(
       (request) => request.key === 'DELETE /api/v1/auth/sessions/current',
@@ -410,7 +406,7 @@ describe('AUTH-010 — a request that met a 401 is replayed only as the account 
   });
 
   it('gives every request that failed alongside the same answer: one wx.login, none replayed, one login page', async () => {
-    const { serveApi, startSession, taroFake, useSession } = await expiredAs7();
+    const { serveApi, startSession, taroFake, useSession, useSessionNotice } = await expiredAs7();
     const seen = serveApi({
       'GET /api/v1/cart/count': () => unauthenticated,
       'POST /api/v1/cart/items': () => unauthenticated,
@@ -446,8 +442,26 @@ describe('AUTH-010 — a request that met a 401 is replayed only as the account 
       ),
     ).toBe(false);
     expect(useSession.getState().session).toEqual({ status: 'signed-out' });
-    await vi.waitFor(() => expect(toasts(taroFake.calls)).toHaveLength(1));
-    expect(loginPages(taroFake.calls)).toHaveLength(1);
+    await vi.waitFor(() => expect(loginPages(taroFake.calls)).toHaveLength(1));
+    expect(useSessionNotice.getState().notice).toBe('登录已过期，请重新登录');
+  });
+
+  it('drops the notice once the shopper signs in again', async () => {
+    const { serveApi, signInWithPassword, startSession, useSessionNotice } = await expiredAs7();
+    serveApi({
+      'POST /api/v1/cart/items': () => unauthenticated,
+      'POST /api/v1/auth/sessions/wechat-mini': () => ({ body: signedIn('b-token', other) }),
+      'DELETE /api/v1/auth/sessions/current': () => ({ status: 204, body: null }),
+      'POST /api/v1/auth/sessions/password': () => ({ status: 201, body: passwordSession }),
+    });
+    const { api } = await import('@/data/api');
+
+    await startSession();
+    await expect(api.call('cart.addItem', addToCart)).rejects.toMatchObject({ status: 401 });
+    expect(useSessionNotice.getState().notice).toBe('登录已过期，请重新登录');
+
+    await signInWithPassword('u7', 'secret-1');
+    expect(useSessionNotice.getState().notice).toBeNull();
   });
 
   it('replays nothing after renewing a token stored with no account beside it', async () => {
@@ -491,7 +505,8 @@ describe('AUTH-010 — a request that met a 401 is replayed only as the account 
   });
 
   it('undoes another account the same way for 修改密码, which leaves the page itself', async () => {
-    const { renewSession, serveApi, startSession, taroFake, useSession } = await expiredAs7();
+    const { renewSession, serveApi, startSession, taroFake, useSession, useSessionNotice } =
+      await expiredAs7();
     serveApi({
       'POST /api/v1/auth/sessions/wechat-mini': () => ({ body: signedIn('b-token', other) }),
       'DELETE /api/v1/auth/sessions/current': () => ({ status: 204, body: null }),
@@ -503,5 +518,6 @@ describe('AUTH-010 — a request that met a 401 is replayed only as the account 
     expect(useSession.getState().session).toEqual({ status: 'signed-out' });
     expect(taroFake.storage.has('shop.session.token')).toBe(false);
     expect(loginPages(taroFake.calls)).toEqual([]);
+    expect(useSessionNotice.getState().notice).toBeNull();
   });
 });

@@ -12,7 +12,7 @@
     返回 `null`。
   - 新增 `renewFor(sent)`，作为 transport 的续期钩子：`sent` 是当前 token（或正在续期）就续期并共用结果；会话已被别的请求续期
     换掉时，只有当前 token 属于同一账号才用它重放；未登录时直接不重放，不再发第二次 `wx.login`。续期换了账号时打开登录页
-    一次（`navigate({ route: 'login' })`，不 await），到达后 toast「登录已过期，请重新登录」。
+    一次（`navigate({ route: 'login' })`，不 await）。~~到达后 toast~~ → 见下「修复：提示改为登录页上的一行字」。
   - `renewSession()`（修改密码页在用）保留，同样的账号比较，但不打开登录页（修改密码页自己 toast 并返回）。
   - `session/renewing-transport.ts`：钩子改为 `renew(sent)`，不再自己判断「token 已过期换新」，交给会话判断。
   - 会话目录外的改动（仅适配签名）：`data/api.ts` 的 `AuthHooks.renew` 改为 `(sent) => …`；`data/upload.ts` 传入发出的 token。
@@ -31,6 +31,17 @@ replayed as the account this phone's WeChat belongs to, and the shopper is back 
   `docs/invariants.md` 新增 AUTH-010（引用 6 条单元测试 + 这条 e2e）；`docs/mini/auth.md`「401：续期」「密码登录」「不变量」、
   `docs/mini/e2e-coverage.md` 续期行已更新。
 
+- **修复：提示改为登录页上的一行字**（orchestrator 跑 e2e 时 AUTH-010 失败：toast 没出现）。trace 显示登录页打开时屏幕上的 toast
+  是加购失败自己的「请先登录」（商品页 `onError: toast.text(error.message)`），它在我们的 toast 之后弹出并把它替换掉（一次只有
+  一个 toast；H5 上 `hideLoading` 也会隐藏它）。真机同样会被顶掉。改为：
+  - `session.ts` 新增 `useSessionNotice`（zustand，`notice: string | null`）和 `clearSessionNotice()`；`sendToLogin` 在打开登录页
+    **之前**设置 `notice = SESSION_ENDED`，不再 toast。任何登录成功（`signedIn`）和 `logout` 清掉它。
+  - `pages/login/index.tsx`：有 `notice` 时在店名下方用它替换「登录后可以下单、查看订单和领取优惠券」（`login__hint--notice`，
+    次要文字色）；页面卸载时 `clearSessionNotice`。
+  - 单元测试：`session.test.ts` 改为断言 `notice`（换账号、并发都设置一次；同账号和 `renewSession()` 不设置），新增「重新登录后
+    notice 清掉」；`pages/login/index.test.tsx` 新增 2 条（有 notice 时替换提示、卸载后清掉；没有时显示原提示）。
+  - e2e 断言不用改（`getByText` 同样找到页面上的文字），只改了注释。invariants AUTH-010 文字与引用、auth.md 同步。
+
 ## In progress
 
 - 无。
@@ -42,14 +53,14 @@ replayed as the account this phone's WeChat belongs to, and the shopper is back 
 ## 本流跑过的检查
 
 - `pnpm --filter @shop/mini exec vitest run src/session src/data/upload.test.ts src/packages/account/password src/pages/login --maxWorkers=2`：
-  5 文件 34 条通过
+  5 文件 34 条通过；修复后同一命令 5 文件 37 条通过
 - typecheck：`@shop/mini`、`@shop/e2e-storefront` 通过
 - eslint：mini 改动文件、`e2e/storefront/specs-mini/login.spec.ts` 通过
 - `pnpm guards`：16 项 0 失败（invariants 287 条规则、873 处引用全部解析）；改动文件 `prettier --check` 通过
 
 ## Tests for the orchestrator to run
 
-- e2e（新增 1 条；同文件的 SMOKE-004 与两条续期测试走的是同账号路径，行为应不变，建议整文件跑一次）：
+- e2e（新增 1 条，修复后请重跑；同文件的 SMOKE-004 与两条续期测试走的是同账号路径，行为应不变，建议整文件跑一次）：
   `pnpm --filter @shop/e2e-storefront test:mini -- specs-mini/login.spec.ts`
 - 可选（`account-fixture.signIn()` 多存了一个键，19 个页面测试文件在用，按理不受影响）：
   `pnpm --filter @shop/mini exec vitest run src/packages/account --maxWorkers=2`
@@ -58,7 +69,7 @@ replayed as the account this phone's WeChat belongs to, and the shopper is back 
 
 - 会话过期后续期登录到了**另一个账号**时（例：共用手机，账号 A 密码登录，本机微信已绑账号 B）：
   旧 = 静默变成账号 B，A 正在提交的地址 / 发票 / 下单 / 加购落到 B 名下，页面显示 B 的数据；
-  新 = 不重放，回到未登录，打开登录页并提示「登录已过期，请重新登录」，提交的操作报错（页面照常显示该请求的错误提示）。
+  新 = 不重放，回到未登录，打开登录页，店名下方原来的「登录后可以下单、查看订单和领取优惠券」换成「登录已过期，请重新登录」（登录或离开后恢复），提交的操作报错（页面照常显示该请求的错误提示）。
   原因：隐私和数据归属（K1 B1）。
 - 升级后第一次续期：本地 token 是本版本之前存的（没有账号 id）时，会话到期不再静默续期，而是同上回到登录页一次；之后照常静默续期。
   小程序尚未正式营业（生产未交易），影响的用户极少。
@@ -74,8 +85,8 @@ replayed as the account this phone's WeChat belongs to, and the shopper is back 
   保留新会话」，但那样可能静默登录到另一个账号，所以没有这样做。
 - **登录页没有 `redirect`**：会话层不知道当前页面，登录后回首页。如果希望回到原页面，需要 `@/platform` 提供当前路由，或登录页接受
   提示参数；这超出了本任务范围（只改 `session/`）。
-- **提示文案可能被页面的错误 toast 顶掉**：失败请求的 401 先到页面（页面可能 toast「请先登录」之类），登录页打开后才 toast
-  「登录已过期，请重新登录」，一般是后者最后显示；e2e 断言了它可见。
+- ~~提示文案可能被页面的错误 toast 顶掉~~：确实会（e2e 证实），已改为登录页上的一行字。页面自己的错误 toast（如「请先登录」）
+  仍会在商品页短暂出现，这是页面原有行为，没有改。
 - **过期 token 碰到别的账号的当前会话**（在途请求期间用户退出并登录了别的账号，极少见）：现在不重放，但客户端的
   `onUnauthorized` 仍会把当前会话置为 `idle`（这是原有行为，客户端的 `onUnauthorized` 不知道是哪个 token 的 401）。
   以前这种情况会以新账号重放。
