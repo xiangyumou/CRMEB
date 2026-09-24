@@ -90,24 +90,9 @@ interface DenyListFile {
 
 const DENY_LISTS: readonly DenyListFile[] = [
   {
-    file: /^packages\/contracts\/src\/diy\/removed\.ts$/,
-    words: ['砍价', '秒杀', '抽奖', '线下支付', '自建客服'],
-    why: 'REMOVED_DIY_COMPONENTS / REMOVED_STOREFRONT_PAGES: the filter that drops the components and links saved before the features were retired',
-  },
-  {
-    file: /^packages\/core\/src\/diy\/diy\.test\.ts$/,
-    words: ['砍价', '秒杀'],
-    why: 'the cleanDiyData test: it asserts a saved page containing those components comes back without them',
-  },
-  {
     file: /^packages\/contracts\/src\/system\/system\.role\.contract\.ts$/,
     words: ['秒杀'],
     why: 'the documented example of unknownPermissions — a stored grant for a module that no longer exists, shown so it can be cleared',
-  },
-  {
-    file: /^apps\/web\/src\/admin\/diy\/defaults\/bottomMenu\.default\.ts$/,
-    words: ['自建客服'],
-    why: "`icon: 'icon-kefu'` is an iconfont glyph name in the DIY default payload, on a 客服 entry whose link the operator sets; the retired module is the page kefu/mobile_list, which REMOVED_STOREFRONT_PAGES drops",
   },
 ];
 

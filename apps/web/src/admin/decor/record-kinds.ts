@@ -29,9 +29,6 @@ import type { DecorRecord, DecorRecordPage, DecorRecordQuery, DecorTreeNode } fr
  *
  * The ids are the ones the storefront sends back to the storefront API: an
  * article id, a coupon *template* id and a group-buy activity id.
- *
- * Moved here from the legacy editor (`admin/diy/record-source.ts`), which now
- * adapts these for its own picker kinds until the cutover deletes it.
  */
 
 // ---------------------------------------------------------------------------

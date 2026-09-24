@@ -12,7 +12,7 @@ export const migrationsDir = path.join(repoRoot, 'packages/db/migrations');
 export const miniApp = path.join(repoRoot, 'apps/mini');
 /** The storefront's typed `/api/v1` client, shared by the mini-program and its tests. */
 export const apiClientSrc = path.join(repoRoot, 'packages/api-client/src');
-/** The DIY blocks, rendered by the mini-program and by the admin's editor canvas. */
+/** The decoration blocks, rendered by the mini-program and by the admin's editor canvas. */
 export const storefrontBlocksSrc = path.join(repoRoot, 'packages/storefront-blocks/src');
 /** The storefront route catalogue: route key -> mini-program page (docs/mini/pages.md §3). */
 export const storefrontRoutesFile = path.join(

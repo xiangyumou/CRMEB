@@ -80,7 +80,7 @@ function walkSchema(
         return;
       }
       case 'lazy':
-        return; // recursive DIY node tree: free-form jsonb, no config key lives there
+        return; // a recursive tree (e.g. a decoration document): free-form jsonb, no config key lives there
       default:
         return;
     }

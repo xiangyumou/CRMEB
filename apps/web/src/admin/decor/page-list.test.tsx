@@ -116,7 +116,8 @@ describe('店铺装修列表', () => {
     ).toBeInTheDocument();
     expect(within(rowOf('秋季首页')).getByText('有未发布修改')).toBeInTheDocument();
     expect(within(rowOf('冬季首页草稿')).getByText('未发布')).toBeInTheDocument();
-    expect(screen.getByText('新版')).toBeInTheDocument();
+    expect(screen.getAllByText('店铺装修').length).toBeGreaterThan(0);
+    expect(screen.queryByText('新版')).not.toBeInTheDocument();
   });
 
   it('designates only a published page of the matching kind, after a confirm', async () => {

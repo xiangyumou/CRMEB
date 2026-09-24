@@ -20,7 +20,6 @@ import '@shop/core/catalog';
 import '@shop/core/cms';
 import '@shop/core/coupon';
 import '@shop/core/decor';
-import '@shop/core/diy';
 import '@shop/core/effects';
 import '@shop/core/groupbuy';
 import '@shop/core/notification';
@@ -48,7 +47,6 @@ export const INSTALLED_DOMAINS = [
   'cms',
   'coupon',
   'decor',
-  'diy',
   'effects',
   'groupbuy',
   'notification',

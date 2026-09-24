@@ -1,8 +1,7 @@
 /**
  * `@shop/core/decor` — 页面装修 v2 (plan §2.1, docs/mini/decor.md).
  *
- * Strangles the legacy `diy` domain, which keeps serving the uni-app
- * untouched. The document model — blocks, links, data sources, validation —
+ * The document model — blocks, links, data sources, validation —
  * lives in `@shop/contracts/decor/*`; this domain stores documents, publishes
  * revisions and resolves pages for the storefront.
  *

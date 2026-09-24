@@ -53,9 +53,8 @@ function makeTargets(type: Exclude<LinkTargetType, 'page' | 'custom'>): LinkTarg
 /**
  * An in-memory `LinkSource`, for tests only.
  *
- * A test that renders `<LinkPicker>` — directly, or through a form or DIY link
+ * A test that renders `<LinkPicker>` — directly, or through a form's link
  * field — wraps it in `<LinkSourceProvider source={createStubLinkSource()}>`.
- * The production editor mounts the real source (`createDiyLinkSource`), and
  * `useLinkSource()` throws when no provider is mounted, so these rows can never
  * reach a saved page. The paths are real storefront routes all the same, so a
  * test that asserts on a picked URL asserts on one the storefront can open.

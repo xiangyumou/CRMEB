@@ -47,10 +47,7 @@ export type { DecorRecord, DecorRecordPage, DecorRecordQuery, DecorTreeNode } fr
  *
  * Each kind is answered from the owning domain's admin contracts:
  * `catalog-records.ts` (商品, 商品标签, 商品分类), `record-kinds.ts` (文章,
- * 优惠券, 拼团) and this file (预售, 微页面). The first five used to live in the
- * legacy editor (`admin/diy`), which now borrows them from here; nothing in
- * this folder imports `admin/diy` (lint enforces it), so the cutover can
- * delete it whole.
+ * 优惠券, 拼团) and this file (预售, 微页面).
  *
  * A 微页面 link may point at a page that is not published yet: operators build
  * the landing page and the banner that links to it together. The server warns

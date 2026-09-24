@@ -55,7 +55,7 @@ const client = createApiClient({
   getToken: () => wx.getStorageSync('token'),
   onUnauthorized: () => wx.getStorageSync('login'),
 });
-export const home = () => client.call('diy.homePage');
+export const home = () => client.call('decor.pageHome');
 export const products = (keyword: string) => client.call('catalog.productList', { query: { keyword } });
 export const product = (id: string) => client.call('catalog.productDetail', { params: { id } });
 export const addToCart = (skuId: string) => client.call('cart.addItem', { body: { skuId, quantity: 1 } });

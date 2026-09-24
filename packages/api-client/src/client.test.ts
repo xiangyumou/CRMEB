@@ -104,7 +104,7 @@ describe('client.call — the request', () => {
     const getToken = vi.fn(() => 'tok-123');
     const { client, requests } = clientWith(() => json(200, {}), { getToken });
     await client.call('catalog.productDetail', { params: { id: '1' } }); // user-optional
-    await client.call('system.siteConfigGet'); // public
+    await client.call('system.appConfigGet'); // public
     expect(requests[0]?.headers['Authorization']).toBe('Bearer tok-123');
     expect(requests[1]?.headers['Authorization']).toBeUndefined();
     expect(getToken).toHaveBeenCalledTimes(1);

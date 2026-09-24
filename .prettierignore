@@ -13,7 +13,6 @@ guards/baselines/
 # `prettier --check .`) goes red without this. See docs/rewrite/status/golden.md.
 apps/web/next-env.d.ts
 
-# Data, not code. The DIY fixtures are production exports and must stay byte-exact.
-packages/contracts/src/diy/__fixtures__/
+# Data, not code.
 packages/db/seed-data/
 packages/db/migrations/

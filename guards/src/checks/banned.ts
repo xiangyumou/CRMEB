@@ -66,7 +66,7 @@ const BANS: readonly Ban[] = [
     message: 'raw HTML injection is allowed only in the sanitised rich-text renderer',
     roots: ['apps/web/src', 'apps/web/app'],
     // The one sanitised renderer, named so the exception is auditable.
-    allow: [/\/kit\/(rich-text|form\/rich-text)/, /\/admin\/diy\/preview\//],
+    allow: [/\/kit\/(rich-text|form\/rich-text)/],
   },
 ];
 

@@ -418,7 +418,7 @@ const FLOWS: Record<string, { weight: number; run: Flow }> = {
   home: {
     weight: 20,
     run: async () => {
-      const r = await call('GET /api/v1/diy/pages/home', 'GET', '/api/v1/diy/pages/home');
+      const r = await call('GET /api/v1/pages/home', 'GET', '/api/v1/pages/home');
       return r.status === 200 ? null : `home ${r.status} ${r.text.slice(0, 300)}`;
     },
   },

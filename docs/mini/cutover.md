@@ -76,28 +76,28 @@ B：删除加落地页；C：删表）不再采用。
 
 ### 2.1 uni-app
 
-- [ ] `apps/uni-app/` 整个目录。
-- [ ] `pnpm-workspace.yaml` 里的 `'!apps/uni-app'` 和它上面的注释。
-- [ ] 根目录 `README.md`：技术栈表里的 `apps/uni-app` 行（第 35 行）、第 38 行「Everything but the uni-app」、
+- [x] `apps/uni-app/` 整个目录。
+- [x] `pnpm-workspace.yaml` 里的 `'!apps/uni-app'` 和它上面的注释。
+- [x] 根目录 `README.md`：技术栈表里的 `apps/uni-app` 行（第 35 行）、第 38 行「Everything but the uni-app」、
       目录树里的 `uni-app/`（第 48 行）、第 113 行起「`apps/uni-app` is an npm project…」一节、清单里的
       `(cd apps/uni-app && npm test && npm run build:h5)`（第 140 行）。
-- [ ] `docs/contributing.md`：`pnpm guards` 说明里的「the uni-app resolves every call and page」（第 40 行）、
+- [x] `docs/contributing.md`：`pnpm guards` 说明里的「the uni-app resolves every call and page」（第 40 行）、
       storefront e2e 一行的「The H5 storefront」、`apps/uni-app/**` 的检查项（第 46 行）、「the uni-app's `npm test`」
       （第 64 行）、「Adding a route」第 8 步「在 `apps/uni-app/api/` 加调用和 mapper」（第 101 行起）。
-- [ ] `docs/architecture.md`、`docs/conventions.md` 中标为 legacy 的 uni-app 小节，以及 Processes 表、Edge 说明里的
+- [x] `docs/architecture.md`、`docs/conventions.md` 中标为 legacy 的 uni-app 小节，以及 Processes 表、Edge 说明里的
       「uni-app H5」（architecture 第 13、24、375 行附近）。
 
 ### 2.2 旧 uni-app 的 e2e
 
-- [ ] `e2e/storefront/specs/`（10 个 spec），`src/uni.ts`、`src/known-gaps.ts`，`src/h5.ts`、`src/stack-file.ts`、
+- [x] `e2e/storefront/specs/`（10 个 spec），`src/uni.ts`、`src/known-gaps.ts`，`src/h5.ts`、`src/stack-file.ts`、
       `scripts/serve.ts` 中 `uniapp` 的分支（`SHOP_E2E_CLIENT` 只剩 `mini`，或者去掉这个开关）。
-- [ ] `src/seed.ts` 里给旧装修建页面的部分（`@shop/core/diy` 的 `createPage`、`setHomePage`，`diyPages`、
+- [x] `src/seed.ts` 里给旧装修建页面的部分（`@shop/core/diy` 的 `createPage`、`setHomePage`，`diyPages`、
       `diyHomePageId`）和 `stack-file.ts` 的对应字段：2.3 删掉 `core/diy` 后它编译不过。
-- [ ] `playwright.config.ts`：去掉 `mobile-chromium` 项目，`testDir` 固定为 `./specs-mini`；`package.json` 的 `test`
+- [x] `playwright.config.ts`：去掉 `mobile-chromium` 项目，`testDir` 固定为 `./specs-mini`；`package.json` 的 `test`
       改为跑小程序（`test:mini` 并入 `test`）。
-- [ ] `docs/invariants.md`：SMOKE-002…005 删去 `e2e/storefront/specs/` 的引用，陈述只写小程序；其他只引用旧 spec 的行
+- [x] `docs/invariants.md`：SMOKE-002…005 删去 `e2e/storefront/specs/` 的引用，陈述只写小程序；其他只引用旧 spec 的行
       （用 `grep -n "e2e/storefront/specs/" docs/invariants.md` 找）改引小程序的测试。
-- [ ] [e2e-coverage.md](e2e-coverage.md) 标注「旧套件已删除」，第 1 节作为历史保留或删去。
+- [x] [e2e-coverage.md](e2e-coverage.md) 标注「旧套件已删除」，第 1 节作为历史保留或删去。
 
 ### 2.3 旧装修（`diy` 域）和旧后台编辑器
 
@@ -107,20 +107,20 @@ B：删除加落地页；C：删表）不再采用。
       `app/admin/(shell)/decor/**` 引用 `diy`。旧目录里剩下的只是转接：`diy/data-source.tsx` 的 `DiyPicker*` 类型是 decor
       类型的别名，`diy/record-source.ts` 把旧的 `labels`、`combination` 映射到 decor 的实现，`diy/catalog-source.ts` 转导出
       选择器函数、自留旧 uni 路径的 `catalogLinkTargets`。整个目录可直接删除，decor 不受影响。
-- [ ] 后台：`apps/web/app/admin/(shell)/diy/`、`apps/web/src/admin/diy/`（含上面的转接文件及其测试）、只供旧面板测试用的
+- [x] 后台：`apps/web/app/admin/(shell)/diy/`、`apps/web/src/admin/diy/`（含上面的转接文件及其测试）、只供旧面板测试用的
       `apps/web/src/test/diy-data-source.ts`、菜单 `apps/web/src/admin/menu/diy.menu.ts`、`diy:*` 权限原子（`permissions`
       守卫会提示没人用的原子）。`NO_LEGACY_DIY` 规则删不删都可以（目录没了就不会再命中）。删完跑一遍
       `grep -rn "admin/diy\|/diy/" apps/web/src apps/web/app` 确认无残留引用。
-- [ ] 接口：`apps/web/app/api/v1/diy/**`（`diy.layout`、`diy.navigation`、`diy.pageVersion`、`diy.theme`、`diy.homePage`、
+- [x] 接口：`apps/web/app/api/v1/diy/**`（`diy.layout`、`diy.navigation`、`diy.pageVersion`、`diy.theme`、`diy.homePage`、
       `diy.userCenterPage`、`diy.productDetailPage`、`diy.page`）、`apps/web/app/admin-api/diy/**`（页面、主题、链接库）。
-- [ ] 契约 `packages/contracts/src/diy/`（含 `removed.ts` 的 `REMOVED_STOREFRONT_PAGES`、默认 JSON、`__fixtures__`），
+- [x] 契约 `packages/contracts/src/diy/`（含 `removed.ts` 的 `REMOVED_STOREFRONT_PAGES`、默认 JSON、`__fixtures__`），
       领域 `packages/core/src/diy/`（`pnpm gen` 重新生成 `domains.gen.ts`）。表的删除见 2.11。
-- [ ] `packages/api-client` 的测试拿 `diy.homePage`、`system.siteConfigGet` 当例子（`client.test.ts`、`bundle.test.ts`、
+- [x] `packages/api-client` 的测试拿 `diy.homePage`、`system.siteConfigGet` 当例子（`client.test.ts`、`bundle.test.ts`、
       `contract.test.ts`），换成保留的接口。
-- [ ] `e2e/admin/specs/diy.spec.ts`。
-- [ ] `docs/invariants.md` 的 DIY-001…009 行（逐条确认只关于旧装修；编号不再复用），以及 RISK-D-008、RISK-D-009
-      中引用旧装修测试的行；`docs/architecture.md` Domains 表的 `diy` 一行。
-- [ ] 后台菜单「店铺装修（新版）」改回「店铺装修」（用户 2026-09-24 已定要改）（`apps/web/src/admin/menu/decor.menu.ts`、
+- [x] `e2e/admin/specs/diy.spec.ts`。
+- [x] `docs/invariants.md` 的 DIY-001…009 行（逐条确认只关于旧装修；编号不再复用），以及 SMOKE-010
+      （引用旧装修测试的是它；RISK-D-008、RISK-D-009 并不引用，原先写错）；`docs/architecture.md` Domains 表的 `diy` 一行。
+- [x] 后台菜单「店铺装修（新版）」改回「店铺装修」（用户 2026-09-24 已定要改）（`apps/web/src/admin/menu/decor.menu.ts`、
       `apps/web/src/admin/decor/page-list.tsx`、`e2e/admin/specs/decor.spec.ts`、`e2e/admin/README.md`、
       [decor.md](decor.md)）。后台看得到的文案变化，改了要告诉你。
 
@@ -171,11 +171,11 @@ B：删除加落地页；C：删表）不再采用。
 
 ### 2.8 守卫
 
-- [ ] `uniapp` 检查：`guards/src/checks/uniapp.ts`、`guards/src/lib/uniapp.ts`（及测试）、`guards/src/cli.ts` 中的注册、
+- [x] `uniapp` 检查：`guards/src/checks/uniapp.ts`、`guards/src/lib/uniapp.ts`（及测试）、`guards/src/cli.ts` 中的注册、
       `guards/src/lib/paths.ts` 的 `uniApp`；`guards/README.md` 的 `uniapp` 一行和 `checks/uniapp.ts` 的说明。
-- [ ] `retired` 检查（`guards/src/checks/retired.ts`）：`ALLOWED` 中的 `apps/uni-app/api/mappers/` 和
+- [x] `retired` 检查（`guards/src/checks/retired.ts`）：`ALLOWED` 中的 `apps/uni-app/api/mappers/` 和
       `apps/uni-app/api/README.md`，检查名称和 RISK 行陈述里的「the uni-app API layer」。
-- [ ] `mini` 检查中为过渡期保留的允许列表（如仍有）清空；`guards/README.md`「next to `uniapp` until the cutover」一句。
+- [x] `mini` 检查中为过渡期保留的允许列表（如仍有）清空；`guards/README.md`「next to `uniapp` until the cutover」一句。
 
 ### 2.9 CI（`.github/workflows/ci.yml`）
 

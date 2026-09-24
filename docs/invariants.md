@@ -1419,66 +1419,6 @@ A team shows strangers only a masked nickname and never an account id (decided 2
 - `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > answers null for no name at all`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the storefront surface > RISK-D-010 — shows a team to anybody with masked names, no account ids, and isMe from the session`
 
-## 页面装修 (DIY)
-
-### DIY-001
-
-A saved page survives parse → serialise byte for byte, including keys no schema in this build knows, for every production export. Validation hands back the caller's own object rather than zod's rebuilt one.
-
-- `packages/contracts/src/diy/schema/round-trip.test.ts::page value round trip > %s: parse -> serialise is byte-identical`
-- `packages/core/src/diy/diy.test.ts::validateDiyContent > hands back the caller’s own object, so the bytes never change`
-
-### DIY-002
-
-Retired components and links to removed storefront pages are filtered on **read**, never on write: the stored row keeps every node, and the storefront is served the page with those nodes stripped.
-
-- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity fixtures > covers every branch of the filter`
-- `packages/core/src/diy/diy.int.test.ts::the storefront read > serves the home page with the retired components stripped`
-
-### DIY-003
-
-Cleaning preserves key order and returns its input by identity when nothing is stripped, so a cleaned page still serialises byte for byte.
-
-- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity fixtures > keeps key order, so a cleaned page still serialises byte for byte`
-
-### DIY-004
-
-Two editors saving the same page do not overwrite each other: the version token covers both `updated_at` and the envelope's `version`, so a save from a stale editor fails with `DIY_VERSION_CONFLICT`.
-
-- `packages/core/src/diy/diy.int.test.ts::saving content > lets exactly one of several simultaneous saves win`
-
-### DIY-005
-
-The editor writes back a page it did not change, unchanged: timestamps and their derived `id`s are only rewritten once the page's order has actually moved.
-
-- `apps/web/src/admin/diy/store.test.ts::serialising > reproduces an untouched page byte for byte`
-- `apps/web/src/admin/diy/store.test.ts::serialising > rewrites timestamps and ids only once the order actually moves`
-
-### DIY-006
-
-Hiding a component never deletes it: `isHide` stays in the payload and the renderer skips it.
-
-- `apps/web/src/admin/diy/store.test.ts::editing > hides without deleting`
-
-### DIY-007
-
-A page kind that owns a footer always saves one (`pageFoot` on 首页, `bottomMenu` on 商品详情) and it always sorts last.
-
-- `apps/web/src/admin/diy/store.test.ts::serialising > appends the factory footer to a home page that has none`
-- `apps/web/src/admin/diy/store.test.ts::serialising > pushes the footer past the body when the body is restamped`
-
-### DIY-008
-
-PostgreSQL `jsonb` reorders the keys inside a node; the guarantee that survives storage is "every key and value is preserved", not the byte order. Pinned so nobody mistakes it for a bug in this code.
-
-- `packages/core/src/diy/diy.int.test.ts::saving content > is the database, not this code, that reorders the keys inside a node`
-
-### DIY-009
-
-超级组件 (`customComponent`) is renderable but not creatable: the palette does not offer it, because the shop has no designer for its inner layout and a freshly created 超级组件 could never be filled. Existing nodes keep their config panel and their `customComponents` tree round-trips untouched.
-
-- `packages/contracts/src/diy/schema/round-trip.test.ts::the registry > keeps customComponent renderable but out of the palette`
-
 ## Storefront end to end
 
 ### SMOKE-002
@@ -1534,13 +1474,6 @@ The group-buy poster is drawn by the client: the server composes and uploads not
 - `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::SMOKE-009 — the group-buy poster, offline > answers the whole poster with no network, no WeChat and no upload`
 - `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::answers a second shopper the same poster, still without an upload`
 - `packages/core/src/groupbuy/groupbuy.smoke.int.test.ts::answers an unknown team with the contract’s 404, not a 500`
-
-### SMOKE-010
-
-The storefront is served DIY data with the components and navigation entries the shop does not have removed whole, and every other node kept.
-
-- `packages/core/src/diy/diy.test.ts::cleanDiyData — parity fixtures > covers every branch of the filter`
-- `packages/core/src/diy/diy.int.test.ts::the storefront read > serves the home page with the retired components stripped`
 
 ### SMOKE-011
 
