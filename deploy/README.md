@@ -104,6 +104,10 @@ In order, refusing to continue when a step cannot be proven, it:
 7. checks from outside: `https://<NEXT_HOST>/` (the landing page, answered by `web`) answers 2xx
    and `http://<NEXT_HOST>/` redirects to https. It reads that one setting with `shop hostname`, which prints it only while the
    Traefik overlay is applied.
+8. checks the shop answers, read-only — GETs with no session, so nothing is written and no login
+   attempt is spent: the storefront home page and product list answer 200, `/admin-api/auth/me`
+   answers the app's own 401 `UNAUTHENTICATED` (not an edge 404 or 502), `/api/v1/readyz` is ok,
+   and an effects backlog older than five minutes is reported as a warning.
 
 | Exit | Meaning                                                                          |
 | ---- | -------------------------------------------------------------------------------- |

@@ -30,7 +30,10 @@
 #           describe what runs;
 #   5. from here: `https://<NEXT_HOST>/` answers 2xx and `http://<NEXT_HOST>/`
 #      redirects to https. The host name is read with `shop hostname`, which
-#      prints that one setting and only while the Traefik overlay is applied.
+#      prints that one setting and only while the Traefik overlay is applied;
+#   6. from here, read-only: the storefront's home page and product list
+#      answer 200, the admin API refuses a request without a session with its
+#      own 401, `/api/v1/readyz` is ok, and an effects backlog is reported.
 #
 # A release that changes only the Compose files goes through the same command:
 # the digests equal what runs, nothing is stopped, and `up -d` recreates what
@@ -522,6 +525,61 @@ case "$answer" in
     failed=1
     ;;
 esac
+[ "$failed" -eq 0 ] || exit 5
+
+# --- 6. the shop answers, read-only --------------------------------------------------------
+#
+# The steps above prove a page is served; these prove the application behind
+# it answers the way a shopper and an operator need. Every probe is a GET with
+# no session and no body: nothing is written, nothing is logged in as anybody,
+# and no login attempt is spent against an account's lockout.
+
+# GET <path>; prints "<status>\n<body>", or "error\n<curl message>".
+probe() {
+  local out
+  out="$(curl -sS --max-time 20 -H 'accept: application/json' -w '\n%{http_code}' \
+    "https://$name$1" 2>&1)" || { printf 'error\n%s' "$out"; return 0; }
+  printf '%s\n%s' "${out##*$'\n'}" "${out%$'\n'*}"
+}
+
+# expect <path> <status> <what> <text the body must contain>
+expect() {
+  local answer status body
+  answer="$(probe "$1")"
+  status="${answer%%$'\n'*}"
+  body="${answer#*$'\n'}"
+  if [ "$status" = "$2" ] && [[ "$body" == *"$4"* ]]; then
+    say "  $3: $1 answers $status"
+  else
+    warn "  $3: $1 answers $status, expected $2 with ${4@Q} in the body"
+    warn "    ${body:0:300}"
+    failed=1
+  fi
+}
+
+say ''
+say 'checking the shop answers (read-only)'
+expect '/api/v1/pages/home' 200 '首页装修' '"blocks"'
+expect '/api/v1/catalog/products?page=1&pageSize=1' 200 '商品列表' '"items"'
+# No cookie: the admin API must refuse in its own JSON, not an edge 404 or 502.
+expect '/admin-api/auth/me' 401 '后台接口' '"code":"UNAUTHENTICATED"'
+expect '/api/v1/readyz' 200 '就绪检查' '"status":"ok"'
+
+# Effects (the refund gateway call, notifications, WeChat shipping sync) are
+# sent after their transaction commits. An old one still due means the worker
+# is not keeping up; it is reported, not failed on, because a release that
+# just restarted the worker has a backlog for a minute.
+readyz="$(probe '/api/v1/readyz')"
+if [[ "$readyz" =~ \"effectsOldestDueSeconds\":([0-9]+) ]]; then
+  if [ "${BASH_REMATCH[1]}" -gt 300 ]; then
+    warn "  effects: the oldest one has been due ${BASH_REMATCH[1]}s; check \`deploy/ship.sh status\` and 后台 → 待处理任务"
+  else
+    say "  effects: oldest due ${BASH_REMATCH[1]}s"
+  fi
+else
+  say '  effects: none due'
+fi
+
 [ "$failed" -eq 0 ] || exit 5
 say ''
 say "shipped $sha"
