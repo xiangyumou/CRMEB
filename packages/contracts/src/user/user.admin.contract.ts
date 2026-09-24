@@ -4,6 +4,7 @@ import { defineRoute } from '../_conventions/route';
 import {
   adminUserBatchGroupBody,
   adminUserBatchLabelBody,
+  adminUserCreateBody,
   adminUserDetail,
   adminUserDetailExample,
   adminUserForm,
@@ -66,6 +67,32 @@ export const userAdminList = defineRoute({
         sortOrder: 'desc',
       },
       response: { items: [adminUserListItemExample], total: 1, page: 1, pageSize: 20 },
+    },
+  ],
+});
+
+export const userAdminCreate = defineRoute({
+  id: 'user.adminCreate',
+  method: 'POST',
+  path: '/admin-api/users',
+  auth: 'admin',
+  permission: 'user:customer:write',
+  summary: '新增用户',
+  tags: ['user'],
+  body: adminUserCreateBody,
+  response: adminUserDetail,
+  errors: ['USER_PHONE_TAKEN', 'USER_GROUP_NOT_FOUND', 'USER_LABEL_NOT_FOUND'],
+  examples: [
+    {
+      name: 'ok',
+      body: {
+        phone: '13800138000',
+        nickname: '小明',
+        adminRemark: '门店老客，电话下单',
+        groupIds: ['3'],
+        labelIds: [],
+      },
+      response: { ...adminUserDetailExample, registerSource: 'admin' },
     },
   ],
 });

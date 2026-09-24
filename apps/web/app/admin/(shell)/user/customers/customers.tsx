@@ -5,6 +5,7 @@ import { useState } from 'react';
 import {
   userAdminBatchSetGroups,
   userAdminBatchSetLabels,
+  userAdminCreate,
   userAdminDetail,
   userAdminList,
   userAdminResetPassword,
@@ -13,6 +14,7 @@ import {
 } from '@shop/contracts/user/user.admin.contract';
 import { userGroupList, userLabelList } from '@shop/contracts/user/user.taxonomy.contract';
 import {
+  adminUserCreateBody,
   adminUserForm,
   type AdminUserDetail,
   type AdminUserListItem,
@@ -59,6 +61,7 @@ export function CustomersPage() {
   const edit = useFormModal<AdminUserListItem, typeof userAdminDetail>({
     detail: { route: userAdminDetail, params: (row) => ({ id: row.id }), select: editValuesOf },
   });
+  const create = useFormModal<AdminUserListItem>();
   const [detailId, setDetailId] = useState<string | null>(null);
   const [resetting, setResetting] = useState<AdminUserListItem | null>(null);
 
@@ -82,10 +85,17 @@ export function CustomersPage() {
   const setLabels = useRouteMutation(userAdminBatchSetLabels, { invalidate: [userAdminList] });
 
   return (
-    <PageContainer subTitle="商城注册用户；列表里的手机号是打码的，完整号码在详情里">
+    <PageContainer subTitle="商城注册与后台录入的用户；列表里的手机号是打码的，完整号码在详情里">
       <CrudTable
         route={userAdminList}
         scrollX={1500}
+        toolbar={
+          <Can permission="user:customer:write">
+            <Button type="primary" onClick={() => create.show()}>
+              新增用户
+            </Button>
+          </Can>
+        }
         filters={[
           { kind: 'text', name: 'keyword', label: '账号/手机号/昵称' },
           { kind: 'select', name: 'status', label: '状态', options: statusOptions(USER_STATUS) },
@@ -259,6 +269,52 @@ export function CustomersPage() {
         toInput={(values) => ({ params: { id: edit.record?.id ?? '' }, body: values })}
         invalidate={[userAdminList]}
         successMessage="已保存"
+      />
+
+      <ModalForm
+        {...create.props}
+        title="新增用户"
+        schema={adminUserCreateBody}
+        columns={2}
+        fields={[
+          {
+            kind: 'text',
+            name: 'phone',
+            label: '手机号',
+            maxLength: 11,
+            help: '即登录账号；用户之后用这个手机号短信或微信登录，进的就是这个账号',
+          },
+          {
+            kind: 'password',
+            name: 'password',
+            label: '登录密码',
+            maxLength: 64,
+            help: '可不填：不填则只能短信或微信登录。至少 6 位，含两类字符',
+          },
+          { kind: 'text', name: 'nickname', label: '昵称', help: '不填则按手机号自动生成' },
+          { kind: 'text', name: 'realName', label: '真实姓名' },
+          { kind: 'date', name: 'birthday', label: '生日' },
+          {
+            kind: 'select',
+            name: 'groupIds',
+            label: '分组',
+            mode: 'multiple',
+            options: groupOptions,
+          },
+          {
+            kind: 'select',
+            name: 'labelIds',
+            label: '标签',
+            mode: 'multiple',
+            options: labelOptions,
+          },
+          { kind: 'textarea', name: 'adminRemark', label: '管理员备注', span: 24, rows: 2 },
+        ]}
+        route={userAdminCreate}
+        toInput={(values) => ({ body: values })}
+        invalidate={[userAdminList]}
+        successMessage="已新增用户"
+        okText="新增"
       />
 
       <ResetPasswordModal record={resetting} onClose={() => setResetting(null)} />

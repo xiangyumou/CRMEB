@@ -426,6 +426,18 @@ export const adminUserForm = z.object({
 });
 export type AdminUserForm = z.infer<typeof adminUserForm>;
 
+/**
+ * 新增用户: an operator opens an account for a customer who has not signed up
+ * themselves. The phone number is the login, as it is for a shopper who
+ * registers by SMS; the password is optional — without one the customer signs
+ * in with an SMS code or WeChat, bound to the same phone.
+ */
+export const adminUserCreateBody = adminUserForm.extend({
+  phone: phoneNumber,
+  password: z.string().min(6).max(64).optional(),
+});
+export type AdminUserCreateBody = z.infer<typeof adminUserCreateBody>;
+
 export const adminUserListQuery = pageQuery
   .extend({
     /** Matches account, phone, nickname or real name. */

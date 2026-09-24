@@ -1,4 +1,8 @@
-import type { AdminUserForm, UserAddressForm } from '@shop/contracts/user/schemas';
+import type {
+  AdminUserCreateBody,
+  AdminUserForm,
+  UserAddressForm,
+} from '@shop/contracts/user/schemas';
 import { admins } from '@shop/db/schema/auth';
 import { attachments } from '@shop/db/schema/storage';
 import { users } from '@shop/db/schema/user';
@@ -551,6 +555,65 @@ describe('admin edit', () => {
     await expect(
       admin.adminUpdate(asAdmin(), { id: String(user.id) }, form({ groupIds: ['999999'] })),
     ).rejects.toMatchObject({ code: 'USER_GROUP_NOT_FOUND' });
+  });
+});
+
+describe('admin create', () => {
+  const body = (overrides: Partial<AdminUserCreateBody> = {}): AdminUserCreateBody => ({
+    phone: '13900139000',
+    groupIds: [],
+    labelIds: [],
+    ...overrides,
+  });
+
+  it('opens an account whose login is the phone, marked 后台录入', async () => {
+    const vip = await admin.groupCreate(asAdmin(), { name: 'VIP', sortOrder: 0 });
+    const created = await admin.adminCreate(
+      asAdmin(),
+      body({ realName: '王五', adminRemark: '电话下单', groupIds: [vip.id] }),
+    );
+
+    expect(created).toMatchObject({
+      account: '13900139000',
+      phone: '13900139000',
+      realName: '王五',
+      adminRemark: '电话下单',
+      registerSource: 'admin',
+      status: 'active',
+    });
+    expect(created.nickname).toBeTruthy();
+    expect(created.groups.map((g) => g.id)).toEqual([vip.id]);
+    // No password given: SMS or WeChat only.
+    expect((await repo.findById(harness.ctx.db, Number(created.id)))!.passwordHash).toBeNull();
+  });
+
+  it('is the account an SMS login with that phone finds later', async () => {
+    const created = await admin.adminCreate(asAdmin(), body({ password: 'abc12345' }));
+    const found = await repo.findByPhone(harness.ctx.db, '13900139000');
+    expect(found!.id).toBe(Number(created.id));
+    expect(found!.passwordAlgo).toBe('bcrypt');
+  });
+
+  it('refuses a phone another account already holds, and writes nothing', async () => {
+    const taken = await makeUser();
+    await expect(admin.adminCreate(asAdmin(), body({ phone: taken.phone! }))).rejects.toMatchObject(
+      { code: 'USER_PHONE_TAKEN' },
+    );
+    expect(await harness.ctx.db.select().from(users)).toHaveLength(1);
+  });
+
+  it('rolls back the account when a group does not exist', async () => {
+    await expect(
+      admin.adminCreate(asAdmin(), body({ groupIds: ['999999'] })),
+    ).rejects.toMatchObject({ code: 'USER_GROUP_NOT_FOUND' });
+    expect(await repo.findByPhone(harness.ctx.db, '13900139000')).toBeNull();
+  });
+
+  it('rejects a weak password before writing anything', async () => {
+    await expect(admin.adminCreate(asAdmin(), body({ password: '123456' }))).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+    });
+    expect(await repo.findByPhone(harness.ctx.db, '13900139000')).toBeNull();
   });
 });
 

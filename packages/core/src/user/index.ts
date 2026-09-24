@@ -25,7 +25,7 @@ import { resetRiskyAvatar } from './user-avatar-check';
  * | `GET /api/v1/auth/wechat-oa/authorize-url` | `oaAuthorizeUrl` |
  * | `POST /api/v1/visits` | `recordVisit` |
  * | worker `user.pruneVisits` | `pruneVisits` — the page-view retention sweep |
- * | `/admin-api/users…` | `adminList` / `adminDetail` / `adminUpdate` / `adminSetStatus` / `adminResetPassword` / `adminAddressList` / `adminBatchSetGroups` / `adminBatchSetLabels` |
+ * | `/admin-api/users…` | `adminList` / `adminCreate` / `adminDetail` / `adminUpdate` / `adminSetStatus` / `adminResetPassword` / `adminAddressList` / `adminBatchSetGroups` / `adminBatchSetLabels` |
  * | `/admin-api/user-groups…`, `/admin-api/user-labels…`, `/admin-api/user-label-categories…` | the taxonomy CRUD below |
  * | `/admin-api/user-cancellations…` | `adminCancellationList` / `adminApproveCancellation` / `adminRejectCancellation` / `adminRemarkCancellation` |
  *
@@ -153,6 +153,7 @@ export {
   adminResetPassword,
   adminSetStatus,
   adminUpdate,
+  adminCreate,
   groupCreate,
   groupDelete,
   groupList,

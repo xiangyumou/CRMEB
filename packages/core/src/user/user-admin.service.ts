@@ -1,6 +1,7 @@
 import type {
   AdminUserBatchGroupBody,
   AdminUserBatchLabelBody,
+  AdminUserCreateBody,
   AdminUserDetail,
   AdminUserForm,
   AdminUserListItem,
@@ -27,6 +28,7 @@ import type { Tx } from '@shop/db';
 import type { SQL } from 'drizzle-orm';
 import { UserSessionService } from '../auth/user-session.service';
 import { hashPassword } from '../auth/password';
+import * as coupon from '../coupon';
 import { requireAdminId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId, toIdOrNull } from '../kernel/ids';
@@ -34,6 +36,7 @@ import { storefrontAuthConfig } from './storefront-auth.config';
 import {
   anonymisedAccount,
   checkPasswordShape,
+  defaultNickname,
   maskPhone,
   pageBounds,
   pickOrder,
@@ -97,6 +100,60 @@ export async function adminList(
     page: query.page,
     pageSize: query.pageSize,
   };
+}
+
+/**
+ * 新增用户.
+ *
+ * The account is the phone number, exactly as an SMS registration would make
+ * it, so when the customer later signs in by SMS or binds that phone in WeChat
+ * they land in this account rather than a second one. A phone that is already
+ * an account is refused — the unique index decides, not a prior `SELECT`. The
+ * row counts as a new customer (`register_source = 'admin'`) and gets the same
+ * welcome coupons, inside the same transaction.
+ */
+export async function adminCreate(ctx: Ctx, body: AdminUserCreateBody): Promise<AdminUserDetail> {
+  requireAdminId(ctx);
+  if (body.password !== undefined && checkPasswordShape(body.password) !== 'ok') {
+    throw new DomainError('VALIDATION_FAILED', {
+      details: [{ field: 'body.password', message: '密码至少 6 位，且需包含至少两类字符' }],
+    });
+  }
+  const passwordHash = body.password === undefined ? null : await hashPassword(body.password);
+  const groupIds = body.groupIds.map(fromId);
+  const labelIds = body.labelIds.map(fromId);
+
+  const id = await ctx.withTx(async (tx) => {
+    const now = ctx.clock.now();
+    await assertKnown(tx, groupIds, labelIds);
+    const inserted = await repo.insertUser(tx, {
+      account: body.phone,
+      phone: body.phone,
+      passwordHash,
+      passwordAlgo: passwordHash === null ? null : 'bcrypt',
+      nickname: body.nickname ?? defaultNickname(body.phone),
+      avatarUrl: null,
+      registerSource: 'admin',
+      registerIp: null,
+      now,
+    });
+    if (!inserted) throw new DomainError('USER_PHONE_TAKEN');
+
+    // What `insertUser` does not take goes on in the same transaction.
+    await repo.updateProfile(tx, {
+      id: inserted.id,
+      realName: body.realName,
+      adminRemark: body.adminRemark,
+      birthday: body.birthday ? new Date(body.birthday) : undefined,
+      now,
+    });
+    await repo.addGroupMemberships(tx, { userIds: [inserted.id], groupIds, now });
+    await repo.addLabelMemberships(tx, { userIds: [inserted.id], labelIds, now });
+    await coupon.grantNewUser(tx, ctx, inserted.id);
+    return inserted.id;
+  });
+  ctx.logger.info({ userId: id, by: ctx.actor.id }, '管理员新增了用户');
+  return loadDetail(ctx, id);
 }
 
 export async function adminDetail(ctx: Ctx, params: { id: string }): Promise<AdminUserDetail> {

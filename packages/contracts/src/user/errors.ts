@@ -13,6 +13,8 @@ import { defineErrors } from '../_conventions/errors';
 export const userErrors = defineErrors({
   /** The customer does not exist, or an operator named an id that was cancelled. */
   USER_NOT_FOUND: { status: 404, message: '用户不存在' },
+  /** 新增用户 with a phone number another account already holds. */
+  USER_PHONE_TAKEN: { status: 409, message: '该手机号已注册' },
   /** Account disabled by an operator. Also raised when a live session's user is disabled. */
   USER_DISABLED: { status: 403, message: '账号已被禁用，请联系客服' },
   /**

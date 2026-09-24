@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   userAdminBatchSetGroups,
   userAdminBatchSetLabels,
+  userAdminCreate,
   userAdminDetail,
   userAdminList,
   userAdminResetPassword,
@@ -91,6 +92,7 @@ function stubApi(): StubCall[] {
     on(userAdminList, { items: [row], total: 1, page: 1, pageSize: 20 }),
     on(userAdminDetail, detail),
     on(userAdminUpdate, detail),
+    on(userAdminCreate, { ...detail, registerSource: 'admin' }),
     on(userAdminSetStatus, { ...detail, status: 'disabled' }),
     on(userAdminResetPassword, { ok: true, revokedSessions: 2 }),
     on(userAdminBatchSetGroups, { affected: 1 }),
@@ -139,6 +141,39 @@ describe('用户列表', () => {
     expect(screen.getByRole('button', { name: '编辑' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '禁用' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '重置密码' })).not.toBeInTheDocument();
+  });
+
+  it('新增用户 posts the phone, and leaves out a password nobody typed', async () => {
+    const calls = stubApi();
+    renderAdmin(<CustomersPage />, { identity: allPermissions });
+    await screen.findByText('小明');
+
+    await userEvent.click(screen.getByRole('button', { name: '新增用户' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('手机号'), '13900139000');
+    await userEvent.type(within(dialog).getByLabelText('真实姓名'), '王五');
+    await userEvent.click(within(dialog).getByRole('button', { name: '新 增' }));
+
+    await waitFor(() => {
+      const create = calls.find(
+        (call) => call.method === 'POST' && call.url.endsWith('/admin-api/users'),
+      );
+      expect(create?.body).toEqual({
+        phone: '13900139000',
+        realName: '王五',
+        groupIds: [],
+        labelIds: [],
+      });
+    });
+  });
+
+  it('hides 新增用户 from an operator who may only read', async () => {
+    stubApi();
+    renderAdmin(<CustomersPage />, {
+      identity: { ...testIdentity, permissions: ['user:customer:read'] },
+    });
+    await screen.findByText('小明');
+    expect(screen.queryByRole('button', { name: '新增用户' })).not.toBeInTheDocument();
   });
 
   it('disables through the status sub-resource, not the edit form', async () => {
