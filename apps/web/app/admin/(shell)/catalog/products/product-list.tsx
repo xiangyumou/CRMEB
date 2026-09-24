@@ -355,8 +355,14 @@ function ExportButton({
   );
 }
 
+/**
+ * Always quoted. A leading `=`, `+`, `-` or `@` gets a `'` first so a
+ * spreadsheet shows a product called `=HYPERLINK(…)` as text instead of
+ * running it.
+ */
 function csvCell(value: string): string {
-  return `"${value.replaceAll('"', '""')}"`;
+  const guarded = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  return `"${guarded.replaceAll('"', '""')}"`;
 }
 
 function downloadCsv(result: ProductExportResult): void {

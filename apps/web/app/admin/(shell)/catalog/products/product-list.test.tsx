@@ -68,8 +68,11 @@ const exportPayload: ProductExportResult = {
     { key: 'id', title: 'ID' },
     { key: 'name', title: '商品名称' },
   ],
-  rows: [{ id: '1', name: '简约白 T 恤' }],
-  total: 1,
+  rows: [
+    { id: '1', name: '简约白 T 恤' },
+    { id: '2', name: '=HYPERLINK("https://evil.example","点我")' },
+  ],
+  total: 2,
   truncated: false,
 };
 
@@ -167,12 +170,19 @@ describe('商品列表', () => {
   });
 
   it('exports the current tab as a CSV the browser writes', async () => {
-    const createObjectURL = vi.fn(() => 'blob:stub');
+    const blobs: Blob[] = [];
+    const createObjectURL = vi.fn((blob: Blob) => {
+      blobs.push(blob);
+      return 'blob:stub';
+    });
     const revokeObjectURL = vi.fn();
     vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
-    const click = vi
-      .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(() => undefined);
+    const saved: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      saved.push(this.download);
+    });
 
     const calls = stubApi();
     renderAdmin(<ProductListPage />, { identity: allPermissions });
@@ -188,6 +198,13 @@ describe('商品列表', () => {
     // The rows arrive as JSON and become a file here, not on the server.
     await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
     expect(click).toHaveBeenCalled();
+    expect(saved).toEqual(['商品列表.csv']);
+    // BOM first so Excel reads UTF-8; a formula-looking name is written as text.
+    expect(await blobs[0]!.text()).toBe(
+      '\uFEFF"ID","商品名称"\r\n' +
+        '"1","简约白 T 恤"\r\n' +
+        '"2","\'=HYPERLINK(""https://evil.example"",""点我"")"',
+    );
     vi.unstubAllGlobals();
   });
 });

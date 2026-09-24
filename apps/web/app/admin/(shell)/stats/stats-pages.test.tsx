@@ -90,14 +90,21 @@ describe('交易统计', () => {
   });
 
   it('turns the CSV envelope into a download', async () => {
-    const createObjectURL = vi.fn(() => 'blob:stub');
+    const blobs: Blob[] = [];
+    const createObjectURL = vi.fn((blob: Blob) => {
+      blobs.push(blob);
+      return 'blob:stub';
+    });
     const revokeObjectURL = vi.fn();
     vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
     // happy-dom treats an anchor click as a navigation and reaches for the
     // real `URL` constructor, which the stub above has replaced.
-    const click = vi
-      .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(() => undefined);
+    const saved: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      saved.push(this.download);
+    });
     const calls = stubApi();
 
     renderAdmin(<TradeStatsPage />, {
@@ -111,6 +118,10 @@ describe('交易统计', () => {
       expect(createObjectURL).toHaveBeenCalled();
     });
     expect(click).toHaveBeenCalled();
+    // The server's CSV, byte for byte, under the server's filename; only the
+    // BOM is added here, so Excel reads it as UTF-8.
+    expect(saved).toEqual([statsExportExample.filename]);
+    expect(await blobs[0]!.text()).toBe(`\uFEFF${statsExportExample.content}`);
     vi.unstubAllGlobals();
   });
 });
