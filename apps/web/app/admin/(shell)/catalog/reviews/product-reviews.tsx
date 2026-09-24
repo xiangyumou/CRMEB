@@ -29,6 +29,8 @@ const MODERATION_REASON: Record<string, string> = {
   sec_check_risky: '微信内容安全：疑似违规',
   sec_check_review: '微信内容安全：建议人工审核',
   sec_check_unavailable: '内容安全检测暂不可用',
+  sec_check_unchecked: '非小程序账号，未经内容安全检测',
+  sec_check_image_unchecked: '图片未经内容安全检测',
 };
 
 /**

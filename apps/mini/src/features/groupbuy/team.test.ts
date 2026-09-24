@@ -26,7 +26,7 @@ function view(patch: Partial<TeamView> = {}): TeamView {
     seatsLeft: 1,
     expiresAt: LATER,
     succeededAt: null,
-    members: [{ userId: '1', nickname: '甲', avatarUrl: null, role: 'leader' }],
+    members: [{ nickname: '甲', avatarUrl: null, role: 'leader', isMe: false }],
     me: null,
     canJoin: true,
     ...patch,

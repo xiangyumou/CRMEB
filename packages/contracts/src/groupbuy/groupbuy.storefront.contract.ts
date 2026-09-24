@@ -171,7 +171,12 @@ export const groupbuyGroupDetailRoute = defineRoute({
     {
       name: 'anonymous-can-join',
       params: { id: '501' },
-      response: { ...groupbuyGroupViewExample, me: null, canJoin: true },
+      response: {
+        ...groupbuyGroupViewExample,
+        members: groupbuyGroupViewExample.members.map((member) => ({ ...member, isMe: false })),
+        me: null,
+        canJoin: true,
+      },
     },
   ],
 });

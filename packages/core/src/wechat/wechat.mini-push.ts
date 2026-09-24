@@ -28,7 +28,11 @@ import {
  *    written. The token and the AES key never reach a log line.
  * 2. **Fresh and single-use.** The triple is good for five minutes and for one
  *    body (the OA callback's rule 1a, for the same reason: it sits in every
- *    access log).
+ *    access log). In 明文/兼容模式 that one-body rule is the only thing tying
+ *    the signature to the body, so when the nonce store (Redis) is down the
+ *    delivery is refused with a 503 and WeChat retries it later (WXSHIP-008);
+ *    in 安全模式 the signature covers the encrypted body itself and a
+ *    delivery is still taken.
  * 3. **Decrypt**, with the appid inside the envelope checked against ours.
  * 4. **Record, don't act.** A known event becomes one effects-ledger row keyed
  *    by the SHA-256 of the decrypted message, in its own transaction, and the
@@ -66,6 +70,8 @@ export interface MiniPushResult {
 
 const OK: MiniPushResult = { status: 200, body: 'success' };
 const FORBIDDEN: MiniPushResult = { status: 403, body: 'invalid signature' };
+/** Anything but `success` makes WeChat deliver again later. */
+const UNAVAILABLE: MiniPushResult = { status: 503, body: 'try again later' };
 
 /** How far a push's `timestamp` may be from our clock, either way. */
 export const MINI_PUSH_FRESHNESS_SECONDS = 300;
@@ -156,7 +162,8 @@ export async function handleMiniPush(ctx: Ctx, req: MiniPushRequest): Promise<Mi
       ctx.logger.warn({}, 'mini push: bad message signature');
       return FORBIDDEN;
     }
-    if (!(await spendTriple(ctx, { timestamp, nonce, body: req.body }))) return FORBIDDEN;
+    const refused = await admitTriple(ctx, creds.mode, { timestamp, nonce, body: req.body });
+    if (refused) return refused;
     try {
       plain = decryptMessage({
         encodingAesKey: creds.aesKey,
@@ -179,7 +186,8 @@ export async function handleMiniPush(ctx: Ctx, req: MiniPushRequest): Promise<Mi
       ctx.logger.warn({}, 'mini push: bad signature');
       return FORBIDDEN;
     }
-    if (!(await spendTriple(ctx, { timestamp, nonce, body: req.body }))) return FORBIDDEN;
+    const refused = await admitTriple(ctx, creds.mode, { timestamp, nonce, body: req.body });
+    if (refused) return refused;
     plain = req.body;
   }
 
@@ -234,25 +242,49 @@ function isFresh(ctx: Ctx, timestamp: string): boolean {
 }
 
 /**
- * `true` for the first body seen under `(timestamp, nonce)` and for a
- * byte-identical re-delivery of it; `false` for a stale triple or another body.
- * Redis down lets it through: the freshness window still holds, and the
- * ledger's unique key still deduplicates.
+ * `spent` for the first body seen under `(timestamp, nonce)` and for a
+ * byte-identical re-delivery of it; `refused` for a stale triple or another
+ * body; `store-down` when Redis could not answer.
  */
 async function spendTriple(
   ctx: Ctx,
   args: { timestamp: string; nonce: string; body: string },
-): Promise<boolean> {
-  if (!isFresh(ctx, args.timestamp)) return false;
+): Promise<'spent' | 'refused' | 'store-down'> {
+  if (!isFresh(ctx, args.timestamp)) return 'refused';
   const key = `wechat-mini:nonce:${args.nonce}:${args.timestamp}`;
   const digest = createHash('sha256').update(args.body).digest('hex');
   try {
-    if ((await ctx.redis.set(key, digest, 'EX', NONCE_TTL_SECONDS, 'NX')) === 'OK') return true;
-    if ((await ctx.redis.get(key)) === digest) return true;
+    if ((await ctx.redis.set(key, digest, 'EX', NONCE_TTL_SECONDS, 'NX')) === 'OK') return 'spent';
+    if ((await ctx.redis.get(key)) === digest) return 'spent';
     ctx.logger.warn({}, 'mini push: a spent signature triple was reused for another body');
-    return false;
+    return 'refused';
   } catch (error) {
     ctx.logger.warn({ err: error }, 'mini push nonce store unavailable');
-    return true;
+    return 'store-down';
   }
+}
+
+/**
+ * `null` when the delivery may go on; otherwise the answer to give.
+ *
+ * With the nonce store down (WXSHIP-008): in 安全模式 the delivery is taken —
+ * `msg_signature` covers the encrypted body, so a leaked URL cannot carry
+ * another message, the freshness window still holds and the ledger's unique
+ * key still deduplicates. In 明文/兼容模式 the signature covers only
+ * `(token, timestamp, nonce)`: a signed URL from an access log could carry any
+ * body for five minutes — a forged `trade_manage_order_settlement` would mark
+ * an order received — so the delivery is refused with a 503 and WeChat, which
+ * re-delivers anything not answered `success`, tries again once Redis is back.
+ */
+async function admitTriple(
+  ctx: Ctx,
+  mode: 'plain' | 'compatible' | 'safe',
+  args: { timestamp: string; nonce: string; body: string },
+): Promise<MiniPushResult | null> {
+  const outcome = await spendTriple(ctx, args);
+  if (outcome === 'spent') return null;
+  if (outcome === 'refused') return FORBIDDEN;
+  if (mode === 'safe') return null;
+  ctx.logger.warn({ mode }, 'mini push refused: no nonce store to bind the signature to the body');
+  return UNAVAILABLE;
 }

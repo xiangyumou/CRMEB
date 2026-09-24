@@ -800,7 +800,8 @@ export const adminProductReview = z.object({
   status: productReviewStatus,
   /**
    * Why it waits in 待审核, when the reason is WeChat's 内容安全 (C09):
-   * `sec_check_risky`, `sec_check_review`, `sec_check_unavailable`; else `null`.
+   * `sec_check_risky`, `sec_check_review`, `sec_check_unavailable`,
+   * `sec_check_unchecked`, `sec_check_image_unchecked`; else `null`.
    */
   moderationReason: z.string().nullable(),
   replyContent: z.string().nullable(),

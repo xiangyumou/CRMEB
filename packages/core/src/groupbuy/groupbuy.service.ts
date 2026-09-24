@@ -38,6 +38,7 @@ import {
   assertWithdrawable,
   isActivityOpen,
   isGroupJoinable,
+  maskNickname,
   seatsLeft,
   wasVirtuallyFilled,
 } from './groupbuy.rules';
@@ -510,7 +511,8 @@ export async function openGroups(
   return {
     items: rows.map((row) => ({
       groupId: toId(row.id),
-      leaderNickname: row.leaderNickname,
+      // Public route: a stranger's name stays masked (RISK-D-010).
+      leaderNickname: maskNickname(row.leaderNickname),
       leaderAvatarUrl: row.leaderAvatarUrl,
       seatsTotal: row.seatsTotal,
       seatsTaken: row.seatsTaken,
@@ -605,7 +607,9 @@ export async function poster(ctx: Ctx, input: { id: string }): Promise<GroupbuyP
     originalPrice: row.activityOriginalPrice,
     seatsLeft: seatsLeft(row),
     expiresAt: row.expiresAt.toISOString(),
-    leaderNickname: row.leaderNickname,
+    // Masked for everybody, the leader included: a poster is made to be passed
+    // on, and any signed-in shopper may ask for any team's (RISK-D-010).
+    leaderNickname: maskNickname(row.leaderNickname),
     leaderAvatarUrl: row.leaderAvatarUrl,
     qrPayload: page,
     page,
@@ -641,12 +645,15 @@ async function buildGroupView(ctx: Ctx, groupId: number): Promise<GroupbuyGroupV
     expiresAt: row.expiresAt.toISOString(),
     succeededAt: row.succeededAt?.toISOString() ?? null,
     // Paid and unrefunded only: an unpaid order is not a participant, and
-    // showing one would be a "phantom member" in the participant list.
+    // showing one would be a "phantom member" in the participant list. Anybody
+    // with the link reads this, so no account id and a masked name; "is this
+    // seat mine" comes from the session, never from an id the client compares
+    // (RISK-D-010).
     members: paid.map((member) => ({
-      userId: toId(member.userId),
-      nickname: member.nickname,
+      nickname: maskNickname(member.nickname),
       avatarUrl: member.avatarUrl,
       role: member.role,
+      isMe: userId !== null && member.userId === userId,
     })),
     me:
       mine === null

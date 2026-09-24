@@ -617,9 +617,11 @@ export const productReviews = pgTable(
     status: productReviewsStatus().notNull().default('published'),
     /**
      * Why a shopper's review is waiting in 待审核 rather than published, when
-     * the reason is 内容安全 (C09): `sec_check_risky`, `sec_check_review` or
-     * `sec_check_unavailable`. `null` for everything else, including a review
-     * held back only because 评价需审核 is on.
+     * the reason is 内容安全 (C09): `sec_check_risky`, `sec_check_review`,
+     * `sec_check_unavailable`, `sec_check_unchecked` (author has no mini-program
+     * openid) or `sec_check_image_unchecked` (a picture WeChat could not check).
+     * `null` for everything else, including a review held back only because
+     * 评价需审核 is on.
      */
     moderationReason: varchar({ length: 32 }),
     replyContent: varchar({ length: 500 }),

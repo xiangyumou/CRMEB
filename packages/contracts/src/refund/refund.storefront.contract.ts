@@ -91,6 +91,7 @@ export const refundApply = defineRoute({
     'REFUND_AMOUNT_ZERO',
     'REFUND_FREIGHT_NOT_REFUNDABLE',
     'REFUND_NO_ORIGINAL_PAYMENT',
+    'REFUND_IMAGE_NOT_ALLOWED',
   ],
   examples: [
     {

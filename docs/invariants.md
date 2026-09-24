@@ -956,13 +956,22 @@ WeChat's shipping reminder and its 已纳入发货信息管理 notice reach oper
 - `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > says so when the mini program is not configured, and when WeChat refuses — WXSHIP-007`
 - `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > is an admin’s, not a shopper’s — WXSHIP-007`
 
+### WXSHIP-008
+
+The push URL never takes a delivery it cannot bind to its body (decided 2026-09-24). In 明文模式 and 兼容模式 the signature covers only `(token, timestamp, nonce)`, so the single-use triple in Redis is what stops a signed URL from an access log carrying a forged body (a `trade_manage_order_settlement` would mark an order received); with Redis unavailable such a delivery — plaintext or encrypted — is answered 503, not `success`, nothing is recorded, and WeChat re-delivers it later. In 安全模式 `msg_signature` covers the encrypted body, and a delivery is still taken with Redis down.
+
+- `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > refuses a plaintext push in 明文模式 with a retryable 503, and records nothing`
+- `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > refuses in 兼容模式 too, a plaintext and an encrypted delivery alike`
+- `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > still takes an encrypted push in 安全模式, where the signature covers the body`
+- `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > takes a plaintext push in 明文模式 while the store is up, and refuses the triple for another body`
+
 ## 内容安全 (WeChat content security)
 
 The policy table and the reasons are in `docs/mini/wechat-compliance.md` C09 and at the top of `packages/core/src/wechat/wechat.sec-check.ts`.
 
 ### CONTENT-001
 
-Review text a customer submits is checked by WeChat's `msgSecCheck` (scene 2, the author's mini-program openid) before it is saved, and is **never refused** for what it says: `risky`, `review`, or no answer at all (an errcode, or the call never arriving) saves it 待审核 with the reason in `moderation_reason`, and the answer is `moderation: 'pending'`, not an error. A held review is not public until an admin publishes it through 评价管理, and an admin may delete it instead. A `pass` publishes as configured. An account without a mini-program identity, or any account while 内容安全 is off, is not checked.
+Review text a customer submits is checked by WeChat's `msgSecCheck` (scene 2, the author's mini-program openid) before it is saved, and is **never refused** for what it says: `risky`, `review`, or no answer at all (an errcode, or the call never arriving) saves it 待审核 with the reason in `moderation_reason`, and the answer is `moderation: 'pending'`, not an error. A held review is not public until an admin publishes it through 评价管理, and an admin may delete it instead. A `pass` publishes as configured. Nothing is checked while 内容安全 is off or the mini program has no AppID/AppSecret; with both on, an account WeChat cannot check under is held (CONTENT-006).
 
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > publishes a review WeChat passes, checked as a comment for the author — CONTENT-001`
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > saves a risky review 待审核 with a neutral answer, not an error — CONTENT-001`
@@ -971,7 +980,7 @@ Review text a customer submits is checked by WeChat's `msgSecCheck` (scene 2, th
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > holds the review when the call never arrives — CONTENT-001`
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > publishes a held review once an admin approves it — CONTENT-001`
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > lets an admin delete a held review — CONTENT-001`
-- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > does not check an account without a mini-program identity, or while switched off — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > does not check anything while switched off, or with no mini program to check with — CONTENT-001`
 - `e2e/storefront/specs-mini/reviews.spec.ts::CONTENT-001: a review the content check holds is shown on the product only once the merchant publishes it`
 
 ### CONTENT-002
@@ -990,7 +999,7 @@ An invoice-title name — in the 抬头 book (create and update) and on an order
 
 ### CONTENT-004
 
-Every distinct review picture is submitted to `mediaCheckAsync` (scene 2) after the review commits, through the ledger, as an absolute https address. A `risky` `wxa_media_check` verdict takes that picture off the review and nothing else; the verdict is stored with a conditional update on `submitted`, so a repeated or concurrent push acts once. A `pass` keeps the picture. A submission WeChat refuses is retried and the picture stays visible meanwhile; an account without a mini-program identity is `skipped`.
+Every distinct review picture is submitted to `mediaCheckAsync` (scene 2) after the review commits, through the ledger, as an absolute https address. A `risky` `wxa_media_check` verdict takes that picture off the review and nothing else; the verdict is stored with a conditional update on `submitted`, so a repeated or concurrent push acts once. A `pass` keeps the picture. A submission WeChat refuses is retried and the picture stays visible meanwhile; an account without a mini-program identity is `skipped` (and its review held, CONTENT-006).
 
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > sends each review picture once, as an absolute https address — CONTENT-004`
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > takes a risky picture off the review, and a repeated verdict does nothing more — CONTENT-004`
@@ -1006,6 +1015,15 @@ A newly stored avatar (not the current one, not the default) is submitted to `me
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > resets a risky avatar and tells the customer — CONTENT-005`
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > leaves an avatar the customer has since replaced — CONTENT-005`
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > does not check an avatar that did not change — CONTENT-005`
+
+### CONTENT-006
+
+"Not checked" is not "passed" (decided 2026-09-24). While 内容安全 is on and the mini program is configured, a review that WeChat cannot check waits in 待审核 instead of going live: review text from an account with no mini-program openid (an H5 account, or an SMS / password session from any HTTP client) is saved `pending` with `sec_check_unchecked`, and a published review one of whose pictures ends `skipped` — no openid, WeChat's 61010 "not opened lately", or no public https address to submit — goes back to `pending` with `sec_check_image_unchecked`, in the transaction that marks the check skipped. A review that already carries a moderation reason (held for its text, or held and then approved by an admin) is left as it is, and a redelivered effect moves nothing.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > holds a review from an account WeChat cannot check under, rather than publishing it unread — CONTENT-006`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > sends a published review back to 待审核 when WeChat will not check its picture (61010) — CONTENT-006`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > holds the review when the shop has no https address to show WeChat the picture at — CONTENT-006`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > leaves a review an admin already approved when its picture turns out uncheckable — CONTENT-006`
 
 ## Refunds
 
@@ -1100,6 +1118,13 @@ It settles through the same path an approved request does — one capital-flow r
 
 - `packages/core/src/refund/refund.system.int.test.ts::a refund the shop opens by itself > settles through the same path an approved request does`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the system refund for a failed team > gives every paid member exactly one refund, however many sweeps run`
+
+### REFUND-014
+
+A shopper's after-sale evidence photos must each be a live image our own storage holds — what `POST /api/v1/uploads` returned, or a library image — the same rule as a review picture (CAT-018) and the avatar (USER-019). A link to another server, or our path shape for a file we never stored, is refused with `REFUND_IMAGE_NOT_ALLOWED` before the order is locked, so no request is opened and nothing is recorded: the photos are shown only to the shopper and the merchant, but a foreign one would hand its server the IP and browser of every admin who opens the request.
+
+- `packages/core/src/refund/refund.int.test.ts::REFUND-014 — evidence photos come from our own storage > takes a photo our uploads stored`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-014 — evidence photos come from our own storage > refuses a link to somebody else’s server, and opens no request`
 
 ## Registration and notifications
 
@@ -1383,6 +1408,16 @@ The 拼团价 is what a group-buy order charges, and an ordinary order for the s
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > leaves the same SKU at its ordinary price on an ordinary order`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > prices a shopper joining an open team the same way`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::beforeCreate > refuses an order whose draft is not at the activity price`
+
+### RISK-D-010
+
+A team shows strangers only a masked nickname and never an account id (decided 2026-09-24: in this shop a team says who bought what). `groupbuy.groupDetail` (anybody with the link, signed in or not), `groupbuy.openGroups` (public) and `groupbuy.poster` answer each nickname as its first character and one star (`小明明` → `小*`), counting whole graphemes so an emoji is never split; a one-character name is all star and a blank one is `null`. Avatars stay. A member row carries no `userId`; whether a seat is the caller's own is `isMe`, computed on the server from the session.
+
+- `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > keeps the first character and one star, whatever the length`
+- `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > keeps a whole emoji rather than half a surrogate pair`
+- `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > stars out a one-character name entirely`
+- `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > answers null for no name at all`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the storefront surface > RISK-D-010 — shows a team to anybody with masked names, no account ids, and isMe from the session`
 
 ## 页面装修 (DIY)
 

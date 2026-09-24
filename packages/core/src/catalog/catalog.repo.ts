@@ -2006,6 +2006,30 @@ export async function removeReviewImage(
   return rows.length > 0;
 }
 
+/**
+ * `published`/`pending` → `pending` with a moderation reason, for a review that
+ * has none yet (CONTENT-006). A reason already recorded means a person has
+ * looked or will, so that row is left alone; a hidden or deleted review too.
+ */
+export async function holdReview(
+  tx: Tx,
+  args: { id: number; reason: string; now: Date },
+): Promise<boolean> {
+  const rows = await tx
+    .update(productReviews)
+    .set({ status: 'pending', moderationReason: args.reason, updatedAt: args.now })
+    .where(
+      and(
+        eq(productReviews.id, args.id),
+        inArray(productReviews.status, ['published', 'pending']),
+        isNull(productReviews.moderationReason),
+        isNull(productReviews.deletedAt),
+      ),
+    )
+    .returning({ id: productReviews.id });
+  return rows.length > 0;
+}
+
 export interface ReviewListFilter {
   productId?: number | undefined;
   userId?: number | undefined;

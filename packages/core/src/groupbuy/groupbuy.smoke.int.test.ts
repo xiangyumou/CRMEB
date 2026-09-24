@@ -226,7 +226,7 @@ describe('SMOKE-009 — the group-buy poster, offline', () => {
       price: '59.00',
       originalPrice: '88.00',
       seatsLeft: 2,
-      leaderNickname: '小明',
+      leaderNickname: '小*',
     });
     expect(poster.leaderAvatarUrl).toMatch(/^https:\/\/example\.test\/u\/\d+\.png$/);
     // The QR code is a string the client encodes, not an image anybody fetched.

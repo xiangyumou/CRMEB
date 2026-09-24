@@ -54,7 +54,7 @@
 			<div class="teamBnt bg-color-red" v-if="pinkBool === 1 || pinkBool === -1"
 				@click="goDetail(storeCombination.id)">{{$t(`再次开团`)}}</div>
 			<div class="cancel" @click="getCombinationRemove"
-				v-if="pinkBool === 0 && userBool === 1 && pinkT.uid == userInfo.uid">
+				v-if="pinkBool === 0 && userBool === 1 && pinkT.isMine">
 				<span class="iconfont icon-guanbi3"></span>
 				{{$t(`取消开团`)}}
 			</div>

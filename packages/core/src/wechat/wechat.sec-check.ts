@@ -22,6 +22,10 @@ import * as checks from './wechat.sec-check.repo';
  * | nickname                        | `msgSecCheck` scene 1, sync    | saved   | saved      | `USER_NICKNAME_REJECTED` | saved (fail-open)     |
  * | invoice-title name (book, order) | `msgSecCheck` scene 1, sync   | saved   | saved      | `…_TITLE_REJECTED`      | saved (fail-open)      |
  * | review picture                  | `mediaCheckAsync` scene 2, async | kept  | kept       | taken off the review    | kept; the ledger retries |
+ *
+ * A review that *cannot* be checked while the check is on — an account with no
+ * mini-program openid, or a picture WeChat will not take (61010, no https
+ * address) — is held in 待审核 too (CONTENT-006): "not checked" is not "passed".
  * | avatar                          | `mediaCheckAsync` scene 1, async | kept  | kept       | reset, and the user told | kept; the ledger retries |
  *
  * Why review text is never refused (the shop owner's decision, 2026-09-23):
@@ -32,13 +36,15 @@ import * as checks from './wechat.sec-check.repo';
  * review. The same reasoning makes "WeChat did not answer" a hold rather than
  * a pass: nothing unreviewed goes live because a call failed.
  *
- * Nicknames and invoice titles fail **open**: neither is shown to other
- * shoppers (an invoice title reaches only the merchant and the tax office; a
- * review freezes no nickname), WeChat's own `type="nickname"` input has
- * already screened a nickname typed in the mini program, and refusing a
- * profile save or an invoice because WeChat is down punishes the customer for
- * our dependency. `risky` is still refused — that is the rule the platform
- * enforces.
+ * Nicknames and invoice titles fail **open**. An invoice title reaches only
+ * the merchant and the tax office. A nickname *is* shown to other shoppers —
+ * on a group-buy team, its activity page and its poster — but only masked to
+ * its first character (`小*`, RISK-D-010), and a review freezes no nickname.
+ * WeChat's own `type="nickname"` input has already screened a nickname typed
+ * in the mini program, and refusing a profile save or an invoice because
+ * WeChat is down punishes the customer for our dependency (the owner kept
+ * fail-open on 2026-09-24). `risky` is still refused — that is the rule the
+ * platform enforces.
  *
  * Pictures are public the moment they are saved, so their check is after the
  * fact by nature (WeChat answers by push, up to 30 minutes later). Unavailable
@@ -48,10 +54,14 @@ import * as checks from './wechat.sec-check.repo';
  * ## Who is checked
  *
  * WeChat checks content *for an openid* of the mini program — one that visited
- * in the last two hours. So only an account with a mini-program identity is
- * checked; an H5 or 公众号-only account is `skipped` (logged, never an error),
- * as is everything while the `content-security` switch is off or the mini
- * program has no AppID/AppSecret. Text is never logged, only the verdict.
+ * in the last two hours. So only an account with a mini-program identity can
+ * be checked. Everything is `skipped` (logged, never an error) while the
+ * `content-security` switch is off or the mini program has no AppID/AppSecret.
+ * With both on, an account with no mini-program identity (an H5 account, or a
+ * session opened by SMS or password from an HTTP client) is `unchecked`, not
+ * `skipped`: a caller that fails safe treats it like `unavailable`, so review
+ * text from such an account waits in 待审核 (CONTENT-006) instead of going live
+ * unread. Text is never logged, only the verdict.
  *
  * ## Pictures, end to end
  *
@@ -176,20 +186,24 @@ export function wechatContentSecurityDriver(ctx: Ctx): ContentSecurityPort {
 // who is checked
 // ---------------------------------------------------------------------------
 
-/** The mini-program openid to check under, or why there is none. */
+/**
+ * The mini-program openid to check under, or why there is none: `skipped` when
+ * the shop has the check off (or no mini program to check with), `unchecked`
+ * when the check is on but this account cannot be checked (CONTENT-006).
+ */
 async function checkIdentity(
   ctx: Ctx,
   userId: number | null,
-): Promise<{ openid: string } | { skipped: string }> {
+): Promise<{ openid: string } | { skipped: string } | { unchecked: string }> {
   const { enabled } = await ctx.config.get(contentSecurityConfig);
   if (!enabled) return { skipped: 'disabled' };
   const wechat = await ctx.config.get(wechatConfig);
   if (wechat.miniAppId.trim() === '' || wechat.miniAppSecret.trim() === '') {
     return { skipped: 'mini-not-configured' };
   }
-  if (userId === null) return { skipped: 'no-user' };
+  if (userId === null) return { unchecked: 'no-user' };
   const openid = await findOpenid(ctx.db, userId, 'mini');
-  return openid ? { openid } : { skipped: 'no-mini-openid' };
+  return openid ? { openid } : { unchecked: 'no-mini-openid' };
 }
 
 // ---------------------------------------------------------------------------
@@ -198,10 +212,12 @@ async function checkIdentity(
 
 /**
  * `pass` / `review` / `risky` — WeChat's answer; `unavailable` — it gave none
- * (transport failure or an `errcode`); `skipped` — not checked (see "Who is
- * checked"). What each means is the caller's policy, per the table above.
+ * (transport failure or an `errcode`); `unchecked` — the check is on but this
+ * account has no mini-program identity to check under; `skipped` — the check
+ * is off (see "Who is checked"). What each means is the caller's policy, per
+ * the table above: a fail-safe caller holds on `unchecked` as on `unavailable`.
  */
-export type TextVerdict = SecCheckSuggest | 'unavailable' | 'skipped';
+export type TextVerdict = SecCheckSuggest | 'unavailable' | 'unchecked' | 'skipped';
 
 /**
  * Checks one piece of text **outside** any transaction (it is an HTTP call),
@@ -216,6 +232,10 @@ export async function checkText(
   if ('skipped' in identity) {
     ctx.logger.info({ what: input.what, reason: identity.skipped }, 'sec check skipped');
     return 'skipped';
+  }
+  if ('unchecked' in identity) {
+    ctx.logger.info({ what: input.what, reason: identity.unchecked }, 'sec check impossible');
+    return 'unchecked';
   }
   try {
     const answer = await contentSecurityPort(ctx).msgSecCheck({
@@ -270,6 +290,23 @@ export function registerMediaRiskHandler(subject: MediaSubject, handler: MediaRi
 }
 
 /**
+ * What the owning domain does with a picture that **cannot** be checked while
+ * the check is on (CONTENT-006), inside the transaction that marks the check
+ * `skipped`. Same shape as `MediaRiskHandler`; returns what it did
+ * (`review_held`, or `none`).
+ */
+export type MediaUncheckedHandler = MediaRiskHandler;
+
+const uncheckedHandlers = new Map<MediaSubject, MediaUncheckedHandler>();
+
+export function registerMediaUncheckedHandler(
+  subject: MediaSubject,
+  handler: MediaUncheckedHandler,
+): void {
+  uncheckedHandlers.set(subject, handler);
+}
+
+/**
  * Queues one picture for `mediaCheckAsync`, inside the caller's transaction.
  * A no-op while 内容安全 is off; everything else (no openid, no public
  * address) is decided after commit and recorded as `skipped`.
@@ -318,6 +355,28 @@ const USER_NOT_RECENT = 61010;
 
 const markSkipped = checks.markMediaCheckSkipped;
 
+/**
+ * The check is on, but this picture will never be checked: mark it `skipped`
+ * and let the owning domain act on that in the same transaction (CONTENT-006 —
+ * a review goes back to 待审核). The conditional `pending → skipped` makes a
+ * redelivered effect act once.
+ */
+async function skipUnchecked(ctx: Ctx, row: ContentSecurityCheck, now: Date): Promise<void> {
+  await ctx.withTx(async (tx) => {
+    const { won } = await markSkipped(tx, row.id, now);
+    if (!won) return;
+    const handler = uncheckedHandlers.get(row.subject);
+    if (!handler) return;
+    const action = await handler(tx, ctx, {
+      checkId: row.id,
+      subjectId: row.subjectId,
+      mediaUrl: row.mediaUrl,
+      userId: row.userId,
+    });
+    await checks.setMediaCheckAction(tx, { id: row.id, action, now });
+  });
+}
+
 async function submitMediaCheck(ctx: Ctx, effect: Effect): Promise<void> {
   const checkId = Number((effect.payload as { checkId?: number } | null)?.checkId);
   const row = await checks.findMediaCheck(ctx.db, checkId);
@@ -330,10 +389,15 @@ async function submitMediaCheck(ctx: Ctx, effect: Effect): Promise<void> {
     await markSkipped(ctx.db, checkId, now);
     return;
   }
+  if ('unchecked' in identity) {
+    ctx.logger.info({ checkId, reason: identity.unchecked }, 'media check impossible');
+    await skipUnchecked(ctx, row, now);
+    return;
+  }
   const mediaUrl = await publicMediaUrl(ctx, row.mediaUrl);
   if (mediaUrl === null) {
     ctx.logger.warn({ checkId }, 'media check skipped: no public https address for the picture');
-    await markSkipped(ctx.db, checkId, now);
+    await skipUnchecked(ctx, row, now);
     return;
   }
 
@@ -351,7 +415,7 @@ async function submitMediaCheck(ctx: Ctx, effect: Effect): Promise<void> {
       { checkId },
       'media check skipped: the user has not opened the mini program lately',
     );
-    await markSkipped(ctx.db, checkId, now);
+    await skipUnchecked(ctx, row, now);
     return;
   }
   // Anything else is WeChat saying "not now": the ledger retries.

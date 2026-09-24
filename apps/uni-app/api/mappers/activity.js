@@ -213,10 +213,10 @@ function pinkBoolOf(status) {
 /**
  * `groupbuyGroupView` (+ the activity and a few sibling activities) → the 拼团状态页.
  *
- * `userInfo.uid` is the **leader's** id when the caller is the leader and 0 otherwise,
- * because the page decides whether to offer 取消开团 by comparing it with `pinkT.uid`
- * and the group view deliberately never says who the caller is. The nickname is the
- * leader's either way: the H5 share text is an invitation from the team.
+ * The group view carries no account ids (RISK-D-010), so every `uid` here is 0 and the
+ * page decides whether to offer 取消开团 from `pinkT.isMine` — the caller is the
+ * leader — rather than by comparing ids. The nickname is the leader's (masked) either
+ * way: the H5 share text is an invitation from the team.
  */
 export function toPageGroupbuyGroup(view, detail, siblings) {
   if (!view) return {};
@@ -244,7 +244,8 @@ export function toPageGroupbuyGroup(view, detail, siblings) {
     ),
     pinkT: {
       id: toId(view.groupId),
-      uid: leader ? toId(leader.userId) : 0,
+      uid: 0,
+      isMine: isLeader,
       nickname: leader ? text(leader.nickname) : '',
       avatar: leader ? text(leader.avatarUrl) : '',
       stop_time: unixSeconds(view.expiresAt),
@@ -255,7 +256,7 @@ export function toPageGroupbuyGroup(view, detail, siblings) {
     pinkAll: members
       .filter((m) => m !== leader)
       .map((m) => ({
-        uid: toId(m.userId),
+        uid: 0,
         nickname: text(m.nickname),
         avatar: text(m.avatarUrl),
       })),
@@ -268,7 +269,7 @@ export function toPageGroupbuyGroup(view, detail, siblings) {
     current_pink_order: me ? text(me.orderId) : '',
     order_pid: isLeader ? 0 : 1,
     userInfo: {
-      uid: isLeader && leader ? toId(leader.userId) : 0,
+      uid: 0,
       nickname: leader ? text(leader.nickname) : '',
       avatar: leader ? text(leader.avatarUrl) : '',
     },

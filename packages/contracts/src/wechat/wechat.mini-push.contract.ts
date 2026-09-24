@@ -13,7 +13,9 @@ import { defineRoute } from '../_conventions/route';
  * `msg_signature` over the ciphertext) is checked before the body is parsed
  * beyond reading the `Encrypt` field; the `(timestamp, nonce)` pair is fresh and
  * single-use; the envelope's appid must be ours. A push that fails any of them
- * is `403 invalid signature` and nothing is written. A genuine push is one
+ * is `403 invalid signature` and nothing is written. In 明文/兼容模式, with the
+ * nonce store down, a push is `503` (WeChat re-delivers it later) because
+ * nothing would tie its signature to its body. A genuine push is one
  * effects-ledger row (deduplicated by the decrypted message's hash) and
  * `success`; what it causes happens after the answer.
  */
