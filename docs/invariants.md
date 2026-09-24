@@ -416,10 +416,11 @@ The export is one row per SKU, reports truncation honestly rather than silently 
 
 ### CAT-018
 
-A shopper's review pictures must each be a live image our own storage holds — what `POST /api/v1/uploads` returned, or a library image — the same rule as the avatar (USER-019). A link to another server is refused with `CATALOG_REVIEW_IMAGE_NOT_ALLOWED` before anything is checked or written: a review is public, and a foreign picture could change after WeChat checked it or log every shopper who opens the product.
+A shopper's review pictures must each be a live image our own storage holds — what `POST /api/v1/uploads` returned, or a library image — the same rule as the avatar (USER-019). A link to another server is refused with `CATALOG_REVIEW_IMAGE_NOT_ALLOWED` before anything is checked or written: a review is public, and a foreign picture could change after WeChat checked it or log every shopper who opens the product. One of that image's thumbnails (`….w360.jpg`, `….w750.jpg`, derived by name) counts as the image, the same for REFUND-014 and USER-019, which share the check (`isStoredImageUrl`).
 
 - `packages/core/src/catalog/catalog.int.test.ts::reviews > CAT-018 — review pictures come from our own storage > takes a picture our uploads stored`
 - `packages/core/src/catalog/catalog.int.test.ts::reviews > CAT-018 — review pictures come from our own storage > refuses a link to somebody else’s server, and writes nothing`
+- `packages/core/src/storage/storage.int.test.ts::image variants > CAT-018 — a thumbnail of a live image counts as ours, a thumbnail of anything else does not`
 
 ## Cart and order creation
 
@@ -1125,6 +1126,7 @@ A shopper's after-sale evidence photos must each be a live image our own storage
 
 - `packages/core/src/refund/refund.int.test.ts::REFUND-014 — evidence photos come from our own storage > takes a photo our uploads stored`
 - `packages/core/src/refund/refund.int.test.ts::REFUND-014 — evidence photos come from our own storage > refuses a link to somebody else’s server, and opens no request`
+- `packages/core/src/storage/storage.int.test.ts::image variants > CAT-018 — a thumbnail of a live image counts as ours, a thumbnail of anything else does not`
 
 ## Registration and notifications
 
@@ -1292,6 +1294,7 @@ A shopper's avatar is a picture we hold: `PUT /profile` takes an `avatarUrl` onl
 - `packages/core/src/user/user.int.test.ts::USER-019 — the avatar comes from our own storage > refuses a deleted attachment and one that is not an image`
 - `packages/core/src/user/user.int.test.ts::USER-019 — the avatar comes from our own storage > takes the current avatar back unchanged, as every legacy save re-sends it`
 - `apps/web/app/api/v1/user.int.test.ts::/api/v1/profile > USER-019 — takes the avatar our upload returned and refuses one on another server`
+- `packages/core/src/storage/storage.int.test.ts::image variants > CAT-018 — a thumbnail of a live image counts as ours, a thumbnail of anything else does not`
 
 ## Coupons
 
