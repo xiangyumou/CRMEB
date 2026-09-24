@@ -510,23 +510,11 @@ export async function countStatusLogs(
  * any future non-storefront path — all of which have no key — from colliding
  * on NULL.
  */
-const IDEMPOTENCY_CONSTRAINT = 'orders_idempotency_uq';
-
 /**
- * True for the unique violation the duplicate submit raises, and only for that
- * one. Drizzle wraps the driver error, so the cause chain is walked rather than
- * the top-level error inspected.
+ * What the loser of the race reads, once the winner has committed — whether
+ * the index refused its insert (23505 on `orders_idempotency_uq`) or it failed
+ * earlier, on a cart the winner had already emptied.
  */
-export function isIdempotencyConflict(error: unknown): boolean {
-  for (let current = error, depth = 0; current && depth < 5; depth += 1) {
-    const candidate = current as { code?: unknown; constraint?: unknown; cause?: unknown };
-    if (candidate.code === '23505' && candidate.constraint === IDEMPOTENCY_CONSTRAINT) return true;
-    current = candidate.cause;
-  }
-  return false;
-}
-
-/** What the loser of the race reads, once the winner has committed. */
 export async function findOrderIdByIdempotencyKey(
   db: DbOrTx,
   args: { userId: number; key: string },

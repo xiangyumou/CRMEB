@@ -695,8 +695,13 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
   // transaction settles, so by the time the violation surfaces the winner has
   // committed and its order is readable; a submit that *failed* leaves a dead
   // index entry, which is what lets the same key be tried again.
+  //
+  // Not only on the violation: a twin that read the key before the winner
+  // committed but reads the cart after it finds the cart already emptied and
+  // fails on `ORDER_EMPTY` — before its insert, so the index never gets to
+  // refuse it. Whatever this attempt failed on, an order carrying the key
+  // means the submit succeeded, and the answer is that order.
   const outcome = await submit().catch(async (error: unknown) => {
-    if (!repo.isIdempotencyConflict(error)) throw error;
     const existing = await repo.findOrderIdByIdempotencyKey(ctx.db, {
       userId,
       key: body.idempotencyKey,

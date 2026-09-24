@@ -100,14 +100,39 @@ readiness_readyz_over_http() {
     return 0
   fi
 
-  # `-w` appends the status on its own line, so one request yields both without
-  # a temporary file holding a body nobody asked to keep.
-  if ! response="$(curl -sS --max-time 15 -w '\n%{http_code}' "http://$bind/readyz" 2>&1)"; then
-    warn "readiness: the published port $bind did not answer /readyz"
-    return 1
-  fi
-  status="${response##*$'\n'}"
-  body="${response%$'\n'*}"
+  # A 502 or 504 is nginx saying it cannot reach `web` *yet*: right after a
+  # recreate, the edge's resolver (valid=2s) and its keepalive pool can still
+  # point at the container that was just replaced, and the containers'
+  # 15-second healthchecks are too coarse to see a window that short. So those
+  # — and a port that does not answer at all — are retried for a short while.
+  # A 503 is not: that is the app itself naming a dependency that is down, and
+  # it is the answer the gate exists to act on.
+  local deadline=$((SECONDS + ${NEXT_READINESS_SETTLE_SECONDS:-30}))
+  while :; do
+    # `-w` appends the status on its own line, so one request yields both
+    # without a temporary file holding a body nobody asked to keep.
+    if response="$(curl -sS --max-time 15 -w '\n%{http_code}' "http://$bind/readyz" 2>&1)"; then
+      status="${response##*$'\n'}"
+      body="${response%$'\n'*}"
+    else
+      status='000'
+      body="$response"
+    fi
+    case "$status" in
+      000 | 502 | 504) ;;
+      *) break ;;
+    esac
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      if [ "$status" = '000' ]; then
+        warn "readiness: the published port $bind did not answer /readyz"
+        warn "  $body"
+        return 1
+      fi
+      break
+    fi
+    say "readiness: /readyz answered $status — the edge cannot reach web yet; retrying"
+    sleep 3
+  done
   if [ "$status" != '200' ]; then
     warn "readiness: /readyz answered $status"
     # The body is `{code, message, details: {checks}}` and carries no host and
