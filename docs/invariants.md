@@ -962,7 +962,7 @@ The policy table and the reasons are in `docs/mini/wechat-compliance.md` C09 and
 
 ### CONTENT-001
 
-Review text a customer submits is checked by WeChat's `msgSecCheck` (scene 2, the author's mini-program openid) before it is saved, and is **never refused** for what it says: `risky`, `review`, or no answer at all (an errcode, or the call never arriving) saves it 待审核 with the reason in `moderation_reason`, and the answer is `moderation: 'pending'`, not an error. A held review is not public until an admin publishes it through 评价管理, and an admin may delete it instead. A `pass` publishes as configured. An account without a mini-program identity, or any account while 内容安全 is off, is not checked.
+Review text a customer submits is checked by WeChat's `msgSecCheck` (scene 2, the author's mini-program openid) before it is saved, and is **never refused** for what it says: `risky`, `review`, or no answer at all (an errcode, or the call never arriving) saves it 待审核 with the reason in `moderation_reason`, and the answer is `moderation: 'pending'`, not an error. A held review is not public until an admin publishes it through 评价管理, and an admin may delete it instead. A `pass` publishes as configured. Nothing is checked while 内容安全 is off or the mini program has no AppID/AppSecret; with both on, an account WeChat cannot check under is held (CONTENT-006).
 
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > publishes a review WeChat passes, checked as a comment for the author — CONTENT-001`
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > saves a risky review 待审核 with a neutral answer, not an error — CONTENT-001`
@@ -971,7 +971,7 @@ Review text a customer submits is checked by WeChat's `msgSecCheck` (scene 2, th
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > holds the review when the call never arrives — CONTENT-001`
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > publishes a held review once an admin approves it — CONTENT-001`
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > lets an admin delete a held review — CONTENT-001`
-- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > does not check an account without a mini-program identity, or while switched off — CONTENT-001`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > does not check anything while switched off, or with no mini program to check with — CONTENT-001`
 - `e2e/storefront/specs-mini/reviews.spec.ts::CONTENT-001: a review the content check holds is shown on the product only once the merchant publishes it`
 
 ### CONTENT-002
@@ -990,7 +990,7 @@ An invoice-title name — in the 抬头 book (create and update) and on an order
 
 ### CONTENT-004
 
-Every distinct review picture is submitted to `mediaCheckAsync` (scene 2) after the review commits, through the ledger, as an absolute https address. A `risky` `wxa_media_check` verdict takes that picture off the review and nothing else; the verdict is stored with a conditional update on `submitted`, so a repeated or concurrent push acts once. A `pass` keeps the picture. A submission WeChat refuses is retried and the picture stays visible meanwhile; an account without a mini-program identity is `skipped`.
+Every distinct review picture is submitted to `mediaCheckAsync` (scene 2) after the review commits, through the ledger, as an absolute https address. A `risky` `wxa_media_check` verdict takes that picture off the review and nothing else; the verdict is stored with a conditional update on `submitted`, so a repeated or concurrent push acts once. A `pass` keeps the picture. A submission WeChat refuses is retried and the picture stays visible meanwhile; an account without a mini-program identity is `skipped` (and its review held, CONTENT-006).
 
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > sends each review picture once, as an absolute https address — CONTENT-004`
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > takes a risky picture off the review, and a repeated verdict does nothing more — CONTENT-004`
@@ -1006,6 +1006,15 @@ A newly stored avatar (not the current one, not the default) is submitted to `me
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > resets a risky avatar and tells the customer — CONTENT-005`
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > leaves an avatar the customer has since replaced — CONTENT-005`
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > does not check an avatar that did not change — CONTENT-005`
+
+### CONTENT-006
+
+"Not checked" is not "passed" (decided 2026-09-24). While 内容安全 is on and the mini program is configured, a review that WeChat cannot check waits in 待审核 instead of going live: review text from an account with no mini-program openid (an H5 account, or an SMS / password session from any HTTP client) is saved `pending` with `sec_check_unchecked`, and a published review one of whose pictures ends `skipped` — no openid, WeChat's 61010 "not opened lately", or no public https address to submit — goes back to `pending` with `sec_check_image_unchecked`, in the transaction that marks the check skipped. A review that already carries a moderation reason (held for its text, or held and then approved by an admin) is left as it is, and a redelivered effect moves nothing.
+
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > holds a review from an account WeChat cannot check under, rather than publishing it unread — CONTENT-006`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > sends a published review back to 待审核 when WeChat will not check its picture (61010) — CONTENT-006`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > holds the review when the shop has no https address to show WeChat the picture at — CONTENT-006`
+- `packages/core/src/wechat/wechat.sec-check.int.test.ts::pictures are checked after the fact, by push > leaves a review an admin already approved when its picture turns out uncheckable — CONTENT-006`
 
 ## Refunds
 

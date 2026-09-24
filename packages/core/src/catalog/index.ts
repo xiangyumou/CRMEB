@@ -50,8 +50,8 @@
 
 import { registerCatalogPort } from '../order';
 import { registerStockPort } from '../order/ports';
-import { registerMediaRiskHandler } from '../wechat';
-import { hideRiskyReviewImage } from './catalog.review.service';
+import { registerMediaRiskHandler, registerMediaUncheckedHandler } from '../wechat';
+import { hideRiskyReviewImage, holdUncheckedReview } from './catalog.review.service';
 import { catalogSalePort } from './catalog.sale';
 import { catalogStockPort } from './catalog.stock';
 // The config group registers itself on import.
@@ -63,6 +63,8 @@ export function registerCatalogDomain(): void {
   registerCatalogPort(catalogSalePort);
   // 内容安全: a review picture WeChat calls risky comes off the review (C09).
   registerMediaRiskHandler('review_image', hideRiskyReviewImage);
+  // …and one WeChat cannot check puts the review back in 待审核 (CONTENT-006).
+  registerMediaUncheckedHandler('review_image', holdUncheckedReview);
 }
 
 registerCatalogDomain();

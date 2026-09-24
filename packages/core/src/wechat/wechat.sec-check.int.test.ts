@@ -354,15 +354,31 @@ describe('review text is held for a person, never refused', () => {
     expect(after.every((row) => row.deletedAt !== null)).toBe(true);
   });
 
-  it('does not check an account without a mini-program identity, or while switched off — CONTENT-001', async () => {
-    const h5Only = await makeUser({ mini: false });
-    const { review } = await submit(h5Only, `这个${RISKY}真不错`);
-    expect(review.moderation).toBe('published');
-
+  it('does not check anything while switched off, or with no mini program to check with — CONTENT-001', async () => {
     await harness.ctx.config.set(contentSecurityConfig, { enabled: false });
     const mini = await makeUser();
-    const { review: second } = await submit(mini, `这个${RISKY}真不错`);
+    const { review } = await submit(mini, `这个${RISKY}真不错`);
+    expect(review.moderation).toBe('published');
+
+    await harness.ctx.config.set(contentSecurityConfig, { enabled: true });
+    await harness.ctx.config.set(wechatConfig, { miniAppId: '', miniAppSecret: '' });
+    const h5Only = await makeUser({ mini: false });
+    const { review: second } = await submit(h5Only, `这个${RISKY}真不错`);
     expect(second.moderation).toBe('published');
+    expect(textChecks()).toHaveLength(0);
+  });
+
+  it('holds a review from an account WeChat cannot check under, rather than publishing it unread — CONTENT-006', async () => {
+    // An SMS or password session from any HTTP client: no mini-program openid.
+    const h5Only = await makeUser({ mini: false });
+    const { productId, review } = await submit(h5Only, '很好');
+
+    expect(review.moderation).toBe('pending');
+    expect(await reviewRow(review.id)).toMatchObject({
+      status: 'pending',
+      moderationReason: 'sec_check_unchecked',
+    });
+    expect((await publicReviews(productId)).total).toBe(0);
     expect(textChecks()).toHaveLength(0);
   });
 });
@@ -540,6 +556,67 @@ describe('pictures are checked after the fact, by push', () => {
     const [check] = await submittedChecks(review.id);
     expect(check!.status).toBe('skipped');
     expect(oa.mediaChecks).toHaveLength(0);
+    // The text already held it for the same reason (CONTENT-006); nothing to add.
+    expect(check!.action).toBe('none');
+    expect(await reviewRow(review.id)).toMatchObject({
+      status: 'pending',
+      moderationReason: 'sec_check_unchecked',
+    });
+  });
+
+  it('sends a published review back to 待审核 when WeChat will not check its picture (61010) — CONTENT-006', async () => {
+    const userId = await makeUser();
+    const { productId, review } = await submit(userId, '很好', [IMAGE, OTHER]);
+    expect(review.moderation).toBe('published');
+    oa.behaviour.failMediaCheck = { errcode: 61010, errmsg: 'user is not recently active' };
+
+    const checks = await submittedChecks(review.id);
+    // Whichever picture is skipped first holds the review; the second finds it held.
+    expect(checks.map((check) => check.status)).toEqual(['skipped', 'skipped']);
+    expect(checks.map((check) => check.action).sort()).toEqual(['none', 'review_held']);
+    expect(await reviewRow(review.id)).toMatchObject({
+      status: 'pending',
+      moderationReason: 'sec_check_image_unchecked',
+      images: [IMAGE, OTHER],
+    });
+    expect((await publicReviews(productId)).total).toBe(0);
+
+    // A redelivered effect finds the checks decided and moves nothing.
+    await drainEffects(harness.ctx);
+    expect((await reviewRow(review.id)).moderationReason).toBe('sec_check_image_unchecked');
+  });
+
+  it('holds the review when the shop has no https address to show WeChat the picture at — CONTENT-006', async () => {
+    await harness.ctx.config.set(siteConfig, { publicOrigin: 'http://shop.example.com' });
+    const userId = await makeUser();
+    const { review } = await submit(userId, '很好', [IMAGE]);
+
+    const [check] = await submittedChecks(review.id);
+    expect(check).toMatchObject({ status: 'skipped', action: 'review_held' });
+    expect(oa.mediaChecks).toHaveLength(0);
+    expect((await reviewRow(review.id)).status).toBe('pending');
+  });
+
+  it('leaves a review an admin already approved when its picture turns out uncheckable — CONTENT-006', async () => {
+    const userId = await makeUser();
+    const adminId = await makeAdmin();
+    oa.behaviour.failMediaCheck = DOWN;
+    const { review } = await submit(userId, `这个${RISKY}真不错`, [IMAGE]);
+    await drainEffects(harness.ctx);
+    await catalog.adminReviewSetStatus(
+      harness.as(adminActor(adminId)),
+      { id: review.id },
+      { status: 'published' },
+    );
+
+    oa.behaviour.failMediaCheck = { errcode: 61010, errmsg: 'user is not recently active' };
+    harness.clock.advance(60 * 60 * 1000);
+    const [check] = await submittedChecks(review.id);
+    expect(check).toMatchObject({ status: 'skipped', action: 'none' });
+    expect(await reviewRow(review.id)).toMatchObject({
+      status: 'published',
+      moderationReason: 'sec_check_risky',
+    });
   });
 
   it('acts once when two different verdict pushes for one picture race — CONTENT-004', async () => {

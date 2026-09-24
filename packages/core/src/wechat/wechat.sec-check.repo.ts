@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { DbOrTx } from '@shop/db';
 import { contentSecurityChecks, type ContentSecurityCheck } from '@shop/db/schema/wechat';
-import { conditionalUpdate } from '../kernel/tx';
+import { conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
 
 /** The `content_security_checks` rows behind `wechat.sec-check.ts` (C09). */
 
@@ -48,8 +48,12 @@ export async function findMediaCheckByTrace(
 }
 
 /** `pending` → `skipped`; a row already past `pending` is left alone. */
-export async function markMediaCheckSkipped(db: DbOrTx, id: number, now: Date): Promise<void> {
-  await conditionalUpdate(db, contentSecurityChecks, {
+export async function markMediaCheckSkipped(
+  db: DbOrTx,
+  id: number,
+  now: Date,
+): Promise<ConditionalUpdateResult> {
+  return conditionalUpdate(db, contentSecurityChecks, {
     where: and(eq(contentSecurityChecks.id, id), eq(contentSecurityChecks.status, 'pending')),
     set: { status: 'skipped', updatedAt: now },
   });
