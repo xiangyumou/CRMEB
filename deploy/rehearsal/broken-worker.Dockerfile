@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 #
 # A deliberately broken release candidate, for rehearsing the failure path of
-# `upgrade.sh`. It is never published and never deployed anywhere real.
+# `shop upgrade`. It is never published and never deployed anywhere real.
 #
 #   docker build -f deploy/rehearsal/broken-worker.Dockerfile \
 #     --build-arg BASE=<a real worker image> -t crmeb-next-worker:broken .

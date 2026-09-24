@@ -110,6 +110,20 @@ describe('<ZodForm> server errors', () => {
     expect(screen.queryByText('提交的数据有误')).not.toBeInTheDocument();
   });
 
+  it('maps the `{ field, message }` list handle() sends onto the matching field', async () => {
+    setup({
+      error: new ApiError({
+        status: 422,
+        code: 'VALIDATION_FAILED',
+        message: '提交的数据有误',
+        details: [{ field: 'name', message: '该名称已被占用' }],
+      }),
+    });
+
+    expect(await screen.findByText('该名称已被占用')).toBeInTheDocument();
+    expect(screen.queryByText('提交的数据有误')).not.toBeInTheDocument();
+  });
+
   it('shows a non-422 failure as a banner', async () => {
     setup({
       error: new ApiError({ status: 409, code: 'THING_LOCKED', message: '该记录已被锁定' }),
@@ -122,6 +136,136 @@ describe('<ZodForm> server errors', () => {
       error: new ApiError({ status: 422, code: 'VALIDATION_FAILED', message: '提交的数据有误' }),
     });
     expect(await screen.findByText('提交的数据有误')).toBeInTheDocument();
+  });
+});
+
+/** The form-level `<Alert>`; antd also gives every field error `role="alert"`. */
+const banner = () => document.querySelector('.ant-alert');
+
+describe('<ZodForm> errors no field shows', () => {
+  const serverError = (details: unknown) =>
+    new ApiError({ status: 422, code: 'VALIDATION_FAILED', message: '提交的数据有误', details });
+
+  it('shows a 422 on a route param as a banner, with its message', async () => {
+    setup({ error: serverError([{ field: 'params.id', message: 'ID 不合法' }]) });
+
+    await waitFor(() => expect(banner()).toHaveTextContent('提交的数据有误'));
+    expect(banner()).toHaveTextContent('ID 不合法');
+  });
+
+  it('shows what landed on a field there, and the rest in the banner', async () => {
+    setup({
+      error: serverError([
+        { field: 'name', message: '该名称已被占用' },
+        { field: 'params.id', message: 'ID 不合法' },
+      ]),
+    });
+
+    const nameItem = (await screen.findByLabelText('名称')).closest('.ant-form-item');
+    await waitFor(() => expect(nameItem).toHaveTextContent('该名称已被占用'));
+    expect(banner()).toHaveTextContent('ID 不合法');
+    expect(banner()).not.toHaveTextContent('该名称已被占用');
+  });
+
+  it('shows a 422 on a field hidden by visibleWhen as a banner', async () => {
+    setup({
+      fields: fields.map((spec) =>
+        spec.name === 'note' ? { ...spec, visibleWhen: () => false } : spec,
+      ),
+      error: serverError([{ field: 'note', message: '备注过长' }]),
+    });
+
+    await waitFor(() => expect(banner()).toHaveTextContent('备注过长'));
+  });
+
+  it('moves an error from the banner onto its field when the field comes into view', async () => {
+    const user = userEvent.setup();
+    setup({
+      fields: fields.map((spec) =>
+        spec.name === 'note' ? { ...spec, visibleWhen: (v) => v['name'] === '显示备注' } : spec,
+      ),
+      error: serverError([{ field: 'note', message: '备注过长' }]),
+    });
+    await waitFor(() => expect(banner()).toHaveTextContent('备注过长'));
+
+    const name = screen.getByLabelText('名称');
+    await user.clear(name);
+    await user.type(name, '显示备注');
+
+    const noteItem = (await screen.findByLabelText('备注')).closest('.ant-form-item');
+    await waitFor(() => expect(noteItem).toHaveTextContent('备注过长'));
+    expect(banner()).toBeNull();
+  });
+
+  it('shows a 422 on a hidden-kind field as a banner', async () => {
+    setup({
+      fields: fields.map((spec) =>
+        spec.name === 'note' ? { kind: 'hidden', name: 'note' } : spec,
+      ),
+      error: serverError([{ field: 'note', message: '备注过长' }]),
+    });
+
+    await waitFor(() => expect(banner()).toHaveTextContent('备注过长'));
+  });
+});
+
+describe('<ZodForm> errors inside a custom field', () => {
+  const skuSchema = z
+    .object({
+      name: z.string().min(1),
+      skus: z.array(z.object({ price: z.string() })),
+    })
+    .superRefine((value, ctx) => {
+      value.skus.forEach((sku, index) => {
+        if (sku.price === '0.00') {
+          ctx.addIssue({ code: 'custom', path: ['skus', index, 'price'], message: '价格不能为 0' });
+        }
+      });
+    });
+
+  const skuFields: FieldSpec[] = [
+    { kind: 'text', name: 'name', label: '名称' },
+    { kind: 'custom', name: 'skus', label: '规格', render: () => <span>规格表</span> },
+  ];
+
+  function setupSkus(props: Partial<Parameters<typeof ZodForm>[0]> = {}) {
+    const onSubmit = vi.fn();
+    renderAdmin(
+      <ZodForm
+        schema={skuSchema as never}
+        fields={skuFields}
+        onSubmit={onSubmit}
+        initialValues={{ name: '商品', skus: [{ price: '1.00' }, { price: '0.00' }] }}
+        {...props}
+      />,
+    );
+    return { onSubmit };
+  }
+
+  const skuItem = () => screen.getByText('规格表').closest('.ant-form-item');
+
+  it('shows a server 422 on a row of the field under that field, without a banner', async () => {
+    setupSkus({
+      error: new ApiError({
+        status: 422,
+        code: 'VALIDATION_FAILED',
+        message: '提交的数据有误',
+        details: [{ field: 'skus.1.price', message: '价格不合法' }],
+      }),
+    });
+
+    await waitFor(() => expect(skuItem()).toHaveTextContent('价格不合法'));
+    expect(banner()).toBeNull();
+  });
+
+  it('shows a whole-form rule that fails on a row under that field', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = setupSkus();
+
+    await user.click(submit());
+
+    await waitFor(() => expect(skuItem()).toHaveTextContent('价格不能为 0'));
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });
 

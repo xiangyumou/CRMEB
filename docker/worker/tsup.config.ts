@@ -10,13 +10,15 @@ import workerConfig from '../../apps/worker/tsup.config';
  * the first time one of them changes. Importing keeps the image's bundle in
  * step with the app's own build.
  *
- * Three entries, one image:
+ * Four entries, one image:
  *
  *  - `main.js`            — the worker process;
  *  - `db/src/migrate.js`  — `@shop/db`'s migrator;
+ *  - `db/src/pending.js`  — the read-only question "is anything left to
+ *    migrate?", which `shop upgrade` asks before it stops anything;
  *  - `db/src/seed/index.js` — the reference-data seed.
  *
- * The two `db` entries keep their *source* directory shape on purpose. Both
+ * The `db` entries keep their *source* directory shape on purpose. They
  * resolve data directories from `import.meta` at runtime — `../migrations` and
  * `../../seed-data` — so flattening them into `db/migrate.js` would send those
  * lookups outside the image. `web.Dockerfile`'s runtime stage copies
@@ -35,6 +37,7 @@ export default defineConfig({
   entry: {
     main: 'apps/worker/src/main.ts',
     'db/src/migrate': 'packages/db/src/migrate.ts',
+    'db/src/pending': 'packages/db/src/pending.ts',
     'db/src/seed/index': 'packages/db/src/seed/index.ts',
   },
   outDir: 'docker/worker/dist',

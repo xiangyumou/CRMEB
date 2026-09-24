@@ -192,3 +192,29 @@ describe('<ModalForm> load', () => {
     expect(api.urls).toEqual([]);
   });
 });
+
+describe('<ModalForm> save', () => {
+  it('keeps the dialog open and shows a server 422 under the field it names', async () => {
+    stubRoutes([
+      on(detailRoute, { id: '7', name: '已加载的名称', note: '已加载的备注' }),
+      on(updateRoute, () =>
+        respondWithError(422, {
+          code: 'VALIDATION_FAILED',
+          message: '提交的数据有误',
+          details: [{ field: 'name', message: '该名称已被占用' }],
+        }),
+      ),
+    ]);
+    const user = userEvent.setup();
+    renderAdmin(<Harness row={{ id: '7', name: '列表里的名称' }} />);
+
+    await user.click(screen.getByRole('button', { name: zhName('打开') }));
+    await screen.findByDisplayValue('已加载的名称');
+    await user.click(screen.getByRole('button', { name: zhName('保存') }));
+
+    const item = screen.getByLabelText('名称').closest('.ant-form-item');
+    await waitFor(() => expect(item).toHaveTextContent('该名称已被占用'));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('dialog').querySelector('.ant-alert')).toBeNull();
+  });
+});

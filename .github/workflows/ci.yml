@@ -8,11 +8,12 @@ name: ci
 #
 # It also builds and publishes the three container images and rehearses a
 # deploy against them. The deploy directory is in the paths filter for that
-# reason: the compose file and the upgrade scripts are part of what this
+# reason: the compose file and the host command are part of what this
 # workflow gates.
 #
 # Nothing here touches the production host. A release is deployed by a person,
-# with the command the images job prints (deploy/README.md).
+# with the `deploy/ship.sh <commit>` line the images job prints
+# (deploy/README.md); ship.sh refuses a commit this workflow did not pass.
 
 on:
   push:
@@ -525,7 +526,8 @@ jobs:
       - name: shellcheck
         run: |
           shellcheck --source-path=SCRIPTDIR -x \
-            deploy/*.sh deploy/lib/*.sh deploy/rehearsal/*.sh \
+            deploy/*.sh deploy/shop deploy/lib/*.sh deploy/lib/commands/*.sh \
+            deploy/rehearsal/*.sh \
             .github/scripts/*.sh
 
   # The publish rules the images job relies on — a conflicting candidate never
@@ -680,18 +682,18 @@ jobs:
             printf '%s=%s@%s\n' "$role" "$image" "$digest" >> "$GITHUB_OUTPUT"
           done
 
-      # The three lines an operator pastes into `deployment.env`, and the three
-      # arguments `upgrade.sh` wants. A release whose digests have to be dug out
-      # of a log is a release that gets deployed by tag.
+      # The one command that releases this commit. ship.sh finds the digests
+      # below on its own, from the `sha-<commit>` tags; they are listed so a
+      # release can be checked against what CI published.
       - name: Release summary
         run: |
           {
             printf '## crmeb-next images\n\n'
             printf 'storefront in the edge image: **%s**\n\n' '${{ steps.bundle.outputs.storefront }}'
-            printf '```sh\ndeploy/upgrade.sh --app-version %s \\\n' "$GITHUB_SHA"
-            printf '  --web    %s \\\n'   '${{ steps.publish.outputs.web }}'
-            printf '  --worker %s \\\n'   '${{ steps.publish.outputs.worker }}'
-            printf '  --edge   %s\n```\n' '${{ steps.publish.outputs.edge }}'
+            printf '```sh\ndeploy/ship.sh %s\n```\n\n' "$GITHUB_SHA"
+            printf -- '- web: `%s`\n'    '${{ steps.publish.outputs.web }}'
+            printf -- '- worker: `%s`\n' '${{ steps.publish.outputs.worker }}'
+            printf -- '- edge: `%s`\n'   '${{ steps.publish.outputs.edge }}'
           } >> "$GITHUB_STEP_SUMMARY"
 
   rehearsal:

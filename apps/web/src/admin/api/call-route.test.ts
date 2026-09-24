@@ -356,6 +356,29 @@ describe('parseFieldErrors', () => {
     });
   });
 
+  it('understands the `{ field, message }` list handle() sends on VALIDATION_FAILED', () => {
+    const details = [
+      { field: 'name', message: '名称至少 2 个字' },
+      { field: 'sku.0.price', message: '价格不合法' },
+      { field: 'sku.0.price', message: '价格必须大于 0' },
+    ];
+    expect(parseFieldErrors(details)).toEqual({
+      name: '名称至少 2 个字',
+      'sku.0.price': '价格不合法',
+    });
+    expect(
+      new ApiError({ status: 422, code: 'VALIDATION_FAILED', message: '提交的数据有误', details })
+        .fieldErrors,
+    ).toEqual({
+      name: '名称至少 2 个字',
+      'sku.0.price': '价格不合法',
+    });
+  });
+
+  it('leaves out the `<body>` entry, which names no field', () => {
+    expect(parseFieldErrors([{ field: '<body>', message: '请求体不是合法的 JSON' }])).toBeNull();
+  });
+
   it('returns null for anything else', () => {
     expect(parseFieldErrors(undefined)).toBeNull();
     expect(parseFieldErrors('boom')).toBeNull();

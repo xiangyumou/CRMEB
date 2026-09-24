@@ -185,14 +185,15 @@ scrollX / size / expandable / emptyText / title / bordered / onData
   columns={2}
   onSubmit={(values) => save.mutate({ body: values })}  // values 已经 parse 过
   submitting={save.isPending}
-  error={save.error}              // 422 自动回填到字段，其它错误显示为横幅
+  error={save.error}              // 422 回填到字段，字段显示不了的和其它错误显示为横幅
 />
 ```
 
 - 单字段规则来自 `schema.shape[name]`，所以字段永远不会和契约打架。
 - `.refine()/.superRefine()` 这类跨字段规则在提交时整体 parse，再把 issue 回填到字段。
 - 必填标记按"schema 是否接受 undefined"自动推断，`required` 可覆盖。
-- 服务端 422 的 `details` 支持 zod `flatten()`、扁平 `{field: message}`、原始 issue 数组三种形状。
+- 服务端 422 的 `details` 支持 `handle()` 发出的 `[{ field, message }]`、zod `flatten()`、扁平 `{field: message}`、原始 issue 数组四种形状。
+- 错误要么显示在字段上，要么进横幅，不会凭空消失：路径对不上精确字段时，落到最近的上级字段（`skus.1.price` 显示在 `custom` 字段 `skus` 下）；当前没渲染的字段（被 `visibleWhen` 隐藏、`hidden` 类型）以及 `params.*`、`query.*` 上的错误，列在横幅里。只有全部错误都显示在字段上时才不出横幅。
 
 字段类型（`FieldSpec`）：
 
@@ -293,6 +294,8 @@ interface AssetSource {
 **分节（`section`）**：字段带 `section` 时，表单按 section **首次出现的顺序**把可见字段分组，每组上面加一条左对齐的分隔标题。没有 `section` 的字段排在最前面，整组都没有 `section` 就和以前一模一样——一个 `<Row>`，没有分隔线。只有当前可见的字段参与分组，所以被 `visibleWhen` 隐藏光的小节不会留下一个空标题。
 
 刻意不做 `<Tabs>`：配置表单是**一次提交**的，藏在别的标签页里的校验错误等于看不见。`trade` 有 11 个字段分四节、`storage` 12 个分两节、`site` 14 个——分节是让"退货地址"这种字段能被找到的唯一办法。
+
+**服务端 422**：保存的请求体是 `{ values: {...} }`，服务端的错误路径是 `values.<key>`，表单去掉 `values.` 前缀后回填到字段。自定义 `toInput` 也要保持这个结构。密钥和只读字段不在表单里，它们的错误显示在横幅中。
 
 **密钥约定（重要）**：`password` 字段在 `values` 里的值是 **布尔** —— `true` 表示已设置、`false`/缺省表示未设置，**服务端永远不回传明文**。界面显示 `已设置 / 未设置` + 一个空输入框；留空 = 不修改，填了才会把新值放进保存的 payload 里。描述符类型在 `config/types.ts`，刻意保持最小，方便 P0-A 的 `defineConfigGroup` 直接产出兼容结构。
 

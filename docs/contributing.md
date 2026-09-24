@@ -53,8 +53,9 @@ build:mp-weixin` if a `#ifdef MP-WEIXIN` block changed).
   mini-program release bumps `version` in `apps/mini/package.json` first: it is the
   `X-Client-Version` every request sends and the upload version
   ([device-check.md §9](mini/device-check.md#9-版本号)).
-- `deploy/**` or `docker/**`: `shellcheck deploy/*.sh deploy/lib/*.sh deploy/rehearsal/*.sh` and the
-  drill, `deploy/rehearsal/drill.sh` (it builds the three images; allow about fifteen minutes).
+- `deploy/**` or `docker/**`: shellcheck, as the `shell` job in `ci.yml` runs it, and the drill,
+  `deploy/rehearsal/drill.sh` (it builds the three images; allow about half an hour). Commit first:
+  its `ship/` cases ship `HEAD`.
 - `.github/**`: `actionlint`, and `.github/scripts/publish-release.test.sh` if the publish script
   changed.
 

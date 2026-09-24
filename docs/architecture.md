@@ -24,7 +24,7 @@ it; [invariants.md](invariants.md) lists the business rules and the tests that p
 | `edge`    | `docker/edge/`              | Serves the uni-app H5 build and `/uploads/`, proxies the application paths to `web`, answers `/healthz`. |
 | `web`     | `apps/web`                  | Every HTTP endpoint and the admin UI. Holds no state of its own.                                         |
 | `worker`  | `apps/worker`               | Scheduled and on-demand jobs, and the dispatcher of the effects ledger.                                  |
-| `migrate` | `packages/db`, worker image | A one-shot that `upgrade.sh` runs, with the application stopped, to apply migrations.                    |
+| `migrate` | `packages/db`, worker image | A one-shot that `shop upgrade` runs to apply migrations (with the application stopped) and the seed.     |
 
 PostgreSQL holds all business state. Redis holds what may be rebuilt or lost with a bounded cost:
 admin sessions, the config cache, rate-limit counters, the BullMQ queue, the worker heartbeat,
@@ -388,7 +388,7 @@ call in `api/` resolves to a route.
 | Guards            | `guards/`                    | The whole tree: contracts vs routes, permissions, retired features, secrets, migrations, the uni-app, the mini-program, the invariant catalogue, the release pipeline. |
 | Admin e2e         | `e2e/admin`                  | The production build of `apps/web`, Playwright, fakes for every third party.                                                                                           |
 | Storefront e2e    | `e2e/storefront`             | The H5 build in mobile Chromium, through the edge, against the built app and worker; `test:mini` runs the mini-program's "模拟小程序" build the same way.              |
-| Deploy drill      | `deploy/rehearsal/drill.sh`  | The production Compose stack, built locally: first deploy, upgrades that must roll back, rollback, backup and restore.                                                 |
+| Deploy drill      | `deploy/rehearsal/drill.sh`  | The production Compose stack, built locally: first deploy, upgrades that stop nothing or must roll back, rollback, backup, and `ship.sh`.                              |
 
 CI (`.github/workflows/ci.yml`) runs all of them, and a nightly soak repeats the concurrency
 suites 50 times with shuffled order.

@@ -3,11 +3,10 @@
 #
 #   NEXT_COMPOSE_OVERLAYS=compose.traefik.yml
 #
-# from then on every script (`upgrade.sh`, `rollback.sh`, `backup.sh`,
-# `readyz.sh`) calls Compose with `-f compose.yml -f compose.traefik.yml`, so
-# a release recreates the edge with its route rather than without it. Taking
-# the site off the router is the reverse: remove the name and run an `up`
-# (README.md, "The Traefik overlay").
+# from then on every `shop` command calls Compose with `-f compose.yml -f
+# compose.traefik.yml`, so a release recreates the edge with its route rather
+# than without it. Taking the site off the router is the reverse: remove the
+# name and run `shop compose up -d --wait` (README.md, "The Traefik overlay").
 #
 # Why a second file rather than `traefik.enable=${NEXT_TRAEFIK:-false}` on the
 # service:

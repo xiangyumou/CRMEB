@@ -6,7 +6,7 @@ import { migrationsDir, rel } from '../lib/paths';
 /**
  * Migrations stay additive unless somebody says otherwise in writing (OPS-007).
  *
- * `deploy/upgrade.sh` rolls a failed release back to the previous digests
+ * `shop upgrade` rolls a failed release back to the previous digests
  * *unattended*: a stack that serves is a better place to end than a stack that
  * is down. That holds only while the previous image tolerates the new schema,
  * which is true while migrations only add. Once one drops a table or a column,
@@ -18,7 +18,7 @@ import { migrationsDir, rel } from '../lib/paths';
  *
  *     --> statement-breakpoint
  *     -- destructive: approved — orders.old_ref has been unread for two
- *     -- releases, and this release is deployed with --no-auto-rollback.
+ *     -- releases, so the previous image never reads the column either.
  *     ALTER TABLE "orders" DROP COLUMN "old_ref";
  *
  * The marker is per statement, not per file: one line at the top of a

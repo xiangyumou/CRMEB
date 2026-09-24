@@ -78,12 +78,16 @@ export type { SortableItemHelpers, SortableListFieldProps } from './form/sortabl
 export { toNamePath } from './form/types';
 export type { FieldBase, FieldName, FieldSpec, SelectOption } from './form/types';
 export {
-  applyApiErrorToForm,
+  applyFieldErrors,
   applyZodIssues,
   fieldSchemaOf,
   isFieldRequired,
+  matchApiError,
+  matchFieldErrors,
   zodFieldRule,
 } from './form/zod-bridge';
+export type { FieldErrorMatch } from './form/zod-bridge';
+export { FormErrorBanner, useFieldErrors } from './form/form-errors';
 
 // ── Asset library ───────────────────────────────────────────────────────────
 export { AssetPicker, useAssetPicker } from './asset/asset-picker';

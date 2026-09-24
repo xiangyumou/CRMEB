@@ -1,11 +1,11 @@
 # The shop's production stack: PostgreSQL, Redis, the Next.js server, the
-# BullMQ worker and the nginx edge. The scripts next to this file drive it; see
+# BullMQ worker and the nginx edge. `shop`, next to this file, drives it; see
 # README.md.
 #
-#   docker compose -p crmeb-next --env-file deployment.env -f compose.yml up -d --wait
+#   ./shop compose up -d --wait
 #
 # Every image is pinned by digest through the env file. A moving tag would make
-# "the stack that passed" unidentifiable, and `upgrade.sh` refuses one outright.
+# "the stack that passed" unidentifiable, and `shop upgrade` refuses one outright.
 #
 # ## Memory
 #
@@ -14,9 +14,10 @@
 #
 #   postgres 512 · redis 160 · web 512 · worker 320 · edge 64
 #
-# `migrate` is a one-shot under a profile and runs only while `web` and
-# `worker` are stopped, so its 384 MiB reuses their 832 MiB rather than adding
-# to the total. Each JavaScript service also gets an explicit old-space ceiling
+# `migrate` is a one-shot under a profile. A release with migrations runs it
+# while `web` and `worker` are stopped, reusing their 832 MiB; a release with
+# none runs only its seed, beside them, for a peak of 1952 MiB. Each
+# JavaScript service also gets an explicit old-space ceiling
 # well under its cgroup limit: V8 sizes its heap from the *host's* memory
 # unless told otherwise, and would happily grow past the limit and be OOM
 # killed with no diagnostic.
@@ -123,7 +124,10 @@ services:
 
   # One-shot. `--profile migrate` keeps it out of a plain `up`: a migration
   # that runs on every `up -d` is a migration that runs against live writers.
-  # `upgrade.sh` runs it with the application services stopped.
+  # `shop upgrade` runs it with the application services stopped when there is
+  # something to migrate, and otherwise runs only the seed, beside them. The
+  # same image answers "is anything left to migrate?" (`db/src/pending.mjs`)
+  # before either.
   migrate:
     image: ${NEXT_WORKER_IMAGE:?}
     container_name: ${NEXT_CONTAINER_PREFIX:-crmeb-next}-migrate

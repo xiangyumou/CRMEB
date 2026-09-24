@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The deploy drill: every claim `deploy` makes, proved against real
+# The deploy drill: every claim `shop` and `ship.sh` make, proved against real
 # containers, on this machine, in one command.
 #
 #   deploy/rehearsal/drill.sh [--list] [--only <substring>] [--keep]
@@ -23,6 +23,13 @@
 # is the part worth drilling. Pinning, pulling, and reading back the digest a
 # container is actually running are three separate mechanisms, and a drill that
 # bypasses them proves the scripts work in the one mode production never uses.
+#
+# The `ship/` cases ship the *committed* tree (`git archive HEAD`), as a real
+# release does, into a directory under $TMPDIR with `SHIP_HOST=local`: no SSH,
+# a stand-in `gh` that answers for CI, and the images published to the
+# throwaway registry under `sha-<HEAD>`. Commit before drilling a change to
+# what ships. The site is never checked from outside: the drill's settings name
+# no public host.
 #
 # Passwords are generated per run into a mode-600 file under $TMPDIR and
 # deleted on teardown. No credential is ever passed in argv — the rule the real
@@ -86,6 +93,7 @@ CASE_IDS=(
   static/memory-budget
   static/no-secrets-in-repo
   static/traefik-overlay-resolves
+  cli/help-lists-commands
   overlay/refuses-missing-file
   upgrade/refuses-moving-tag
   upgrade/requires-all-three-candidates
@@ -93,6 +101,7 @@ CASE_IDS=(
   upgrade/dry-run-changes-nothing
   edge/proxies-every-page-route
   backup/verifies-restore
+  backup/verifies-beside-live-writes
   backup/refuses-tampered-dump
   backup/refuses-truncated-dump
   upgrade/failed-migration-ends-on-previous
@@ -102,12 +111,23 @@ CASE_IDS=(
   rollback/refuses-unavailable-target
   rollback/last-upgrade-returns-previous
   overlay/upgrade-and-rollback-keep-overlay
+  status/reports-the-release
+  upgrade/no-migration-keeps-serving
+  upgrade/edge-follows-a-recreated-web
+  upgrade/config-only-stops-nothing
+  upgrade/pending-migration-stops-writers
+  ship/refuses-red-ci
+  ship/dry-run-changes-nothing
+  ship/into-a-fresh-dir
+  ship/removes-what-it-no-longer-ships
+  ship/forwards-host-commands
 )
 CASE_FNS=(
   case_healthcheck_per_service
   case_memory_budget
   case_no_secrets_in_repo
   case_traefik_overlay_resolves
+  case_help_lists_commands
   case_overlay_refuses_missing
   case_refuses_moving_tag
   case_requires_all_three
@@ -115,6 +135,7 @@ CASE_FNS=(
   case_dry_run
   case_edge_proxies_every_page
   case_backup_verifies_restore
+  case_backup_beside_live_writes
   case_backup_refuses_tampered_dump
   case_backup_refuses_truncated_dump
   case_failed_migration
@@ -124,6 +145,16 @@ CASE_FNS=(
   case_rollback_refuses_unavailable
   case_rollback_last_upgrade
   case_overlay_kept
+  case_status_reports
+  case_no_migration_keeps_serving
+  case_edge_follows_web
+  case_config_only
+  case_pending_migration
+  case_ship_refuses_red_ci
+  case_ship_dry_run
+  case_ship_fresh_dir
+  case_ship_removes
+  case_ship_forwards
 )
 
 if [ "$list_only" -eq 1 ]; then
@@ -215,6 +246,7 @@ sed \
   -e "s|^APP_ORIGIN=.*|APP_ORIGIN=http://127.0.0.1:$edge_port|" \
   -e "s|^APP_VERSION=.*|APP_VERSION=drill|" \
   -e "s|^NEXT_EDGE_BIND=.*|NEXT_EDGE_BIND=127.0.0.1:$edge_port|" \
+  -e "s|^NEXT_HOST=.*|NEXT_HOST=|" \
   -e "s|^NEXT_BACKUP_DIR=.*|NEXT_BACKUP_DIR=$workdir/backups|" \
   "$deploy_dir/deployment.env.example" >"$NEXT_DEPLOYMENT_ENV"
 chmod 600 "$NEXT_DEPLOYMENT_ENV"
@@ -253,7 +285,7 @@ fi
 
 # Pushes an image and returns the immutable reference the registry gave it.
 # That reference — never the tag that was pushed — is what the cases deploy,
-# which is what `upgrade.sh` demands of a real release.
+# which is what `shop upgrade` demands of a real release.
 publish() {
   local source="$1" repo="$2" tag="$3" digest
   docker tag "$source" "$registry/$repo:$tag"
@@ -289,9 +321,15 @@ worker_v2="$(publish crmeb-next-worker:drill-v2 crmeb-next-worker v2)" || exit 3
 edge_v2="$(publish crmeb-next-edge:drill-v2 crmeb-next-edge v2)" || exit 3
 
 derive "$here/broken-worker.Dockerfile" "$worker_src" crmeb-next-worker:drill-broken || exit 3
-derive "$here/broken-migrate.Dockerfile" "$worker_src" crmeb-next-worker:drill-badmigrate || exit 3
+derive "$here/pending-migration.Dockerfile" "$worker_src" crmeb-next-worker:drill-badmigrate \
+  --build-arg MIGRATION_TAG=9000_drill_fails \
+  --build-arg 'MIGRATION_SQL=SELECT 1 / 0;' || exit 3
+derive "$here/pending-migration.Dockerfile" "$worker_src" crmeb-next-worker:drill-v3 \
+  --build-arg MIGRATION_TAG=9000_drill_marker \
+  --build-arg 'MIGRATION_SQL=CREATE TABLE "drill_marker" ("id" integer);' || exit 3
 worker_broken="$(publish crmeb-next-worker:drill-broken crmeb-next-worker broken)" || exit 3
 worker_badmigrate="$(publish crmeb-next-worker:drill-badmigrate crmeb-next-worker badmigrate)" || exit 3
+worker_v3="$(publish crmeb-next-worker:drill-v3 crmeb-next-worker v3)" || exit 3
 
 say "  web    v1 $web_v1"
 say "  web    v2 $web_v2"
@@ -338,9 +376,10 @@ run_expect() {
   return 0
 }
 
-upgrade() { "$deploy_dir/upgrade.sh" "$@"; }
-rollback() { "$deploy_dir/rollback.sh" "$@"; }
-backup() { "$deploy_dir/backup.sh" "$@"; }
+shop() { "$deploy_dir/shop" "$@"; }
+upgrade() { shop upgrade "$@"; }
+rollback() { shop rollback "$@"; }
+backup() { shop backup "$@"; }
 
 # What `deployment.env` pins, and what the containers are actually running. The
 # drill asserts on both every time: a rollback that edited the file but left the
@@ -451,16 +490,19 @@ def limit(service):
         raise SystemExit(f'  unparsable memory limit: {value!r}')
     return int(match.group(1)) * unit[(match.group(2) or 'b').lower()]
 
-failures, total = [], 0
+ONE_SHOT_CAP = 2048 * 1024 * 1024   # the same, with the seed running beside them
+failures, total, one_shot = [], 0, 0
 for name, service in sorted(config['services'].items()):
     value = limit(service)
     if value is None:
         failures.append(f'{name} declares no memory limit')
         continue
-    # `migrate` runs while web and worker are stopped, so it reuses their
-    # allowance rather than adding to the total.
+    # `migrate` is a one-shot. A release with nothing to migrate runs its seed
+    # beside the live stack, so it is counted once more on top, separately.
     if name != 'migrate':
         total += value
+    else:
+        one_shot = value
     print(f'  {name:<9} {value // 1024 // 1024:>4} MiB')
     # V8 sizes its heap from the *host's* memory, not the cgroup's, so a node
     # container with no explicit heap cap is OOM killed with no diagnostic.
@@ -468,8 +510,11 @@ for name, service in sorted(config['services'].items()):
     if name in ('web', 'worker', 'migrate') and '--max-old-space-size' not in options:
         failures.append(f'{name} runs node without --max-old-space-size')
 print(f'  {"total":<9} {total // 1024 // 1024:>4} MiB of {CAP // 1024 // 1024} MiB')
+print(f'  {"+ seed":<9} {(total + one_shot) // 1024 // 1024:>4} MiB of {ONE_SHOT_CAP // 1024 // 1024} MiB')
 if total > CAP:
     failures.append(f'the long-running services total {total // 1024 // 1024} MiB')
+if total + one_shot > ONE_SHOT_CAP:
+    failures.append(f'with the one-shot beside them they total {(total + one_shot) // 1024 // 1024} MiB')
 for failure in failures:
     print('  NOT ok:', failure)
 sys.exit(1 if failures else 0)
@@ -499,6 +544,19 @@ case_no_secrets_in_repo() {
   fi
   check 'deployment.env is gitignored' \
     git -C "$repo_root" check-ignore -q deploy/deployment.env
+  check 'ship.local.env is gitignored' \
+    git -C "$repo_root" check-ignore -q deploy/ship.local.env
+}
+
+# One entry point on the host, and it says what it does.
+case_help_lists_commands() {
+  local command
+  run_expect 0 "$workdir/help.log" shop help || return 1
+  for command in upgrade rollback backup status resolve compose hostname; do
+    check "shop help lists $command" grep -qE "^  $command " "$workdir/help.log"
+  done
+  run_expect 2 "$workdir/help-unknown.log" shop readyz || return 1
+  check 'an unknown command is refused and the list printed' grep -q '^usage: shop' "$workdir/help-unknown.log"
 }
 
 # The real Traefik overlay, merged the way every script merges it: named by
@@ -566,13 +624,13 @@ case_overlay_refuses_missing() {
   local saved="$workdir/settings.before-missing-overlay"
   cp -p "$NEXT_DEPLOYMENT_ENV" "$saved"
   set_setting NEXT_COMPOSE_OVERLAYS 'compose.yml, compose.not-there.yml'
-  if run_expect 1 "$workdir/overlay-missing-readyz.log" "$deploy_dir/readyz.sh"; then
-    check 'readyz.sh names the missing file' \
-      grep -q 'compose.not-there.yml, which does not exist' "$workdir/overlay-missing-readyz.log"
+  if run_expect 1 "$workdir/overlay-missing-status.log" shop status; then
+    check 'shop status names the missing file' \
+      grep -q 'compose.not-there.yml, which does not exist' "$workdir/overlay-missing-status.log"
   fi
   if run_expect 1 "$workdir/overlay-missing-upgrade.log" \
     upgrade --dry-run --web "$web_v1" --worker "$worker_v1" --edge "$edge_v1"; then
-    check 'upgrade.sh names the missing file' \
+    check 'shop upgrade names the missing file' \
       grep -q 'compose.not-there.yml, which does not exist' "$workdir/overlay-missing-upgrade.log"
   fi
   cp -p "$saved" "$NEXT_DEPLOYMENT_ENV"
@@ -626,6 +684,8 @@ case_dry_run() {
   run_expect 0 "$workdir/dry-run.log" \
     upgrade --dry-run --web "$web_v2" --worker "$worker_v2" --edge "$edge_v2" || return 1
   check 'it says it changed nothing' grep -q 'no migration ran' "$workdir/dry-run.log"
+  check 'it asked the candidate and found nothing to migrate' \
+    grep -q 'the release would stop nothing' "$workdir/dry-run.log"
   check 'the settings are untouched' [ "$before" = "$(cat "$NEXT_DEPLOYMENT_ENV")" ]
   check 'the stack is still on v1' on_release web "$web_v1"
 }
@@ -719,6 +779,34 @@ case_backup_verifies_restore() {
 # the same data. A structurally perfect dump that is missing rows is the
 # failure mode that costs you the recovery, so the drill removes some and
 # requires the verifier to notice.
+# `pg_dump` reads one snapshot, so a dump taken while the shop is writing is a
+# good dump, but its row counts stop matching the live database a moment
+# later. The verification has to prove it against the dump's own snapshot, and
+# must not refuse a good dump because somebody placed an order meanwhile.
+case_backup_beside_live_writes() {
+  ensure_deployed || return 1
+  psql_q 'create table if not exists drill_writes (id serial primary key, at timestamptz default now())' \
+    >/dev/null || return 1
+  local writer rc=0 before after
+  before="$(psql_q 'select count(*) from drill_writes')"
+  (
+    while :; do
+      psql_q 'insert into drill_writes default values' >/dev/null 2>&1 || true
+      sleep 0.1
+    done
+  ) &
+  writer=$!
+  run_expect 0 "$workdir/backup-live.log" backup --out "$workdir/live.sql.gz" || rc=1
+  kill "$writer" 2>/dev/null
+  wait "$writer" 2>/dev/null || true
+  after="$(psql_q 'select count(*) from drill_writes')"
+  psql_q 'drop table drill_writes' >/dev/null || true
+  [ "$rc" -eq 0 ] || return 1
+  check "rows were written while it ran ($before, then $after)" [ "$after" -gt "$before" ]
+  check "it verified against the dump's own snapshot" \
+    grep -q "counted against the dump's own snapshot" "$workdir/backup-live.log"
+}
+
 case_backup_refuses_tampered_dump() {
   [ -n "$drill_dump" ] || {
     note 'no dump from the previous case'
@@ -768,12 +856,18 @@ case_failed_migration() {
   run_expect 1 "$workdir/bad-migrate.log" \
     upgrade --app-version drill-badmigrate \
     --web "$web_v2" --worker "$worker_badmigrate" --edge "$edge_v2" || return 1
+  check 'it found the pending migration' \
+    grep -q '1 migration(s) to apply: 9000_drill_fails' "$workdir/bad-migrate.log"
+  check 'it stopped the writers to migrate' \
+    grep -q 'stopping the application services' "$workdir/bad-migrate.log"
   check 'it says the migration failed' grep -q 'the migration failed' "$workdir/bad-migrate.log"
   check 'a verified dump was taken first' grep -qE '^backup: ' "$workdir/bad-migrate.log"
+  check 'it reports the schema may have moved' \
+    grep -q 'the database is on the NEW schema' "$workdir/bad-migrate.log"
   check 'web is back on v1' on_release web "$web_v1"
   check 'worker is back on v1' on_release worker "$worker_v1"
   check 'edge is back on v1' on_release edge "$edge_v1"
-  check 'the readiness gate still passes' "$deploy_dir/readyz.sh"
+  check 'the readiness gate still passes' shop status
 }
 
 case_unhealthy_worker() {
@@ -785,14 +879,16 @@ case_unhealthy_worker() {
     --web "$web_v2" --worker "$worker_broken" --edge "$edge_v2" || return 1
   check 'it says the stack did not become healthy' \
     grep -q 'did not become healthy' "$workdir/broken-worker.log"
-  # The migration ran before the stack was started, so the operator has to be
-  # told the schema moved even though the images did not.
-  check 'it reports the schema had already moved' \
-    grep -q 'the database is on the NEW schema' "$workdir/broken-worker.log"
+  # Nothing to migrate, so nothing was stopped; the operator is told the schema
+  # did not move, which is what makes the previous images a safe place to end.
+  check 'it took the path that stops nothing' \
+    grep -q 'the release will not stop anything' "$workdir/broken-worker.log"
+  check 'it reports the schema did not move' \
+    grep -q 'the schema did not move' "$workdir/broken-worker.log"
   check 'web is back on v1' on_release web "$web_v1"
   check 'worker is back on v1' on_release worker "$worker_v1"
   check 'edge is back on v1' on_release edge "$edge_v1"
-  check 'the readiness gate still passes' "$deploy_dir/readyz.sh"
+  check 'the readiness gate still passes' shop status
 }
 
 # Every container healthy, both probes answering, and the release still refused
@@ -839,7 +935,7 @@ case_rollback_refuses_unavailable() {
     rollback --web "$registry/crmeb-next-web@sha256:$zeros" \
     --worker "$worker_v1" --edge "$edge_v1" || return 1
   check 'the settings were not touched' [ "$before" = "$(cat "$NEXT_DEPLOYMENT_ENV")" ]
-  check 'the stack is still serving' "$deploy_dir/readyz.sh"
+  check 'the stack is still serving' shop status
 }
 
 case_rollback_last_upgrade() {
@@ -853,7 +949,7 @@ case_rollback_last_upgrade() {
   check 'web is back on v1' on_release web "$web_v1"
   check 'worker is back on v1' on_release worker "$worker_v1"
   check 'edge is back on v1' on_release edge "$edge_v1"
-  check 'the readiness gate passes on the rolled-back stack' "$deploy_dir/readyz.sh"
+  check 'the readiness gate passes on the rolled-back stack' shop status
 }
 
 # --- the overlay -------------------------------------------------------------------------
@@ -914,7 +1010,7 @@ YAML
   check 'the rollback put the edge back on v1' on_release edge "$edge_v1"
   check 'after the rollback the edge is on the overlay network' edge_on_network "$overlay_network"
   check 'after the rollback the edge carries the overlay label' edge_labelled
-  check 'readyz.sh passes with the overlay' "$deploy_dir/readyz.sh"
+  check 'shop status passes with the overlay' shop status
 
   # The other way round: with the key emptied, an `up` takes the edge off the
   # overlay. That is how the site leaves the router, and it shows the checks
@@ -923,7 +1019,315 @@ YAML
   compose up -d --wait --wait-timeout 180 >/dev/null 2>&1 || true
   check 'with the key emptied, an up takes the edge off the overlay network' \
     edge_off_network "$overlay_network"
-  check 'and the stack still serves' "$deploy_dir/readyz.sh"
+  check 'and the stack still serves' shop status
+}
+
+# --- what a release that stops nothing looks like from outside -------------------------
+
+# A request every 200 ms through the edge to `web` (`/api/v1/health`, which
+# touches nothing behind the app), one `<epoch ms> <status>` line each.
+probe_pid=''
+probe_log=''
+start_probe() {
+  probe_log="$workdir/probe-$1.log"
+  : >"$probe_log"
+  (
+    while :; do
+      code="$(curl -s -o /dev/null --max-time 2 -w '%{http_code}' \
+        "http://127.0.0.1:$edge_port/api/v1/health" 2>/dev/null || true)"
+      printf '%s %s\n' "$(date +%s%3N)" "${code:-000}" >>"$probe_log"
+      sleep 0.2
+    done
+  ) &
+  probe_pid=$!
+  sleep 1
+}
+stop_probe() {
+  kill "$probe_pid" 2>/dev/null
+  wait "$probe_pid" 2>/dev/null || true
+}
+# `<longest gap ms> <failed requests> <requests>`: the gap runs from the last
+# answer before a failure to the first answer after it, and is -1 when the
+# probe never got an answer again.
+probe_summary() {
+  awk '
+    $2 ~ /^2/ {
+      if (failing && seen) { gap = $1 - last_ok; if (gap > longest) longest = gap }
+      failing = 0; seen = 1; last_ok = $1; next
+    }
+    { failing = 1; failed++ }
+    END { if (failing) longest = -1; printf "%d %d %d\n", longest, failed, NR }
+  ' "$probe_log"
+}
+container_of() { compose ps -q "$1" 2>/dev/null; }
+lacks() { ! grep -q -- "$1" "$2"; }
+lacks_fixed() { ! grep -qF -- "$1" "$2"; }
+# shellcheck disable=SC2012  # the names are generated by `shop upgrade`.
+last_manifest() { ls -t "$workdir"/backups/upgrade-*.manifest | head -n1; }
+started_at() { docker inspect -f '{{.State.StartedAt}}' "$(container_of "$1")" 2>/dev/null; }
+
+case_status_reports() {
+  ensure_deployed || return 1
+  run_expect 0 "$workdir/status.log" shop status || return 1
+  check 'it names each running image' grep -q "web: $(running web)" "$workdir/status.log"
+  check 'it shows the last upgrade manifest' grep -q '^last upgrade: .*upgrade-.*\.manifest' "$workdir/status.log"
+  check 'it runs the readiness gate' grep -q 'readiness gate: passed' "$workdir/status.log"
+  check 'it prints no password' lacks_fixed "$pg_password" "$workdir/status.log"
+  check 'it prints no Redis password' lacks_fixed "$redis_password" "$workdir/status.log"
+}
+
+# The point of asking the candidate first: a release with nothing to migrate
+# stops nothing. `web` is recreated, so there is a moment with no `web`, and
+# the edge is recreated after it; this case measures the longest gap rather
+# than pretending it is zero, and holds it to a few seconds (the path that
+# stops the writers, measured the same way below, is down for all of it).
+case_no_migration_keeps_serving() {
+  ensure_deployed || return 1
+  on_release web "$web_v1" || {
+    note 'the stack is not on v1 (run without --only)'
+    return 77
+  }
+  local rc=0 summary gap failed total
+  start_probe no-migration
+  run_expect 0 "$workdir/no-migration.log" \
+    upgrade --app-version drill-no-migration \
+    --web "$web_v2" --worker "$worker_v2" --edge "$edge_v2" || rc=1
+  stop_probe
+  [ "$rc" -eq 0 ] || return 1
+  summary="$(probe_summary)"
+  read -r gap failed total <<<"$summary"
+  note "measured: $failed of $total requests failed; the longest gap was $gap ms"
+  check 'it asked and found nothing to migrate' grep -q 'nothing to migrate' "$workdir/no-migration.log"
+  check 'it stopped nothing' lacks 'stopping the application services' "$workdir/no-migration.log"
+  check 'it still took and verified a backup' grep -q 'backup verified' "$workdir/no-migration.log"
+  check 'it ran the seed beside the live stack' grep -q 'reference seed beside the live stack' "$workdir/no-migration.log"
+  check 'web is on v2' on_release web "$web_v2"
+  check 'worker is on v2' on_release worker "$worker_v2"
+  check 'edge is on v2' on_release edge "$edge_v2"
+  check 'web answered again afterwards' [ "$gap" -ge 0 ]
+  check 'no gap in answers was longer than 5 s' [ "$gap" -le 5000 ]
+}
+
+# Only `web` changes, so Compose recreates only `web`, under a new address,
+# beside an edge it does not touch. The edge has to find it: nginx looks the
+# name up again rather than keeping the address it started with.
+case_edge_follows_web() {
+  ensure_deployed || return 1
+  on_release edge "$edge_v2" || {
+    note 'the stack is not on v2 (run without --only)'
+    return 77
+  }
+  local edge_before rc=0 gap failed total
+  edge_before="$(started_at edge)"
+  start_probe edge-follows
+  run_expect 0 "$workdir/edge-follows.log" \
+    upgrade --app-version drill-web-only \
+    --web "$web_v1" --worker "$worker_v2" --edge "$edge_v2" || rc=1
+  stop_probe
+  [ "$rc" -eq 0 ] || return 1
+  read -r gap failed total <<<"$(probe_summary)"
+  note "measured: $failed of $total requests failed; the longest gap was $gap ms"
+  check 'web is on v1' on_release web "$web_v1"
+  check 'the edge was neither recreated nor restarted' [ "$(started_at edge)" = "$edge_before" ]
+  check 'the edge reaches the new web' \
+    curl -fsS --max-time 10 -o /dev/null "http://127.0.0.1:$edge_port/api/v1/health"
+}
+
+# The same digests, and a Compose file that changed: the http-to-https
+# redirect in `compose.traefik.yml` is that kind of release. It goes through
+# the same command, stops nothing, and recreates only what the files changed.
+case_config_only() {
+  ensure_deployed || return 1
+  if ! { on_release web "$web_v1" && on_release worker "$worker_v2"; }; then
+    note 'the stack is not where the previous case left it (run without --only)'
+    return 77
+  fi
+  local overlay="$workdir/compose.drill-config.yml" web_before worker_before edge_before rc=0
+  cat >"$overlay" <<'YAML'
+services:
+  edge:
+    labels:
+      - crmeb-next-drill.config=applied
+YAML
+  set_setting NEXT_COMPOSE_OVERLAYS "$overlay"
+  web_before="$(container_of web)"
+  worker_before="$(container_of worker)"
+  edge_before="$(container_of edge)"
+  run_expect 0 "$workdir/config-only.log" \
+    upgrade --app-version drill-config-only \
+    --web "$web_v1" --worker "$worker_v2" --edge "$edge_v2" || rc=1
+  set_setting NEXT_COMPOSE_OVERLAYS ''
+  [ "$rc" -eq 0 ] || return 1
+  check 'it stopped nothing' lacks 'stopping the application services' "$workdir/config-only.log"
+  check 'it saw the images were the running ones' grep -q 'only the Compose files can change' "$workdir/config-only.log"
+  check 'APP_VERSION still names the build that runs' [ "$(setting APP_VERSION)" != 'drill-config-only' ]
+  check 'web was left alone' [ "$(container_of web)" = "$web_before" ]
+  check 'worker was left alone' [ "$(container_of worker)" = "$worker_before" ]
+  check 'the edge was recreated with the change' [ "$(container_of edge)" != "$edge_before" ]
+  check 'the edge carries the new label' [ "$(docker inspect -f '{{index .Config.Labels "crmeb-next-drill.config"}}' \
+    "$(container_of edge)")" = 'applied' ]
+}
+
+# And the other way: a candidate that brings a migration still stops the
+# writers, backs up, migrates and starts, exactly as before.
+case_pending_migration() {
+  ensure_deployed || return 1
+  local rc=0 gap failed total
+  start_probe pending
+  run_expect 0 "$workdir/pending.log" \
+    upgrade --app-version drill-pending \
+    --web "$web_v2" --worker "$worker_v3" --edge "$edge_v2" || rc=1
+  stop_probe
+  [ "$rc" -eq 0 ] || return 1
+  read -r gap failed total <<<"$(probe_summary)"
+  note "measured, for comparison: $failed of $total requests failed; the longest gap was $gap ms"
+  check 'it found the migration' grep -q '1 migration(s) to apply: 9000_drill_marker' "$workdir/pending.log"
+  check 'it stopped the writers' grep -q 'stopping the application services' "$workdir/pending.log"
+  check 'a verified dump was taken first' grep -qE '^backup: ' "$workdir/pending.log"
+  check 'the migration ran' [ "$(psql_q "select to_regclass('public.drill_marker') is not null")" = 't' ]
+  check 'worker is on v3' on_release worker "$worker_v3"
+  check 'the manifest records the path' grep -q '^path=stopped' "$(last_manifest)"
+}
+
+# --- ship.sh ---------------------------------------------------------------------------------
+
+ship_dir="$workdir/host"
+ship_bin="$workdir/bin"
+ship_sha=''
+ship_web=''
+ship_ready=0
+
+# What CI would have done for HEAD (published its images as `sha-<HEAD>`, and
+# passed), and a release directory holding only what the host owns.
+ensure_ship() {
+  case "$ship_ready" in
+    1) return 0 ;;
+    -1) return 1 ;;
+  esac
+  ship_ready=-1
+  ensure_deployed || return 1
+  ship_sha="$(git -C "$repo_root" rev-parse --verify -q HEAD)" || {
+    note 'not a git checkout'
+    return 1
+  }
+  [ -z "$(git -C "$repo_root" status --porcelain -- deploy)" ] ||
+    note "deploy/ has uncommitted changes; the ship cases ship HEAD ($ship_sha) without them"
+  ship_web="$(publish "$web_src" crmeb-next-web "sha-$ship_sha")" || return 1
+  publish "$worker_src" crmeb-next-worker "sha-$ship_sha" >/dev/null || return 1
+  publish "$edge_src" crmeb-next-edge "sha-$ship_sha" >/dev/null || return 1
+  mkdir -p "$ship_bin" "$ship_dir/data"
+  cat >"$ship_bin/gh" <<'EOF'
+#!/usr/bin/env bash
+# Stands in for `gh run list`: answers DRILL_CI for the commit the drill ships,
+# and nothing for any other.
+case " $* " in
+  *" run list "*"--commit $DRILL_SHA "*) printf '%s\n' "${DRILL_CI:-completed success}" ;;
+esac
+EOF
+  chmod +x "$ship_bin/gh"
+  cp -p "$NEXT_DEPLOYMENT_ENV" "$ship_dir/deployment.env"
+  printf '# drill: owned by the host\n' >>"$ship_dir/deployment.env"
+  printf 'the host keeps this\n' >"$ship_dir/data/keep-me"
+  # From here on the release directory's settings are the deployment's.
+  settings="$ship_dir/deployment.env"
+  ship_ready=1
+}
+
+ship() {
+  PATH="$ship_bin:$PATH" DRILL_SHA="$ship_sha" SHIP_HOST=local SHIP_DIR="$ship_dir" \
+    SHIP_REMOTE="$repo_root" SHIP_BRANCH=HEAD "$deploy_dir/ship.sh" "$@"
+}
+
+host_owned_intact() {
+  [ "$(stat -c '%a' "$ship_dir/deployment.env")" = '600' ] &&
+    grep -q '^# drill: owned by the host$' "$ship_dir/deployment.env" &&
+    [ "$(cat "$ship_dir/data/keep-me")" = 'the host keeps this' ]
+}
+
+tree_of() { (cd "$1" && find . -type f -printf '%P %s %T@ %m\n' | LC_ALL=C sort); }
+
+case_ship_refuses_red_ci() {
+  ensure_ship || return 1
+  DRILL_CI='completed failure' run_expect 4 "$workdir/ship-red.log" ship "$ship_sha" || return 1
+  check 'it says CI did not pass' grep -q 'CI did not pass' "$workdir/ship-red.log"
+  DRILL_CI='in_progress ' run_expect 4 "$workdir/ship-running.log" ship "$ship_sha" || return 1
+  check 'it waits for a CI run still in progress' grep -q 'CI is still running' "$workdir/ship-running.log"
+  check 'nothing was shipped' [ ! -e "$ship_dir/shop" ]
+}
+
+case_ship_dry_run() {
+  ensure_ship || return 1
+  local before web_before
+  before="$(tree_of "$ship_dir")"
+  web_before="$(running web)"
+  run_expect 0 "$workdir/ship-dry.log" ship --dry-run "$ship_sha" || return 1
+  check 'it resolved the digests CI published' grep -qF "web:    $ship_web" "$workdir/ship-dry.log"
+  check 'it lists the files it would add' grep -q '^  + shop$' "$workdir/ship-dry.log"
+  check 'the staged upgrade ran as a dry run' grep -q 'dry run: nothing was stopped' "$workdir/ship-dry.log"
+  check 'the release directory is unchanged' [ "$before" = "$(tree_of "$ship_dir")" ]
+  check 'the stack is unchanged' [ "$(running web)" = "$web_before" ]
+}
+
+case_ship_fresh_dir() {
+  ensure_ship || return 1
+  [ ! -e "$ship_dir/shop" ] || {
+    note 'the release directory is not fresh'
+    return 77
+  }
+  run_expect 0 "$workdir/ship-fresh.log" ship "$ship_sha" || return 1
+  check 'shop is there and executable' [ -x "$ship_dir/shop" ]
+  check 'the Compose files and lib/ are there' \
+    test -f "$ship_dir/compose.yml" -a -f "$ship_dir/compose.traefik.yml" -a -f "$ship_dir/lib/commands/upgrade.sh"
+  check 'the drill, the docs and ship.sh are not' \
+    test ! -e "$ship_dir/rehearsal" -a ! -e "$ship_dir/README.md" -a ! -e "$ship_dir/ship.sh"
+  check 'shipped.list names exactly what was shipped' [ "$(LC_ALL=C sort "$ship_dir/data/shipped.list")" = \
+    "$(cd "$ship_dir" && find . -type f ! -path './data/*' ! -name deployment.env ! -name REVISION -printf '%P\n' | LC_ALL=C sort)" ]
+  check 'REVISION names the commit' [ "$(cat "$ship_dir/REVISION")" = "$ship_sha" ]
+  check 'web runs what CI published for it' on_release web "$ship_web"
+  check 'it stopped nothing' lacks 'stopping the application services' "$workdir/ship-fresh.log"
+  check 'deployment.env and data/ survived' host_owned_intact
+  check 'it did not look for the site from outside' grep -q 'no public host name' "$workdir/ship-fresh.log"
+}
+
+case_ship_removes() {
+  ensure_ship || return 1
+  [ -f "$ship_dir/data/shipped.list" ] || {
+    note 'nothing has been shipped yet (run without --only)'
+    return 77
+  }
+  # What an earlier release shipped and this one no longer has, and a file the
+  # operator put there that no release ever shipped.
+  mkdir -p "$ship_dir/lib/retired"
+  printf 'old\n' >"$ship_dir/lib/retired/old.sh"
+  printf 'old\n' >"$ship_dir/retired.yml"
+  printf 'lib/retired/old.sh\nretired.yml\n' >>"$ship_dir/data/shipped.list"
+  printf 'mine\n' >"$ship_dir/operator-notes.txt"
+  local web_before
+  web_before="$(container_of web)"
+  run_expect 0 "$workdir/ship-again.log" ship "$ship_sha" || return 1
+  check 'it listed the removals' grep -q '^  - retired.yml$' "$workdir/ship-again.log"
+  check 'the retired files are gone' test ! -e "$ship_dir/retired.yml" -a ! -e "$ship_dir/lib/retired"
+  check 'shipped.list no longer names them' lacks retired "$ship_dir/data/shipped.list"
+  check 'a file no release shipped is left alone' [ "$(cat "$ship_dir/operator-notes.txt")" = 'mine' ]
+  check 'deployment.env and data/ survived' host_owned_intact
+  check 'the same release again recreated nothing' [ "$(container_of web)" = "$web_before" ]
+}
+
+case_ship_forwards() {
+  ensure_ship || return 1
+  [ -x "$ship_dir/shop" ] || {
+    note 'nothing has been shipped yet (run without --only)'
+    return 77
+  }
+  run_expect 0 "$workdir/ship-status.log" ship status || return 1
+  check 'status names the release' grep -q "^release:   $ship_sha" "$workdir/ship-status.log"
+  check 'status runs the gate' grep -q 'readiness gate: passed' "$workdir/ship-status.log"
+  run_expect 0 "$workdir/ship-backup.log" ship backup --out "$workdir/forwarded.sql.gz" || return 1
+  check 'backup verified its dump' grep -q 'backup verified' "$workdir/ship-backup.log"
+  run_expect 0 "$workdir/ship-rollback.log" ship rollback --last-upgrade || return 1
+  check 'rollback ran on the host' grep -q '^rolled back:' "$workdir/ship-rollback.log"
+  check 'REVISION still names the release it returned to' [ "$(cat "$ship_dir/REVISION")" = "$ship_sha" ]
+  run_expect 2 "$workdir/ship-misuse.log" ship status --bogus || return 1
 }
 
 # --- run ---------------------------------------------------------------------------------

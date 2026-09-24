@@ -1558,7 +1558,7 @@ The concurrency set (payment creation vs cancellation, refund agreement in two p
 
 ### OPS-005
 
-`upgrade.sh` refuses a moving tag, records the running digests as the rollback target, and refuses a release that does not name all three candidates (`web`, `worker`, `edge`); afterwards each service is verified to be running its own image.
+`shop upgrade` refuses a moving tag, records the running digests as the rollback target, and refuses a release that does not name all three candidates (`web`, `worker`, `edge`); afterwards each service is verified to be running its own image.
 
 - `deploy/rehearsal/drill.sh::upgrade/refuses-moving-tag`
 - `deploy/rehearsal/drill.sh::upgrade/requires-all-three-candidates`
@@ -1566,7 +1566,7 @@ The concurrency set (payment creation vs cancellation, refund agreement in two p
 
 ### OPS-006
 
-A dry run reports the plan without stopping writers or taking a backup.
+A dry run reports the plan, including whether the release would stop anything, without stopping writers or taking a backup.
 
 - `deploy/rehearsal/drill.sh::upgrade/dry-run-changes-nothing`
 
@@ -1593,14 +1593,15 @@ A backup that cannot be restored (contents disagree with the live database) stop
 
 ### OPS-010
 
-A valid upgrade dumps, verifies the dump by restoring it into an isolated database and comparing row counts, runs the migrations, resumes traffic and reports the rollback target.
+A valid upgrade dumps, verifies the dump by restoring it into an isolated database and comparing row counts, runs the migrations, resumes traffic and reports the rollback target. A dump taken while the writers run is verified against its own snapshot: every row it carries must come back, and it must hold every table the live database has.
 
 - `deploy/rehearsal/drill.sh::backup/verifies-restore`
+- `deploy/rehearsal/drill.sh::backup/verifies-beside-live-writes`
 - `deploy/rehearsal/drill.sh::upgrade/deploys-and-records-rollback-target`
 
 ### OPS-011
 
-`rollback.sh` refuses an unavailable target instead of changing the deployment, and never claims a database was restored.
+`shop rollback` refuses an unavailable target instead of changing the deployment, and never claims a database was restored.
 
 - `deploy/rehearsal/drill.sh::rollback/refuses-unavailable-target`
 - `deploy/rehearsal/drill.sh::rollback/last-upgrade-returns-previous`
@@ -1616,6 +1617,32 @@ Every long-running service declares a memory limit, the limits together stay und
 No tracked file under `deploy/` or `docker/` carries a credential, and `deployment.env` — the one file that does — is gitignored.
 
 - `deploy/rehearsal/drill.sh::static/no-secrets-in-repo`
+
+### OPS-014
+
+An upgrade stops the writers only when the candidate has a migration to apply. The candidate worker image is asked, read-only, which migrations the database lacks; when none is pending, nothing is stopped, the verified dump is still taken, the reference seed runs beside the live stack (it only upserts reference rows by natural key, in one transaction), and `up -d` recreates only what changed, while the edge keeps answering. A release that changes only the Compose files stops nothing, and a candidate with a new migration still stops `web`, `worker` and `edge` before it migrates.
+
+- `deploy/rehearsal/drill.sh::upgrade/no-migration-keeps-serving`
+- `deploy/rehearsal/drill.sh::upgrade/edge-follows-a-recreated-web`
+- `deploy/rehearsal/drill.sh::upgrade/config-only-stops-nothing`
+- `deploy/rehearsal/drill.sh::upgrade/pending-migration-stops-writers`
+
+### OPS-015
+
+`deploy/ship.sh` releases only a commit on `master` whose CI passed, has the host resolve the images CI published for it to digests, and passes those digests, never a tag. It syncs exactly the files the commit ships, removing what the previous release shipped and this one does not, and never touches `deployment.env` or `data/`. Its dry run changes nothing on the host, and `REVISION` is written only after the upgrade passed.
+
+- `deploy/rehearsal/drill.sh::ship/refuses-red-ci`
+- `deploy/rehearsal/drill.sh::ship/dry-run-changes-nothing`
+- `deploy/rehearsal/drill.sh::ship/into-a-fresh-dir`
+- `deploy/rehearsal/drill.sh::ship/removes-what-it-no-longer-ships`
+
+### OPS-016
+
+Every operation on the host goes through one command, `shop`, which lists its subcommands; `shop status` reports the release, the running digests and the last upgrade before it runs the readiness gate, and `ship.sh` forwards `status`, `backup` and `rollback` to it.
+
+- `deploy/rehearsal/drill.sh::cli/help-lists-commands`
+- `deploy/rehearsal/drill.sh::status/reports-the-release`
+- `deploy/rehearsal/drill.sh::ship/forwards-host-commands`
 
 ## Release publishing
 
