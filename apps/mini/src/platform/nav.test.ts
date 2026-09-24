@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import Taro from '@tarojs/taro';
 import { taroFake } from '@/test/taro-fake/taro';
 import {
   goBack,
@@ -53,6 +54,72 @@ describe('navigate', () => {
   it('sends an unknown key home', async () => {
     await navigate({ route: 'staff-orders' });
     expect(lastCall()).toEqual({ api: 'switchTab', args: { url: '/pages/index/index' } });
+  });
+
+  describe('a double tap opens the page once (K3)', () => {
+    const product = { route: 'product', params: { id: '1' } } as const;
+    const opens = () => taroFake.calls.filter((call) => call.api === 'navigateTo').length;
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('shares the open under way with a second call for the same page', async () => {
+      let land = () => undefined as void;
+      vi.spyOn(Taro, 'navigateTo').mockImplementation((args) => {
+        taroFake.calls.push({ api: 'navigateTo', args });
+        return new Promise((resolve) => {
+          land = () => resolve({ errMsg: 'navigateTo:ok' } as never);
+        });
+      });
+      const first = navigate(product);
+      const second = navigate(product);
+      land();
+      await Promise.all([first, second]);
+      expect(opens()).toBe(1);
+    });
+
+    it('drops the same page just landed while the shopper is still on it, not after going back or later', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      await navigate(product);
+      await navigate(product);
+      expect(opens()).toBe(1);
+
+      // Went back (the stack changed): the tap is a new one.
+      taroFake.pageStackDepth = 2;
+      await navigate(product);
+      expect(opens()).toBe(2);
+
+      vi.advanceTimersByTime(500);
+      await navigate(product);
+      expect(opens()).toBe(3);
+    });
+
+    it('lets another page, a replace of the same page, and a tab through', async () => {
+      await navigate(product);
+      await navigate({ route: 'product', params: { id: '2' } });
+      await navigate(product, { replace: true });
+      await navigate({ route: 'cart', params: {} });
+      await navigate({ route: 'cart', params: {} });
+      expect(taroFake.calls.map((call) => call.api)).toEqual([
+        'navigateTo',
+        'navigateTo',
+        'redirectTo',
+        'switchTab',
+        'switchTab',
+      ]);
+    });
+
+    it('forgets a failed open, so trying again opens the page', async () => {
+      const spy = vi
+        .spyOn(Taro, 'navigateTo')
+        .mockRejectedValueOnce(new Error('navigateTo:fail'));
+      await expect(navigate(product)).rejects.toThrow('navigateTo:fail');
+      spy.mockRestore();
+      await navigate(product);
+      expect(opens()).toBe(1);
+    });
   });
 
   it('goes back, or home when there is nothing behind', async () => {
