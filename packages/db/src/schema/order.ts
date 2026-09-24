@@ -110,6 +110,11 @@ export const orders = pgTable(
      * Each line's share is `order_items.discount_amount`; refunds use the line's `total_amount`.
      */
     couponDiscount: money().notNull().default('0.00'),
+    /**
+     * The part of `couponDiscount` an operator added by 改价. Each 改价 replaces
+     * it rather than adding to it, so 0.00 takes the last one back.
+     */
+    operatorDiscount: money().notNull().default('0.00'),
     /** What the buyer owes. `itemsAmount + freightAmount - couponDiscount`, unless an operator re-priced. */
     payableAmount: money().notNull(),
     /** What the gateway actually took. NULL until paid. */
@@ -185,6 +190,10 @@ export const orders = pgTable(
       .where(sql`status = 'shipped'`),
 
     check('orders_quantity_positive', sql`${t.totalQuantity} >= 1`),
+    check(
+      'orders_operator_discount_range',
+      sql`${t.operatorDiscount} >= 0 and ${t.operatorDiscount} <= ${t.couponDiscount}`,
+    ),
     check(
       'orders_amounts_non_negative',
       sql`${t.itemsAmount} >= 0 and ${t.freightAmount} >= 0 and ${t.couponDiscount} >= 0 and ${t.payableAmount} >= 0 and ${t.refundedAmount} >= 0 and (${t.paidAmount} is null or ${t.paidAmount} >= 0) and (${t.costAmount} is null or ${t.costAmount} >= 0)`,

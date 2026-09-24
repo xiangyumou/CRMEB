@@ -76,7 +76,11 @@ const DEFAULT_MESSAGE: Record<CancelReason, string> = {
   'payment-failed': '支付失败，订单已取消',
 };
 
-async function paymentState(ctx: Ctx, tx: Tx, orderId: number): Promise<PaymentState> {
+/**
+ * Step 2, under the order lock: is any attempt still open (or already paid)?
+ * Exported inside the domain for 改价, which needs the same answer.
+ */
+export async function openPaymentState(ctx: Ctx, tx: Tx, orderId: number): Promise<PaymentState> {
   const port = resolvePaymentPort();
   if (port) return port.ensureNoOpenAttempts(tx, orderId);
   ctx.logger.debug({ orderId }, 'no PaymentPort registered; treating payment as closed');
@@ -135,7 +139,7 @@ export async function cancelOrder(ctx: Ctx, input: CancelInput): Promise<CancelO
 
     // Step 2. The re-check, under the lock. Database-only by contract, and the
     // reason an attempt that opened between step 0 and here cannot slip past.
-    refuseOn(await paymentState(ctx, tx, input.orderId));
+    refuseOn(await openPaymentState(ctx, tx, input.orderId));
 
     const moved = await orderStateMachine.transition(
       tx,

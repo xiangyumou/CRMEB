@@ -8,6 +8,7 @@ import {
   paymentCallbacks,
   paymentExceptions,
 } from '@shop/db/schema/payment';
+import { admins } from '@shop/db/schema/auth';
 import { effects as effectsTable } from '@shop/db/schema/system';
 import { users } from '@shop/db/schema/user';
 import {
@@ -456,6 +457,59 @@ describe('QUEUE-003 — a callback racing an order cancel', () => {
     const order = await orderRow(started.orderId);
     expect(order.status).toBe('cancelled');
     expect((await attemptRows(started.orderId))[0]!.status).toBe('closed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 改价 against a payment the buyer already started
+// ---------------------------------------------------------------------------
+
+describe('改价 while the buyer holds a payment for the old amount', () => {
+  async function operator(): Promise<Ctx> {
+    sequence += 1;
+    const [row] = await harness.ctx.db
+      .insert(admins)
+      .values({ account: `op-${sequence}`, passwordHash: 'x', name: `操作员${sequence}` })
+      .returning({ id: admins.id });
+    return harness.ctx.as({ kind: 'admin', id: row!.id, permissions: [], isSuper: true });
+  }
+
+  const reprice = async (orderId: number, operatorDiscount: string) =>
+    order.orderConsole.adminAdjustPrice(
+      await operator(),
+      { id: String(orderId) },
+      { operatorDiscount },
+    );
+
+  it('closes the old payment at the gateway, and the buyer then pays the new amount', async () => {
+    const started = await startedPayment('99.00');
+
+    const detail = await reprice(started.orderId, '9.00');
+    expect(detail.payableAmount).toBe('90.00');
+    expect(gateway.transactions.get(started.outTradeNo)?.tradeState).toBe('CLOSED');
+    expect((await attemptRows(started.orderId))[0]!.status).toBe('closed');
+
+    // A fresh tap starts a fresh attempt, for the new amount.
+    const intent = await service.startPayment(racer(started.userId), {
+      orderId: started.orderId,
+      channel: 'wechat_mini',
+      openid: 'oFakeOpenid',
+    });
+    expect(intent.outTradeNo).not.toBe(started.outTradeNo);
+    const open = (await attemptRows(started.orderId)).find((a) => a.status !== 'closed');
+    expect(open?.amount).toBe('90.00');
+  });
+
+  it('refuses, and books the payment, when the buyer paid the old amount while the form was open', async () => {
+    const paid = await paidAtGateway('99.00');
+
+    await expect(reprice(paid.orderId, '9.00')).rejects.toMatchObject({
+      code: 'ORDER_PRICE_NOT_ADJUSTABLE',
+    });
+    const row = await orderRow(paid.orderId);
+    expect(row.status).toBe('paid');
+    expect(row.payableAmount).toBe('99.00');
+    expect(row.paidAmount).toBe('99.00');
   });
 });
 

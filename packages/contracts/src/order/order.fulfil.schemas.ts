@@ -375,6 +375,8 @@ export const adminOrderDetail = adminOrderListItem.extend({
   cancelReason: z.string().nullable(),
   /** Operator cost total, for the margin column. Never sent to a storefront surface. */
   costAmount: money.nullable(),
+  /** The 改价 discount currently on the order: the part of `couponDiscount` an operator added. */
+  operatorDiscount: money,
   transactionNo: z.string().nullable(),
   /** Deadline for `shipped -> received`; the auto-receive job reads it. */
   autoReceiveAt: instant.nullable(),
@@ -390,6 +392,7 @@ export const adminOrderDetailExample = {
   userCouponId: '9001',
   cancelReason: null,
   costAmount: '70.00',
+  operatorDiscount: '0.00',
   transactionNo: '4200001234202602011234567890',
   autoReceiveAt: null,
   shipments: [],
@@ -451,7 +454,10 @@ export type OrderRemarkBody = z.infer<typeof orderRemarkBody>;
  * no "set the total" field.
  */
 export const orderPriceBody = z.object({
-  /** Taken off the goods total, on top of any coupon. `"0.00"` undoes a previous change. */
+  /**
+   * Taken off the goods total, on top of checkout's discounts. It **replaces**
+   * the previous 改价 discount rather than adding to it, so `"0.00"` undoes it.
+   */
   operatorDiscount: money,
   /** Replaces the freight. Omit to keep what the freight rule quoted. */
   freightAmount: money.optional(),

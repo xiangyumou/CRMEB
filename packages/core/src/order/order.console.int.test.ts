@@ -472,10 +472,9 @@ describe('改价', () => {
 
   /**
    * The subject carries the resulting amount rather than only the order id.
-   * An order may legitimately be repriced more than once — the operator's
-   * discount is *added* to what is already there — and a per-order key would
-   * deduplicate every change after the first into silence. A save that leaves
-   * the total where it was still notifies once.
+   * An order may legitimately be repriced more than once — each 改价 replaces
+   * the last — and a per-order key would deduplicate every change after the
+   * first into silence. A save that leaves the total where it was notifies once.
    */
   it('tells the buyer again when the price moves again, and not when it does not', async () => {
     const adminId = await makeAdmin();
@@ -488,13 +487,21 @@ describe('改价', () => {
       );
 
     expect((await reprice('20.00')).payableAmount).toBe('40.00');
-    // Adds nothing, so the buyer owes what they were already told.
-    expect((await reprice('0.00')).payableAmount).toBe('40.00');
-    expect((await reprice('10.00')).payableAmount).toBe('30.00');
+    // 0.00 takes the 改价 back: the buyer owes the checkout price again.
+    const undone = await reprice('0.00');
+    expect(undone.payableAmount).toBe('60.00');
+    expect(undone.operatorDiscount).toBe('0.00');
+    // Replaces, never adds: 10 after 20 is 10 off, not 30.
+    const again = await reprice('10.00');
+    expect(again.payableAmount).toBe('50.00');
+    expect(again.operatorDiscount).toBe('10.00');
+    // The same 改价 twice leaves the total, and the buyer, alone.
+    expect((await reprice('10.00')).payableAmount).toBe('50.00');
 
-    expect((await priceChangeEffects()).map((row) => row.scopeId)).toEqual([
-      `order_price_changed:order-price:${placed.orderId}:30.00`,
+    expect((await priceChangeEffects()).map((row) => row.scopeId).sort()).toEqual([
       `order_price_changed:order-price:${placed.orderId}:40.00`,
+      `order_price_changed:order-price:${placed.orderId}:50.00`,
+      `order_price_changed:order-price:${placed.orderId}:60.00`,
     ]);
   });
 });

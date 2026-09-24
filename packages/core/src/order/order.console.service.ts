@@ -22,6 +22,8 @@ import { DomainError } from '../kernel/errors';
 import { fromId, toId, toIdOrNull } from '../kernel/ids';
 import { Money } from '../kernel/money';
 import { notify } from '../notification';
+import { closeOrderPayments, openPaymentState } from './order.cancel.service';
+import type { PaymentState } from './ports';
 import { orderFulfilConfig } from './order.fulfil.config';
 import * as fulfilRepo from './order.fulfil.repo';
 import * as rules from './order.fulfil.rules';
@@ -257,6 +259,7 @@ export async function adminDetail(ctx: Ctx, params: { id: string }): Promise<Adm
     userCouponId: toIdOrNull(row.userCouponId),
     cancelReason: row.cancelReason,
     costAmount: row.costAmount,
+    operatorDiscount: row.operatorDiscount,
     transactionNo: row.transactionNo,
     autoReceiveAt: iso(row.autoReceiveAt),
     shipments: shipmentRows.map((shipment) =>
@@ -353,7 +356,22 @@ export async function adminRemark(
  * payment that landed while the form was open makes this affect zero rows and
  * the operator is told — rather than the system quietly rewriting the price of
  * an order somebody has already paid for.
+ *
+ * The buyer may already hold a payment for the old amount. It is closed first,
+ * with the cancel path's two-call protocol: `closeOrderPayments` at the gateway
+ * outside the transaction, `openPaymentState` again under the order lock. Money
+ * that arrived meanwhile refuses the change; a close the gateway did not
+ * confirm refuses it too, because that payment could still land at the old price.
+ *
+ * The operator's discount **replaces** the previous one (kept on
+ * `orders.operator_discount`), so the form means what it says and 0.00 undoes.
  */
+/** `paid`: the money is in, so the price is final. `unknown`: it still might be. */
+function refuseRepriceOn(state: PaymentState): void {
+  if (state === 'paid') throw new DomainError('ORDER_PRICE_NOT_ADJUSTABLE');
+  if (state === 'unknown') throw new DomainError('ORDER_PAYMENT_STATE_UNKNOWN');
+}
+
 export async function adminAdjustPrice(
   ctx: Ctx,
   params: { id: string },
@@ -362,18 +380,23 @@ export async function adminAdjustPrice(
   const operator = operatorOf(ctx);
   const orderId = fromId(params.id);
 
+  refuseRepriceOn(await closeOrderPayments(ctx, orderId));
+
   await ctx.withTx(async (tx) => {
     const order = await repo.lockOrder(tx, orderId);
     if (!order || order.deletedAt !== null) throw new DomainError('ORDER_NOT_FOUND');
     if (order.status !== 'pending_payment') {
       throw new DomainError('ORDER_PRICE_NOT_ADJUSTABLE', { details: { status: order.status } });
     }
+    // A payment started after the close above is open again: same refusal.
+    refuseRepriceOn(await openPaymentState(ctx, tx, orderId));
 
     const items = await repo.listItems(tx, [orderId]);
-    // `orders.coupon_discount` is every goods-level discount, checkout's
-    // decision. The operator's discount is added to it, never substituted for
-    // it.
-    const existing = Money.sum(items.map((item) => Money.parse(item.discountAmount)));
+    // Checkout's goods-level discounts stay; only the last 改价 is taken out
+    // before the new one goes on.
+    const existing = Money.sum(items.map((item) => Money.parse(item.discountAmount))).sub(
+      Money.parse(order.operatorDiscount),
+    );
     const outcome = rules.reprice({
       lines: items.map((item) => ({
         orderItemId: item.id,
@@ -395,6 +418,7 @@ export async function adminAdjustPrice(
       orderId,
       freightAmount: outcome.freightAmount.toString(),
       couponDiscount: outcome.couponDiscount.toString(),
+      operatorDiscount: Money.parse(body.operatorDiscount).toString(),
       payableAmount: outcome.payableAmount.toString(),
     });
     if (!applied.won) throw new DomainError('ORDER_PRICE_NOT_ADJUSTABLE');
@@ -425,8 +449,8 @@ export async function adminAdjustPrice(
     //
     // The subject carries the **resulting amount**, not just the order id, for
     // the same reason two partial refunds of one order need two keys. An order
-    // is legitimately repriced more than once — `operatorDiscount` is *added*
-    // to what is already there — so a per-order key would deduplicate every
+    // is legitimately repriced more than once — each 改价 replaces the last
+    // one — so a per-order key would deduplicate every
     // change after the first into silence. Keyed on the amount, a save that
     // leaves the total where it was is the one thing that notifies once.
     await notify(tx, ctx, {

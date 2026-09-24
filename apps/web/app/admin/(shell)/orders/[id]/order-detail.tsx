@@ -329,11 +329,12 @@ export function OrderDetailPage({ id }: { id: string }) {
             kind: 'money',
             name: 'operatorDiscount',
             label: '再优惠',
-            help: '从商品总额里减掉的金额，会按行重新分摊；填 0.00 撤销上次改价。',
+            help: '从商品总额里减掉的金额，会按行重新分摊。它替换上次改价的优惠而不是叠加，填 0.00 撤销改价。买家手里未付的支付单会先被关闭。',
           },
           { kind: 'money', name: 'freightAmount', label: '运费', help: '留空表示不改运费。' },
           { kind: 'text', name: 'reason', label: '原因', maxLength: 255 },
         ]}
+        initialValues={{ operatorDiscount: data?.operatorDiscount ?? '0.00' }}
         route={orderAdminAdjustPrice}
         toInput={(values) => ({ params: { id }, body: values })}
         invalidate={invalidate}

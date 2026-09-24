@@ -672,6 +672,7 @@ export async function applyRepricing(
     orderId: number;
     freightAmount: string;
     couponDiscount: string;
+    operatorDiscount: string;
     payableAmount: string;
   },
 ): Promise<ConditionalUpdateResult> {
@@ -680,6 +681,7 @@ export async function applyRepricing(
     set: {
       freightAmount: args.freightAmount,
       couponDiscount: args.couponDiscount,
+      operatorDiscount: args.operatorDiscount,
       payableAmount: args.payableAmount,
       updatedAt: sql`now()`,
     },

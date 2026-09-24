@@ -187,7 +187,12 @@ export const orderAdminAdjustPrice = defineRoute({
   params: orderIdParams,
   body: orderPriceBody,
   response: adminOrderDetail,
-  errors: ['ORDER_NOT_FOUND', 'ORDER_PRICE_NOT_ADJUSTABLE', 'ORDER_PRICE_INVALID'],
+  errors: [
+    'ORDER_NOT_FOUND',
+    'ORDER_PRICE_NOT_ADJUSTABLE',
+    'ORDER_PRICE_INVALID',
+    'ORDER_PAYMENT_STATE_UNKNOWN',
+  ],
   examples: [
     {
       name: 'ten-off-and-free-shipping',

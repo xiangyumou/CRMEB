@@ -78,6 +78,13 @@
       "when": 1790245572676,
       "tag": "0010_api_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790249647497,
+      "tag": "0011_order_operator_discount",
+      "breakpoints": true
     }
   ]
 }
