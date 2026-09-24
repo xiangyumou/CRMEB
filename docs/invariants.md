@@ -745,6 +745,7 @@ A password sign-in that carries a parked WeChat sign-in's `bindToken` links that
 - `packages/core/src/user/storefront-auth.int.test.ts::password login that finishes a parked mini sign-in > AUTH-009 — refuses a taken openid the way the SMS path does, and issues no session`
 - `packages/core/src/user/storefront-auth.int.test.ts::password login that finishes a parked mini sign-in > AUTH-009 — refuses a second mini openid for an account that already has one`
 - `packages/core/src/user/storefront-auth.int.test.ts::password login that finishes a parked mini sign-in > AUTH-009 — links nothing without a bind token`
+- `e2e/storefront/specs-mini/login.spec.ts::SMOKE-004: 密码登录 under 其他方式 reaches an authenticated screen, and a wrong password is its field's error`
 
 ## Fulfilment, the order console and invoices
 
