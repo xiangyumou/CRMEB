@@ -41,7 +41,8 @@ const two = (value: number) => String(value).padStart(2, '0');
 
 /**
  * Time left to a real deadline (C02, C16: no fake urgency), on the server's clock, not the
- * phone's (`lib/server-clock`). Ticks once a second; says 「已结束」 at zero.
+ * phone's (`lib/server-clock`). Ticks once a second; says 「已结束」 at zero and stops ticking.
+ * A new `endsAt` (the deadline moved) starts it again.
  */
 export function Countdown({
   endsAt,
@@ -53,24 +54,33 @@ export function Countdown({
 }: CountdownProps) {
   const end = Date.parse(endsAt);
   const [left, setLeft] = useState(() => remainingUntil(end, serverNow()));
-  const ended = useRef(left.total === 0);
   const onEndRef = useRef(onEnd);
   useEffect(() => {
     onEndRef.current = onEnd;
   });
 
   useEffect(() => {
+    // Already over when shown: nothing to count, and no `onEnd` (it did not reach zero here).
+    let ended = remainingUntil(end, serverNow()).total === 0;
+    let timer: ReturnType<typeof setInterval> | undefined;
     const tick = () => {
       const next = remainingUntil(end, serverNow());
       setLeft(next);
-      if (next.total === 0 && !ended.current) {
-        ended.current = true;
+      if (next.total > 0) return;
+      // At zero: stop ticking (a list of order cards would otherwise re-render every second
+      // for as long as the page lives), and say so once.
+      if (timer !== undefined) clearInterval(timer);
+      timer = undefined;
+      if (!ended) {
+        ended = true;
         onEndRef.current?.();
       }
     };
     tick();
-    const timer = setInterval(tick, 1000);
-    return () => clearInterval(timer);
+    if (!ended) timer = setInterval(tick, 1000);
+    return () => {
+      if (timer !== undefined) clearInterval(timer);
+    };
   }, [end]);
 
   if (left.total === 0) {

@@ -42,6 +42,12 @@ login return, guest browsing, copy). Updated at every commit.
    - 搜索 asks for the history on every visit (`refetchOnMount: 'always'`): the last search added
      to it on the server, and the 30 s cache showed the list without it.
 
+6. **Countdown kept ticking after zero.** `ui/countdown.tsx`'s interval ran for as long as the
+   component lived, re-rendering 「已结束」 every second (every unpaid card in 我的订单 once its
+   window closed), and a deadline that moved did not arm `onEnd` again. It now clears the
+   interval at zero, never starts one for a deadline already past, and re-arms on a new
+   `endsAt`. Tests in `countdown.test.tsx`.
+
 ## In progress
 
 - The rest of the review.
