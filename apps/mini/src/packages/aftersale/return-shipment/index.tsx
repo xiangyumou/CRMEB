@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import type { RefundDetail } from '@shop/contracts/refund/schemas';
 import type { ExpressCompany } from '@shop/contracts/shipping/schemas';
@@ -23,23 +23,23 @@ import { REFUND_READS } from '../shared/actions';
 import { awaitsReturn } from '../shared/refund';
 import './index.scss';
 
-/** How many companies the picker lists at once; the rest are a search away (there are ~1100). */
-export const PICKER_LIMIT = 30;
+/**
+ * The picker asks the server for this many companies per search (`shipping.expressCompanyOptions`
+ * searches name and code, WeChat's couriers first, SHIP-003); the rest are a search away
+ * (there are ~1100).
+ */
+const LISTED = 30;
+/** How long typing pauses before the search goes out. */
+export const SEARCH_DELAY_MS = 300;
 
-/** The companies to list for a search: by name or code, the server's order kept. */
-export function matchCompanies(
-  companies: readonly ExpressCompany[],
-  query: string,
-  limit = PICKER_LIMIT,
-): ExpressCompany[] {
-  const words = query.trim().toLowerCase();
-  const hits = words
-    ? companies.filter(
-        (company) =>
-          company.name.toLowerCase().includes(words) || company.code.toLowerCase().includes(words),
-      )
-    : companies;
-  return hits.slice(0, limit);
+/** `value`, once it has stopped changing for `delay` ms. */
+function useDebounced<T>(value: T, delay: number): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return settled;
 }
 
 /** A waybill number as couriers print it: letters, digits and dashes, no spaces. */
@@ -50,7 +50,7 @@ export function cleanTrackingNo(value: string): string {
 /**
  * 填写退货物流 (`refundReturnShipment`, `packages/aftersale/return-shipment/index?id=`). For a
  * 退货退款 the merchant approved: where to send it (copyable), then the courier (picked from
- * `GET /api/v1/express-companies`), the waybill number and an optional phone. Submitting asks
+ * `GET /api/v1/express-companies?keyword=`), the waybill number and an optional phone. Submitting asks
  * for the refund notices (C08) and goes back to the request.
  */
 export default function ReturnShipmentPage() {
@@ -97,7 +97,6 @@ function Body({ id }: { id: string }) {
 function Form({ refund }: { refund: RefundDetail }) {
   const client = useApiClient();
   const invalidate = useInvalidateRoutes();
-  const companies = useRouteQuery('shipping.expressCompanyOptions');
   const [company, setCompany] = useState<ExpressCompany | null>(null);
   const [picking, setPicking] = useState(false);
   const [trackingNo, setTrackingNo] = useState('');
@@ -224,9 +223,6 @@ function Form({ refund }: { refund: RefundDetail }) {
 
       <CompanySheet
         visible={picking}
-        companies={companies.data?.items}
-        error={companies.isError ? companies.error : null}
-        onRetry={() => void companies.refetch()}
         selected={company?.id}
         onClose={() => setPicking(false)}
         onPick={(picked) => {
@@ -240,30 +236,31 @@ function Form({ refund }: { refund: RefundDetail }) {
 
 function CompanySheet({
   visible,
-  companies,
-  error,
-  onRetry,
   selected,
   onClose,
   onPick,
 }: {
   visible: boolean;
-  companies: readonly ExpressCompany[] | undefined;
-  error: unknown;
-  onRetry: () => void;
   selected: string | undefined;
   onClose: () => void;
   onPick: (company: ExpressCompany) => void;
 }) {
   const [query, setQuery] = useState('');
-  const shown = useMemo(() => matchCompanies(companies ?? [], query), [companies, query]);
+  const keyword = useDebounced(query.trim(), SEARCH_DELAY_MS);
+  const search = useRouteQuery(
+    'shipping.expressCompanyOptions',
+    { query: { limit: LISTED, ...(keyword ? { keyword } : {}) } },
+    // The last answer stays up while the next search is out, rather than a skeleton per key.
+    { enabled: visible, placeholderData: (previous) => previous },
+  );
+  const shown = search.data?.items;
   return (
     <Sheet visible={visible} onClose={onClose} title="选择快递公司" height="tall">
       <Field label="搜索快递公司" value={query} placeholder="输入名称搜索" onChange={setQuery} />
       <View className="return-shipment__companies">
-        {error ? (
-          <ErrorBlock error={error} onRetry={onRetry} compact />
-        ) : !companies ? (
+        {search.isError ? (
+          <ErrorBlock error={search.error} onRetry={() => void search.refetch()} compact />
+        ) : !shown ? (
           <CellSkeleton rows={5} />
         ) : shown.length === 0 ? (
           <Text className="return-shipment__hint">没有找到，换个名称试试</Text>
@@ -278,7 +275,7 @@ function CompanySheet({
             />
           ))
         )}
-        {companies && shown.length === PICKER_LIMIT ? (
+        {shown && shown.length >= LISTED ? (
           <Text className="return-shipment__hint">没有你用的快递？输入名称搜索</Text>
         ) : null}
       </View>

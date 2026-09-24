@@ -6,7 +6,7 @@ import { serveApi } from '@/test/fake-api';
 import { refundDetail } from '@/test/order-fixtures';
 import { renderPage } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
-import ReturnShipmentPage, { cleanTrackingNo, matchCompanies, PICKER_LIMIT } from './index';
+import ReturnShipmentPage, { cleanTrackingNo } from './index';
 
 const approved = refundDetail({
   kind: 'return_and_refund',
@@ -23,29 +23,42 @@ const companies = {
   ],
 };
 
+/** The last `?keyword=` the picker sent (the fake answers like the server: name or code). */
+let keyword = '';
+
 function serve(refund = approved) {
-  return serveApi({
+  keyword = '';
+  const seen = serveApi({
     'GET /api/v1/refunds/601': () => ({ body: refund }),
-    'GET /api/v1/express-companies': () => ({ body: companies }),
+    'GET /api/v1/express-companies': () => {
+      const words = keyword.toLowerCase();
+      return {
+        body: {
+          items: companies.items.filter(
+            (c) => !words || c.name.includes(words) || c.code.includes(words),
+          ),
+        },
+      };
+    },
     'POST /api/v1/refunds/601/return-shipment': () => ({
       body: { ...refund, returnStage: 'shipped_back', returnTrackingNo: 'SF123' },
     }),
   });
+  // The handler sees no query string; read it off the request as it is recorded.
+  const onRequest = taroFake.onRequest;
+  taroFake.onRequest = (option) => {
+    const search = option.url.split('?')[1] ?? '';
+    if (option.url.includes('/express-companies'))
+      keyword = new URLSearchParams(search).get('keyword') ?? '';
+    return onRequest(option);
+  };
+  return seen;
 }
 
-describe('matchCompanies / cleanTrackingNo', () => {
-  it('finds by name or code and caps the list', () => {
-    expect(matchCompanies(companies.items, '中通').map((c) => c.id)).toEqual(['13']);
-    expect(matchCompanies(companies.items, 'YUN').map((c) => c.id)).toEqual(['14']);
-    const many = Array.from({ length: 50 }, (_, i) => ({
-      id: String(i),
-      code: `c${i}`,
-      name: `快递${i}`,
-      sortOrder: 0,
-    }));
-    expect(matchCompanies(many, '')).toHaveLength(PICKER_LIMIT);
-  });
+const searches = (seen: ReturnType<typeof serve>) =>
+  seen.filter((r) => r.key === 'GET /api/v1/express-companies').map((r) => r.query);
 
+describe('cleanTrackingNo', () => {
   it('drops spaces and upper-cases a waybill number', () => {
     expect(cleanTrackingNo(' sf 1234 5678 ')).toBe('SF12345678');
   });
@@ -66,10 +79,13 @@ describe('填写退货物流', () => {
     await screen.findByText('广州市天河区某路 1 号');
 
     fireEvent.click(screen.getByRole('link', { name: '选择快递公司' }));
-    fireEvent.change(await screen.findByRole('textbox', { name: '搜索快递公司' }), {
+    await screen.findByRole('radio', { name: '顺丰速运' });
+    fireEvent.change(screen.getByRole('textbox', { name: '搜索快递公司' }), {
       target: { value: '中通' },
     });
-    expect(screen.queryByRole('radio', { name: '顺丰速运' })).toBeNull();
+    // The search goes to the server once typing pauses; the list is what it answered.
+    await waitFor(() => expect(screen.queryByRole('radio', { name: '顺丰速运' })).toBeNull());
+    expect(searches(seen)).toEqual([{ limit: '30' }, { limit: '30', keyword: '中通' }]);
     fireEvent.click(screen.getByRole('radio', { name: '中通快递' }));
     fireEvent.change(screen.getByRole('textbox', { name: '快递单号' }), {
       target: { value: 'zt 7788 9900' },
@@ -112,6 +128,20 @@ describe('填写退货物流', () => {
       args: expect.objectContaining({ title: '请填写快递单号' }),
     });
     expect(seen.some((r) => r.key === 'POST /api/v1/refunds/601/return-shipment')).toBe(false);
+  });
+
+  it('asks the server only once typing stops, and says when nothing matches', async () => {
+    const seen = serve();
+    await renderPage(<ReturnShipmentPage />);
+    await screen.findByText('广州市天河区某路 1 号');
+    // Nothing is fetched until the picker opens.
+    expect(searches(seen)).toEqual([]);
+    fireEvent.click(screen.getByRole('link', { name: '选择快递公司' }));
+    await screen.findByRole('radio', { name: '顺丰速运' });
+    const box = screen.getByRole('textbox', { name: '搜索快递公司' });
+    for (const value of ['极', '极兔', '极兔快']) fireEvent.change(box, { target: { value } });
+    await screen.findByText('没有找到，换个名称试试');
+    expect(searches(seen)).toEqual([{ limit: '30' }, { limit: '30', keyword: '极兔快' }]);
   });
 
   it('says so when nothing needs sending back', async () => {
