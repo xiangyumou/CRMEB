@@ -7,9 +7,9 @@ import { loadLanding } from '@/server/landing';
 /**
  * `/` — the landing page: the shop's name, the 小程序码, "open it in WeChat".
  *
- * Until the cutover the edge serves the uni-app H5 at `/`, so this is reached
- * only on the web container directly; docs/mini/cutover.md §2.10 is the edge
- * change that puts it in front.
+ * The edge proxies exactly `/` here and redirects every path it does not know
+ * to it (docker/edge/nginx.conf, docs/mini/cutover.md §2.10). It inherits the
+ * root layout's `robots: noindex`.
  */
 export const dynamic = 'force-dynamic';
 

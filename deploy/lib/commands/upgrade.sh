@@ -213,6 +213,16 @@ backup_dir="$(backup_dir)"
 mkdir -p "$backup_dir"
 chmod 700 "$backup_dir"
 
+# The edge mounts this read-only. Created here so that Docker does not create
+# it as root on the first `up`, which would leave the operator unable to place a
+# verification file without sudo. Readable by all: nginx's workers are not the
+# host user. An existing directory, and whatever is in it, is left alone.
+verification_dir="$(verification_dir)"
+if [ ! -d "$verification_dir" ]; then
+  mkdir -p "$verification_dir"
+  chmod 755 "$verification_dir"
+fi
+
 stamp="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 manifest="$backup_dir/upgrade-$stamp.manifest"
 settings_backup="$backup_dir/deployment.env.$stamp"

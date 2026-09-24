@@ -100,6 +100,7 @@ CASE_IDS=(
   upgrade/first-deploy
   upgrade/dry-run-changes-nothing
   edge/proxies-every-page-route
+  edge/serves-verification-files
   backup/verifies-restore
   backup/verifies-beside-live-writes
   backup/refuses-tampered-dump
@@ -134,6 +135,7 @@ CASE_FNS=(
   case_first_deploy
   case_dry_run
   case_edge_proxies_every_page
+  case_edge_serves_verification_files
   case_backup_verifies_restore
   case_backup_beside_live_writes
   case_backup_refuses_tampered_dump
@@ -248,6 +250,7 @@ sed \
   -e "s|^NEXT_EDGE_BIND=.*|NEXT_EDGE_BIND=127.0.0.1:$edge_port|" \
   -e "s|^NEXT_HOST=.*|NEXT_HOST=|" \
   -e "s|^NEXT_BACKUP_DIR=.*|NEXT_BACKUP_DIR=$workdir/backups|" \
+  -e "s|^NEXT_DOMAIN_VERIFICATION_DIR=.*|NEXT_DOMAIN_VERIFICATION_DIR=$workdir/domain-verification|" \
   "$deploy_dir/deployment.env.example" >"$NEXT_DEPLOYMENT_ENV"
 chmod 600 "$NEXT_DEPLOYMENT_ENV"
 
@@ -712,32 +715,31 @@ route_url() {
   printf '%s\n' "${url:-/}"
 }
 
-# The edge serves the storefront's `index.html` for any path it does not
-# proxy, so a Next page left out of `nginx.conf` does not 404: it quietly shows
-# the storefront. Every page route, and one route handler per top-level path,
-# is requested through the real edge, and none may come back as that file.
-#
-# `/` is the storefront's on purpose: the Next page there only points at
-# `/admin`.
+# The edge redirects any path it does not proxy to the landing page at `/`, so
+# a Next page left out of `nginx.conf` does not 404: it quietly turns into a
+# 302 to `/`. Every page route — `/` included, which must be answered by `web`
+# itself — and one route handler per top-level path is requested through the
+# real edge, and none may come back as that redirect.
 case_edge_proxies_every_page() {
   ensure_deployed || return 1
-  local app="$repo_root/apps/web/app" storefront file url prefix response status
-  local checked=0 handler_prefixes=' '
+  local app="$repo_root/apps/web/app" file url prefix response status location
+  local checked=0 handler_prefixes=' ' landing="http://127.0.0.1:$edge_port/"
   [ -d "$app" ] || {
     note "no Next app at $app"
     return 77
   }
-  # Fetched exactly as the routes are below and split the same way, so the
-  # comparison cannot differ by a trailing newline that `$(…)` strips from one
-  # side only.
-  storefront="$(curl -fsS --max-time 10 -w '\n%{http_code}' "http://127.0.0.1:$edge_port/index.html")" || {
-    note "NOT ok: the edge did not serve the storefront's index.html"
-    return 1
-  }
-  storefront="${storefront%$'\n'*}"
+  # What "not proxied" looks like, proved on a path no route has (an old H5
+  # link): a 302 whose Location resolves to `/`. `%{redirect_url}` is the
+  # Location resolved against the request, so `Location: /` reads as
+  # `$landing`.
+  response="$(curl -sS --max-time 10 -o /dev/null -w '%{http_code} %{redirect_url}' \
+    "http://127.0.0.1:$edge_port/pages/index/index")" || response=''
+  check 'an unknown path is redirected to the landing page' [ "$response" = "302 $landing" ]
+  check 'the redirect is relative (Location: /)' \
+    sh -c "curl -sS --max-time 10 -o /dev/null -D - 'http://127.0.0.1:$edge_port/pages/index/index' |
+      tr -d '\\r' | grep -qix 'location: /'"
   while IFS= read -r file; do
     url="$(route_url "${file#"$app"}")" || continue
-    [ "$url" != '/' ] || continue
     case "${file##*/}" in
       route.*)
         prefix="${url#/}"
@@ -747,18 +749,53 @@ case_edge_proxies_every_page() {
         ;;
     esac
     checked=$((checked + 1))
-    response="$(curl -sS --max-time 30 -w '\n%{http_code}' "http://127.0.0.1:$edge_port$url" 2>/dev/null || true)"
-    status="${response##*$'\n'}"
+    response="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code} %{redirect_url}' \
+      "http://127.0.0.1:$edge_port$url" 2>/dev/null || true)"
+    status="${response%% *}"
+    location="${response#* }"
     if [ -z "$status" ] || [ "$status" = '000' ]; then
       note "NOT ok: $url did not answer (${file#"$repo_root/"})"
       case_failures=$((case_failures + 1))
-    elif [ "${response%$'\n'*}" = "$storefront" ]; then
-      note "NOT ok: $url is answered by the storefront, not by web (${file#"$repo_root/"})"
+    elif [ "$status" = '302' ] && [ "$location" = "$landing" ]; then
+      note "NOT ok: $url is redirected to / by the edge, not answered by web (${file#"$repo_root/"})"
       case_failures=$((case_failures + 1))
     fi
   done < <(find "$app" -type f -regextype posix-extended \
     -regex '.*/(page|route)\.(tsx|ts|jsx|js|mdx)' | sort)
   check "$checked route(s) reach web through the edge" [ "$checked" -gt 0 ]
+}
+
+# The WeChat domain-verification files: `/<name>.txt` at the root comes from the
+# read-only mount (`NEXT_DOMAIN_VERIFICATION_DIR`, which this drill points into
+# its own workdir), byte for byte; a name that is not there is a 404, not the
+# landing-page redirect; nothing outside the plain-name pattern reaches it.
+case_edge_serves_verification_files() {
+  ensure_deployed || return 1
+  local dir edge_id name="drill_${RANDOM}${RANDOM}" body base="http://127.0.0.1:$edge_port"
+  dir="$(verification_dir)"
+  check 'shop upgrade created the verification directory, mode 755' \
+    [ "$(stat -c '%a' "$dir" 2>/dev/null)" = '755' ]
+  body="drill verification $name"
+  printf '%s' "$body" >"$dir/$name.txt"
+  chmod 644 "$dir/$name.txt"
+  check 'a placed file is served as is' \
+    [ "$(curl -fsS --max-time 10 "$base/$name.txt")" = "$body" ]
+  check 'it is served as text/plain' \
+    sh -c "curl -fsS --max-time 10 -o /dev/null -w '%{content_type}' '$base/$name.txt' | grep -qi '^text/plain'"
+  check 'a missing file is a 404' \
+    [ "$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' "$base/${name}-missing.txt")" = '404' ]
+  check 'a nested .txt is not served from the directory' \
+    [ "$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' "$base/x/$name.txt")" = '302' ]
+  # `docker exec` runs as root, so only the read-only mount can refuse this.
+  edge_id="$(compose ps -q edge)"
+  if docker exec "$edge_id" touch /srv/domain-verification/drill-write 2>/dev/null; then
+    note 'NOT ok: the edge can write the verification directory (mount is not read-only)'
+    case_failures=$((case_failures + 1))
+    rm -f "$dir/drill-write"
+  else
+    note 'ok: the edge cannot write the verification directory'
+  fi
+  rm -f "$dir/$name.txt"
 }
 
 # --- backup cases -------------------------------------------------------------------

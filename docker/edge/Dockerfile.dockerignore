@@ -1,15 +1,13 @@
 # Build context filter for `edge/Dockerfile` (context: the repository root).
 #
-# The build context is the repository root, and the H5 build output lives under
-# `apps/uni-app/`. BuildKit prefers this per-Dockerfile file over the root
-# `.dockerignore`, so the edge build gets its own view of the context: the edge
-# config and the H5 build, nothing else.
+# BuildKit prefers this per-Dockerfile file over the root `.dockerignore`, so
+# the edge build gets its own view of the context: its own config, nothing
+# else. The image carries no front-end files (docker/edge/Dockerfile).
 #
-# Everything is excluded, then the two things the edge needs are allowed back.
+# Everything is excluded, then the one thing the edge needs is allowed back.
 
 *
 !docker/edge
-!apps/uni-app/dist
 
 # Never, whatever the rules above say.
 **/.git

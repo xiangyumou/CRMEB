@@ -351,12 +351,13 @@ and `pnpm --filter @shop/e2e-storefront test`; the rest only a real phone can sh
 `docker/edge/nginx.conf`, in front of `web`:
 
 - `/healthz` answers from nginx; `/readyz` proxies to the application's `/api/v1/readyz`.
-- `^/(admin|admin-api|api)(/|$)` and `/_next/static/` go to `web`;
-  `/admin-api/notifications/stream` goes unbuffered, for SSE.
+- `= /` (the landing page, `apps/web/app/page.tsx`), `^/(admin|admin-api|api|scan-upload)(/|$)`
+  and `/_next/static/` go to `web`; `/admin-api/notifications/stream` goes unbuffered, for SSE.
 - `^~ /uploads/` serves the uploads volume read-only; anything that could execute is refused.
-- `/` is the landing page (`apps/web/app/page.tsx`: the shop's name and 小程序码), answered by
-  `web`; any other path redirects to it. The mini-program's H5 builds are never served in
-  production.
+- `^/[A-Za-z0-9_-]+\.txt$` serves the WeChat domain-verification files from a read-only mount
+  (`deploy/README.md`, "Domain verification files").
+- Everything else is a relative `302` to `/`. The edge image carries no front-end files; the
+  mini-program's H5 builds are never served in production.
 - The client address is taken from `X-Forwarded-For` only when the peer is in
   `NEXT_EDGE_TRUSTED_PROXIES`; the app reads `X-Real-IP` and nothing else.
 
