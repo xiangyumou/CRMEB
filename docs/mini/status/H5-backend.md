@@ -15,14 +15,29 @@ Worktree `CRMEB-mini-wt/H5-backend`, branch `storefront/mini-H5-backend` (from `
   (`OrderRefundedEvent.refundNo`, optional), 支付成功 lacked `paidAt`. A unit test checks every
   event's wording against its declared variables; fan-out logs a placeholder that rendered blank.
 
+- **Picked activities in the service.** `groupbuy.list` / `presale.list` take the `ids` branch
+  (`cardsFor`, then page); the two `api/v1/*/activities` routes are one-line binders. `ids` with
+  `productId` is their intersection (documented on the contract fields, tested in
+  `picked-lists.int.test.ts`).
+- **Decor editor off legacy DIY.** The record pickers moved to `src/admin/decor`
+  (`record-types`, `catalog-records`, `record-kinds`); `admin/diy` keeps thin adapters over them.
+  ESLint `NO_LEGACY_DIY` forbids `admin/decor` and the decor pages importing `admin/diy`.
+  `docs/mini/cutover.md` §2.3 lists the files the cutover deletes.
+- **Web unit tests under contention.** Measured: alone, the named tests take 0.1–4.4 s; a CPU
+  profile of 拼团活动 showed ~40 % of the worker in `*ByRole` → happy-dom `getComputedStyle`
+  matching antd's injected stylesheets against every ancestor. `renderAdmin` now puts antd's
+  styles in a detached node. Same load, back to back: summed test time 172 s → 109 s, wall
+  86.7 s → 76.4 s (CPU user 378 s → 338 s); 拼团活动 edit 4.4 → 1.0 s, 装修列表 designate
+  3.5 → 0.5 s, 商品编辑器 shipping 4.4 → 1.9 s. Workers stay at 4 (A2's finding holds: the
+  load is external). What remains is per-file import of antd (~40 % of the run).
+
 ## In progress
 
-- Route logic of `api/v1/{groupbuy,presale}/activities` into the services.
+- Merge checklist.
 
 ## Pending
 
-- Decor editor off legacy `admin/diy` (+ lint boundary, cutover checklist).
-- Web unit tests under contention (measure, then fix or cap workers).
+- none
 
 ## Page-form changes
 
@@ -39,4 +54,4 @@ Worktree `CRMEB-mini-wt/H5-backend`, branch `storefront/mini-H5-backend` (from `
 
 ## Open questions
 
-- none yet
+- Nothing antd hides only through a class is hidden in unit tests any more (see `src/test/render.tsx`). No test relied on it; flagging for whoever writes a visibility test.
