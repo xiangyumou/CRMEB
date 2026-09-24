@@ -60,6 +60,10 @@ export default defineMenu({
       path: '/admin/system/api-tokens',
       permission: 'auth:api-token:self',
       order: 45,
+      // Every admin holds this atom, so a visible entry would put 设置 — and
+      // with it the way to admins and roles — in the narrowest role's sider.
+      // Reached from the avatar menu, like 个人资料.
+      hidden: true,
     },
     {
       key: 'system.profile',

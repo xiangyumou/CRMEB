@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ApiOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -27,6 +28,9 @@ const SIDER_WIDTH = 216;
 
 /** The avatar menu's 个人资料. The page lives under 系统; `/admin/profile` is a 404. */
 export const PROFILE_PATH = '/admin/system/profile';
+
+/** The avatar menu's API 令牌 — hidden from the sider, see `system.menu.ts`. */
+export const API_TOKENS_PATH = '/admin/system/api-tokens';
 
 /**
  * The route-level guard every page gets from the shell: a URL whose
@@ -72,6 +76,7 @@ function toMenuItems(nodes: readonly MenuNode[]): NonNullable<Parameters<typeof 
  */
 export function AdminShell({ children }: { children: ReactNode }) {
   const { identity, logout, loggingOut } = useSession();
+  const can = useCan();
   const { mode, toggle } = useThemeMode();
   const { items, selectedKeys, openKeys } = useAdminMenu();
   const router = useRouter();
@@ -193,6 +198,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
                   },
                   { type: 'divider' },
                   { key: 'profile', icon: <UserOutlined />, label: '个人资料' },
+                  ...(can('auth:api-token:self')
+                    ? [{ key: 'api-tokens', icon: <ApiOutlined />, label: 'API 令牌' }]
+                    : []),
                   {
                     key: 'logout',
                     icon: <LogoutOutlined />,
@@ -203,6 +211,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 onClick: ({ key }) => {
                   if (key === 'logout') logout();
                   if (key === 'profile') router.push(PROFILE_PATH);
+                  if (key === 'api-tokens') router.push(API_TOKENS_PATH);
                 },
               }}
             >

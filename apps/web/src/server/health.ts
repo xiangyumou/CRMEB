@@ -37,7 +37,7 @@ const READY_TIMEOUT_MS = 2000;
  * forgetting this line is a merge-gate failure rather than a surprise during a
  * release.
  */
-export const EXPECTED_MIGRATIONS = 10;
+export const EXPECTED_MIGRATIONS = 11;
 
 /** The key the worker refreshes from the same loop that runs the jobs. */
 const HEARTBEAT_KEY = 'worker:heartbeat';
