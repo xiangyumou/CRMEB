@@ -114,7 +114,8 @@ export async function update(
 }
 
 /**
- * Soft delete, refused while a product still points at the template.
+ * Soft delete, refused while a product or a running activity still points at
+ * the template.
  *
  * The foreign key from `products.shipping_template_id` is `restrict`, but this
  * is a *soft* delete: without the check the row would survive the delete and
@@ -124,10 +125,11 @@ export async function update(
 export async function remove(ctx: Ctx, params: { id: string }): Promise<{ deleted: true }> {
   const id = fromId(params.id);
   await ctx.withTx(async (tx) => {
-    const inUse = await repo.countProductsPerTemplate(tx, [id]);
-    if ((inUse.get(id) ?? 0) > 0) {
+    const productCount = (await repo.countProductsPerTemplate(tx, [id])).get(id) ?? 0;
+    const activityCount = (await repo.countActivitiesPerTemplate(tx, [id])).get(id) ?? 0;
+    if (productCount > 0 || activityCount > 0) {
       throw new DomainError('SHIPPING_TEMPLATE_IN_USE', {
-        details: { productCount: inUse.get(id) ?? 0 },
+        details: { productCount, activityCount },
       });
     }
     const affected = await repo.softDeleteTemplate(tx, id);

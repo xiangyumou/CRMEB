@@ -17,7 +17,10 @@ export const shippingErrors = defineErrors({
    * those products onto "no template", which quotes zero freight.
    * `details` carries `{ productCount }`.
    */
-  SHIPPING_TEMPLATE_IN_USE: { status: 409, message: '该运费模板正在被商品使用，无法删除' },
+  SHIPPING_TEMPLATE_IN_USE: {
+    status: 409,
+    message: '该运费模板正在被商品或进行中的活动使用，无法删除',
+  },
   /**
    * A region / free-shipping / no-delivery row named a city id that is not in
    * the seeded tree. `details` carries `{ cityIds }`.

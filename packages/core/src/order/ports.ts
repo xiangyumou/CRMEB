@@ -433,6 +433,17 @@ export interface OrderKindHandler {
     db: DbOrTx,
     selections: Readonly<Record<string, string | undefined>>,
   ): Promise<OrderKindPreviewTerms>;
+  /**
+   * Read-only: the shipping template this kind's order is charged by instead of each
+   * product's own freight setting (an activity's 运费模板), or `null` to follow the
+   * products. Optional, and read on every pricing pass — preview and create alike —
+   * so the two cannot disagree. Same rule as `previewTerms` for an activity it
+   * cannot find: `null`, not a throw.
+   */
+  freightTemplateId?(
+    db: DbOrTx,
+    selections: Readonly<Record<string, string | undefined>>,
+  ): Promise<number | null>;
 }
 
 /** What `OrderKindHandler.detailLinks` answers; every key is optional. */

@@ -1,6 +1,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
 import type { ShippingTemplateForm } from '@shop/contracts/shipping/schemas';
 import { products, productSkus } from '@shop/db/schema/catalog';
+import { presaleActivities } from '@shop/db/schema/presale';
 import { cities, expressCompanies } from '@shop/db/schema/reference';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import { registerCatalogDomain } from '../catalog';
@@ -264,6 +266,37 @@ describe('运费模板', () => {
 
     const list = await templates.list(harness.ctx, { page: 1, pageSize: 20 });
     expect(list.items[0]?.productCount).toBe(1);
+  });
+
+  it('refuses to delete a template a live presale still charges by, and lets an ended one go', async () => {
+    const created = await templates.create(harness.ctx, form());
+    const skuId = await makeSku({ freightMode: 'free' });
+    const [sku] = await harness.ctx.db.select().from(productSkus).where(eq(productSkus.id, skuId));
+    const [activity] = await harness.ctx.db
+      .insert(presaleActivities)
+      .values({
+        productId: sku!.productId,
+        title: '预售',
+        status: 'active',
+        price: '80.00',
+        startAt: new Date('2026-01-01T00:00:00Z'),
+        endAt: new Date('2027-01-01T00:00:00Z'),
+        shippingTemplateId: Number(created.id),
+      })
+      .returning({ id: presaleActivities.id });
+
+    // The delete is soft, so no foreign key stops it: without the count the
+    // campaign would quietly start charging no freight.
+    await expect(templates.remove(harness.ctx, { id: created.id })).rejects.toMatchObject({
+      code: 'SHIPPING_TEMPLATE_IN_USE',
+      details: { productCount: 0, activityCount: 1 },
+    });
+
+    await harness.ctx.db
+      .update(presaleActivities)
+      .set({ status: 'ended' })
+      .where(eq(presaleActivities.id, activity!.id));
+    expect(await templates.remove(harness.ctx, { id: created.id })).toEqual({ deleted: true });
   });
 
   it('soft-deletes an unused template and drops it from the list', async () => {

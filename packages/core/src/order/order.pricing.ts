@@ -198,12 +198,30 @@ const cubicCentimetresOf = (volumeM3: string | null): number => unitsOf(volumeM3
  * The `FreightPort` line for one priced line. Freight is quoted on the goods
  * *before* any discount, which is what "满 99 包邮" has always meant in this
  * shop and what the shipping templates assume.
+ *
+ * `templateOverride` is an activity's own 运费模板: when there is one, the line
+ * is charged by it whatever the product says.
  */
-export function freightLineOf(line: {
-  sku: SkuForSale;
-  quantity: number;
-  subtotal: Money;
-}): FreightLine {
+export function freightLineOf(
+  line: {
+    sku: SkuForSale;
+    quantity: number;
+    subtotal: Money;
+  },
+  templateOverride: number | null = null,
+): FreightLine {
+  if (templateOverride !== null) {
+    return {
+      skuId: line.sku.skuId,
+      quantity: line.quantity,
+      freightTemplateId: templateOverride,
+      freightMode: 'template',
+      fixedFreightFen: 0,
+      weight: gramsOf(line.sku.weight) * line.quantity,
+      volume: cubicCentimetresOf(line.sku.volume) * line.quantity,
+      amountFen: line.subtotal.fen,
+    };
+  }
   return {
     skuId: line.sku.skuId,
     quantity: line.quantity,

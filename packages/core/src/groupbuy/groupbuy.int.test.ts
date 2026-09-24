@@ -21,7 +21,7 @@ import { registerCatalogDomain } from '../catalog';
 import { getEffectHandler } from '../effects/index';
 import { notificationAdmin, registerSmsPort, type SmsPort } from '../notification';
 import { resetWechatTokenFlight, wechatConfig } from '../wechat';
-import { registerShippingFreightPort } from '../shipping';
+import { registerShippingFreightPort, templates as shippingTemplates } from '../shipping';
 import { anonymousActor, type Actor, type Ctx } from '../kernel/context';
 import { Money } from '../kernel/money';
 import { withTx } from '../kernel/tx';
@@ -477,6 +477,44 @@ describe('the group-buy price through the real checkout', () => {
       idempotencyKey: `plain-${fixture.activityId}`,
     });
     expect(ordinary.groupbuyTeamId).toBeNull();
+  });
+
+  it('charges freight by the activity’s 运费模板, not the product’s 包邮', async () => {
+    const fixture = await makeActivity();
+    // ¥6 for the first piece, anywhere.
+    const template = await shippingTemplates.create(harness.ctx, {
+      name: '活动运费',
+      chargeMode: 'quantity',
+      hasFreeRules: false,
+      hasNoDeliveryRules: false,
+      sortOrder: 0,
+      regions: [
+        {
+          isFallback: true,
+          cityIds: [],
+          firstUnit: 1,
+          firstPrice: '6.00',
+          additionalUnit: 1,
+          additionalPrice: '2.00',
+        },
+      ],
+      freeRules: [],
+      noDeliveryCityIds: [],
+    });
+    await harness.ctx.db
+      .update(groupbuyActivities)
+      .set({ shippingTemplateId: Number(template.id) })
+      .where(eq(groupbuyActivities.id, fixture.activityId));
+    const { ctx } = await shopper();
+
+    const onActivity = await checkout.preview(
+      ctx,
+      buyNow(fixture, { activityId: String(fixture.activityId) }),
+    );
+    expect(onActivity.freightAmount).toBe('6.00');
+    expect(onActivity.payableAmount).toBe('65.00');
+    // The product itself is still 包邮 outside the activity.
+    expect((await checkout.preview(ctx, buyNow(fixture))).freightAmount).toBe('0.00');
   });
 
   it('leaves the same SKU at its ordinary price on an ordinary order', async () => {

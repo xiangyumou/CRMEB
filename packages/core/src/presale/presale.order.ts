@@ -212,6 +212,16 @@ export const presaleKindHandler: OrderKindHandler = {
     const activity = await repo.findActivity(db, activityId);
     return activity ? { shipAfterDays: activity.shipAfterDays } : {};
   },
+
+  /**
+   * The activity's own 运费模板, which charges the order in place of the
+   * product's freight setting; `null` (the form's 留空) follows the product.
+   */
+  async freightTemplateId(db, selections) {
+    const activityId = Number(selections['activityId']);
+    if (!Number.isInteger(activityId) || activityId <= 0) return null;
+    return (await repo.findActivity(db, activityId))?.shippingTemplateId ?? null;
+  },
 };
 
 // ---------------------------------------------------------------------------

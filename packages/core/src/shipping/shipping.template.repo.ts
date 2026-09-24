@@ -1,5 +1,7 @@
 import type { DbOrTx, Tx } from '@shop/db';
 import { products } from '@shop/db/schema/catalog';
+import { groupbuyActivities } from '@shop/db/schema/groupbuy';
+import { presaleActivities } from '@shop/db/schema/presale';
 import {
   shippingTemplateFreeRuleCities,
   shippingTemplateFreeRules,
@@ -8,7 +10,7 @@ import {
   shippingTemplateRegions,
   shippingTemplates,
 } from '@shop/db/schema/shipping';
-import { and, asc, count, desc, eq, ilike, inArray, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, sql, type SQL } from 'drizzle-orm';
 
 /**
  * The 运费模板 aggregate's statements.
@@ -114,6 +116,38 @@ export async function countProductsPerTemplate(
   const out = new Map<number, number>();
   for (const row of rows) {
     if (row.templateId !== null) out.set(row.templateId, row.value);
+  }
+  return out;
+}
+
+/**
+ * How many live activities (预售, 拼团) charge by each of these templates. The
+ * same deliberate cross-domain read as the product count, for the same reason:
+ * a template soft-deleted under a running campaign would quote nothing. An
+ * ended campaign charges nobody, so it does not hold the template.
+ */
+export async function countActivitiesPerTemplate(
+  db: DbOrTx,
+  templateIds: number[],
+): Promise<Map<number, number>> {
+  if (templateIds.length === 0) return new Map();
+  const out = new Map<number, number>();
+  for (const table of [presaleActivities, groupbuyActivities] as const) {
+    const rows = await db
+      .select({ templateId: table.shippingTemplateId, value: count() })
+      .from(table)
+      .where(
+        and(
+          inArray(table.shippingTemplateId, templateIds),
+          isNull(table.deletedAt),
+          ne(table.status, 'ended'),
+        ),
+      )
+      .groupBy(table.shippingTemplateId);
+    for (const row of rows) {
+      if (row.templateId !== null)
+        out.set(row.templateId, (out.get(row.templateId) ?? 0) + row.value);
+    }
   }
   return out;
 }

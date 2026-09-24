@@ -259,6 +259,7 @@ async function quoteFreight(
   db: DbOrTx,
   lines: readonly DraftLine[],
   address: repo.AddressRow | null,
+  templateOverride: number | null,
 ): Promise<Money> {
   const physical = lines.filter((line) => line.sku.productKind === 'physical');
   // Nothing to ship, or nowhere to ship it to: the shopper is shown zero and
@@ -267,7 +268,7 @@ async function quoteFreight(
 
   const quote = await resolveFreightPort().quote(db, ctx, {
     addressCityId: address.cityId,
-    lines: physical.map(freightLineOf),
+    lines: physical.map((line) => freightLineOf(line, templateOverride)),
   });
   return Money.fromFen(quote.totalFen);
 }
@@ -350,7 +351,9 @@ async function buildDraft(
   });
   const discount = splitAdjustments(lines, adjustments);
   const itemsAmount = goodsTotalOf(lines);
-  const freightAmount = await quoteFreight(ctx, db, lines, address);
+  const activityTemplate =
+    (await getOrderKindHandler(input.kind)?.freightTemplateId?.(db, kindSelections(input))) ?? null;
+  const freightAmount = await quoteFreight(ctx, db, lines, address, activityTemplate);
   // Through `db`: on `create` it is the checkout transaction, and a cold cache
   // must not take a second pooled connection while it is open. On the preview
   // it is the pool, where `getIn` is exactly `get`.
