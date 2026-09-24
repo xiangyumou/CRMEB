@@ -23,6 +23,15 @@ export const systemErrors = defineErrors({
     status: 409,
     message: '不能停用或删除自己，也不能移除最后一个超级管理员',
   },
+  /**
+   * A non-super admin tried to grant, or to manage, more than they hold: a role
+   * with an atom they lack, or an admin (a super admin included) whose grants
+   * go beyond theirs. `details` carries `{ permissions }` when atoms are the reason.
+   */
+  SYSTEM_GRANT_EXCEEDS_OWN: {
+    status: 403,
+    message: '不能授予或管理超出自己权限范围的身份或管理员',
+  },
   /** `roleIds` named a role that does not exist. `details` carries `{ roleIds }`. */
   SYSTEM_ROLE_UNKNOWN: { status: 422, message: '部分身份不存在，请刷新后重试' },
 

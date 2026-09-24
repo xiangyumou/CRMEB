@@ -18,6 +18,7 @@ import { createAdminSessionStore } from '../auth/admin-session.store';
 import * as authAdminRepo from '../auth/admin.repo';
 import { DEFAULT_BCRYPT_COST, hashPassword, verifyPassword } from '../auth/password';
 import { effectivePermissions } from '../auth/rbac';
+import { assertMayManageAdmin, assertRolesWithinOwnGrants } from './grant-guard';
 import * as repo from './system.repo';
 
 /**
@@ -122,6 +123,7 @@ async function assertRolesExist(ctx: Ctx, roleIds: readonly string[]): Promise<n
 export async function adminCreate(ctx: Ctx, body: AdminForm): Promise<AdminMutationResult> {
   if (!body.password) throw new DomainError('SYSTEM_ADMIN_PASSWORD_REQUIRED');
   const roleIds = await assertRolesExist(ctx, body.roleIds);
+  await assertRolesWithinOwnGrants(ctx, roleIds);
   if (await repo.accountTaken(ctx.db, body.account)) {
     throw new DomainError('SYSTEM_ADMIN_ACCOUNT_TAKEN');
   }
@@ -162,8 +164,10 @@ export async function adminUpdate(
   const callerId = requireAdminId(ctx);
   const existing = await repo.findAdmin(ctx.db, id);
   if (!existing) throw new DomainError('SYSTEM_ADMIN_NOT_FOUND');
+  await assertMayManageAdmin(ctx, existing);
 
   const roleIds = await assertRolesExist(ctx, body.roleIds);
+  await assertRolesWithinOwnGrants(ctx, roleIds);
   if (await repo.accountTaken(ctx.db, body.account, id)) {
     throw new DomainError('SYSTEM_ADMIN_ACCOUNT_TAKEN');
   }
@@ -227,6 +231,7 @@ export async function adminSetStatus(
   const callerId = requireAdminId(ctx);
   const existing = await repo.findAdmin(ctx.db, id);
   if (!existing) throw new DomainError('SYSTEM_ADMIN_NOT_FOUND');
+  await assertMayManageAdmin(ctx, existing);
 
   const to = body.enabled ? 1 : 0;
   if (!body.enabled) await assertMayDisable(ctx, { id, callerId, isSuper: existing.isSuper });
@@ -251,6 +256,7 @@ export async function adminResetPassword(
   const id = fromId(params.id);
   const existing = await repo.findAdmin(ctx.db, id);
   if (!existing) throw new DomainError('SYSTEM_ADMIN_NOT_FOUND');
+  await assertMayManageAdmin(ctx, existing);
 
   const hash = await hashPassword(body.password, bcryptCost);
   await authAdminRepo.setPassword(ctx.db, id, { hash, now: ctx.clock.now() });
@@ -264,6 +270,7 @@ export async function adminDelete(ctx: Ctx, params: { id: string }): Promise<voi
   const callerId = requireAdminId(ctx);
   const existing = await repo.findAdmin(ctx.db, id);
   if (!existing) throw new DomainError('SYSTEM_ADMIN_NOT_FOUND');
+  await assertMayManageAdmin(ctx, existing);
   await assertMayDisable(ctx, { id, callerId, isSuper: existing.isSuper });
 
   const { won } = await repo.softDeleteAdmin(ctx.db, { id, now: ctx.clock.now() });

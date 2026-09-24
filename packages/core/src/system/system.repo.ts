@@ -445,6 +445,31 @@ export async function existingRoleIds(
   return new Set(rows.map((r) => r.id));
 }
 
+/**
+ * Every atom the given roles grant, enabled or not: a disabled role is one
+ * switch away from granting all of it.
+ */
+export async function permissionsOfRoles(
+  db: DbOrTx,
+  roleIds: readonly number[],
+): Promise<string[]> {
+  if (roleIds.length === 0) return [];
+  const rows = await db
+    .selectDistinct({ permission: rolePermissions.permission })
+    .from(rolePermissions)
+    .where(inArray(rolePermissions.roleId, [...roleIds]));
+  return rows.map((r) => r.permission);
+}
+
+/** The role ids an admin holds, enabled or not. */
+export async function roleIdsOfAdmin(db: DbOrTx, adminId: number): Promise<number[]> {
+  const rows = await db
+    .select({ roleId: adminRoles.roleId })
+    .from(adminRoles)
+    .where(eq(adminRoles.adminId, adminId));
+  return rows.map((r) => r.roleId);
+}
+
 /** Admin ids that still hold a role. Used to invalidate their sessions on a grant change. */
 export async function adminIdsWithRole(db: DbOrTx, roleId: number): Promise<number[]> {
   const rows = await db

@@ -82,7 +82,7 @@ export const systemRoleCreate = defineRoute({
   body: roleForm,
   response: roleDetail,
   status: 201,
-  errors: ['SYSTEM_ROLE_NAME_TAKEN', 'SYSTEM_PERMISSION_UNKNOWN'],
+  errors: ['SYSTEM_ROLE_NAME_TAKEN', 'SYSTEM_PERMISSION_UNKNOWN', 'SYSTEM_GRANT_EXCEEDS_OWN'],
   examples: [
     {
       name: 'operator',
@@ -108,7 +108,12 @@ export const systemRoleUpdate = defineRoute({
   params: roleParams,
   body: roleForm,
   response: roleDetail,
-  errors: ['SYSTEM_ROLE_NOT_FOUND', 'SYSTEM_ROLE_NAME_TAKEN', 'SYSTEM_PERMISSION_UNKNOWN'],
+  errors: [
+    'SYSTEM_ROLE_NOT_FOUND',
+    'SYSTEM_ROLE_NAME_TAKEN',
+    'SYSTEM_PERMISSION_UNKNOWN',
+    'SYSTEM_GRANT_EXCEEDS_OWN',
+  ],
   examples: [
     {
       name: 'grant-one-more',
@@ -139,7 +144,7 @@ export const systemRoleSetStatus = defineRoute({
   params: roleParams,
   body: roleStatusBody,
   response: roleDetail,
-  errors: ['SYSTEM_ROLE_NOT_FOUND'],
+  errors: ['SYSTEM_ROLE_NOT_FOUND', 'SYSTEM_GRANT_EXCEEDS_OWN'],
   examples: [
     {
       name: 'disable',
@@ -162,7 +167,7 @@ export const systemRoleDelete = defineRoute({
   params: roleParams,
   response: z.void(),
   status: 204,
-  errors: ['SYSTEM_ROLE_NOT_FOUND', 'SYSTEM_ROLE_IN_USE'],
+  errors: ['SYSTEM_ROLE_NOT_FOUND', 'SYSTEM_ROLE_IN_USE', 'SYSTEM_GRANT_EXCEEDS_OWN'],
   examples: [{ name: 'ok', params: { id: '4' }, response: undefined }],
 });
 

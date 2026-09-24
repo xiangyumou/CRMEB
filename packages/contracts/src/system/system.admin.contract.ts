@@ -80,7 +80,12 @@ export const systemAdminCreate = defineRoute({
   body: adminForm,
   response: adminMutationResult,
   status: 201,
-  errors: ['SYSTEM_ADMIN_ACCOUNT_TAKEN', 'SYSTEM_ADMIN_PASSWORD_REQUIRED', 'SYSTEM_ROLE_UNKNOWN'],
+  errors: [
+    'SYSTEM_ADMIN_ACCOUNT_TAKEN',
+    'SYSTEM_ADMIN_PASSWORD_REQUIRED',
+    'SYSTEM_ROLE_UNKNOWN',
+    'SYSTEM_GRANT_EXCEEDS_OWN',
+  ],
   examples: [
     {
       name: 'operator',
@@ -127,6 +132,7 @@ export const systemAdminUpdate = defineRoute({
     'SYSTEM_ADMIN_ACCOUNT_TAKEN',
     'SYSTEM_ADMIN_SELF_LOCKOUT',
     'SYSTEM_ROLE_UNKNOWN',
+    'SYSTEM_GRANT_EXCEEDS_OWN',
   ],
   examples: [
     {
@@ -167,7 +173,7 @@ export const systemAdminSetStatus = defineRoute({
   params: adminParams,
   body: adminStatusBody,
   response: adminMutationResult,
-  errors: ['SYSTEM_ADMIN_NOT_FOUND', 'SYSTEM_ADMIN_SELF_LOCKOUT'],
+  errors: ['SYSTEM_ADMIN_NOT_FOUND', 'SYSTEM_ADMIN_SELF_LOCKOUT', 'SYSTEM_GRANT_EXCEEDS_OWN'],
   examples: [
     {
       name: 'disable',
@@ -199,7 +205,7 @@ export const systemAdminResetPassword = defineRoute({
   params: adminParams,
   body: adminPasswordBody,
   response: passwordChangeResult,
-  errors: ['SYSTEM_ADMIN_NOT_FOUND'],
+  errors: ['SYSTEM_ADMIN_NOT_FOUND', 'SYSTEM_GRANT_EXCEEDS_OWN'],
   examples: [
     {
       name: 'reset',
@@ -221,7 +227,7 @@ export const systemAdminDelete = defineRoute({
   params: adminParams,
   response: z.void(),
   status: 204,
-  errors: ['SYSTEM_ADMIN_NOT_FOUND', 'SYSTEM_ADMIN_SELF_LOCKOUT'],
+  errors: ['SYSTEM_ADMIN_NOT_FOUND', 'SYSTEM_ADMIN_SELF_LOCKOUT', 'SYSTEM_GRANT_EXCEEDS_OWN'],
   examples: [{ name: 'ok', params: { id: '3' }, response: undefined }],
 });
 

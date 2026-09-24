@@ -13,6 +13,7 @@ import { createAdminSessionStore } from '../auth/admin-session.store';
 import * as authAdminRepo from '../auth/admin.repo';
 import { allPermissionAtoms, isKnownPermission } from '../auth/permissions';
 import { IMPLICIT_ADMIN_PERMISSIONS } from '../auth/rbac';
+import { assertWithinOwnGrants } from './grant-guard';
 import * as repo from './system.repo';
 
 /**
@@ -103,6 +104,7 @@ function assertPermissionsKnown(permissions: readonly string[]): void {
 
 export async function roleCreate(ctx: Ctx, body: RoleForm): Promise<RoleDetail> {
   assertPermissionsKnown(body.permissions);
+  assertWithinOwnGrants(ctx, body.permissions);
   if (await repo.roleNameTaken(ctx.db, body.name)) {
     throw new DomainError('SYSTEM_ROLE_NAME_TAKEN');
   }
@@ -135,6 +137,9 @@ export async function roleUpdate(
   assertPermissionsKnown(body.permissions);
   const existing = await repo.findRole(ctx.db, id);
   if (!existing) throw new DomainError('SYSTEM_ROLE_NOT_FOUND');
+  // Both sides: adding an atom the caller lacks is a grant, and so is rewriting
+  // (or stripping) a role more powerful than the caller.
+  assertWithinOwnGrants(ctx, [...(await repo.permissionsOfRole(ctx.db, id)), ...body.permissions]);
   if (await repo.roleNameTaken(ctx.db, body.name, id)) {
     throw new DomainError('SYSTEM_ROLE_NAME_TAKEN');
   }
@@ -167,6 +172,7 @@ export async function roleSetStatus(
   const id = fromId(params.id);
   const existing = await repo.findRole(ctx.db, id);
   if (!existing) throw new DomainError('SYSTEM_ROLE_NOT_FOUND');
+  assertWithinOwnGrants(ctx, await repo.permissionsOfRole(ctx.db, id));
 
   const to = body.enabled ? 1 : 0;
   const { won } = await repo.setRoleStatus(ctx.db, {
@@ -184,6 +190,7 @@ export async function roleDelete(ctx: Ctx, params: { id: string }): Promise<void
   const id = fromId(params.id);
   const existing = await repo.findRole(ctx.db, id);
   if (!existing) throw new DomainError('SYSTEM_ROLE_NOT_FOUND');
+  assertWithinOwnGrants(ctx, await repo.permissionsOfRole(ctx.db, id));
 
   // The guard is inside the DELETE, so an admin granted this role a millisecond
   // ago still blocks it — a prior count would not.

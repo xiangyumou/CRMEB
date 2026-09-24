@@ -353,6 +353,169 @@ describe('roles', () => {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * `system:admin:write` and `system:role:write` must not be a way to become a
+ * super admin. A non-super admin may only hand out, and only manage, what they
+ * hold themselves.
+ */
+describe('no admin hands out more than they hold', () => {
+  const MANAGER_GRANTS = [
+    'system:admin:read',
+    'system:admin:write',
+    'system:admin:delete',
+    'system:role:read',
+    'system:role:write',
+    'system:role:delete',
+    'storage:attachment:read',
+  ];
+
+  let managerId: number;
+  let managerRoleId: string;
+  let manager: Ctx;
+
+  beforeEach(async () => {
+    const root = as(superId);
+    const role = await roleCreate(root, {
+      name: '账号管理员',
+      enabled: true,
+      permissions: MANAGER_GRANTS,
+    });
+    managerRoleId = role.id;
+    const created = await adminCreate(root, {
+      account: 'manager',
+      name: '账号管理员',
+      password: PASSWORD,
+      enabled: true,
+      roleIds: [role.id],
+    });
+    managerId = Number(created.admin.id);
+    manager = as(managerId, { isSuper: false, permissions: MANAGER_GRANTS });
+  });
+
+  it('refuses to reset, edit, disable or delete a super admin', async () => {
+    const otherSuper = String(await seedAdmin('root2', true));
+    expect(
+      await code(adminResetPassword(manager, { id: otherSuper }, { password: 'x-123456789' })),
+    ).toBe('SYSTEM_GRANT_EXCEEDS_OWN');
+    expect(
+      await code(
+        adminUpdate(
+          manager,
+          { id: otherSuper },
+          { account: 'root2', name: 'root2', enabled: true, roleIds: [] },
+        ),
+      ),
+    ).toBe('SYSTEM_GRANT_EXCEEDS_OWN');
+    expect(await code(adminSetStatus(manager, { id: otherSuper }, { enabled: false }))).toBe(
+      'SYSTEM_GRANT_EXCEEDS_OWN',
+    );
+    expect(await code(adminDelete(manager, { id: otherSuper }))).toBe('SYSTEM_GRANT_EXCEEDS_OWN');
+  });
+
+  it('refuses to reset the password of an admin who holds more than the caller', async () => {
+    const root = as(superId);
+    const bigger = await roleCreate(root, {
+      name: '财务',
+      enabled: true,
+      permissions: ['payment:config:write'],
+    });
+    const target = await adminCreate(root, {
+      account: 'finance',
+      name: '财务',
+      password: PASSWORD,
+      enabled: true,
+      roleIds: [bigger.id],
+    });
+    expect(
+      await code(adminResetPassword(manager, { id: target.admin.id }, { password: 'x-123456789' })),
+    ).toBe('SYSTEM_GRANT_EXCEEDS_OWN');
+  });
+
+  it('refuses to give anybody, themselves included, a role that grants more than they hold', async () => {
+    const bigger = await roleCreate(as(superId), {
+      name: '全能',
+      enabled: true,
+      permissions: [...MANAGER_GRANTS, 'payment:config:write'],
+    });
+    expect(
+      await code(
+        adminUpdate(
+          manager,
+          { id: String(managerId) },
+          { account: 'manager', name: '账号管理员', enabled: true, roleIds: [bigger.id] },
+        ),
+      ),
+    ).toBe('SYSTEM_GRANT_EXCEEDS_OWN');
+    expect(
+      await code(
+        adminCreate(manager, {
+          account: 'sock',
+          name: '马甲',
+          password: PASSWORD,
+          enabled: true,
+          roleIds: [bigger.id],
+        }),
+      ),
+    ).toBe('SYSTEM_GRANT_EXCEEDS_OWN');
+  });
+
+  it('refuses to add to a role an atom the caller does not hold — their own role included', async () => {
+    expect(
+      await code(
+        roleUpdate(
+          manager,
+          { id: managerRoleId },
+          {
+            name: '账号管理员',
+            enabled: true,
+            permissions: [...MANAGER_GRANTS, 'payment:config:write'],
+          },
+        ),
+      ),
+    ).toBe('SYSTEM_GRANT_EXCEEDS_OWN');
+    expect(
+      await code(
+        roleCreate(manager, { name: '新身份', enabled: true, permissions: ['order:order:write'] }),
+      ),
+    ).toBe('SYSTEM_GRANT_EXCEEDS_OWN');
+  });
+
+  it('refuses to touch a role that already grants more than the caller holds', async () => {
+    const bigger = await roleCreate(as(superId), {
+      name: '财务',
+      enabled: false,
+      permissions: ['payment:config:write'],
+    });
+    expect(await code(roleSetStatus(manager, { id: bigger.id }, { enabled: true }))).toBe(
+      'SYSTEM_GRANT_EXCEEDS_OWN',
+    );
+    expect(await code(roleDelete(manager, { id: bigger.id }))).toBe('SYSTEM_GRANT_EXCEEDS_OWN');
+  });
+
+  it('still lets them manage what is within their own grants', async () => {
+    const small = await roleCreate(manager, {
+      name: '素材',
+      enabled: true,
+      permissions: ['storage:attachment:read'],
+    });
+    const created = await adminCreate(manager, {
+      account: 'clerk',
+      name: '素材员',
+      password: PASSWORD,
+      enabled: true,
+      roleIds: [small.id],
+    });
+    await expect(
+      adminResetPassword(manager, { id: created.admin.id }, { password: 'x-123456789' }),
+    ).resolves.toMatchObject({ revokedSessions: 0 });
+    await expect(
+      roleUpdate(manager, { id: small.id }, { name: '素材', enabled: true, permissions: [] }),
+    ).resolves.toMatchObject({ permissions: [] });
+  });
+});
+
+// ---------------------------------------------------------------------------
+
 describe('config', () => {
   it('never returns a stored secret — only whether one is set', async () => {
     const ctx = as(superId);
