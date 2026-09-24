@@ -137,11 +137,11 @@ A union is matched branch by branch on its tag (`object(kind=product)`), so
 reordering branches changes nothing. Response limits are not compared: the
 production build does not validate responses.
 
-**Report-only until the first mini-program release.** `ENFORCED` at the top of
-`checks/api-compat.ts` is the switch: `false` prints each breaking change as a
-note (`[breaking, report-only]`) and passes; `true` fails. It is flipped in the
-commit that refreshes the baseline for the first release
-([cutover.md §5](../docs/mini/cutover.md#5-商城接口兼容守卫api-compat)).
+**Report-only.** `ENFORCED` at the top of `checks/api-compat.ts` is the
+switch: `false` prints each breaking change as a note
+(`[breaking, report-only]`) and passes; `true` fails. It stays `false` through
+the first mini-program release; whether and when to flip it is decided after
+that release ([cutover.md §5](../docs/mini/cutover.md#5-商城接口兼容守卫api-compat)).
 
 **The refresh command**, run only when a mini-program version is released:
 
