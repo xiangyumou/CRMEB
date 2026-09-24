@@ -232,7 +232,7 @@
 - [ ] `docker/edge/Dockerfile`：删除 `ARG H5_DIST=docker/edge/h5-placeholder`、`FROM` 下面的 `ARG H5_DIST`、
       `COPY ${H5_DIST}/ /srv/h5/` 和文件头关于 H5 的说明（镜像只剩 nginx 配置）；删除 `docker/edge/h5-placeholder/`；
       `Dockerfile.dockerignore` 删去 `!apps/uni-app/dist` 和关于 uni-app 的注释。
-- [ ] `deploy/rehearsal/drill.sh` 的 `case_edge_proxies_every_page`（第 655 行起）：「没有被代理」的判据从「回答等于
+- [ ] `deploy/rehearsal/drill.sh` 的 `case_edge_proxies_every_page`（第 722 行起）：「没有被代理」的判据从「回答等于
       storefront 的 `index.html`」改为「回答是 302、`Location` 为 `/`」；去掉跳过 `/` 的那一行
       （`[ "$url" != '/' ] || continue`）和「`/` is the storefront's on purpose」的注释——`/` 现在也必须由 `web` 回答；
       开头取 `index.html` 的那段删除。`deploy/README.md` 相应段落。（`deploy/` 由切换那次的提交改，R1 没有动。）
