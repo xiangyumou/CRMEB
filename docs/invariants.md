@@ -956,6 +956,15 @@ WeChat's shipping reminder and its 已纳入发货信息管理 notice reach oper
 - `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > says so when the mini program is not configured, and when WeChat refuses — WXSHIP-007`
 - `packages/core/src/payment/payment.mini-trade.int.test.ts::同步 (is_trade_managed + set_msg_jump_path) > is an admin’s, not a shopper’s — WXSHIP-007`
 
+### WXSHIP-008
+
+The push URL never takes a delivery it cannot bind to its body (decided 2026-09-24). In 明文模式 and 兼容模式 the signature covers only `(token, timestamp, nonce)`, so the single-use triple in Redis is what stops a signed URL from an access log carrying a forged body (a `trade_manage_order_settlement` would mark an order received); with Redis unavailable such a delivery — plaintext or encrypted — is answered 503, not `success`, nothing is recorded, and WeChat re-delivers it later. In 安全模式 `msg_signature` covers the encrypted body, and a delivery is still taken with Redis down.
+
+- `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > refuses a plaintext push in 明文模式 with a retryable 503, and records nothing`
+- `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > refuses in 兼容模式 too, a plaintext and an encrypted delivery alike`
+- `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > still takes an encrypted push in 安全模式, where the signature covers the body`
+- `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > takes a plaintext push in 明文模式 while the store is up, and refuses the triple for another body`
+
 ## 内容安全 (WeChat content security)
 
 The policy table and the reasons are in `docs/mini/wechat-compliance.md` C09 and at the top of `packages/core/src/wechat/wechat.sec-check.ts`.
