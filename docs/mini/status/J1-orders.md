@@ -34,9 +34,16 @@ presale price defect, 我的评价 status, the receipt foreground fallback.
    gained `receipt: 'confirm-silently'` (+ the e2e type), and `orders.spec.ts` a journey for it.
 9. Docs: pages.md rows (我的订单, 订单详情, 评价, 填写退货物流), wechat-compliance.md C07 client note.
 
+## Checklist (2026-09-24, all green)
+
+`prettier --check .`; `turbo run typecheck lint build` (exit 0); `turbo run test:unit
+--concurrency=2` (16/16); `pnpm guards` (15 checks, 0 failures); `check:examples` (461 routes);
+`@shop/contracts test:int` (pass); `test:mini` 38 passed (incl. the former `test.fail` and the
+new receipt-fallback journey).
+
 ## In progress
 
-- Merge checklist.
+- Nothing; reported.
 
 ## Page-form changes (旧 → 新)
 
