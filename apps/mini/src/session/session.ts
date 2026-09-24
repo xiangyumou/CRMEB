@@ -13,7 +13,8 @@ import { navigate, platform, showToast, storage, useLaunchContext } from '@/plat
  *                              └─ phone-required (bindToken, 10 min)
  *                                   ├─ 手机号快速登录 ─▶ POST …/wechat-mini/phone ─▶ token stored
  *                                   └─ 短信验证码 ─────▶ POST …/wechat-oa/phone ───▶ token stored
- *   其他方式 · 密码登录 (any state) ──▶ POST /auth/sessions/password ──▶ token stored (openid not linked)
+ *   其他方式 · 密码登录 (any state) ──▶ POST /auth/sessions/password ──▶ token stored
+ *                                      (from phone-required: + bindToken, openid linked)
  *
  * Browsing never needs a session (C05): a page shows `<LoginCard>` where signed-in content
  * would be, and an action that needs one calls `requireLogin()` first. Nothing here navigates
@@ -192,15 +193,32 @@ export async function bindPhoneWithSms(phone: string, code: string): Promise<voi
   }
 }
 
+/** A password login refused only for its `bindToken`; the password itself was right. */
+const LINK_REFUSED = new Set(['AUTH_WECHAT_BIND_EXPIRED', 'AUTH_WECHAT_ALREADY_BOUND']);
+
 /**
  * 密码登录 (the login page's 其他方式, auth.md「密码登录」). Signs in to the account the
- * password belongs to; a parked `phone-required` sign-in is dropped. The mini-program openid is
- * **not** linked (`auth.passwordLogin` takes no `bindToken`), so this token lasts its own
- * `sessionTtlDays` and a later renewal goes through `wx.login` again. Rejects with the server's
- * error (wrong password, too many attempts…) and leaves the session as it was.
+ * password belongs to. From a parked `phone-required` sign-in the `bindToken` goes along, and the
+ * server links the mini-program openid to that account once the password is right (AUTH-009), so
+ * the next `wx.login` renewal signs in to the same account. When the link is refused — the token
+ * expired (`AUTH_WECHAT_BIND_EXPIRED`) or the openid or the account's mini slot is taken
+ * (`AUTH_WECHAT_ALREADY_BOUND`) — the password was right, so it signs in once more without the
+ * token, linking nothing, rather than stranding the shopper on the login page. Other failures
+ * (wrong password, too many attempts…) reject with the server's error and leave the session as
+ * it was.
  */
 export async function signInWithPassword(account: string, password: string): Promise<void> {
-  const result = await api.call('auth.passwordLogin', { body: { account, password } });
+  const state = current();
+  const bindToken = state.status === 'phone-required' ? state.bindToken : undefined;
+  let result: ResponseOf<'auth.passwordLogin'>;
+  try {
+    result = await api.call('auth.passwordLogin', {
+      body: bindToken ? { account, password, bindToken } : { account, password },
+    });
+  } catch (error) {
+    if (!bindToken || !isApiError(error) || !LINK_REFUSED.has(error.code)) throw error;
+    result = await api.call('auth.passwordLogin', { body: { account, password } });
+  }
   storage.set(TOKEN_KEY, result.token);
   set({ status: 'signed-in', token: result.token });
 }

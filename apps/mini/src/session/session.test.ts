@@ -20,6 +20,7 @@ const signedIn = (token: string) => ({
   bindToken: null,
   bindTokenExpiresInSec: null,
 });
+const passwordSession = { token: 'pw1', expiresAt: '2026-10-23T00:00:00.000Z', user };
 const phoneRequired = {
   status: 'phone-required',
   session: null,
@@ -229,14 +230,11 @@ describe('session', () => {
     });
   });
 
-  it('signs in with a password from a parked sign-in, as wechat-mini, without a bindToken', async () => {
+  it('signs in with a password from a parked sign-in, as wechat-mini, passing its bindToken (AUTH-009)', async () => {
     const { serveApi, signInWithPassword, startSession, taroFake, useSession } = await load();
     const seen = serveApi({
       'POST /api/v1/auth/sessions/wechat-mini': () => ({ body: phoneRequired }),
-      'POST /api/v1/auth/sessions/password': () => ({
-        status: 201,
-        body: { token: 'pw1', expiresAt: '2026-10-23T00:00:00.000Z', user },
-      }),
+      'POST /api/v1/auth/sessions/password': () => ({ status: 201, body: passwordSession }),
     });
     await startSession();
 
@@ -244,10 +242,73 @@ describe('session', () => {
 
     expect(useSession.getState().session).toEqual({ status: 'signed-in', token: 'pw1' });
     expect(taroFake.storage.get('shop.session.token')).toBe('pw1');
-    expect(seen[1]?.body).toEqual({ account: '13900000000', password: 'secret-1' });
+    expect(seen).toHaveLength(2);
+    expect(seen[1]?.body).toEqual({
+      account: '13900000000',
+      password: 'secret-1',
+      bindToken: 'bind-1',
+    });
     expect(seen[1]?.headers['X-Client-Platform'] ?? seen[1]?.headers['x-client-platform']).toBe(
       'wechat-mini',
     );
+  });
+
+  it('sends no bindToken when nothing is parked', async () => {
+    const { serveApi, signInWithPassword, useSession } = await load();
+    const seen = serveApi({
+      'POST /api/v1/auth/sessions/password': () => ({ status: 201, body: passwordSession }),
+    });
+    useSession.setState({ session: { status: 'signed-out' } });
+
+    await signInWithPassword('u7', 'secret-1');
+
+    expect(seen.map((request) => request.body)).toEqual([{ account: 'u7', password: 'secret-1' }]);
+    expect(useSession.getState().session).toEqual({ status: 'signed-in', token: 'pw1' });
+  });
+
+  it.each(['AUTH_WECHAT_ALREADY_BOUND', 'AUTH_WECHAT_BIND_EXPIRED'])(
+    'signs in once more without the bindToken when only the link is refused (%s)',
+    async (code) => {
+      const { serveApi, signInWithPassword, useSession } = await load();
+      const seen = serveApi({
+        'POST /api/v1/auth/sessions/password': (body) =>
+          (body as { bindToken?: string }).bindToken
+            ? {
+                status: code === 'AUTH_WECHAT_ALREADY_BOUND' ? 409 : 400,
+                body: { code, message: '-' },
+              }
+            : { status: 201, body: passwordSession },
+      });
+      useSession.setState({ session: { status: 'phone-required', bindToken: 'bind-1' } });
+
+      await signInWithPassword('u7', 'secret-1');
+
+      expect(seen.map((request) => request.body)).toEqual([
+        { account: 'u7', password: 'secret-1', bindToken: 'bind-1' },
+        { account: 'u7', password: 'secret-1' },
+      ]);
+      expect(useSession.getState().session).toEqual({ status: 'signed-in', token: 'pw1' });
+    },
+  );
+
+  it('does not retry a wrong password, and keeps the parked sign-in', async () => {
+    const { serveApi, signInWithPassword, useSession } = await load();
+    const seen = serveApi({
+      'POST /api/v1/auth/sessions/password': () => ({
+        status: 401,
+        body: { code: 'AUTH_INVALID_CREDENTIALS', message: '账号或密码不正确' },
+      }),
+    });
+    useSession.setState({ session: { status: 'phone-required', bindToken: 'bind-1' } });
+
+    await expect(signInWithPassword('u7', 'wrong')).rejects.toMatchObject({
+      code: 'AUTH_INVALID_CREDENTIALS',
+    });
+    expect(seen).toHaveLength(1);
+    expect(useSession.getState().session).toEqual({
+      status: 'phone-required',
+      bindToken: 'bind-1',
+    });
   });
 
   it('leaves the session alone when the password is refused', async () => {

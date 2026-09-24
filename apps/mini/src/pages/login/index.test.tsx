@@ -49,7 +49,12 @@ describe('登录 · 其他方式 · 密码登录', () => {
     await waitFor(() =>
       expect(useSession.getState().session).toEqual({ status: 'signed-in', token: 'pw-token' }),
     );
-    expect(seen[0]?.body).toEqual({ account: '13800138000', password: 'secret-1' });
+    // From the parked sign-in, the bindToken goes along and the server links the openid (AUTH-009).
+    expect(seen[0]?.body).toEqual({
+      account: '13800138000',
+      password: 'secret-1',
+      bindToken: 'bind-1',
+    });
     expect(taroFake.storage.get(TOKEN_KEY)).toBe('pw-token');
     // Signed in, the page goes home (no redirect).
     await waitFor(() =>
