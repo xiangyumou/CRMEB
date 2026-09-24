@@ -7,15 +7,16 @@
  *     node scripts/preview.mjs --confirm [--robot 1] [--qr-file /tmp/preview.jpg]
  *
  * **Every run uploads the package to WeChat's servers.** Run it only when the user has approved
- * this one preview; `--confirm` is never defaulted, never read from the environment, and this
- * script never uploads a release (`miniprogram-ci upload` is not wrapped on purpose).
+ * this one preview; `--confirm` is never defaulted and never read from the environment. A trial
+ * build (体验版) goes up through `upload.mjs` instead.
  *
  * It refuses to run unless:
  *
- * - `WX_MINI_UPLOAD_KEY_PATH` names an existing file **outside** the repository (the upload key
- *   from 公众平台 → 开发管理 → 开发设置 → 小程序代码上传; it is a credential, never committed,
- *   and the `mini` guard fails on a `private.*.key` in the tree);
- * - `dist/weapp` exists and its AppID (`project.config.json`) is a real one, not touristappid;
+ * - `WX_MINI_UPLOAD_KEY_PATH` names an existing file outside the repository, or inside it where
+ *   git ignores it (the upload key from 公众平台 → 开发管理 → 开发设置 → 小程序代码上传; it is a
+ *   credential, never committed, and the `mini` guard fails on a tracked `private.*.key`);
+ * - `dist/weapp` exists, its AppID (`project.config.json`) is a real one, not touristappid, and
+ *   size-report passed on exactly its files (`dist/weapp.gate.json`, gate-stamp.mjs);
  * - a `miniprogram-ci` executable is on `PATH` or named by `MINIPROGRAM_CI_BIN`. It is not a
  *   dependency of this repository; install it yourself, outside it (`npm i -g miniprogram-ci`).
  *
@@ -28,9 +29,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-
-const appRoot = path.resolve(import.meta.dirname, '..');
-const repoRoot = path.resolve(appRoot, '../..');
+import { appRoot, gatedBuild, miniprogramCi, refuser, uploadKey } from './wx-ci.mjs';
 
 const { values: args } = parseArgs({
   options: {
@@ -40,40 +39,9 @@ const { values: args } = parseArgs({
   },
 });
 
-function refuse(message) {
-  console.error(`preview: ${message}`);
-  process.exit(1);
-}
-
-// --- the upload key: named by the environment, outside the repository ---------------------
-const keyEnv = process.env.WX_MINI_UPLOAD_KEY_PATH;
-if (!keyEnv) {
-  refuse(
-    'WX_MINI_UPLOAD_KEY_PATH is not set. Point it at the upload key, kept outside the repository.',
-  );
-}
-const keyPath = path.resolve(keyEnv.replace(/^~(?=$|\/)/, process.env.HOME ?? '~'));
-if (!fs.existsSync(keyPath) || !fs.statSync(keyPath).isFile()) {
-  refuse(`WX_MINI_UPLOAD_KEY_PATH: ${keyPath} is not a file`);
-}
-const realKey = fs.realpathSync(keyPath);
-const fromRepo = path.relative(fs.realpathSync(repoRoot), realKey);
-if (!fromRepo.startsWith('..') && !path.isAbsolute(fromRepo)) {
-  refuse(
-    `${realKey} is inside the repository; move the key outside it (and rotate it if it was ever committed)`,
-  );
-}
-
-// --- the build ----------------------------------------------------------------------------
-const dist = path.join(appRoot, 'dist/weapp');
-const projectFile = path.join(dist, 'project.config.json');
-if (!fs.existsSync(projectFile)) refuse('dist/weapp not found; run scripts/device-build.mjs first');
-const { appid } = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
-if (typeof appid !== 'string' || !/^wx[0-9a-f]{16}$/.test(appid)) {
-  refuse(
-    `dist/weapp is built for ${String(appid)}; a preview needs a real AppID (device-build --appid)`,
-  );
-}
+const refuse = refuser('preview');
+const realKey = uploadKey(refuse);
+const { dist, appid } = gatedBuild(refuse);
 if (!/^([1-9]|[12][0-9]|30)$/.test(args.robot)) refuse('--robot is 1–30');
 
 // --- the user's say-so, every time --------------------------------------------------------
@@ -84,23 +52,7 @@ if (!args.confirm) {
   );
 }
 
-// --- the CLI, which this repository does not install --------------------------------------
-function findOnPath(name) {
-  for (const dir of (process.env.PATH ?? '').split(path.delimiter)) {
-    const candidate = path.join(dir, name);
-    try {
-      fs.accessSync(candidate, fs.constants.X_OK);
-      return candidate;
-    } catch {
-      // not here
-    }
-  }
-  return undefined;
-}
-const bin = process.env.MINIPROGRAM_CI_BIN ?? findOnPath('miniprogram-ci');
-if (!bin) {
-  refuse('miniprogram-ci is not installed; `npm i -g miniprogram-ci` (outside this repository)');
-}
+const bin = miniprogramCi(refuse);
 
 const version = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8')).version;
 const qr = args['qr-file']

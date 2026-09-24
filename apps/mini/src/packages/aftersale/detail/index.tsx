@@ -3,6 +3,7 @@ import { Text, View } from '@tarojs/components';
 import type { RefundDetail } from '@shop/contracts/refund/schemas';
 import { routeKey, useRouteQuery } from '@shop/api-client/react';
 import { useRefetchOnShow } from '@/data/use-refetch-on-show';
+import { assetUrl } from '@/lib/asset-url';
 import { formatDateTime } from '@/lib/format';
 import { formatSpec } from '@/lib/spec';
 import { copyText, goBack, navigate, previewImages, useRouteParams } from '@/platform';
@@ -198,7 +199,12 @@ function Body({ id }: { id: string }) {
                   key={url}
                   label={`查看凭证 ${index + 1}`}
                   className="refund-detail__image"
-                  onClick={() => previewImages(refund.images, url)}
+                  onClick={() =>
+                    previewImages(
+                      refund.images.map((image) => assetUrl(image) ?? image),
+                      assetUrl(url) ?? url,
+                    )
+                  }
                 >
                   <Image src={url} radius="sm" size="small" />
                 </Pressable>

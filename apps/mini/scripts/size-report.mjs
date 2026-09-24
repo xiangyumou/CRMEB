@@ -37,6 +37,9 @@
  *   missing or older than the build, or shows more than one copy of react, react-dom,
  *   react-reconciler, @tarojs/runtime or TanStack Query, or any zod at all.
  *
+ * On success it writes `dist/weapp.gate.json`, the fingerprint of the files it passed;
+ * `preview.mjs` and `upload.mjs` refuse a build that does not match it (gate-stamp.mjs).
+ *
  * Package sizes count every file WeChat uploads: everything except the developer-tool project
  * files. The report ends with the main package's breakdown by owner (raw module bytes, before
  * minification): what to look at first when the main package grows.
@@ -45,6 +48,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { parse } from 'acorn';
+import { clearStamp, NOT_UPLOADED, writeStamp } from './gate-stamp.mjs';
 
 const appRoot = path.resolve(import.meta.dirname, '..');
 const KB = 1024;
@@ -83,8 +87,8 @@ if (!fs.existsSync(path.join(dist, 'app.json'))) {
   process.exit(1);
 }
 
-/** Not part of the uploaded package. */
-const NOT_UPLOADED = new Set(['project.config.json', 'project.private.config.json']);
+// A run that fails, or stops half-way, leaves no record that the gate passed (gate-stamp.mjs).
+clearStamp(dist);
 
 function listFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true, recursive: true }).flatMap((entry) => {
@@ -425,6 +429,7 @@ if (args.json) {
   console.log(failures.length ? `size-report: ${failures.length} failure(s)` : 'size-report: ok');
 }
 
+if (failures.length === 0) writeStamp(dist);
 process.exit(failures.length ? 1 : 0);
 
 function kb(bytes) {

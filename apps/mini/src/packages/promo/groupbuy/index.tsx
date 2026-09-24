@@ -1,6 +1,7 @@
 import { Swiper, SwiperItem, Text, View } from '@tarojs/components';
 import { useInfiniteRouteQuery, useRouteQuery } from '@shop/api-client/react';
 import { activityCard, activityPhase } from '@/features/promo/activity';
+import { parseQuery } from '@/lib/query';
 import { serverNow } from '@/lib/server-clock';
 import { decodeEnter, navigate, useShare } from '@/platform';
 import { Button } from '@/ui/button';
@@ -19,7 +20,7 @@ const ROUTE = { route: 'groupbuyList', params: {} } as const;
 function bannerRoute(link: string | null) {
   if (!link) return null;
   const [path = '', search = ''] = link.split('?');
-  const query = Object.fromEntries(new URLSearchParams(search));
+  const query = parseQuery(search);
   return decodeEnter({ path, query }).route;
 }
 

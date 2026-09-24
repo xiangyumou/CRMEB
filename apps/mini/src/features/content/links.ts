@@ -23,7 +23,9 @@ function decode(value: string): string {
 export function extractLinks(html: string): ContentLink[] {
   const seen = new Set<string>();
   const links: ContentLink[] = [];
-  for (const match of html.matchAll(ANCHOR)) {
+  // `exec`, not `matchAll`: iOS 12's JavaScriptCore has no `matchAll` and nothing polyfills it.
+  ANCHOR.lastIndex = 0;
+  for (let match = ANCHOR.exec(html); match; match = ANCHOR.exec(html)) {
     const href = decode(match[2] ?? '').trim();
     if (!/^https?:\/\//i.test(href) || seen.has(href)) continue;
     seen.add(href);

@@ -6,6 +6,7 @@ import {
   type StorefrontRoute,
   type StorefrontRouteKey,
 } from '@shop/api-client/routes';
+import { parseQuery } from '@/lib/query';
 
 /**
  * Navigation by route key (docs/mini/pages.md §3). Pages, DIY links, messages and shares name a
@@ -291,7 +292,7 @@ export function loginReturn(
   if (entry.tab) return definedParams(key, target.params ?? {}).length === 0 ? 'back' : 'replace';
   const query = previous.path?.split('?')[1] ?? '';
   const options = {
-    ...Object.fromEntries(new URLSearchParams(query)),
+    ...parseQuery(query),
     ...previous.$taroParams,
     ...previous.options,
   };

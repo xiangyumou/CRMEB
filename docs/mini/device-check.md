@@ -20,7 +20,7 @@ e2e（`pnpm --filter @shop/e2e-storefront test`）跑的是「模拟小程序」
   `apps/mini` 下任何 32 位十六进制串，`size-report` 会拦 `dist/weapp` 里的同样的串。
   **不要为了测试去公众平台「重置」AppSecret。** 但如果它泄露过（比如贴进过聊天、邮件、截图），就应该重置：
   重置后旧值立即失效，所以要**同时**把新值填进生产后台的配置，否则已上线的登录会断。
-- **代码上传密钥（`private.*.key`）放在仓库外**，见[第 8 节](#8-可选用-miniprogram-ci-出预览码)。
+- **代码上传密钥（`private.*.key`）放在仓库外**，见[第 8 节](#8-可选用-miniprogram-ci-出预览码或上传)。
 - **预览、真机调试、上传都会把代码包送到微信的服务器。** 在开发者工具里点「预览」「真机调试」是你本人的
   操作；让脚本或 agent 去做（miniprogram-ci），每一次都要你本人明确同意。本清单只用「预览」和「真机调试」，
   不点「上传」：上传会在公众平台「版本管理」里生成开发版本，它可以被设为体验版或提交审核，属于发布流程。
@@ -182,16 +182,23 @@ iPhone 和 Android 各过一遍。每项记「通过 / 失败 / 未测（原因�
 失败项：复现步骤、期望、实际、截图编号、控制台报错原文。
 ```
 
-## 8. 可选：用 miniprogram-ci 出预览码
+## 8. 可选：用 miniprogram-ci 出预览码或上传
 
-不开开发者工具，在本机命令行直接出预览二维码。miniprogram-ci **不是**这个仓库的依赖，CI 也不跑它。
+不开开发者工具，在本机命令行直接出预览二维码（`scripts/preview.mjs`），或上传开发版本供设为体验版
+（`scripts/upload.mjs`）。miniprogram-ci **不是**这个仓库的依赖，CI 也不跑它。**不要直接调用
+`miniprogram-ci upload/preview`**：只有这两个脚本会核对 size-report 是否通过了这份产物。
 
-1. **每次运行都会把 `dist/weapp` 上传到微信服务器**（生成预览版本）。每一次都要你本人明确同意；agent
-   不能自己替你加 `--confirm`。脚本只做预览，不提供「上传」（生成版本记录属于发布流程）。
+1. **每次运行都会把 `dist/weapp` 上传到微信服务器**。每一次都要你本人明确同意；agent
+   不能自己替你加 `--confirm`。版本号固定取 `package.json` 的 `version`，脚本不接受版本参数。
+   **只上传 size-report 通过的产物**：`size-report.mjs` 通过时在 `dist/weapp.gate.json` 记下产物的指纹，
+   两个脚本发现产物和指纹对不上（之后又跑了 `dev:weapp` 或裸 `taro build`）就拒绝。开发者工具里的
+   「上传」按钮不做这项检查，只对 `device-build.mjs` 刚成功构建出的 `dist/weapp` 使用；它失败时会删掉
+   `dist/weapp`。
 2. **上传密钥**：管理员在公众平台 **开发管理 → 开发设置 → 小程序代码上传** 里生成并下载
    `private.wx4f4b772125e155ed.key`。它是凭证：
-   - 放在**仓库外**，例如 `~/.config/shop/private.wx4f4b772125e155ed.key`，`chmod 600`；
-   - 用环境变量 `WX_MINI_UPLOAD_KEY_PATH` 指向它；脚本发现它在仓库里就拒绝运行；
+   - 放在**仓库外**，例如 `~/.config/shop/private.wx4f4b772125e155ed.key`，`chmod 600`；放在仓库里时
+     必须被 git 忽略（根目录 `private.*.key`），否则脚本拒绝运行；
+   - 用环境变量 `WX_MINI_UPLOAD_KEY_PATH` 指向它；
    - 根目录 `.gitignore` 忽略 `private.*.key`，`mini` 守卫在 `apps/mini` 下发现一个或者 git 里跟踪了一个就失败；
    - 怀疑泄漏就在同一处重新生成，旧的立即作废。
 3. **IP 白名单**：同一页面里配置。填本机的公网出口 IP（WSL2 和 Windows 共用；家庭宽带的 IP 会变，
@@ -203,10 +210,14 @@ iPhone 和 Android 各过一遍。每项记「通过 / 失败 / 未测（原因�
    WX_MINI_UPLOAD_KEY_PATH=~/.config/shop/private.wx4f4b772125e155ed.key \
      pnpm --filter @shop/mini exec node scripts/preview.mjs --confirm
    # 二维码默认打印在终端；--qr-file /tmp/preview.jpg 存成图片；--robot 1–30 选 CI 机器人编号
+
+   WX_MINI_UPLOAD_KEY_PATH=~/.config/shop/private.wx4f4b772125e155ed.key \
+     pnpm --filter @shop/mini exec node scripts/upload.mjs --confirm [--desc "说明"]
+   # 上传为开发版本，再在公众平台「版本管理」里设为体验版
    ```
 
-   `apps/mini/scripts/preview.mjs` 在这些情况下拒绝运行：没设 `WX_MINI_UPLOAD_KEY_PATH`、密钥不存在或在仓库里、
-   `dist/weapp` 没构建或是 `touristappid`、没加 `--confirm`、找不到 `miniprogram-ci` 命令
+   两个脚本在这些情况下拒绝运行：没设 `WX_MINI_UPLOAD_KEY_PATH`、密钥不存在或在仓库里且未被忽略、
+   `dist/weapp` 没构建或是 `touristappid`、size-report 没通过这份产物、没加 `--confirm`、找不到 `miniprogram-ci` 命令
    （也可以用 `MINIPROGRAM_CI_BIN` 指定）。它调用的是 miniprogram-ci 文档里的 `preview` 参数
    （`--pp --pkp --appid --uv -r --qrcode-format --qrcode-output-dest`），第一次用前对照你装的版本的
    `miniprogram-ci preview --help` 核对一遍。
@@ -217,7 +228,7 @@ iPhone 和 Android 各过一遍。每项记「通过 / 失败 / 未测（原因�
 
 小程序的版本号只有一个来源：`apps/mini/package.json` 的 `version`（例如 `1.0.0`）。构建时
 `config/index.ts` 把它写进包里，每个请求都带 `X-Client-Version: <版本>`（`src/data/api.ts`，
-上传图片也一样）；`scripts/preview.mjs` 也用它作为上传版本。服务端据此区分新旧客户端：装修块的
+上传图片也一样）；`scripts/preview.mjs` 和 `scripts/upload.mjs` 也用它作为上传版本。服务端据此区分新旧客户端：装修块的
 `minClient` 高于这个版本时，这个客户端就不会收到那一块。
 
 - **每次发版前先改版本号**，和要提交审核的版本一致：修复 `1.0.1`，新功能 `1.1.0`，与旧客户端不兼容的

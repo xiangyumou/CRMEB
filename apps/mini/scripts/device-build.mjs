@@ -148,7 +148,13 @@ const size = spawnSync('node', [path.join(appRoot, 'scripts/size-report.mjs')], 
   cwd: appRoot,
   stdio: 'inherit',
 });
-if (size.status !== 0) refuse('size-report failed; fix it before putting this build on a phone');
+if (size.status !== 0) {
+  // Nothing half-checked is left for DevTools to open or upload.
+  fs.rmSync(dist, { recursive: true, force: true });
+  refuse(
+    'size-report failed, so dist/weapp was removed; fix it before putting this build on a phone',
+  );
+}
 
 console.log(`
 device-build: dist/weapp is ready.
