@@ -723,6 +723,7 @@ A parked mini-program sign-in survives a phone code WeChat refused, and the same
 
 - `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-007 — keeps the bind token when WeChat refuses the phone code`
 - `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-007 — finishes a mini sign-in with an SMS code instead, and links the mini openid`
+- `e2e/storefront/specs-mini/login.spec.ts::a new WeChat user ticks the terms, signs up with an SMS code, and a wrong code leaves it usable`
 
 ### AUTH-008
 
@@ -732,6 +733,8 @@ A known mini-program openid renews silently: `signed-in`, `registered: false`, t
 - `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — leaves the shopper’s other sessions alone when renewing`
 - `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — refuses to renew a disabled account`
 - `packages/core/src/user/storefront-auth.int.test.ts::mini-program session renewal > AUTH-008 — says registered only on the call that created the account`
+- `e2e/storefront/specs-mini/login.spec.ts::a session the server stopped honouring is renewed once, and the reads that failed are replayed`
+- `e2e/storefront/specs-mini/login.spec.ts::a write that meets an expired session is replayed once after renewal, not lost or doubled`
 
 ## Fulfilment, the order console and invoices
 
@@ -932,6 +935,7 @@ Review text a customer submits is checked by WeChat's `msgSecCheck` (scene 2, th
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > publishes a held review once an admin approves it — CONTENT-001`
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > lets an admin delete a held review — CONTENT-001`
 - `packages/core/src/wechat/wechat.sec-check.int.test.ts::review text is held for a person, never refused > does not check an account without a mini-program identity, or while switched off — CONTENT-001`
+- `e2e/storefront/specs-mini/reviews.spec.ts::CONTENT-001: a review the content check holds is shown on the product only once the merchant publishes it`
 
 ### CONTENT-002
 
@@ -1391,27 +1395,31 @@ PostgreSQL `jsonb` reorders the keys inside a node; the guarantee that survives 
 
 ### SMOKE-002
 
-The DIY home's product lists load on the real stack with no console error and no failed request.
+The DIY home's product lists load on the real stack with no console error and no failed request — the uni-app's DIY home, and in the mini-program a 装修 v2 page's product list.
 
 - `e2e/storefront/specs/home-category-product.spec.ts::the DIY home page renders every fixture component with no console error`
+- `e2e/storefront/specs-mini/decor.spec.ts::a page published in the admin shows each of its blocks in order, and follows the next publish`
 
 ### SMOKE-003
 
-The home page, `GET /api/v1/diy/pages/home`, loads for a signed-in shopper on the H5 build.
+The home page loads for a signed-in shopper: `GET /api/v1/diy/pages/home` on the uni-app's H5 build, `GET /api/v1/pages/home` in the mini-program.
 
 - `e2e/storefront/specs/home-category-product.spec.ts::the DIY home page renders every fixture component with no console error`
+- `e2e/storefront/specs-mini/shop-journey.spec.ts::a shopper goes from 首页 through 分类 and the cart to a paid order`
 
 ### SMOKE-004
 
-`GET /api/v1/profile` answers 200 after a password login on the H5 build.
+`GET /api/v1/profile` answers 200 after a sign-in: a password login on the uni-app's H5 build, the silent `wx.login` sign-in in the mini-program (which has no password login).
 
 - `e2e/storefront/specs/login.spec.ts::password login reaches an authenticated screen`
+- `e2e/storefront/specs-mini/login.spec.ts::a WeChat user the shop knows is signed in on opening the app, with no login page`
 
 ### SMOKE-005
 
 An order is created `pending_payment`, paid through the cashier with the worker running, and read back `paid`.
 
 - `e2e/storefront/specs/cart-checkout-pay.spec.ts::a shopper pays an order at the cashier and the order is paid`
+- `e2e/storefront/specs-mini/new-shopper-buys.spec.ts::a new WeChat user signs in, binds a phone, buys a product and pays`
 
 ### SMOKE-006
 
@@ -1652,6 +1660,7 @@ Every contract has a route file that exports its method, and every route file is
 - `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > shares the (page, scene) cache with the legacy endpoint — SHARE-001`
 - `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > refuses params that do not fit the key, without calling WeChat — SHARE-001`
 - `packages/core/src/wechat/wechat.mini-code.int.test.ts::shareMiniCodeUrl > refuses a key the catalogue does not mark miniCode — SHARE-001`
+- `e2e/storefront/specs-mini/share.spec.ts::SHARE-001: a 小程序码 opens the product, activity, coupon or decor page it was made for`
 
 ### SHARE-002
 
@@ -1820,6 +1829,14 @@ A save to any group `GET /api/v1/app/config` is built from drops its cache and m
 - `packages/core/src/system/app-config.int.test.ts::SYS-019 — web-view domains > serves the operator list lower-cased and deduplicated, one per line or comma`
 - `packages/core/src/system/app-config.int.test.ts::SYS-019 — web-view domains > refuses <label>, and writes nothing`
 - `packages/contracts/src/system/app.schemas.test.ts::SYS-019 — webview domains > refuses <label>`
+- `e2e/storefront/specs-mini/app-config.spec.ts::the app config answers cached and versioned: an ETag, a 304 for it, a new one after a save`
+
+### CLIENT-002
+
+The mini-program opens a `webview` link in its web-view only when the URL is https and its host is `mp.weixin.qq.com` or on `app/config.webviewDomains`; any other link is copied for the shopper to open in a browser (「链接已复制，请在浏览器中打开」) and never opened, because WeChat refuses a web-view outside the configured 业务域名 (`docs/mini/wechat-compliance.md` C12).
+
+- `apps/mini/src/platform/link.test.ts::openLinkTarget > opens an allowed web page in the web-view and copies any other`
+- `e2e/storefront/specs-mini/decor.spec.ts::a web-view link opens only a 业务域名 the shop listed; any other link is copied`
 
 ### SYS-020
 
@@ -2216,6 +2233,7 @@ A preview token opens the current draft of the one document it was issued for, a
 - `packages/core/src/decor/decor.int.test.ts::preview tokens — DECOR-012 > DECOR-012: the token expires with Redis and is stored only as a hash`
 - `apps/web/app/api/v1/pages/pages.int.test.ts::GET /api/v1/pages/:id > with a preview token serves the draft of that document only`
 - `e2e/admin/specs/decor.spec.ts::DECOR-012: the preview frames the saved draft through a preview token`
+- `e2e/storefront/specs-mini/decor.spec.ts::DECOR-012: the editor’s preview token shows the draft under a banner, and nothing without it`
 
 ### DECOR-013
 
@@ -2229,6 +2247,7 @@ A page serves only what the shopper could see, by each domain's own rule, throug
 - `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-013: 优惠券 shows only what can be claimed now, in the operator’s order`
 - `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-013: a manual 拼团 / 预售 pick is found by id, however far down the list it sits`
 - `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-013: 资讯 resolves a category’s newest published articles`
+- `e2e/storefront/specs-mini/decor.spec.ts::a page published in the admin shows each of its blocks in order, and follows the next publish`
 
 ### DECOR-014
 

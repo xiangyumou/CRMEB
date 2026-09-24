@@ -294,14 +294,15 @@ jobs:
   # The mini-program's journeys (`test:mini`): the same stack as the job above,
   # serving `apps/mini`'s "模拟小程序" H5 build instead of the uni-app, plus a
   # fake api.weixin.qq.com. A job of its own rather than a step of the uni-app
-  # one (docs/mini/spikes/S4-e2e.md): one stack serves one client, and this
-  # suite takes seconds where the uni-app one takes minutes. The WeChat package
-  # itself (weapp build, size gate, test-only scan) is the build job's.
+  # one (docs/mini/spikes/S4-e2e.md): one stack serves one client. It runs every
+  # spec in `e2e/storefront/specs-mini/` (docs/mini/e2e-coverage.md maps them);
+  # the job above runs every one in `specs/`. The WeChat package itself (weapp
+  # build, size gate, test-only scan) is the build job's.
   storefront-e2e-mini:
     name: storefront e2e (playwright, mini-program emulation)
     runs-on: ubuntu-latest
     # Cold: image pulls, the emulation build (~10 s), `next build` unless the
-    # cache has it, then the journeys (~10 s).
+    # cache has it, then the journeys (a few minutes, one worker).
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
