@@ -1023,6 +1023,129 @@ describe('mini-program session renewal', () => {
   });
 });
 
+describe('password login that finishes a parked mini sign-in', () => {
+  beforeEach(async () => {
+    await harness.ctx.config.set(wechatMiniConfig, { enabled: true });
+    await harness.ctx.config.set(wechatConfig, { miniAppId: 'wx-mini' });
+  });
+
+  const mini = (): Ctx => asAnonymous({ platform: 'wechat-mini' });
+
+  /** `wx.login` for an openid nobody has seen: `phone-required` and its bind token. */
+  async function parked(openid: string, code: string): Promise<string> {
+    wechat.setMiniSession(code, { openid });
+    const started = await auth.miniLogin(mini(), { code });
+    expect(started.status).toBe('phone-required');
+    return started.bindToken!;
+  }
+
+  async function sessionCount(): Promise<number> {
+    const [row] = await harness.ctx.db.select({ n: sql<number>`count(*)::int` }).from(userSessions);
+    return row!.n;
+  }
+
+  it('AUTH-009 — links the mini openid once the password is right, so the next wx.login renewal is the same account', async () => {
+    const { userId } = await registerCustomer();
+    const bindToken = await parked('o_mini_1', 'code-1');
+
+    const session = await auth.passwordLogin(mini(), {
+      account: PHONE,
+      password: 'crmeb654321',
+      bindToken,
+    });
+    expect(Number(session.user.id)).toBe(userId);
+    expect(session.user.boundWechat).toEqual(['mini']);
+
+    // The password session expires; the 401 renewal goes through wx.login.
+    wechat.setMiniSession('relaunch-code', { openid: 'o_mini_1' });
+    const renewed = await auth.miniLogin(mini(), { code: 'relaunch-code' });
+    expect(renewed).toMatchObject({ status: 'signed-in', registered: false });
+    expect(Number(renewed.session!.user.id)).toBe(userId);
+
+    // Single-use, like every bind token.
+    await expect(
+      auth.passwordLogin(mini(), { account: PHONE, password: 'crmeb654321', bindToken }),
+    ).rejects.toMatchObject({ code: 'AUTH_WECHAT_BIND_EXPIRED' });
+  });
+
+  it('AUTH-009 — a wrong password neither links nor spends the bind token', async () => {
+    const { userId } = await registerCustomer();
+    const bindToken = await parked('o_mini_1', 'code-1');
+
+    await expect(
+      auth.passwordLogin(mini(), { account: PHONE, password: 'wrong-one-1', bindToken }),
+    ).rejects.toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' });
+    expect(
+      await repo.findIdentityByOpenid(harness.ctx.db, { platform: 'mini', openid: 'o_mini_1' }),
+    ).toBeNull();
+
+    const session = await auth.passwordLogin(mini(), {
+      account: PHONE,
+      password: 'crmeb654321',
+      bindToken,
+    });
+    expect(Number(session.user.id)).toBe(userId);
+    expect(session.user.boundWechat).toEqual(['mini']);
+  });
+
+  it('AUTH-009 — refuses a taken openid the way the SMS path does, and issues no session', async () => {
+    await registerCustomer();
+    // Two launches of one new openid park two sign-ins; somebody else finishes the
+    // second one with an SMS code first.
+    const mine = await parked('o_mini_1', 'code-1');
+    const theirs = await parked('o_mini_1', 'code-2');
+    await auth.oaPhoneLogin(mini(), {
+      bindToken: theirs,
+      phone: OTHER_PHONE,
+      code: await codeFor('login', OTHER_PHONE),
+    });
+    const before = await sessionCount();
+
+    await expect(
+      auth.passwordLogin(mini(), { account: PHONE, password: 'crmeb654321', bindToken: mine }),
+    ).rejects.toMatchObject({ code: 'AUTH_WECHAT_ALREADY_BOUND' });
+    expect(await sessionCount()).toBe(before);
+
+    // Without the token the same password signs in, linking nothing.
+    const plain = await auth.passwordLogin(mini(), { account: PHONE, password: 'crmeb654321' });
+    expect(plain.user.boundWechat).toEqual([]);
+  });
+
+  it('AUTH-009 — refuses a second mini openid for an account that already has one', async () => {
+    await registerCustomer();
+    await auth.passwordLogin(mini(), {
+      account: PHONE,
+      password: 'crmeb654321',
+      bindToken: await parked('o_mini_1', 'code-1'),
+    });
+    const before = await sessionCount();
+
+    await expect(
+      auth.passwordLogin(mini(), {
+        account: PHONE,
+        password: 'crmeb654321',
+        bindToken: await parked('o_mini_2', 'code-2'),
+      }),
+    ).rejects.toMatchObject({ code: 'AUTH_WECHAT_ALREADY_BOUND' });
+    expect(await sessionCount()).toBe(before);
+    expect(
+      await repo.findIdentityByOpenid(harness.ctx.db, { platform: 'mini', openid: 'o_mini_2' }),
+    ).toBeNull();
+  });
+
+  it('AUTH-009 — links nothing without a bind token', async () => {
+    await registerCustomer();
+    await parked('o_mini_1', 'code-1');
+    const session = await auth.passwordLogin(mini(), { account: PHONE, password: 'crmeb654321' });
+    expect(session.user.boundWechat).toEqual([]);
+
+    wechat.setMiniSession('relaunch-code', { openid: 'o_mini_1' });
+    await expect(auth.miniLogin(mini(), { code: 'relaunch-code' })).resolves.toMatchObject({
+      status: 'phone-required',
+    });
+  });
+});
+
 describe('WeChat Official Account sign-in', () => {
   beforeEach(async () => {
     // The switch is the OA group's; the app id is the `wechat` group's.

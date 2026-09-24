@@ -77,6 +77,19 @@ export const authSendSmsCode = defineRoute({
 // sessions
 // ---------------------------------------------------------------------------
 
+/**
+ * Password sign-in.
+ *
+ * With a `bindToken` (a parked `phone-required` WeChat sign-in) the password
+ * also finishes that sign-in: once the password is right, the openid is linked
+ * to the account, so the mini-program's next `wx.login` renewal signs in to it
+ * silently (AUTH-009). The token is only read after the password check, so a
+ * wrong password leaves it alone. It fails like the SMS path does:
+ * `AUTH_WECHAT_BIND_EXPIRED` for a spent or expired token,
+ * `AUTH_WECHAT_ALREADY_BOUND` when the openid, or this account's place on that
+ * WeChat app, is already taken. Either way no session is issued, and the same
+ * request without the token signs in without linking.
+ */
 export const authPasswordLogin = defineRoute({
   id: 'auth.passwordLogin',
   method: 'POST',
@@ -94,12 +107,26 @@ export const authPasswordLogin = defineRoute({
     'AUTH_PASSWORD_NOT_SET',
     'AUTH_CAPTCHA_REQUIRED',
     'AUTH_CAPTCHA_INVALID',
+    'AUTH_WECHAT_BIND_EXPIRED',
+    'AUTH_WECHAT_ALREADY_BOUND',
   ],
   examples: [
     {
       name: 'ok',
       body: { account: '13800138000', password: 'crmeb123456' },
       response: storefrontSessionExample,
+    },
+    {
+      name: 'links-mini-openid',
+      body: {
+        account: '13800138000',
+        password: 'crmeb123456',
+        bindToken: 'wxb_9d2b6e4a1c7f3085',
+      },
+      response: {
+        ...storefrontSessionExample,
+        user: { ...userProfileExample, boundWechat: ['mini'] },
+      },
     },
   ],
 });

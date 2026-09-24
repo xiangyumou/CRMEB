@@ -736,6 +736,16 @@ A known mini-program openid renews silently: `signed-in`, `registered: false`, t
 - `e2e/storefront/specs-mini/login.spec.ts::a session the server stopped honouring is renewed once, and the reads that failed are replayed`
 - `e2e/storefront/specs-mini/login.spec.ts::a write that meets an expired session is replayed once after renewal, not lost or doubled`
 
+### AUTH-009
+
+A password sign-in that carries a parked WeChat sign-in's `bindToken` links that openid to the account once the password is right, so the next `wx.login` renewal signs in to the same account. A wrong password neither links nor spends the token; a spent token is `AUTH_WECHAT_BIND_EXPIRED`; an openid that is already taken, or an account that already has an identity on that WeChat app, is `AUTH_WECHAT_ALREADY_BOUND` as on the SMS path, and no session is issued; without a token nothing is linked.
+
+- `packages/core/src/user/storefront-auth.int.test.ts::password login that finishes a parked mini sign-in > AUTH-009 — links the mini openid once the password is right, so the next wx.login renewal is the same account`
+- `packages/core/src/user/storefront-auth.int.test.ts::password login that finishes a parked mini sign-in > AUTH-009 — a wrong password neither links nor spends the bind token`
+- `packages/core/src/user/storefront-auth.int.test.ts::password login that finishes a parked mini sign-in > AUTH-009 — refuses a taken openid the way the SMS path does, and issues no session`
+- `packages/core/src/user/storefront-auth.int.test.ts::password login that finishes a parked mini sign-in > AUTH-009 — refuses a second mini openid for an account that already has one`
+- `packages/core/src/user/storefront-auth.int.test.ts::password login that finishes a parked mini sign-in > AUTH-009 — links nothing without a bind token`
+
 ## Fulfilment, the order console and invoices
 
 ### FULFILL-001
