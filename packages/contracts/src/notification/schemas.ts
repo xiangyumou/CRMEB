@@ -84,7 +84,8 @@ export const wechatMiniChannelConfig = z.object({
   fields: z.record(z.string(), template).optional(),
   // No `page`: the page a message opens is the event's route-catalogue entry,
   // rendered by `toMiniPath` (docs/mini/pages.md §3.4). A `page` key left in a
-  // template saved before the cutover is stripped on read.
+  // template saved before the cutover is stripped on read, and migration 0009
+  // deletes it from the stored rows.
 });
 export type WechatMiniChannelConfig = z.infer<typeof wechatMiniChannelConfig>;
 

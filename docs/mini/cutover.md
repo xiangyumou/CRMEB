@@ -142,6 +142,8 @@ B：删除加落地页；C：删表）不再采用。
       （C1 结果：`app/config` 复用 `site.service.ts` 的 `paymentsOf`、`authOf`、`supportOf` 和两个探针注册表；
       `siteConfigGet` 本身只剩测试在用——`system.int.test.ts` 通过它断言探针和密钥规则，SYS-016 拿它对照——所以保留函数、
       不再从 `@shop/core/system` 导出，只删了路由、契约和 `apps/web/app/api/v1/site/config.int.test.ts`。）
+      （X1：`siteConfigGet` 连同它的 Redis 缓存和 `invalidateSiteConfigCache` 已删；探针、密钥、缓存测试改读 `appConfigGet`，
+      SYS-016 改为直接断言保存的站点值。）
 
 ### 2.5 店员接口（计划第 10 节第 3 项：你已同意）
 
@@ -159,9 +161,12 @@ B：删除加落地页；C：删表）不再采用。
       后台已无调用方但保留的：`UserOrderStatsPort`（和 `order.repo.statsForUsers`）、`refund.admin.ts` 的
       `Reviewer` 里的 `staff` 分支、`coupon` 的 `activeOnly` 选项、`order.console.service.ts` 的 `operatorOf` 的
       `user` 分支——都是订单、退款、优惠券逻辑，不在本次改写范围。）
+      （X1：以上四项已删。退款审核只记管理员；后台发券不查状态（与原来 `activeOnly: false` 相同）；订单后台操作只认管理员，
+      用户身份被拒（`UNAUTHENTICATED`）。历史日志里的 `user`/`staff` 行照常读出。CONSOLE-004 随之退役。）
 - [x] `order.fulfil.config.ts`、`storage.service.ts` 中与店员相关的分支；`audit_logs.actor_kind = 'staff'` 的约束和已有数据保留。
       （C1 结果：配置组「店员与订单提醒」（`order-staff`）和存储设置里的「店员上传大小上限」「每店员每小时上传次数」
       从后台消失；库里已存的这些配置行没有删。后台操作日志的「店员」筛选保留，用来看历史行。）
+      （X1：迁移 `0009_drop_cutover_leftover_config.sql` 删除这些配置行。）
 
 ### 2.6 写死的旧小程序路径和旧小程序码接口
 
@@ -192,6 +197,7 @@ B：删除加落地页；C：删表）不再采用。
       （C1 结果：用户事件的 `link` 全部删除，后台事件（订单、售后、库存、支付异常、小程序交易）的 `link` 是后台铃铛的
       跳转路径，保留；注册时对带 `link` 的用户事件直接报错（NOTIF-006 加了一条测试）。站内信 `data` 里不再有 `link`。
       后台「通知管理」的「小程序页面」输入框删除。）
+      （X1：迁移 `0009_drop_cutover_leftover_config.sql` 删除库里已存的 `wechatMini.page` 键，渠道其余字段不动。）
 
 ### 2.8 守卫
 
