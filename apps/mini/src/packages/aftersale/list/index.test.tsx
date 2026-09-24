@@ -52,6 +52,31 @@ describe('我的售后', () => {
     await waitFor(() => expect(requestedStates()).toEqual(['open', 'closed']));
   });
 
+  it('coming back to a stale list, asks for page 1 only and keeps the pages scrolled through', async () => {
+    let round = 0;
+    const seen = serveApi({
+      'GET /api/v1/refunds': () => {
+        const page = Number(seen.at(-1)?.query.page);
+        if (page === 1) round += 1;
+        const ids = page === 1 ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [11];
+        const items = ids.map((n) =>
+          refundListItem({ id: String(n), refundNo: n === 1 ? `R${round}-RF1` : `RF${n}` }),
+        );
+        return { body: paged(items, 11, page) };
+      },
+    });
+    await renderPage(<RefundListPage />);
+    await screen.findByText('售后单号 R1-RF1');
+    taroFake.reachBottom();
+    await screen.findByText('售后单号 RF11');
+
+    // Back from another page after the 30 s staleTime (the test client's is 0).
+    taroFake.showPage();
+    await screen.findByText('售后单号 R2-RF1');
+    expect(seen.map((r) => r.query.page)).toEqual(['1', '2', '1']);
+    expect(screen.getByText('售后单号 RF11')).toBeTruthy();
+  });
+
   it('withdraws a request after asking', async () => {
     const seen = serveApi({
       'GET /api/v1/refunds': () => ({ body: paged([refundListItem()]) }),

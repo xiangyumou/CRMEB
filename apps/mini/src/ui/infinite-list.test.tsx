@@ -45,6 +45,23 @@ describe('InfiniteList', () => {
     expect(screen.getByText('香蕉')).toBeTruthy();
   });
 
+  it('shows a row that two overlapping pages both carry once', () => {
+    render(
+      <List
+        query={state({
+          data: { pages: [{ items: ['梨', '苹果', '香蕉'] }, { items: ['香蕉', '橙子'] }] },
+        })}
+      />,
+    );
+    expect(screen.getAllByText('香蕉')).toHaveLength(1);
+    expect(screen.getAllByText(/^(梨|苹果|香蕉|橙子)$/).map((node) => node.textContent)).toEqual([
+      '梨',
+      '苹果',
+      '香蕉',
+      '橙子',
+    ]);
+  });
+
   it('loads the next page at the bottom, and only one at a time', () => {
     const query = state();
     render(<List query={query} />);

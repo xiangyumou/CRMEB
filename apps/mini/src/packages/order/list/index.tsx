@@ -67,7 +67,7 @@ function OrderList({ tab }: { tab: ShownTab }) {
     { query: { tab, pageSize: 10 } },
     { enabled: signedIn },
   );
-  useRefetchOnShow(routeKey('order.list'));
+  useRefetchOnShow(routeKey('order.list'), { pages: 'first' });
   const actions = useOrderActions();
 
   return (
