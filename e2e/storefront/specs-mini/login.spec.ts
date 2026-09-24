@@ -1,14 +1,15 @@
 import { hashPassword } from '@shop/core/auth';
 import { codeKey } from '@shop/core/sms';
 import { userSessions } from '@shop/db/schema/auth';
+import { cartItems } from '@shop/db/schema/cart';
 import { users } from '@shop/db/schema/user';
 import { wechatIdentities } from '@shop/db/schema/wechat';
 import type { Page } from '@playwright/test';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 
 import { miniRoute, newWechatUser, sessionToken, test, expect } from '../src/mini';
 import type { Stack } from '../src/stack';
-import { CartPage, openTab } from '../src/mini-pages/shopping-pages';
+import { CartPage, openTab, ProductPage } from '../src/mini-pages/shopping-pages';
 import {
   arrangeCartLine,
   cartQuantities,
@@ -260,6 +261,108 @@ test("SMOKE-004: 密码登录 under 其他方式 reaches an authenticated screen
   const renewedAway = seen.filter((line) => line.endsWith(' 401'));
   expect(renewedAway.length).toBeGreaterThan(0);
   expect(failedRequests).toEqual(['POST /api/v1/auth/sessions/password 401', ...renewedAway]);
+});
+
+test("AUTH-010: a write that meets an ended password session is not replayed as the account this phone's WeChat belongs to, and the shopper is back at the login page", async ({
+  miniPage: page,
+  wechatUser,
+  shop,
+  playwright,
+  consoleErrors,
+  failedRequests,
+}) => {
+  const owner = await passwordAccount(shop);
+
+  // The silent sign-in finds no account for this openid yet (phone-required); 其他方式 is there.
+  await page.goto(miniRoute('pages/login/index'));
+  await expect(shown(page).getByText('手机号快速登录', { exact: true })).toBeVisible();
+
+  // Meanwhile the openid becomes another account's: whoever else uses this phone's WeChat.
+  const [holder] = await shop.db
+    .insert(users)
+    .values({
+      account: `mini-${wechatUser.phone}`,
+      phone: wechatUser.phone,
+      nickname: '另一位顾客',
+      registerSource: 'wechat_mini',
+    })
+    .returning({ id: users.id });
+  await shop.db
+    .insert(wechatIdentities)
+    .values({ userId: holder!.id, platform: 'mini', openid: wechatUser.openid });
+
+  // 密码登录: the link is refused (the openid is taken, AUTH-009) and the app signs in without
+  // it, so the password account's session and this phone's openid belong to two accounts.
+  await shown(page).getByRole('button', { name: '密码登录' }).click();
+  await shown(page).locator('input[placeholder="手机号或账号"]').fill(owner.phone);
+  await shown(page).locator('input[placeholder="请输入密码"]').fill(PASSWORD);
+  await shown(page).getByRole('checkbox', { name: '我已阅读并同意用户协议和隐私政策' }).click();
+  await shown(page)
+    .locator('.login__actions')
+    .getByRole('button', { name: '登录', exact: true })
+    .click();
+  await expect(page).toHaveURL(/pages\/index\/index/);
+  const api = await playwright.request.newContext({
+    baseURL: shop.baseUrl,
+    extraHTTPHeaders: {
+      Authorization: `Bearer ${await signedInToken(page)}`,
+      'X-Client-Platform': 'wechat-mini',
+    },
+  });
+  const profile = await api.get('/api/v1/profile');
+  expect(((await profile.json()) as { phone: string }).phone).toBe(owner.phone);
+  const linked = await shop.db
+    .select({ userId: wechatIdentities.userId })
+    .from(wechatIdentities)
+    .where(eq(wechatIdentities.openid, wechatUser.openid));
+  expect(linked).toEqual([{ userId: holder!.id }]);
+
+  // The sheet is ready to add; then the password session ends (expired, 退出所有设备 elsewhere).
+  const product = new ProductPage(page);
+  await product.open(shop.fixtures.multiSpecProductId);
+  await product.barButton('加入购物车').click();
+  await product.specValue('白').click();
+  await product.specValue('M').click();
+  const revoked = await api.delete('/api/v1/auth/sessions');
+  expect(revoked.ok(), await revoked.text()).toBe(true);
+  await api.dispose();
+  const signIns = countSignIns(page);
+  const seen = recordApi(page);
+  await product.sheetButton('加入购物车').click();
+
+  // The renewal's wx.login reached the other account: not kept, the shopper signed out and
+  // asked to sign in again.
+  await expect(page).toHaveURL(/pages\/login\/index/);
+  await expect(shown(page).getByText('登录已过期，请重新登录')).toBeVisible();
+  expect(signIns.count()).toBe(1);
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem('shop.session.token')))
+    .toBeNull();
+
+  // The write went out once, as the password account, and landed in nobody's cart.
+  expect(seen.filter((line) => line.startsWith('POST /api/v1/cart/items'))).toEqual([
+    'POST /api/v1/cart/items 401',
+  ]);
+  const lines = await shop.db
+    .select({ userId: cartItems.userId })
+    .from(cartItems)
+    .where(inArray(cartItems.userId, [owner.id, holder!.id]));
+  expect(lines).toEqual([]);
+  // The session the renewal minted for the other account was ended, not left behind.
+  await expect
+    .poll(() =>
+      shop.db
+        .select({ id: userSessions.id })
+        .from(userSessions)
+        .where(and(eq(userSessions.userId, holder!.id), isNull(userSessions.revokedAt))),
+    )
+    .toEqual([]);
+
+  expect(consoleErrors).toEqual([]);
+  // The refused link, then only the 401s the renewal let stand.
+  expect(failedRequests.filter((line) => !line.endsWith(' 401'))).toEqual([
+    'POST /api/v1/auth/sessions/password 409',
+  ]);
 });
 
 test.describe('the privacy sheet WeChat raises before 手机号快速登录', () => {
