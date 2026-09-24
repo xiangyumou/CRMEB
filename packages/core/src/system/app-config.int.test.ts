@@ -167,6 +167,16 @@ describe('SYS-015 — 小程序外观', () => {
       productReviews: true,
       productRecommendations: false,
       productServiceTags: true,
+      productPoster: true,
+    });
+  });
+
+  it('offers the product poster until the operator switches it off', async () => {
+    expect((await appConfigGet(anonymous())).display.productPoster).toBe(true);
+    await save('storefront-appearance', { showProductPoster: false });
+    expect((await appConfigGet(anonymous())).display).toEqual({
+      ...appDisplayDefaults,
+      productPoster: false,
     });
   });
 

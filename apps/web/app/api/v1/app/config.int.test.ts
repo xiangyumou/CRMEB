@@ -119,6 +119,24 @@ describe('GET /api/v1/app/config — conditional', () => {
   });
 });
 
+describe('SYS-015 — the product poster switch over HTTP', () => {
+  it('offers the poster on a fresh install and stops once the operator switches it off', async () => {
+    const before = (await (await read()).json()) as AppPublicConfig;
+    expect(before.display.productPoster).toBe(true);
+
+    harness.clock.advance(1_000);
+    await configSave(
+      harness.ctx,
+      { group: 'storefront-appearance' },
+      { values: { showProductPoster: false } },
+    );
+
+    const after = (await (await read()).json()) as AppPublicConfig;
+    expect(after.display).toEqual({ ...before.display, productPoster: false });
+    expect(after.version).not.toBe(before.version);
+  });
+});
+
 describe('SYS-017 — the server clock rides outside the ETag', () => {
   it('stamps every answer with the server time, in the body and the X-Server-Time header', async () => {
     const response = await read();
