@@ -16,7 +16,7 @@ import {
   Typography,
   Upload,
 } from 'antd';
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { useAssetSource } from './asset-source-context';
 import type { AssetCategory, AssetItem } from './types';
@@ -51,8 +51,38 @@ function toTreeData(
 }
 
 /**
+ * Shift+click: walk the page from the anchor to the clicked item and append,
+ * in walking order, every item not yet picked — so the numbers on the grid
+ * follow the direction the operator swept. Stops at `max`. Without an anchor on
+ * this page it only picks the clicked item.
+ */
+export function selectRange(
+  selected: readonly AssetItem[],
+  items: readonly AssetItem[],
+  anchorId: string | null,
+  targetIndex: number,
+  max: number | undefined,
+): { next: AssetItem[]; capped: boolean } {
+  const anchorIndex = anchorId === null ? -1 : items.findIndex((item) => item.id === anchorId);
+  const from = anchorIndex === -1 ? targetIndex : anchorIndex;
+  const step = targetIndex >= from ? 1 : -1;
+  const picked = new Set(selected.map((asset) => asset.id));
+  const next = [...selected];
+  for (let i = from; i !== targetIndex + step; i += step) {
+    const item = items[i];
+    if (!item || picked.has(item.id)) continue;
+    if (max !== undefined && next.length >= max) return { next, capped: true };
+    picked.add(item.id);
+    next.push(item);
+  }
+  return { next, capped: false };
+}
+
+/**
  * Material library picker: category tree, paginated image grid, drag-and-drop
- * upload, single or multiple selection. Returns contract `asset` objects.
+ * upload, single or multiple selection. Returns contract `asset` objects, in
+ * the order they were picked; with `multiple` each tile shows its number and
+ * Shift+click picks the run from the last clicked tile.
  *
  * Talks to an `AssetSource`, not to routes directly, so it works today against
  * the in-memory stub and unchanged against the real storage API.
@@ -74,6 +104,9 @@ export function AssetPicker({
   const [keyword, setKeyword] = useState('');
   const [selected, setSelected] = useState<AssetItem[]>([]);
   const [uploading, setUploading] = useState(false);
+  // Where a Shift+click range starts: the last tile clicked on, only while it is
+  // still picked and still on the page being looked at.
+  const anchor = useRef<string | null>(null);
 
   const categories = useQuery({
     queryKey: ['kit.assets.categories'],
@@ -89,27 +122,55 @@ export function AssetPicker({
   });
 
   const treeData = useMemo(() => toTreeData(categories.data ?? []), [categories.data]);
+  const items = list.data?.items;
+
+  // A new page, category or search shows other tiles; the old anchor is off-screen.
+  useEffect(() => {
+    anchor.current = null;
+  }, [items]);
+
+  const warnMax = useCallback(() => {
+    void message.warning(`最多选择 ${max} 个素材`);
+  }, [max, message]);
 
   const toggle = useCallback(
     (item: AssetItem) => {
-      setSelected((prev) => {
-        const exists = prev.some((asset) => asset.id === item.id);
-        if (!multiple) return exists ? [] : [item];
-        if (exists) return prev.filter((asset) => asset.id !== item.id);
-        if (max !== undefined && prev.length >= max) {
-          void message.warning(`最多选择 ${max} 个素材`);
-          return prev;
-        }
-        return [...prev, item];
-      });
+      const exists = selected.some((asset) => asset.id === item.id);
+      if (!multiple) {
+        setSelected(exists ? [] : [item]);
+        return;
+      }
+      if (exists) {
+        anchor.current = null;
+        setSelected(selected.filter((asset) => asset.id !== item.id));
+        return;
+      }
+      if (max !== undefined && selected.length >= max) {
+        warnMax();
+        return;
+      }
+      anchor.current = item.id;
+      setSelected([...selected, item]);
     },
-    [multiple, max, message],
+    [selected, multiple, max, warnMax],
+  );
+
+  const pickRange = useCallback(
+    (index: number) => {
+      const { next, capped } = selectRange(selected, items ?? [], anchor.current, index, max);
+      if (capped) warnMax();
+      const target = items?.[index];
+      if (target && next.some((asset) => asset.id === target.id)) anchor.current = target.id;
+      setSelected(next);
+    },
+    [selected, items, max, warnMax],
   );
 
   const reset = useCallback(() => {
     setSelected([]);
     setKeyword('');
     setPage(1);
+    anchor.current = null;
   }, []);
 
   const confirm = (): void => {
@@ -194,15 +255,21 @@ export function AssetPicker({
                   gap: 10,
                   maxHeight: 340,
                   overflowY: 'auto',
+                  // Shift+click would otherwise also select the page's text.
+                  userSelect: 'none',
                 }}
               >
-                {list.data.items.map((item) => {
-                  const active = selected.some((asset) => asset.id === item.id);
+                {list.data.items.map((item, index) => {
+                  const order = selected.findIndex((asset) => asset.id === item.id) + 1;
+                  const active = order > 0;
                   return (
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => toggle(item)}
+                      onClick={(event) => {
+                        if (multiple && event.shiftKey) pickRange(index);
+                        else toggle(item);
+                      }}
                       title={item.name}
                       data-testid={`asset-${item.id}`}
                       aria-pressed={active}
@@ -251,15 +318,17 @@ export function AssetPicker({
                             insetBlockStart: 4,
                             background: 'var(--ant-color-primary)',
                             color: '#fff',
-                            borderRadius: '50%',
-                            width: 18,
+                            borderRadius: 9,
+                            minWidth: 18,
                             height: 18,
+                            paddingInline: 4,
+                            boxSizing: 'border-box',
                             display: 'grid',
                             placeItems: 'center',
                             fontSize: 11,
                           }}
                         >
-                          <CheckOutlined />
+                          {multiple ? order : <CheckOutlined />}
                         </span>
                       ) : null}
                     </button>
@@ -278,6 +347,7 @@ export function AssetPicker({
             <Typography.Text type="secondary">
               已选 {selected.length}
               {max !== undefined ? ` / ${max}` : ''}
+              {multiple ? '，按住 Shift 点击可连选' : ''}
             </Typography.Text>
             <Pagination
               size="small"
