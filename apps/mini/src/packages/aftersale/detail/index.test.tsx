@@ -49,6 +49,36 @@ describe('售后详情', () => {
     });
   });
 
+  it('goes back to the 订单详情 it was opened from for 查看订单, not to a second copy', async () => {
+    serveApi({ 'GET /api/v1/refunds/601': () => ({ body: awaitingReturn }) });
+    taroFake.pageStack = [
+      { route: 'packages/order/detail/index', options: { id: '9001' } },
+      { route: 'packages/aftersale/detail/index', options: { id: '601' } },
+    ];
+    await renderPage(<RefundDetailPage />);
+    fireEvent.click(await screen.findByRole('link', { name: '查看订单' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({ api: 'navigateBack', args: { delta: 1 } }),
+    );
+    expect(taroFake.calls.some((call) => call.api === 'navigateTo')).toBe(false);
+  });
+
+  it('opens 订单详情 in its place from 售后列表 for 查看订单', async () => {
+    serveApi({ 'GET /api/v1/refunds/601': () => ({ body: awaitingReturn }) });
+    taroFake.pageStack = [
+      { route: 'packages/aftersale/list/index', options: {} },
+      { route: 'packages/aftersale/detail/index', options: { id: '601' } },
+    ];
+    await renderPage(<RefundDetailPage />);
+    fireEvent.click(await screen.findByRole('link', { name: '查看订单' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'redirectTo',
+        args: { url: '/packages/order/detail/index?id=9001' },
+      }),
+    );
+  });
+
   it('withdraws a request from the bar and shows it withdrawn', async () => {
     let status: 'applied' | 'cancelled' = 'applied';
     const seen = serveApi({

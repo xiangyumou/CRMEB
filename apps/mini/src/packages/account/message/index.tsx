@@ -12,14 +12,8 @@ import { confirm, toast } from '@/ui/feedback';
 import { PageShell } from '@/ui/page-shell';
 import { CellSkeleton } from '@/ui/skeleton';
 import { errorMessage } from '../shared/form';
-import { messageRoute } from '../shared/message';
+import { MESSAGE_READS, messageRoute } from '../shared/message';
 import './index.scss';
-
-const INVALIDATE = [
-  'notification.myList',
-  'notification.myUnreadCount',
-  'notification.myDetail',
-] as const;
 
 /**
  * 消息详情 (`message { id }`, pages.md §2.6). Reading does not mark the message read on the
@@ -43,8 +37,8 @@ export default function MessagePage() {
 function Message({ id }: { id: string }) {
   const signedIn = useSignedIn();
   const message = useRouteQuery('notification.myDetail', { params: { id } }, { enabled: signedIn });
-  const markRead = useRouteMutation('notification.myMarkRead', { invalidate: INVALIDATE });
-  const remove = useRouteMutation('notification.myDelete', { invalidate: INVALIDATE });
+  const markRead = useRouteMutation('notification.myMarkRead', { invalidate: MESSAGE_READS });
+  const remove = useRouteMutation('notification.myDelete', { invalidate: MESSAGE_READS });
   const unread = message.data !== undefined && message.data.readAt === null;
   const { mutate } = markRead;
 

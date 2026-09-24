@@ -149,9 +149,25 @@ describe('填写退货物流', () => {
     await renderPage(<ReturnShipmentPage />);
     await screen.findByText('这个售后单无需寄回商品');
     fireEvent.click(screen.getByRole('button', { name: '查看售后详情' }));
-    expect(taroFake.calls).toContainEqual({
-      api: 'redirectTo',
-      args: { url: '/packages/aftersale/detail/index?id=601' },
-    });
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'redirectTo',
+        args: { url: '/packages/aftersale/detail/index?id=601' },
+      }),
+    );
+  });
+
+  it('goes back to the 售后详情 it was opened from when nothing needs sending back', async () => {
+    serve(refundDetail({ status: 'applied' }));
+    taroFake.pageStack = [
+      { route: 'packages/aftersale/detail/index', options: { id: '601' } },
+      { route: 'packages/aftersale/return-shipment/index', options: { id: '601' } },
+    ];
+    await renderPage(<ReturnShipmentPage />);
+    fireEvent.click(await screen.findByRole('button', { name: '查看售后详情' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({ api: 'navigateBack', args: { delta: 1 } }),
+    );
+    expect(taroFake.calls.some((call) => call.api === 'redirectTo')).toBe(false);
   });
 });

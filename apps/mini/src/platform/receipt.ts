@@ -1,4 +1,5 @@
 import type { ApiClient, ResponseOf } from '@shop/api-client';
+import { errorMessage } from '@/lib/error-message';
 import { showModal } from './feedback';
 import { onAppShown, type AppShowOptions } from './lifecycle';
 import { platform } from './runtime';
@@ -45,7 +46,7 @@ async function wechatTarget(
 }
 
 function messageOf(error: unknown): string {
-  return error instanceof Error && error.message ? error.message : '确认收货失败，请稍后重试';
+  return errorMessage(error, '确认收货失败，请稍后重试');
 }
 
 type ComponentAnswer = OrderConfirmOutcome | { kind: 'returned' };

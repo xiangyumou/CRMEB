@@ -54,20 +54,20 @@ export function previewFixture(overrides: Partial<Preview> = {}): Preview {
   };
 }
 
-/** The same order priced with 满100减10 (`uc1`). */
+/** The same order priced with 满100减10 (`901`). */
 export function previewWithCoupon(): Preview {
   return previewFixture({
     couponDiscount: '10.00',
     adjustments: [{ source: 'coupon:full-reduction', label: '满100减10', amount: '-10.00' }],
     payableAmount: '116.00',
-    userCouponId: 'uc1',
+    userCouponId: '901',
   });
 }
 
 export function userCouponFixture(id: string, minSpend: string, discountAmount: string) {
   return {
     id,
-    templateId: `t-${id}`,
+    templateId: `8${id}`,
     title: `满${Number(minSpend)}减${Number(discountAmount)}`,
     discountAmount,
     minSpend,
@@ -87,14 +87,14 @@ export function applicableFixture(): Applicable {
     subtotal: '118.00',
     items: [
       {
-        coupon: userCouponFixture('uc1', '100.00', '10.00'),
+        coupon: userCouponFixture('901', '100.00', '10.00'),
         usable: true,
         discount: '10.00',
         eligibleLineIndexes: [0],
         reason: null,
       },
       {
-        coupon: userCouponFixture('uc2', '200.00', '30.00'),
+        coupon: userCouponFixture('902', '200.00', '30.00'),
         usable: false,
         discount: '0.00',
         eligibleLineIndexes: [0],
@@ -147,7 +147,7 @@ export function orderFixture(overrides: Partial<Order> = {}): Order {
     receiver: receiverFixture,
     buyerRemark: null,
     customForm: null,
-    userCouponId: 'uc1',
+    userCouponId: '901',
     paidAt: null,
     shippedAt: null,
     receivedAt: null,

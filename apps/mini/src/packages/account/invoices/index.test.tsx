@@ -65,4 +65,19 @@ describe('发票', () => {
       }),
     );
   });
+
+  it('asks again for 开票记录 when it comes back, where the merchant may have issued one', async () => {
+    taroFake.routerParams = { tab: 'records' };
+    let status = 'requested';
+    const seen = serveApi({
+      'GET /api/v1/invoices': () => ({ body: page([{ ...orderInvoiceFixture, status }]) }),
+    });
+    await renderPage(<InvoicesPage />);
+    expect(await screen.findByText('待开票')).toBeTruthy();
+
+    status = 'issued';
+    taroFake.showPage();
+    expect(await screen.findByText('已开票')).toBeTruthy();
+    expect(seen.filter((r) => r.key === 'GET /api/v1/invoices')).toHaveLength(2);
+  });
 });

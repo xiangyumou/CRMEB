@@ -5,7 +5,6 @@ import { addressFixture, cityTreeFixture } from '@/test/address-fixture';
 import { serveApi } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
-import { useImportedAddress } from '../shared/address';
 import AddressesPage from './index';
 
 const second = { ...addressFixture, id: '32', receiverName: '王五', isDefault: false };
@@ -89,7 +88,9 @@ describe('收货地址', () => {
         args: { url: '/packages/account/address-edit/index' },
       }),
     );
-    expect(useImportedAddress.getState().draft).toMatchObject({
+    expect(
+      JSON.parse((taroFake.storage.get('shop.address.imported') as string | undefined) ?? 'null'),
+    ).toMatchObject({
       receiverName: '张三',
       region: null,
     });

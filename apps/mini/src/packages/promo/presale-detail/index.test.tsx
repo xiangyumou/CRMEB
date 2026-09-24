@@ -97,6 +97,32 @@ describe('预售商品', () => {
     await waitFor(() => expect(navigatedTo()[0]).toMatch(/^\/pages\/login\/index\?redirect=/));
   });
 
+  it('goes back to the 商品详情 it was opened from for 查看商品, else takes its place', async () => {
+    serve(activity());
+    taroFake.pageStack = [
+      { route: 'pages/product/index', options: { id: '12' } },
+      { route: 'packages/promo/presale-detail/index', options: { id: '2' } },
+    ];
+    await renderPage(<PresaleDetailPage />);
+    fireEvent.click(await screen.findByRole('button', { name: '查看商品' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({ api: 'navigateBack', args: { delta: 1 } }),
+    );
+
+    taroFake.pageStack = [
+      { route: 'packages/promo/presale/index', options: {} },
+      { route: 'packages/promo/presale-detail/index', options: { id: '2' } },
+    ];
+    fireEvent.click(screen.getByRole('button', { name: '查看商品' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'redirectTo',
+        args: { url: '/pages/product/index?id=12' },
+      }),
+    );
+    expect(navigatedTo()).toEqual([]);
+  });
+
   it('says a removed presale is over', async () => {
     serve({
       reply: {

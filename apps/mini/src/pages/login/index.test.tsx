@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { TOKEN_KEY, useSession, useSessionNotice } from '@/session/session';
-import { rejected } from '@/test/account-fixture';
+import { profileFixture, rejected } from '@/test/account-fixture';
 import { holdRequests, serveApi } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
@@ -13,7 +13,7 @@ const type = (label: string, value: string) =>
 const session = {
   token: 'pw-token',
   expiresAt: '2026-10-23T00:00:00.000Z',
-  user: { id: '7', nickname: '老顾客', avatarUrl: null, phone: '13800138000' },
+  user: profileFixture,
 };
 
 async function openPasswordForm() {
@@ -184,7 +184,13 @@ describe('登录 · 短信验证码', () => {
     const seen = serveApi({
       'POST /api/v1/auth/sessions/wechat-oa/phone': () => ({
         status: 201,
-        body: { status: 'signed-in', session },
+        body: {
+          status: 'signed-in',
+          session,
+          registered: false,
+          bindToken: null,
+          bindTokenExpiresInSec: null,
+        },
       }),
     });
     const held = holdRequests('/wechat-oa/phone');

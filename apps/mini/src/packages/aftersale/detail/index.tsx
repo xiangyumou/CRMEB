@@ -6,7 +6,7 @@ import { useRefetchOnShow } from '@/data/use-refetch-on-show';
 import { assetUrl } from '@/lib/asset-url';
 import { formatDateTime } from '@/lib/format';
 import { formatSpec } from '@/lib/spec';
-import { copyText, goBack, navigate, previewImages, useRouteParams } from '@/platform';
+import { copyText, goBack, leaveFor, previewImages, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
 import { ActionBar } from '@/ui/action-bar';
@@ -183,7 +183,8 @@ function Body({ id }: { id: string }) {
               role="link"
               label="查看订单"
               className="refund-detail__fact-value refund-detail__link"
-              onClick={() => void navigate({ route: 'order', params: { id: refund.orderId } })}
+              // Back to 订单详情 when 售后 was opened from it, rather than a second copy of it.
+              onClick={() => void leaveFor({ route: 'order', params: { id: refund.orderId } })}
             >
               {refund.orderNo}
             </Pressable>

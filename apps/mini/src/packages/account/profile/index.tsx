@@ -38,6 +38,10 @@ function ProfileForm() {
   const save = useRouteMutation('user.updateProfile', { invalidate: ['user.getProfile'] });
   const [nickname, setNickname] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>();
+  // A request to focus, apart from the error: tied to the error, `focus` went false as the
+  // shopper typed (which can drop the keyboard), and a second failed save changed nothing to
+  // focus again. Cleared on blur, so the next failure asks anew.
+  const [focusNickname, setFocusNickname] = useState(false);
 
   const saved = profile.data?.nickname ?? '';
 
@@ -53,6 +57,7 @@ function ProfileForm() {
   async function submit() {
     if (!trimmed) {
       setError('请输入昵称');
+      setFocusNickname(true);
       return;
     }
     try {
@@ -61,8 +66,10 @@ function ProfileForm() {
       toast.success('已保存');
     } catch (failure) {
       const fields = fieldErrorsOf(failure, { USER_NICKNAME_REJECTED: 'nickname' });
-      if (fields?.['nickname']) setError(fields['nickname']);
-      else toast.text(errorMessage(failure));
+      if (fields?.['nickname']) {
+        setError(fields['nickname']);
+        setFocusNickname(true);
+      } else toast.text(errorMessage(failure));
     }
   }
 
@@ -80,7 +87,7 @@ function ProfileForm() {
           value={value}
           maxLength={NICKNAME_MAX}
           error={error}
-          focus={Boolean(error)}
+          focus={focusNickname}
           onChange={(next) => {
             setError(undefined);
             setNickname(next);
@@ -88,6 +95,7 @@ function ProfileForm() {
           // WeChat fills a `type="nickname"` input from its own suggestion without an input
           // event on some versions; the blur carries the final value.
           onBlur={(next) => {
+            setFocusNickname(false);
             if (next !== value) setNickname(next);
           }}
         />
@@ -105,13 +113,7 @@ function ProfileForm() {
         />
       </CellGroup>
       <SubmitBar>
-        <Button
-          size="lg"
-          block
-          disabled={!changed}
-          loading={save.isPending}
-          onClick={() => void submit()}
-        >
+        <Button size="lg" block disabled={!changed} loading={save.isPending} onClick={submit}>
           保存
         </Button>
       </SubmitBar>

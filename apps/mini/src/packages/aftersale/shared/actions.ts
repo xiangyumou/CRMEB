@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RouteId } from '@shop/api-client';
 import { useApiClient, useInvalidateRoutes } from '@shop/api-client/react';
 import { navigate } from '@/platform';
+import { errorMessage as messageOf } from '@/lib/error-message';
 import { confirm, toast } from '@/ui/feedback';
 
 export type RefundActionKey = 'cancel' | 'hide' | 'returnShipment';
@@ -15,10 +16,6 @@ export const REFUND_READS: readonly RouteId[] = [
   'order.list',
   'order.counts',
 ];
-
-function messageOf(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
 
 /** 撤销申请, 删除记录 and 填写退货物流, the same on the list and the detail. */
 export function useRefundActions(options: { onHidden?: () => void } = {}) {

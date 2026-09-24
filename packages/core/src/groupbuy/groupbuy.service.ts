@@ -26,6 +26,7 @@ import type {
 } from '@shop/contracts/groupbuy/schemas';
 import { GROUPBUY_SUMMARY_AVATAR_LIMIT } from '@shop/contracts/groupbuy/schemas';
 import { toMiniPath } from '@shop/contracts/system/storefront-routes';
+import { hasPermission } from '../auth/rbac';
 import { DomainError } from '../kernel/errors';
 import { resolveActivityStocks } from '../kernel/stock-edit';
 import { toId, toIdOrNull } from '../kernel/ids';
@@ -33,6 +34,7 @@ import type { Ctx } from '../kernel/context';
 import { recordEffect } from '../effects/index';
 import { groupbuyConfig } from './groupbuy.config';
 import { settleGroup } from './groupbuy.jobs';
+import { groupbuyPermissions } from './permissions';
 import * as repo from './groupbuy.repo';
 import {
   assertCompletable,
@@ -793,7 +795,9 @@ async function toDetail(
   return {
     ...toListItem(row, forming.get(row.id) ?? 0),
     sliderImages: row.sliderImages,
-    cost: row.cost,
+    // 成本价 is margin: the editor that sets it sees it, a look-only role gets
+    // `null` (catalog's rule). It cannot save, so the `null` never comes back.
+    cost: hasPermission(ctx.actor, groupbuyPermissions['activity:write']) ? row.cost : null,
     shippingTemplateId: toIdOrNull(row.shippingTemplateId),
     views: row.views,
     skus: skus.map((sku) => ({

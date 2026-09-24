@@ -131,7 +131,26 @@ describe('拼团商品', () => {
     const ended = await screen.findAllByText('活动已结束');
     expect(ended.length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: '单独购买' }));
-    expect(navigatedTo().at(-1)).toBe('/pages/product/index?id=11');
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'redirectTo',
+        args: { url: '/pages/product/index?id=11' },
+      }),
+    );
+  });
+
+  it('goes back to the 商品详情 it was opened from for 单独购买, not to a second copy', async () => {
+    serve(activity());
+    taroFake.pageStack = [
+      { route: 'pages/product/index', options: { id: '11' } },
+      { route: 'packages/promo/groupbuy-detail/index', options: { id: '1' } },
+    ];
+    await renderPage(<GroupbuyDetailPage />);
+    fireEvent.click(await screen.findByRole('button', { name: '单独购买' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({ api: 'navigateBack', args: { delta: 1 } }),
+    );
+    expect(navigatedTo()).toEqual([]);
   });
 
   it('says a removed activity is over', async () => {

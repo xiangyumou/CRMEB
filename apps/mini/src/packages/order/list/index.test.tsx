@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSession } from '@/session/session';
 import { serveApi } from '@/test/fake-api';
-import { orderItem, orderListItem, paged } from '@/test/order-fixtures';
+import { orderDetail, orderItem, orderListItem, paged } from '@/test/order-fixtures';
 import { renderPage } from '@/test/render';
 import { routeQueryKey } from '@shop/api-client/react';
 import { taroFake } from '@/test/taro-fake/taro';
@@ -165,11 +165,15 @@ describe('我的订单', () => {
     const seen = serveApi({
       'GET /api/v1/orders/counts': () => ({ body: counts }),
       'GET /api/v1/orders': () => ({ body: paged([unpaid]) }),
-      'POST /api/v1/orders/9001/cancel': () => ({ body: { ...unpaid, status: 'cancelled' } }),
+      'POST /api/v1/orders/9001/cancel': () => ({
+        body: orderDetail({ ...unpaid, status: 'cancelled' }),
+      }),
     });
     const { client } = await renderPage(<OrderListPage />);
     const wallet = routeQueryKey('coupon.myList', { query: { state: 'unused' } });
     client.setQueryData(wallet, { items: [], page: 1, pageSize: 20, total: 0 });
+    const teams = routeQueryKey('groupbuy.myGroups', { query: {} });
+    client.setQueryData(teams, { items: [], page: 1, pageSize: 20, total: 0 });
 
     fireEvent.click(await screen.findByRole('button', { name: '取消订单' }));
     await waitFor(() =>
@@ -181,8 +185,9 @@ describe('我的订单', () => {
     await waitFor(() =>
       expect(seen.filter((r) => r.key === 'GET /api/v1/orders').length).toBeGreaterThan(1),
     );
-    // Its coupon is back in the wallet.
+    // Its coupon is back in the wallet, and a 拼团 order's seat is free again.
     expect(client.getQueryState(wallet)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(teams)?.isInvalidated).toBe(true);
   });
 
   it('keeps the order when the shopper backs out of cancelling', async () => {
@@ -210,7 +215,7 @@ describe('我的订单', () => {
       }),
       'GET /api/v1/orders/2/wechat-receipt': () => ({ body: { receipt: null } }),
       'POST /api/v1/orders/2/receipt': () => ({
-        body: orderListItem({ id: '2', status: 'received' }),
+        body: orderDetail({ id: '2', status: 'received' }),
       }),
     });
     await renderPage(<OrderListPage />);
@@ -230,9 +235,16 @@ describe('我的订单', () => {
       'GET /api/v1/orders/counts': () => ({ body: counts }),
       'GET /api/v1/orders': () => ({ body: paged([orderListItem({ status: 'completed' })]) }),
       'POST /api/v1/cart/rebuys': () => ({
-        body: { added: 1, skippedSkuIds: [], cart: { items: 1, quantity: 1 } },
+        status: 201,
+        body: {
+          added: 1,
+          skippedSkuIds: [],
+          cart: { items: 1, quantity: 1, availableCount: 1, unavailableCount: 0 },
+        },
       }),
-      'GET /api/v1/cart/count': () => ({ body: { items: 1, quantity: 1 } }),
+      'GET /api/v1/cart/count': () => ({
+        body: { items: 1, quantity: 1, availableCount: 1, unavailableCount: 0 },
+      }),
     });
     await renderPage(<OrderListPage />);
     fireEvent.click(await screen.findByRole('button', { name: '再次购买' }));

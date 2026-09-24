@@ -159,9 +159,8 @@ function Apply({ orderId }: { orderId: string }) {
           block
           disabled={!chosen}
           loading={submit.isPending}
-          onClick={() => {
-            if (chosen) void send(chosen);
-          }}
+          // The promise keeps the button busy until the request settles (no second request).
+          onClick={() => (chosen ? send(chosen) : undefined)}
         >
           提交申请
         </Button>

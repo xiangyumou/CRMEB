@@ -4,7 +4,6 @@ import { isApiError } from '@shop/api-client';
 import { routeKey, useRouteMutation, useRouteQuery } from '@shop/api-client/react';
 import { AddressSheet } from '@/features/checkout/address-sheet';
 import {
-  addressFormFromChosen,
   couponLinesOf,
   customFormBody,
   customFormProblem,
@@ -23,8 +22,15 @@ import {
   type CheckoutDraft,
 } from '@/features/checkout/draft';
 import { useCityTree } from '@/data/cities';
+import { ADDRESS_READS, COUPON_READS } from '@/data/stale-reads';
 import { useRefetchOnShow } from '@/data/use-refetch-on-show';
 import { formatSpec } from '@/lib/spec';
+import {
+  addressBody,
+  checkAddress,
+  draftFromChosen,
+  handOffImportedAddress,
+} from '@/packages/account/shared/address';
 import { navigate, subscribe, type ChosenAddress } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { AddressCard } from '@/ui/address-card';
@@ -63,7 +69,7 @@ export default function CheckoutPage() {
               variant="outline"
               onClick={() => void navigate({ route: 'home', params: {} })}
             >
-              去逛逛
+              回到首页
             </Button>
           }
         />
@@ -80,7 +86,7 @@ export default function CheckoutPage() {
   );
 }
 
-const yuanOrFree = (amount: string) => (Number(amount) === 0 ? '免运费' : `¥${amount}`);
+const yuanOrFree = (amount: string) => (Number(amount) === 0 ? '包邮' : `¥${amount}`);
 
 /** The presale ship time, from the preview (`shipAfterDays`, H4; `null` from an older server). */
 function presaleNote(shipAfterDays: number | null): string {
@@ -124,17 +130,28 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
 
   const cities = useCityTree(sheet === 'address');
 
-  const addAddress = useRouteMutation('user.addressCreate', {
-    invalidate: ['user.addressList', 'user.defaultAddress'],
-  });
+  const addAddress = useRouteMutation('user.addressCreate', { invalidate: ADDRESS_READS });
   const create = useRouteMutation('order.create', {
-    // The coupon now sits on the order: out of the wallet's 可使用.
-    invalidate: ['cart.list', 'cart.count', 'order.list', 'order.counts', 'coupon.myList'],
+    // The coupon now sits on the order: out of the wallet's 可使用, and no longer usable in the
+    // cart's hint or on another 确认订单.
+    invalidate: ['cart.list', 'cart.count', 'order.list', 'order.counts', ...COUPON_READS],
   });
 
-  const importAddress = (chosen: ChosenAddress) => {
+  // 导入微信地址, as 我的地址 does it: the city tree turns WeChat's names into the ids freight is
+  // priced on. Here the tree loads only with the sheet, so an import from the card fetches it
+  // first; an address it cannot resolve is finished in the form, not saved without its ids.
+  const importChosen = async (chosen: ChosenAddress) => {
+    const tree = cities.data ?? (await cities.refetch()).data;
+    const imported = draftFromChosen(chosen, tree?.items ?? []);
+    const { region } = imported;
+    if (!region || Object.keys(checkAddress(imported)).length > 0) {
+      handOffImportedAddress(imported);
+      setSheet(null);
+      void navigate({ route: 'addressEdit', params: {} });
+      return;
+    }
     addAddress.mutate(
-      { body: addressFormFromChosen(chosen, cities.data) },
+      { body: addressBody({ ...imported, region }) },
       {
         onSuccess: (address) => {
           setAddressId(address.id);
@@ -145,6 +162,7 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
       },
     );
   };
+  const importAddress = (chosen: ChosenAddress) => void importChosen(chosen);
 
   if (base.isPending) {
     return (

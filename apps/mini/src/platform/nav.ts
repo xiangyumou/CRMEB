@@ -82,8 +82,12 @@ export interface NavigateOptions {
   replace?: boolean;
 }
 
+function stackPages(): readonly StackPage[] {
+  return typeof Taro.getCurrentPages === 'function' ? Taro.getCurrentPages() : [];
+}
+
 function stackDepth(): number {
-  return typeof Taro.getCurrentPages === 'function' ? Taro.getCurrentPages().length : 0;
+  return stackPages().length;
 }
 
 /**
@@ -140,6 +144,10 @@ export function resetOpenGuard(): void {
  * Opens a page by route. Never throws for an unknown key: that opens the home page. The same
  * page asked for twice in a row (a double tap) opens once (`openOnce`); tab switches are not
  * guarded, a second `switchTab` to the same tab being harmless.
+ *
+ * A push to the very page under this one (same route, same params) goes back to it instead:
+ * 订单详情 → 拼团进度 →「查看订单」, 商品 → 拼团 →「单独购买」. Pushing would stack a second copy,
+ * and Back would show the page twice; this happened page by page until it moved here.
  */
 export async function navigate(
   route: StorefrontRoute | { route: string; params?: object },
@@ -154,6 +162,10 @@ export async function navigate(
     return;
   }
   const url = toPath(route);
+  if (!replace && loginReturn(route, stackPages()) === 'back') {
+    await openOnce(`navigateBack ${url}`, () => Taro.navigateBack({ delta: 1 }));
+    return;
+  }
   if (replace || stackDepth() >= MAX_STACK) {
     await openOnce(`redirectTo ${url}`, () => Taro.redirectTo({ url }));
   } else {
@@ -282,22 +294,37 @@ export function loginReturn(
   target: StorefrontRoute | { route: string; params?: object },
   stack: readonly StackPage[],
 ): 'back' | 'replace' {
-  const previous = stack.length >= 2 ? stack[stack.length - 2] : undefined;
   const entry = entryOf(target.route);
-  if (!previous || !entry) return 'replace';
-  const [path = ''] = (previous.route ?? previous.path ?? '').replace(/^\//, '').split('?');
-  if (path !== entry.path) return 'replace';
-  const key = target.route as StorefrontRouteKey;
+  const below = routeOfPage(stack.length >= 2 ? stack[stack.length - 2] : undefined);
+  if (!entry || !below || below.route !== target.route) return 'replace';
   // A tab takes its params through `navigate` (pending tab params), never through going back.
-  if (entry.tab) return definedParams(key, target.params ?? {}).length === 0 ? 'back' : 'replace';
-  const query = previous.path?.split('?')[1] ?? '';
+  if (entry.tab) {
+    const key = target.route as StorefrontRouteKey;
+    return definedParams(key, target.params ?? {}).length === 0 ? 'back' : 'replace';
+  }
+  return toPath(below) === toPath(target) ? 'back' : 'replace';
+}
+
+/** The route and params of a page on the stack; `null` for login or a path not in the catalogue. */
+function routeOfPage(page: StackPage | undefined): StorefrontRoute | null {
+  if (!page) return null;
+  const [path = ''] = (page.route ?? page.path ?? '').replace(/^\//, '').split('?');
+  const key = routeKeyOfPath(path);
+  if (!key || key === 'login') return null;
+  // A tab's params wait in `pendingTabParams` for the tab itself; reading them here would take them.
+  if (storefrontRoutes[key].tab) return { route: key, params: {} } as StorefrontRoute;
   const options = {
-    ...parseQuery(query),
-    ...previous.$taroParams,
-    ...previous.options,
+    ...parseQuery(page.path?.split('?')[1] ?? ''),
+    ...page.$taroParams,
+    ...page.options,
   };
-  const params = readRouteParams(key, options);
-  return toPath({ route: key, params }) === toPath(target) ? 'back' : 'replace';
+  return { route: key, params: readRouteParams(key, options) } as StorefrontRoute;
+}
+
+/** The page the shopper is on, as a route (the login page's `redirect`); `null` on login. */
+export function currentRoute(): StorefrontRoute | null {
+  const stack = stackPages();
+  return routeOfPage(stack[stack.length - 1]);
 }
 
 /**
@@ -309,9 +336,7 @@ export function loginReturn(
 export async function leaveFor(
   target: StorefrontRoute | { route: string; params?: object },
 ): Promise<void> {
-  const stack: readonly StackPage[] =
-    typeof Taro.getCurrentPages === 'function' ? Taro.getCurrentPages() : [];
-  if (loginReturn(target, stack) === 'back') await Taro.navigateBack({ delta: 1 });
+  if (loginReturn(target, stackPages()) === 'back') await Taro.navigateBack({ delta: 1 });
   else await navigate(target, { replace: true });
 }
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { InputOf, ResponseOf } from '@shop/api-client';
+import type { InputOf, ResponseOf, RouteId } from '@shop/api-client';
 import type { ChosenInvoiceTitle } from '@/platform';
 
 /**
@@ -7,6 +7,16 @@ import type { ChosenInvoiceTitle } from '@/platform';
  * (a 企业 title needs a 税号, a 专票 needs the four registration and bank fields), written again
  * here because `@shop/contracts` is type-only in the mini-program bundle.
  */
+
+/**
+ * Reads a 发票抬头 change makes stale (added, edited, deleted, made the default): the list, the
+ * default 申请开票 starts from, and the title's edit form. The same on 发票 and the edit page.
+ */
+export const INVOICE_TITLE_READS: readonly RouteId[] = [
+  'user.invoiceTitleList',
+  'user.invoiceTitleDefault',
+  'user.invoiceTitleDetail',
+];
 
 export type InvoiceTitle = ResponseOf<'user.invoiceTitleList'>['items'][number];
 export type OrderInvoice = ResponseOf<'order.myInvoices'>['items'][number];

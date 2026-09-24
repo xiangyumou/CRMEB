@@ -100,6 +100,7 @@ describe('DecorPage', () => {
     taroFake.loginCode = 'code-1';
     serveApi({
       'POST /api/v1/auth/sessions/wechat-mini': () => ({
+        status: 201,
         body: {
           status: 'phone-required',
           session: null,

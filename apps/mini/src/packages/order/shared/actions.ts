@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RouteId } from '@shop/api-client';
 import { useApiClient, useInvalidateRoutes } from '@shop/api-client/react';
+import { COUPON_READS } from '@/data/stale-reads';
 import { confirmReceipt, navigate } from '@/platform';
+import { errorMessage as messageOf } from '@/lib/error-message';
 import { confirm, toast } from '@/ui/feedback';
 import type { OrderActionKey } from '@/ui/order-actions';
 
@@ -13,8 +15,16 @@ export const ORDER_READS: readonly RouteId[] = [
   'order.myShipments',
 ];
 
-/** A cancelled unpaid order puts its coupon back in the wallet. */
-const CANCEL_READS: readonly RouteId[] = [...ORDER_READS, 'coupon.myList'];
+/**
+ * A cancelled unpaid order puts its coupon back in the wallet (and back in the cart's hint and
+ * 确认订单's list), and a cancelled 拼团 order gives its seat back.
+ */
+const CANCEL_READS: readonly RouteId[] = [
+  ...ORDER_READS,
+  ...COUPON_READS,
+  'groupbuy.groupDetail',
+  'groupbuy.myGroups',
+];
 
 export interface OrderRef {
   id: string;
@@ -29,10 +39,6 @@ export interface OrderActionsState {
   /** The action in flight, and whose. */
   busy: { orderId: string; key: OrderActionKey } | null;
   run: (key: OrderActionKey, order: OrderRef) => void;
-}
-
-function messageOf(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 /**

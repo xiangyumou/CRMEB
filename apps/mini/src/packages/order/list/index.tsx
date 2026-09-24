@@ -101,7 +101,7 @@ function OrderList({ tab }: { tab: ShownTab }) {
                 size="md"
                 onClick={() => void navigate({ route: 'home', params: {} })}
               >
-                去逛逛
+                回到首页
               </Button>
             }
           />

@@ -370,54 +370,58 @@ export function ConfigGroupForm<R extends AnyRouteDef, T extends AnyRouteDef = A
         ))}
       </Space>
 
-      <div
-        style={{
-          position: 'sticky',
-          bottom: 0,
-          zIndex: 5,
-          marginTop: 16,
-          padding: '12px 16px',
-          background: token.colorBgContainer,
-          border: `1px solid ${token.colorBorderSecondary}`,
-          borderRadius: token.borderRadiusLG,
-          boxShadow: dirty ? token.boxShadowSecondary : 'none',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 8,
-          flexWrap: 'wrap',
-        }}
-      >
-        <span data-testid="config-dirty-state">
-          {dirty ? (
-            <Badge status="warning" text={`已修改 ${changed.length} 项，尚未保存`} />
-          ) : (
-            <Badge status="default" text="没有未保存的修改" />
-          )}
-        </span>
-        <Space wrap>
-          {canTest ? (
-            <Button
-              icon={<ExperimentOutlined />}
-              onClick={() => {
-                setOutcome(null);
-                setTestError(null);
-                setTestOpen(true);
-              }}
-            >
-              {descriptor.test!.label}
+      {/* A form that cannot be saved has no save bar: a greyed 保存 reads as
+          "not yet", and there is never anything unsaved to report. */}
+      {disabled ? null : (
+        <div
+          style={{
+            position: 'sticky',
+            bottom: 0,
+            zIndex: 5,
+            marginTop: 16,
+            padding: '12px 16px',
+            background: token.colorBgContainer,
+            border: `1px solid ${token.colorBorderSecondary}`,
+            borderRadius: token.borderRadiusLG,
+            boxShadow: dirty ? token.boxShadowSecondary : 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span data-testid="config-dirty-state">
+            {dirty ? (
+              <Badge status="warning" text={`已修改 ${changed.length} 项，尚未保存`} />
+            ) : (
+              <Badge status="default" text="没有未保存的修改" />
+            )}
+          </span>
+          <Space wrap>
+            {canTest ? (
+              <Button
+                icon={<ExperimentOutlined />}
+                onClick={() => {
+                  setOutcome(null);
+                  setTestError(null);
+                  setTestOpen(true);
+                }}
+              >
+                {descriptor.test!.label}
+              </Button>
+            ) : null}
+            <Button disabled={!dirty || disabled} onClick={discard}>
+              放弃修改
             </Button>
-          ) : null}
-          <Button disabled={!dirty || disabled} onClick={discard}>
-            放弃修改
-          </Button>
-          <Tooltip title="Ctrl / ⌘ + S">
-            <Button type="primary" htmlType="submit" loading={mutation.isPending}>
-              保存
-            </Button>
-          </Tooltip>
-        </Space>
-      </div>
+            <Tooltip title="Ctrl / ⌘ + S">
+              <Button type="primary" htmlType="submit" loading={mutation.isPending}>
+                保存
+              </Button>
+            </Tooltip>
+          </Space>
+        </div>
+      )}
     </Form>
   );
 

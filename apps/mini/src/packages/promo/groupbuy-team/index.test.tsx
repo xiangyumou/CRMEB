@@ -74,6 +74,11 @@ const navigatedTo = () =>
     .filter((call) => call.api === 'navigateTo')
     .map((call) => (call.args as { url: string }).url);
 
+const redirectedTo = () =>
+  taroFake.calls
+    .filter((call) => call.api === 'redirectTo')
+    .map((call) => (call.args as { url: string }).url);
+
 describe('拼团进度', () => {
   beforeEach(() => {
     taroFake.routerParams = { id: '501' };
@@ -172,10 +177,45 @@ describe('拼团进度', () => {
     expect(screen.getByText('款项已原路退回，请留意到账')).toBeTruthy();
     // Nobody is left in it: no seats, and no 待加入 to invite a stranger into.
     expect(screen.queryByText('待加入')).toBeNull();
+    // Opened from neither page: each takes this page's place.
     fireEvent.click(screen.getByRole('button', { name: '查看订单' }));
-    expect(navigatedTo().at(-1)).toBe('/packages/order/detail/index?id=70');
+    await waitFor(() => expect(redirectedTo().at(-1)).toBe('/packages/order/detail/index?id=70'));
     fireEvent.click(screen.getByRole('button', { name: '再开一团' }));
-    expect(navigatedTo().at(-1)).toBe('/packages/promo/groupbuy-detail/index?id=1');
+    await waitFor(() =>
+      expect(redirectedTo().at(-1)).toBe('/packages/promo/groupbuy-detail/index?id=1'),
+    );
+  });
+
+  it('goes back to the 订单详情 or activity it was opened from, not to a second copy', async () => {
+    serve(
+      view({
+        status: 'failed',
+        members: [],
+        me: { role: 'leader', status: 'refunded', orderId: '70', paid: false },
+        canJoin: false,
+      }),
+    );
+    taroFake.pageStack = [
+      { route: 'packages/order/detail/index', options: { id: '70' } },
+      { route: 'packages/promo/groupbuy-team/index', options: { id: '501' } },
+    ];
+    await renderPage(<GroupbuyTeamPage />);
+    fireEvent.click(await screen.findByRole('button', { name: '查看订单' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({ api: 'navigateBack', args: { delta: 1 } }),
+    );
+
+    taroFake.calls.length = 0;
+    taroFake.pageStack = [
+      { route: 'packages/promo/groupbuy-detail/index', options: { id: '1' } },
+      { route: 'packages/promo/groupbuy-team/index', options: { id: '501' } },
+    ];
+    fireEvent.click(screen.getByRole('link', { name: '双人团 · 护理套装，查看拼团商品' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({ api: 'navigateBack', args: { delta: 1 } }),
+    );
+    expect(redirectedTo()).toEqual([]);
+    expect(navigatedTo()).toEqual([]);
   });
 
   it('shows a team past its deadline as settling, not open', async () => {

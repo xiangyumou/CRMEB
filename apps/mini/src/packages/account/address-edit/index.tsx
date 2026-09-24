@@ -24,7 +24,7 @@ import {
   checkAddress,
   draftFromAddress,
   draftFromChosen,
-  useImportedAddress,
+  takeImportedAddress,
   type AddressDraft,
   type AddressErrors,
 } from '../shared/address';
@@ -64,14 +64,14 @@ function AddressForm({ id, initial }: { id?: string; initial: AddressDraft | nul
   const [draft, setDraft] = useState<AddressDraft>(() => {
     if (initial) return initial;
     // An import the list could not save as it was: finish it here.
-    const imported = useImportedAddress.getState().draft;
-    useImportedAddress.setState({ draft: null });
-    return imported ?? EMPTY_DRAFT;
+    return takeImportedAddress() ?? EMPTY_DRAFT;
   });
   const [errors, setErrors] = useState<AddressErrors>(() =>
     draft.region || !draft.detail ? {} : { region: '请选择所在地区' },
   );
+  // Cleared on blur: a second failed save on the same field must change it to focus again.
   const [focus, setFocus] = useState<keyof AddressErrors | null>(null);
+  const blurred = () => setFocus(null);
   const tree = useCityTree();
   const create = useRouteMutation('user.addressCreate', { invalidate: ADDRESS_READS });
   const update = useRouteMutation('user.addressUpdate', { invalidate: ADDRESS_READS });
@@ -144,6 +144,7 @@ function AddressForm({ id, initial }: { id?: string; initial: AddressDraft | nul
           maxLength={32}
           error={errors.receiverName}
           focus={focus === 'receiverName'}
+          onBlur={blurred}
           onChange={(value) => change('receiverName', value)}
         />
         <Field
@@ -153,6 +154,7 @@ function AddressForm({ id, initial }: { id?: string; initial: AddressDraft | nul
           value={draft.receiverPhone}
           error={errors.receiverPhone}
           focus={focus === 'receiverPhone'}
+          onBlur={blurred}
           onChange={(value) => change('receiverPhone', value)}
         />
         <RegionPicker
@@ -168,6 +170,7 @@ function AddressForm({ id, initial }: { id?: string; initial: AddressDraft | nul
           maxLength={255}
           error={errors.detail}
           focus={focus === 'detail'}
+          onBlur={blurred}
           onChange={(value) => change('detail', value)}
         />
       </CellGroup>
@@ -184,12 +187,7 @@ function AddressForm({ id, initial }: { id?: string; initial: AddressDraft | nul
         />
       </CellGroup>
       <SubmitBar>
-        <Button
-          size="lg"
-          block
-          loading={create.isPending || update.isPending}
-          onClick={() => void submit()}
-        >
+        <Button size="lg" block loading={create.isPending || update.isPending} onClick={submit}>
           保存
         </Button>
       </SubmitBar>

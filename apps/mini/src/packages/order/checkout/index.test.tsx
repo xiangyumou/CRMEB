@@ -11,6 +11,7 @@ import {
   previewFixture,
   previewWithCoupon,
 } from '@/test/checkout-fixture';
+import { cityTreeFixture } from '@/test/address-fixture';
 import { serveApi, type FakeReply } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
 import { routeQueryKey } from '@shop/api-client/react';
@@ -29,7 +30,7 @@ function serve(overrides: Routes = {}) {
   return serveApi({
     'POST /api/v1/checkout/preview': (body) => ({
       body:
-        (body as { userCouponId?: string | null }).userCouponId === 'uc1'
+        (body as { userCouponId?: string | null }).userCouponId === '901'
           ? previewWithCoupon()
           : previewFixture(),
     }),
@@ -77,6 +78,8 @@ describe('确认订单', () => {
     const { client } = await open();
     const wallet = routeQueryKey('coupon.myList', { query: { state: 'unused' } });
     client.setQueryData(wallet, { items: [], page: 1, pageSize: 20, total: 0 });
+    const claimable = routeQueryKey('coupon.claimableList', { query: {} });
+    client.setQueryData(claimable, { items: [], page: 1, pageSize: 20, total: 0 });
 
     expect(await screen.findByText('-¥10.00')).toBeTruthy();
     await ready();
@@ -104,14 +107,15 @@ describe('确认订单', () => {
       item: { skuId: '103', quantity: 2 },
       kind: 'normal',
       addressId: '301',
-      userCouponId: 'uc1',
+      userCouponId: '901',
       expectedPayableAmount: '116.00',
       buyerRemark: '工作日送达',
     });
     expect(String(created.idempotencyKey)).toMatch(/^mini-/);
     expect(useCheckoutDraft.getState().draft).toBeNull();
-    // The coupon went onto the order: 我的优惠券 must not offer it.
+    // The coupon went onto the order: 我的优惠券 must not offer it, nor the coupon lists.
     expect(client.getQueryState(wallet)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(claimable)?.isInvalidated).toBe(true);
   });
 
   it('lets the shopper drop the coupon', async () => {
@@ -138,20 +142,33 @@ describe('确认订单', () => {
     taroFake.address = {
       userName: '林小姐',
       telNumber: '13800138000',
-      provinceName: '浙江省',
-      cityName: '杭州市',
-      countyName: '西湖区',
-      detailInfo: '文三路 100 号',
-      postalCode: '310012',
+      provinceName: '广东省',
+      cityName: '深圳市',
+      countyName: '南山区',
+      detailInfo: '科技园 100 号',
+      postalCode: '518057',
     };
     let created = false;
     const seen = serve({
       'POST /api/v1/checkout/preview': (body) => ({
+        // No address until the imported one (302) is chosen; then the preview is to it.
         body: previewFixture({
-          receiver: (body as { addressId?: string }).addressId === '302' ? undefined : null,
-        } as never),
+          receiver:
+            (body as { addressId?: string }).addressId === '302'
+              ? {
+                  addressId: '302',
+                  name: '林小姐',
+                  phone: '13800138000',
+                  province: '广东省',
+                  city: '深圳市',
+                  district: '南山区',
+                  detail: '科技园 100 号',
+                  postCode: '518057',
+                }
+              : null,
+        }),
       }),
-      'GET /api/v1/cities': () => ({ body: { version: 'v1', items: [] } }),
+      'GET /api/v1/cities': () => ({ body: cityTreeFixture }),
       'GET /api/v1/addresses': () => ({ body: { items: [], total: 0, page: 1, pageSize: 50 } }),
       'POST /api/v1/addresses': () => {
         created = true;
@@ -161,14 +178,14 @@ describe('确认订单', () => {
             id: '302',
             receiverName: '林小姐',
             receiverPhone: '13800138000',
-            provinceId: null,
-            cityId: null,
-            districtId: null,
-            provinceName: '浙江省',
-            cityName: '杭州市',
-            districtName: '西湖区',
-            detail: '文三路 100 号',
-            postCode: '310012',
+            provinceId: '44',
+            cityId: '4403',
+            districtId: '440305',
+            provinceName: '广东省',
+            cityName: '深圳市',
+            districtName: '南山区',
+            detail: '科技园 100 号',
+            postCode: '518057',
             lng: null,
             lat: null,
             isDefault: true,
@@ -178,7 +195,10 @@ describe('确认订单', () => {
         };
       },
     });
-    await open();
+    const { client } = await open();
+    // 地址管理's edit form for another address, which now is not the default.
+    const other = routeQueryKey('user.addressDetail', { params: { id: '301' } });
+    client.setQueryData(other, {});
 
     await ready();
     fireEvent.click(submitButton());
@@ -188,10 +208,15 @@ describe('确认订单', () => {
     await waitFor(() => expect(document.getElementById('address-sheet')).not.toBeNull());
     fireEvent.click(screen.getAllByRole('button', { name: '导入微信地址' }).at(-1) as HTMLElement);
     await waitFor(() => expect(created).toBe(true));
+    await waitFor(() => expect(client.getQueryState(other)?.isInvalidated).toBe(true));
+    // With the division ids, which freight is priced on.
     expect(seen.find((r) => r.key === 'POST /api/v1/addresses')?.body).toMatchObject({
       receiverName: '林小姐',
-      provinceName: '浙江省',
-      postCode: '310012',
+      provinceId: '44',
+      provinceName: '广东省',
+      cityId: '4403',
+      districtId: '440305',
+      postCode: '518057',
     });
     await waitFor(() =>
       expect(
@@ -202,6 +227,47 @@ describe('确认订单', () => {
         ),
       ).toBe(true),
     );
+  });
+
+  it('finishes an imported address in the form when the city tree does not resolve it', async () => {
+    taroFake.address = {
+      userName: '林小姐',
+      telNumber: '13800138000',
+      provinceName: '海外',
+      cityName: '某市',
+      countyName: '',
+      detailInfo: '某街 1 号',
+      postalCode: '',
+    };
+    const seen = serve({
+      'POST /api/v1/checkout/preview': () => ({
+        body: previewFixture({ receiver: null } as never),
+      }),
+      'GET /api/v1/cities': () => ({ body: cityTreeFixture }),
+      'GET /api/v1/addresses': () => ({ body: { items: [], total: 0, page: 1, pageSize: 50 } }),
+    });
+    await open();
+    await ready();
+    fireEvent.click(submitButton());
+    await waitFor(() => expect(document.getElementById('address-sheet')).not.toBeNull());
+    fireEvent.click(screen.getAllByRole('button', { name: '导入微信地址' }).at(-1) as HTMLElement);
+
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual(
+        expect.objectContaining({
+          api: 'navigateTo',
+          args: { url: '/packages/account/address-edit/index' },
+        }),
+      ),
+    );
+    expect(
+      JSON.parse((taroFake.storage.get('shop.address.imported') as string | undefined) ?? 'null'),
+    ).toMatchObject({
+      receiverName: '林小姐',
+      region: null,
+      detail: '某街 1 号',
+    });
+    expect(seen.some((r) => r.key === 'POST /api/v1/addresses')).toBe(false);
   });
 
   it('checks the custom form, and shows the presale ship time', async () => {

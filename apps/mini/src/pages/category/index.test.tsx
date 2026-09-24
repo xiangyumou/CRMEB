@@ -5,6 +5,7 @@ import { useAppConfigStore } from '@/app-config';
 import { navigate } from '@/platform';
 import { startSession, useSession } from '@/session/session';
 import { appConfigFixture } from '@/test/app-config-fixture';
+import { cartItemFixture } from '@/test/cart-fixture';
 import {
   cardFixture,
   categoryTreeFixture,
@@ -163,7 +164,22 @@ describe('分类', () => {
       }),
       'GET /api/v1/catalog/products/31/skus': () => ({ body: singleSkuMatrix('31') }),
       'GET /api/v1/catalog/products/12/skus': () => ({ body: skuMatrixFixture }),
-      'POST /api/v1/cart/items': () => ({ status: 201, body: { id: '9', quantity: 1 } }),
+      'POST /api/v1/cart/items': () => ({
+        status: 201,
+        body: {
+          item: cartItemFixture({
+            id: '9',
+            productId: '31',
+            skuId: '301',
+            quantity: 1,
+            productName: '温感按摩油',
+            specText: '',
+            unitPrice: '39.00',
+            subtotal: '39.00',
+          }),
+          cart: { items: 1, quantity: 1, availableCount: 1, unavailableCount: 0 },
+        },
+      }),
     });
     await startSession();
     await renderPage(<Category />);
@@ -188,6 +204,7 @@ describe('分类', () => {
       ...tree,
       ...products,
       'POST /api/v1/auth/sessions/wechat-mini': () => ({
+        status: 201,
         body: {
           status: 'phone-required',
           session: null,

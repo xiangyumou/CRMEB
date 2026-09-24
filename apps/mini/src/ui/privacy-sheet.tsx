@@ -6,6 +6,7 @@ import {
   usePrivacyPrompt,
 } from '@/platform';
 import { Button, buttonClassName } from './button';
+import { Pressable } from './pressable';
 import { Sheet } from './sheet';
 import './privacy-sheet.scss';
 
@@ -35,13 +36,21 @@ export function PrivacySheet() {
         </View>
       }
     >
-      <Text className="shop-privacy__lead">
-        {purpose ? `为了${purpose}，` : ''}我们需要你同意
-        <Text className="shop-privacy__link" ariaRole="link" onClick={openPrivacyContract}>
-          《用户隐私保护指引》
-        </Text>
-        。请阅读后选择是否同意。
-      </Text>
+      {/* The link is a Pressable (role and name for a screen reader, like AgreementCheck's), so
+          the lead is a View: WeChat's <text> may hold only <text>. */}
+      <View className="shop-privacy__lead">
+        <Text>{purpose ? `为了${purpose}，` : ''}我们需要你同意</Text>
+        <Pressable
+          role="link"
+          label="用户隐私保护指引"
+          pressedTint={false}
+          className="shop-privacy__link"
+          onClick={openPrivacyContract}
+        >
+          <Text>《用户隐私保护指引》</Text>
+        </Pressable>
+        <Text>。请阅读后选择是否同意。</Text>
+      </View>
       <Text className="shop-privacy__note">拒绝后仅这项功能不可用，你仍可继续浏览和购物。</Text>
     </Sheet>
   );

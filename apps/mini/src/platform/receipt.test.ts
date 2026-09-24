@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api as client } from '@/data/api';
+import { orderFixture } from '@/test/checkout-fixture';
 import { serveApi } from '@/test/fake-api';
 import { taroFake } from '@/test/taro-fake/taro';
 import { confirmReceipt, RETURN_GRACE_MS } from './receipt';
 
-const received = { id: '9', status: 'received' };
+const received = orderFixture({ status: 'received', userCouponId: null });
 const plain = { 'GET /api/v1/orders/9/wechat-receipt': () => ({ body: { receipt: null } }) };
 
 describe('confirmReceipt', () => {

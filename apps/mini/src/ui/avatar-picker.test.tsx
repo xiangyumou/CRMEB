@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { profileFixture } from '@/test/account-fixture';
 import { serveApi } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
@@ -8,7 +9,7 @@ import { AvatarPicker } from './avatar-picker';
 describe('AvatarPicker', () => {
   it("uploads WeChat's avatar and saves it to the profile", async () => {
     taroFake.upload = { statusCode: 201, data: '{"url":"/uploads/avatar/x.png"}' };
-    const seen = serveApi({ 'PUT /api/v1/profile': () => ({ body: { id: '1' } }) });
+    const seen = serveApi({ 'PUT /api/v1/profile': () => ({ body: profileFixture }) });
     const onChange = vi.fn();
     await renderPage(<AvatarPicker src={null} onChange={onChange} />);
     fireEvent.click(screen.getByRole('button', { name: '更换头像' }));

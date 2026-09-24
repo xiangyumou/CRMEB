@@ -14,6 +14,7 @@ import { ConfigGroupForm } from '@/admin/kit/config/config-group-form';
 import type { ConfigFieldDescriptor, ConfigValues } from '@/admin/kit/config/types';
 import { InstantText } from '@/admin/kit/instant-text';
 import { PageContainer } from '@/admin/kit/page-container';
+import { useCan } from '@/admin/session/session-provider';
 
 import { AppearancePreview } from './appearance-preview';
 import { MiniTradePanel } from './mini-trade-panel';
@@ -43,6 +44,10 @@ export function SettingsGroupPage({ group }: { group: string }) {
   const input = { params: { group } };
   // Set by the settings search: which field to scroll to.
   const focusKey = useSearchParams().get('field') ?? undefined;
+  // Reading a group is `system:config:read`; saving and 测试 are both
+  // `system:config:write`. A reader gets the form read-only, with no 保存 or
+  // 测试 to press into a 403.
+  const mayWrite = useCan()('system:config:write');
   const { data, isPending, error } = useRouteQuery(systemConfigGet, input, {
     presentError: false,
   });
@@ -68,7 +73,7 @@ export function SettingsGroupPage({ group }: { group: string }) {
     );
   }
 
-  const writable = data.descriptor.fields.length > 0;
+  const writable = mayWrite && data.descriptor.fields.length > 0;
 
   return (
     <PageContainer
@@ -86,6 +91,9 @@ export function SettingsGroupPage({ group }: { group: string }) {
       }
     >
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        {mayWrite ? null : (
+          <Alert type="info" showIcon message="你的身份只能查看这些配置，不能在这里修改" />
+        )}
         <ConfigGroupForm
           descriptor={{
             group: data.descriptor.group,

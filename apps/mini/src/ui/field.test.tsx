@@ -82,4 +82,15 @@ describe('Textarea', () => {
     });
     expect(onChange).toHaveBeenCalledWith('很好很好');
   });
+
+  it('keeps its error line in the tree, hidden, so an error coming or going adds no node', () => {
+    const { container, rerender } = render(
+      <Textarea label="评价" value="" onChange={() => undefined} error="请填写评价" />,
+    );
+    const nodes = container.querySelectorAll('*').length;
+    expect(screen.getByText('请填写评价')).toBeTruthy();
+    rerender(<Textarea label="评价" value="好" onChange={() => undefined} />);
+    expect(container.querySelectorAll('*').length).toBe(nodes);
+    expect(container.querySelector('.shop-field__error--hidden')).toBeTruthy();
+  });
 });

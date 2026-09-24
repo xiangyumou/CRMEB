@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { isApiError, type ResponseOf } from '@shop/api-client';
 import type { StorefrontRoute } from '@shop/api-client/routes';
 import { api, installAuth } from '@/data/api';
-import { navigate, platform, showToast, storage, useLaunchContext } from '@/platform';
+import { currentRoute, navigate, platform, showToast, storage, useLaunchContext } from '@/platform';
 
 /**
  * The shopper's session (docs/mini/auth.md): silent WeChat sign-in at launch, the phone-number
@@ -241,8 +241,13 @@ function sendToLogin(renewal: Renewal): void {
   if (renewal.sentToLogin) return;
   renewal.sentToLogin = true;
   useSessionNotice.setState({ notice: SESSION_ENDED });
+  // Back to this page once signed in again; without a redirect the login page leaves for 首页.
+  const here = currentRoute();
   // Not awaited: the failed request's 401 reaches its caller meanwhile.
-  void navigate({ route: 'login', params: {} }).catch(() => undefined);
+  void navigate({
+    route: 'login',
+    params: here ? { redirect: JSON.stringify(here) } : {},
+  }).catch(() => undefined);
 }
 
 /**

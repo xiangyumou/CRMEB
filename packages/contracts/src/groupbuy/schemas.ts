@@ -122,7 +122,7 @@ export const groupbuyActivityForm = z
     originalPrice: money.optional(),
     cost: money.optional(),
     seatsRequired: z.number().int().min(2).max(100),
-    /** 拼团有效时长. Stored in seconds; the form edits hours. */
+    /** 拼团有效时长, in seconds — stored and edited as such. */
     groupTtlSeconds: z
       .number()
       .int()

@@ -106,17 +106,25 @@ describe('通知模板', () => {
     });
   });
 
-  it('offers no test send to a read-only admin', { timeout: 20_000 }, async () => {
-    stubApi();
-    renderAdmin(<NotificationTemplatesPage />, {
-      identity: { ...testIdentity, permissions: ['notification:template:read'] },
-    });
+  it(
+    'opens the form read-only for a read-only admin, with no 保存 and no test send',
+    { timeout: 20_000 },
+    async () => {
+      const calls = stubApi();
+      renderAdmin(<NotificationTemplatesPage />, {
+        identity: { ...testIdentity, permissions: ['notification:template:read'] },
+      });
 
-    await user.click(await screen.findByText('配置'));
-    const form = await screen.findByRole('dialog');
-    await user.click(within(form).getByTestId('notification-preview'));
-    const dialog = (await screen.findAllByRole('dialog')).at(-1)!;
-    await within(dialog).findByTestId('notification-preview-result');
-    expect(within(dialog).queryByTestId('notification-test-send')).not.toBeInTheDocument();
-  });
+      await user.click(await screen.findByText('查看'));
+      const form = await screen.findByRole('dialog');
+      expect(within(form).getByLabelText('站内信标题')).toBeDisabled();
+      expect(within(form).queryByRole('button', { name: zhName('保存') })).not.toBeInTheDocument();
+      expect(screen.queryByText('配置')).not.toBeInTheDocument();
+      await user.click(within(form).getByTestId('notification-preview'));
+      const dialog = (await screen.findAllByRole('dialog')).at(-1)!;
+      await within(dialog).findByTestId('notification-preview-result');
+      expect(within(dialog).queryByTestId('notification-test-send')).not.toBeInTheDocument();
+      expect(calls.some((call) => call.method === 'PUT')).toBe(false);
+    },
+  );
 });

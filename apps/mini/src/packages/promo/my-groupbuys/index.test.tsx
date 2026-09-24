@@ -51,6 +51,14 @@ describe('我的拼团', () => {
     });
   });
 
+  it('asks again when it comes back, as a team fills while the shopper is away', async () => {
+    const seen = serve([team({})]);
+    await renderPage(<MyGroupbuysPage />);
+    await screen.findByText('拼团中 · 还差 1 人');
+    taroFake.showPage();
+    await waitFor(() => expect(seen).toHaveLength(2));
+  });
+
   it('filters by tab', async () => {
     const seen = serve([team({})]);
     await renderPage(<MyGroupbuysPage />);

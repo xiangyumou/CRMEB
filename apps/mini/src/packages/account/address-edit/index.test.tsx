@@ -6,7 +6,7 @@ import { serveApi } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
 import { routeQueryKey } from '@shop/api-client/react';
 import { taroFake } from '@/test/taro-fake/taro';
-import { useImportedAddress } from '../shared/address';
+import { handOffImportedAddress } from '../shared/address';
 import AddressEditPage from './index';
 
 const type = (label: string, value: string) =>
@@ -79,21 +79,19 @@ describe('新增 / 编辑地址', () => {
   });
 
   it('opens on an import the list handed over, asking only for the region', async () => {
-    useImportedAddress.setState({
-      draft: {
-        receiverName: '张三',
-        receiverPhone: '13800138000',
-        region: null,
-        detail: '体育西路 100 号',
-        postCode: null,
-        isDefault: false,
-      },
+    handOffImportedAddress({
+      receiverName: '张三',
+      receiverPhone: '13800138000',
+      region: null,
+      detail: '体育西路 100 号',
+      postCode: null,
+      isDefault: false,
     });
     serveApi({ 'GET /api/v1/cities': () => ({ body: cityTreeFixture }) });
     await renderPage(<AddressEditPage />);
 
     expect(screen.getByDisplayValue('张三')).toBeTruthy();
     expect(screen.getByText('请选择所在地区')).toBeTruthy();
-    expect(useImportedAddress.getState().draft).toBeNull();
+    expect(taroFake.storage.has('shop.address.imported')).toBe(false);
   });
 });

@@ -21,6 +21,7 @@ export { fromWechatInvoiceTitle, type ChosenInvoiceTitle } from './invoice-title
 export { onAppVisibility } from './lifecycle';
 export { openLinkTarget } from './link';
 export {
+  currentRoute,
   goBack,
   leaveFor,
   loginReturn,

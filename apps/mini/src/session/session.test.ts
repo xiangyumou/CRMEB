@@ -430,6 +430,27 @@ describe('AUTH-010 — a request that met a 401 is replayed only as the account 
     expect(revoked.map((request) => request.headers['Authorization'])).toEqual(['Bearer b-token']);
   });
 
+  it('opens the login page with the page the shopper was on, so signing in comes back to it', async () => {
+    const { serveApi, startSession, taroFake } = await expiredAs7();
+    taroFake.pageStack = [{ route: 'pages/product/index', options: { id: '12' } }];
+    serveApi({
+      'POST /api/v1/cart/items': () => unauthenticated,
+      'POST /api/v1/auth/sessions/wechat-mini': () => ({
+        status: 201,
+        body: signedIn('b-token', other),
+      }),
+      'DELETE /api/v1/auth/sessions/current': () => ({ body: { ok: true } }),
+    });
+    const { api } = await import('@/data/api');
+
+    await startSession();
+    await expect(api.call('cart.addItem', addToCart)).rejects.toMatchObject({ status: 401 });
+    await vi.waitFor(() => expect(loginPages(taroFake.calls)).toHaveLength(1));
+    const url = (loginPages(taroFake.calls)[0]?.args as { url: string }).url;
+    const redirect = new URLSearchParams(url.split('?')[1]).get('redirect');
+    expect(JSON.parse(redirect ?? 'null')).toEqual({ route: 'product', params: { id: '12' } });
+  });
+
   it('gives every request that failed alongside the same answer: one wx.login, none replayed, one login page', async () => {
     const { serveApi, startSession, taroFake, useSession, useSessionNotice } = await expiredAs7();
     const seen = serveApi({

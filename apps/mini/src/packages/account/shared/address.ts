@@ -1,7 +1,6 @@
-import { create } from 'zustand';
 import type { InputOf, ResponseOf } from '@shop/api-client';
 import type { CityProvince } from '@/data/cities';
-import type { ChosenAddress } from '@/platform';
+import { storage, type ChosenAddress } from '@/platform';
 import type { Region } from '@/ui/region-picker';
 
 export type AddressBody = InputOf<'user.addressCreate'>['body'];
@@ -149,10 +148,27 @@ export function addressBody(draft: AddressDraft & { region: Region }): AddressBo
   };
 }
 
+const IMPORTED_KEY = 'shop.address.imported';
+
 /**
- * An imported address the list could not save as it is (its region did not resolve), handed
- * to the edit page to finish. In memory: it is the shopper's own data, never in a URL.
+ * An imported address that could not be saved as it was (its region did not resolve), handed
+ * to the edit page to finish — from 我的地址 or from 确认订单. Through storage, read once and
+ * removed, not a store: 确认订单 is in the order sub-package and the edit page in account, and
+ * Taro copies a module two sub-packages share into each of them (`sub-common`), so each side
+ * would hold its own store and the address would never arrive. Never in a URL.
  */
-export const useImportedAddress = create<{ draft: AddressDraft | null }>()(() => ({
-  draft: null,
-}));
+export function handOffImportedAddress(draft: AddressDraft): void {
+  storage.set(IMPORTED_KEY, JSON.stringify(draft));
+}
+
+/** The handed-over import, once; `null` when there is none. */
+export function takeImportedAddress(): AddressDraft | null {
+  const raw = storage.get(IMPORTED_KEY);
+  if (!raw) return null;
+  storage.remove(IMPORTED_KEY);
+  try {
+    return JSON.parse(raw) as AddressDraft;
+  } catch {
+    return null;
+  }
+}

@@ -38,6 +38,7 @@ export default function CouponCenterPage() {
   const invalidate = useInvalidateRoutes();
   const claim = useClaimCoupon();
   const [claiming, setClaiming] = useState<string | null>(null);
+  const inFlight = useRef(false);
 
   // Signing in turns every `canClaim: null` into an answer.
   const lastSignedIn = useRef(signedIn);
@@ -48,7 +49,14 @@ export default function CouponCenterPage() {
   }, [signedIn, invalidate]);
 
   const take = async (coupon: ClaimableCoupon) => {
-    if (!(await requireLogin(ROUTE))) return;
+    // Set before the login check is awaited: `claiming` state lands a render later, so a quick
+    // second tap would otherwise claim twice. One claim at a time, as the decor host does.
+    if (inFlight.current) return;
+    inFlight.current = true;
+    if (!(await requireLogin(ROUTE).catch(() => false))) {
+      inFlight.current = false;
+      return;
+    }
     setClaiming(coupon.templateId);
     claim.mutate(
       { params: { id: coupon.templateId } },
@@ -58,7 +66,10 @@ export default function CouponCenterPage() {
           toast.text(claimFailureText(error));
           void invalidate('coupon.claimableList');
         },
-        onSettled: () => setClaiming(null),
+        onSettled: () => {
+          inFlight.current = false;
+          setClaiming(null);
+        },
       },
     );
   };
@@ -145,7 +156,7 @@ export default function CouponCenterPage() {
                   variant="outline"
                   onClick={() => void navigate({ route: 'home', params: {} })}
                 >
-                  去首页逛逛
+                  回到首页
                 </Button>
               }
             />

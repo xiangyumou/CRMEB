@@ -14,6 +14,7 @@ import {
 import { ModalForm, useFormModal } from '@/admin/kit/form/modal-form';
 import type { FieldSpec } from '@/admin/kit/form/types';
 import { PageContainer } from '@/admin/kit/page-container';
+import { useCan } from '@/admin/session/session-provider';
 import { StatusTag } from '@/admin/kit/status-tag';
 import { enumColumn, instantColumn, textColumn } from '@/admin/kit/table/columns';
 import { CrudTable } from '@/admin/kit/table/crud-table';
@@ -37,6 +38,9 @@ import { NotificationPreviewButton } from './notification-preview';
  */
 export function NotificationTemplatesPage() {
   const modal = useFormModal<NotificationTemplate>();
+  // Saving is `notification:template:write`. A reader still opens the form —
+  // to see the wording and 预览 it — but read-only, with no 保存 into a 403.
+  const mayWrite = useCan()('notification:template:write');
 
   return (
     <PageContainer subTitle="事件由代码定义，这里只决定发哪些渠道、用什么措辞。改完在配置窗口里「预览」看实际效果">
@@ -94,7 +98,9 @@ export function NotificationTemplatesPage() {
             width: 90,
             fixed: 'right' as const,
             render: (_value: unknown, row: NotificationTemplate) => (
-              <Typography.Link onClick={() => modal.show(row)}>配置</Typography.Link>
+              <Typography.Link onClick={() => modal.show(row)}>
+                {mayWrite ? '配置' : '查看'}
+              </Typography.Link>
             ),
           },
         ]}
@@ -104,7 +110,8 @@ export function NotificationTemplatesPage() {
         <ModalForm
           {...modal.props}
           key={modal.record.code}
-          title={`配置：${modal.record.name}`}
+          title={`${mayWrite ? '配置' : '查看'}：${modal.record.name}`}
+          readOnly={!mayWrite}
           width={860}
           columns={1}
           schema={notificationTemplateForm}

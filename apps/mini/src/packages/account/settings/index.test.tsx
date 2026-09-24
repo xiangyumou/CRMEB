@@ -27,7 +27,7 @@ describe('设置', () => {
   it('signs out after a confirmation, revoking the session on the server', async () => {
     signIn();
     const seen = serveApi({
-      'DELETE /api/v1/auth/sessions/current': () => ({ status: 204, body: null }),
+      'DELETE /api/v1/auth/sessions/current': () => ({ body: { ok: true } }),
     });
     await renderPage(<SettingsPage />);
 

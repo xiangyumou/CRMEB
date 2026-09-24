@@ -51,7 +51,10 @@ describe('手机号', () => {
     signIn();
     const seen = serveApi({
       'GET /api/v1/profile': () => ({ body: profileFixture }),
-      'POST /api/v1/auth/sms-codes': () => ({ body: { expiresInSec: 300, resendAfterSec: 60 } }),
+      'POST /api/v1/auth/sms-codes': () => ({
+        status: 202,
+        body: { expiresInSec: 300, resendAfterSec: 60 },
+      }),
       'PUT /api/v1/auth/phone': () => ({ body: { ok: true } }),
     });
     await renderPage(<PhonePage />);

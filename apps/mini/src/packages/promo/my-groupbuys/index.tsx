@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Text, View } from '@tarojs/components';
-import { useInfiniteRouteQuery } from '@shop/api-client/react';
+import { routeKey, useInfiniteRouteQuery } from '@shop/api-client/react';
+import { LIST_FULL_RELOAD_AFTER_MS, useRefetchOnShow } from '@/data/use-refetch-on-show';
 import { myTeamStatus, type MyTeam } from '@/features/groupbuy/team';
 import { serverNow } from '@/lib/server-clock';
 import { navigate } from '@/platform';
@@ -53,6 +54,11 @@ function Teams({ tab }: { tab: Tab }) {
     { query: { pageSize: 20, ...(tab === 'all' ? {} : { status: tab }) } },
     { enabled: signedIn },
   );
+  // Teams fill, succeed or run out of time while the shopper is elsewhere.
+  useRefetchOnShow(routeKey('groupbuy.myGroups'), {
+    pages: 'first',
+    allPagesAfter: LIST_FULL_RELOAD_AFTER_MS,
+  });
   return (
     <View className="my-groupbuys" id={`my-groupbuys-${tab}`}>
       <InfiniteList

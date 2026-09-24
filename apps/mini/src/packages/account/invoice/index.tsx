@@ -1,7 +1,8 @@
 import { Text, View } from '@tarojs/components';
-import { useRouteMutation, useRouteQuery } from '@shop/api-client/react';
+import { routeKey, useRouteMutation, useRouteQuery } from '@shop/api-client/react';
+import { useRefetchOnShow } from '@/data/use-refetch-on-show';
 import { formatDateTime } from '@/lib/format';
-import { navigate, useRouteParams } from '@/platform';
+import { leaveFor, navigate, useRouteParams } from '@/platform';
 import { LoginGate } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
 import { Button } from '@/ui/button';
@@ -60,8 +61,11 @@ export default function InvoicePage() {
 function Invoice({ id }: { id: string }) {
   const signedIn = useSignedIn();
   const query = useRouteQuery('order.myInvoiceDetail', { params: { id } }, { enabled: signedIn });
+  // The merchant issues or rejects a request while the shopper is elsewhere.
+  useRefetchOnShow(routeKey('order.myInvoiceDetail'));
+  // 订单详情 offers 申请开票 or 查看发票 by the order's invoice state, which a withdrawal changes.
   const cancel = useRouteMutation('order.cancelInvoice', {
-    invalidate: ['order.myInvoices', 'order.myInvoiceDetail'],
+    invalidate: ['order.myInvoices', 'order.myInvoiceDetail', 'order.detail'],
   });
   if (query.isPending) return <CellSkeleton rows={6} />;
   if (query.isError) return <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />;
@@ -118,7 +122,8 @@ function Invoice({ id }: { id: string }) {
           title={orderSummaryText(invoice)}
           description={`订单号 ${invoice.orderNo}`}
           label="查看订单"
-          onClick={() => void navigate({ route: 'order', params: { id: invoice.orderId } })}
+          // Back to 订单详情 when 查看发票 was opened from it, rather than a second copy of it.
+          onClick={() => void leaveFor({ route: 'order', params: { id: invoice.orderId } })}
         />
       </CellGroup>
       {invoice.status === 'requested' ? (
@@ -139,8 +144,13 @@ function Invoice({ id }: { id: string }) {
           <Button
             size="lg"
             block
+            // In place of this 发票详情: 申请开票 then puts the new request in its own place, so
+            // going back does not land on the withdrawn or refused one.
             onClick={() =>
-              void navigate({ route: 'invoiceApply', params: { orderId: invoice.orderId } })
+              void navigate(
+                { route: 'invoiceApply', params: { orderId: invoice.orderId } },
+                { replace: true },
+              )
             }
           >
             重新申请

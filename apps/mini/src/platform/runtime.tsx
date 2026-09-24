@@ -11,7 +11,7 @@ import type {
   PhoneNumberButtonProps,
   SubscribeResult,
 } from './types';
-import { isPrivacyUndeclared, PRIVACY_UNDECLARED_PHONE } from './privacy';
+import { isPrivacyRefusal, isPrivacyUndeclared, PRIVACY_UNDECLARED_PHONE } from './privacy';
 
 /**
  * The WeChat mini-program: the real `wx.*` APIs through Taro. This is the default module for
@@ -28,6 +28,22 @@ function errMsg(error: unknown): string {
   const message = (error as { errMsg?: unknown } | null)?.errMsg;
   return typeof message === 'string' ? message : String(error);
 }
+
+/**
+ * WeChat's `errMsg` is English (`requestPayment:fail …`) and means nothing to a shopper, so every
+ * `failed` outcome carries a Chinese line instead. The raw text goes to the console, which is
+ * what a bug report from 真机调试 / vConsole shows.
+ */
+function failedWith(message: string, error: unknown): string {
+  console.warn(message, errMsg(error));
+  return message;
+}
+
+const PAYMENT_FAILED = '支付没有完成，请稍后重试';
+const RECEIPT_FAILED = '确认收货失败，请稍后重试';
+const PHONE_FAILED = '暂时无法获取手机号，请使用短信验证码';
+const AVATAR_FAILED = '头像没有选好，请重试';
+const AVATAR_PRIVACY = '未同意隐私保护指引，无法设置头像';
 
 function PhoneNumberButton({ children, className, disabled, onResult }: PhoneNumberButtonProps) {
   return (
@@ -50,7 +66,16 @@ function PhoneNumberButton({ children, className, disabled, onResult }: PhoneNum
           });
         else if (/deny|cancel/i.test(message))
           onResult({ ok: false, reason: 'denied', message: '已取消授权' });
-        else onResult({ ok: false, reason: 'failed', message });
+        // Left as WeChat worded it: each caller matches it with `isPrivacyRefusal` and says what
+        // else that page offers (SMS login, another number); it never reaches the screen as is.
+        else if (isPrivacyRefusal({ errno, errMsg: message }))
+          onResult({ ok: false, reason: 'failed', message });
+        else
+          onResult({
+            ok: false,
+            reason: 'failed',
+            message: failedWith(PHONE_FAILED, event.detail),
+          });
       }}
     >
       {children}
@@ -70,7 +95,10 @@ function AvatarButton({ children, className, label, onResult }: AvatarButtonProp
           errMsg?: string;
         };
         if (avatarUrl) onResult({ ok: true, tempPath: avatarUrl });
-        else onResult({ ok: false, message: message ?? '没有选择头像' });
+        // Closing the picker is not an error: an empty message shows no toast.
+        else if (message && /cancel/i.test(message)) onResult({ ok: false, message: '' });
+        else if (isPrivacyRefusal(event.detail)) onResult({ ok: false, message: AVATAR_PRIVACY });
+        else onResult({ ok: false, message: failedWith(AVATAR_FAILED, event.detail) });
       }}
     >
       {children}
@@ -114,7 +142,7 @@ export const platform: MiniPlatform = {
       return { kind: 'paid' };
     } catch (error) {
       if (isCancel(error)) return { kind: 'cancelled' };
-      return { kind: 'failed', message: errMsg(error) };
+      return { kind: 'failed', message: failedWith(PAYMENT_FAILED, error) };
     }
   },
   async requestSubscribe(templateIds) {
@@ -187,7 +215,7 @@ export const platform: MiniPlatform = {
       return { kind: 'failed', message: '微信确认收货未完成' };
     } catch (error) {
       if (isCancel(error)) return { kind: 'cancelled' };
-      return { kind: 'failed', message: errMsg(error) };
+      return { kind: 'failed', message: failedWith(RECEIPT_FAILED, error) };
     }
   },
 };

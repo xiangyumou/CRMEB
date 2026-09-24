@@ -1,11 +1,9 @@
-import type { PartInputOf, ResponseOf } from '@shop/api-client';
-import type { ChosenAddress } from '@/platform';
+import type { ResponseOf } from '@shop/api-client';
 
 export type CheckoutPreview = ResponseOf<'order.checkoutPreview'>;
 export type CustomFormField = NonNullable<CheckoutPreview['customFormFields']>[number];
 export type ApplicableCoupons = ResponseOf<'coupon.applicableList'>;
 export type ApplicableCoupon = ApplicableCoupons['items'][number];
-export type CityTree = ResponseOf<'shipping.cityTree'>;
 
 /**
  * The shopper's coupon choice: `auto` (the default: the best usable one, as the server ranks
@@ -104,47 +102,6 @@ export function customFormBody(
     }
   }
   return Object.keys(body).length > 0 ? body : undefined;
-}
-
-type Named = { id: string; name: string; children?: readonly Named[] };
-
-/** `浙江省` and `浙江`, `杭州市` and `杭州`: WeChat's names and the seeded tree's differ in suffix. */
-function sameDivision(a: string, b: string): boolean {
-  const bare = (name: string) =>
-    name.trim().replace(/(特别行政区|自治区|自治州|自治县|省|市|区|县|盟|地区)$/, '');
-  return a.trim() === b.trim() || bare(a) === bare(b);
-}
-
-function findNamed(nodes: readonly Named[] | undefined, name: string): Named | undefined {
-  return nodes?.find((node) => sameDivision(node.name, name));
-}
-
-/**
- * 导入微信地址: WeChat's address (names only) as an address form, with the division ids from
- * the city tree wherever the names match, since freight rules key on ids. What does not match
- * keeps its name alone, which the address API accepts.
- */
-export function addressFormFromChosen(
-  chosen: ChosenAddress,
-  tree: CityTree | undefined,
-): PartInputOf<'user.addressCreate', 'body'> {
-  const province = tree ? findNamed(tree.items, chosen.province) : undefined;
-  const city = province ? findNamed(province.children, chosen.city) : undefined;
-  const district = city && chosen.district ? findNamed(city.children, chosen.district) : undefined;
-  const postCode = chosen.postCode && /^\d{6}$/.test(chosen.postCode) ? chosen.postCode : undefined;
-  return {
-    receiverName: chosen.name.trim().slice(0, 32),
-    receiverPhone: chosen.phone.trim(),
-    provinceName: chosen.province,
-    cityName: chosen.city,
-    ...(chosen.district ? { districtName: chosen.district } : {}),
-    detail: chosen.detail.trim().slice(0, 255),
-    ...(postCode ? { postCode } : {}),
-    ...(province ? { provinceId: province.id } : {}),
-    ...(city ? { cityId: city.id } : {}),
-    ...(district ? { districtId: district.id } : {}),
-    isDefault: false,
-  };
 }
 
 /** The receiver as `AddressCard` shows it. */

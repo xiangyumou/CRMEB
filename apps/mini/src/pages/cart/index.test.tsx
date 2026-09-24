@@ -1,11 +1,17 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { routeQueryKey } from '@shop/api-client/react';
 import { useAppConfigStore } from '@/app-config';
 import { useCheckoutDraft } from '@/features/checkout/draft';
 import { startSession, useSession } from '@/session/session';
 import { appConfigFixture } from '@/test/app-config-fixture';
 import { cartItemFixture, cartListFixture } from '@/test/cart-fixture';
-import { cardFixture, pageOf, skuMatrixFixture } from '@/test/catalog-fixture';
+import {
+  cardFixture,
+  pageOf,
+  productDetailFixture,
+  skuMatrixFixture,
+} from '@/test/catalog-fixture';
 import { serveApi, type FakeReply } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
@@ -58,10 +64,11 @@ function serveCart(start: Item[], overrides: Routes = {}) {
     },
     'POST /api/v1/cart/items/removals': (body) => {
       const { itemIds, unavailableOnly } = body as { itemIds: string[]; unavailableOnly: boolean };
+      const before = items.length;
       items = items.filter((item) =>
         unavailableOnly ? item.available : !itemIds.includes(item.id),
       );
-      return mutated(null);
+      return { body: { removed: before - items.length, cart: count(items) } };
     },
     ...overrides,
   });
@@ -195,6 +202,27 @@ describe('购物车', () => {
     await waitFor(() => expect(cart.items().map((item) => item.id)).toEqual(['502']));
   });
 
+  it('moves the ticked rows to 收藏, and a cached 商品详情 of them says so next time', async () => {
+    const cart = serveCart(rows(), {
+      'POST /api/v1/me/favorites/batch': () => ({
+        status: 201,
+        body: { added: 1, items: [{ productId: '12', favorited: true }] },
+      }),
+    });
+    await signIn();
+    const { client } = await renderPage(<Cart />);
+    const product = routeQueryKey('catalog.productDetail', { params: { id: '12' } });
+    client.setQueryData(product, productDetailFixture());
+
+    fireEvent.click(await screen.findByRole('button', { name: '管理' }));
+    fireEvent.click(screen.getByRole('button', { name: '移入收藏' }));
+    await waitFor(() => expect(cart.items().map((item) => item.id)).toEqual(['502', '503']));
+    expect(cart.seen.find((r) => r.key === 'POST /api/v1/me/favorites/batch')?.body).toEqual({
+      productIds: ['12'],
+    });
+    expect(client.getQueryState(product)?.isInvalidated).toBe(true);
+  });
+
   it('changes a row’s spec in the SkuSheet', async () => {
     const { seen } = serveCart(rows(), {
       'GET /api/v1/catalog/products/12/skus': () => ({ body: skuMatrixFixture }),
@@ -227,8 +255,8 @@ describe('购物车', () => {
           items: [
             {
               coupon: {
-                id: 'uc1',
-                templateId: 't1',
+                id: '801',
+                templateId: '81',
                 title: '店铺券',
                 discountAmount: '20.00',
                 minSpend: '150.00',

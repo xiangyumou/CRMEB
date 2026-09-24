@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Button, H5_BUTTON_ROLE, buttonClassName } from './button';
 
@@ -34,6 +34,44 @@ describe('Button', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: '提交订单' }));
     expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('stays busy until a returned promise settles, dropping a second tap in the same tick', async () => {
+    let finish: () => void = () => undefined;
+    const onClick = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = () => resolve();
+        }),
+    );
+    render(<Button onClick={onClick}>保存</Button>);
+    const button = screen.getByRole('button', { name: '保存' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(button.className).toContain('shop-btn--loading');
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+
+    await act(async () => {
+      finish();
+      await Promise.resolve();
+    });
+    expect(button.className).not.toContain('shop-btn--loading');
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledTimes(2);
+  });
+
+  it('is free again after a rejected promise', async () => {
+    const onClick = vi.fn(() => Promise.reject(new Error('保存失败')));
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(<Button onClick={onClick}>保存</Button>);
+    const button = screen.getByRole('button', { name: '保存' });
+    fireEvent.click(button);
+    await waitFor(() => expect(button.className).not.toContain('shop-btn--loading'));
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledTimes(2);
+    expect(logged).toHaveBeenCalledWith(new Error('保存失败'));
+    logged.mockRestore();
   });
 
   it('passes the contact open-type and its session source', () => {

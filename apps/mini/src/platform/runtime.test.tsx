@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import Taro from '@tarojs/taro';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { taroFake } from '@/test/taro-fake/taro';
 import { isPrivacyRefusal, PRIVACY_UNDECLARED_PHONE } from './privacy';
 import { platform } from './runtime';
@@ -47,7 +48,7 @@ describe('weapp platform', () => {
     taroFake.paymentError = 'requestPayment:fail 系统错误';
     await expect(platform.requestPayment({ outTradeNo: 'P1', params: jsapi })).resolves.toEqual({
       kind: 'failed',
-      message: 'requestPayment:fail 系统错误',
+      message: '支付没有完成，请稍后重试',
     });
   });
 
@@ -80,6 +81,86 @@ describe('weapp platform', () => {
     expect(
       isPrivacyRefusal({ errMsg: 'getPhoneNumber:fail privacy permission is not authorized' }),
     ).toBe(true);
+  });
+
+  describe("every failure reads as Chinese, never as WeChat's errMsg", () => {
+    const chinese = (message: string) => {
+      expect(message).toMatch(/[一-龥]/);
+      expect(message).not.toMatch(/fail/i);
+    };
+
+    beforeEach(() => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('requestPayment', async () => {
+      taroFake.paymentError = 'requestPayment:fail invalid paySign';
+      const outcome = await platform.requestPayment({ outTradeNo: 'P1', params: jsapi });
+      expect(outcome.kind).toBe('failed');
+      if (outcome.kind === 'failed') chinese(outcome.message);
+      // The raw text still goes somewhere a developer can read it.
+      expect(console.warn).toHaveBeenCalledWith(
+        '支付没有完成，请稍后重试',
+        'requestPayment:fail invalid paySign',
+      );
+    });
+
+    it('openBusinessView', async () => {
+      taroFake.businessViewStatus = 'fail';
+      const settled = await platform.openOrderConfirm({ transactionId: '4200' });
+      if (settled.kind === 'failed') chinese(settled.message);
+
+      vi.spyOn(Taro, 'openBusinessView').mockRejectedValueOnce({
+        errMsg: 'openBusinessView:fail system error',
+      });
+      const thrown = await platform.openOrderConfirm({ transactionId: '4200' });
+      expect(thrown).toEqual({ kind: 'failed', message: '确认收货失败，请稍后重试' });
+    });
+
+    it('the phone-number button', () => {
+      const onResult = vi.fn();
+      render(<platform.PhoneNumberButton onResult={onResult}>手机号</platform.PhoneNumberButton>);
+      taroFake.phoneNumberDetail = { errMsg: 'getPhoneNumber:fail system error' };
+      fireEvent.click(screen.getByRole('button', { name: '手机号' }));
+      expect(onResult).toHaveBeenLastCalledWith({
+        ok: false,
+        reason: 'failed',
+        message: '暂时无法获取手机号，请使用短信验证码',
+      });
+      for (const detail of [
+        { errMsg: 'getPhoneNumber:fail user deny' },
+        { errMsg: 'getPhoneNumber:fail', errno: 112 },
+        { errMsg: 'getPhoneNumber:fail', errno: 1400001 },
+        { errMsg: 'getPhoneNumber:fail system error' },
+      ]) {
+        taroFake.phoneNumberDetail = detail;
+        fireEvent.click(screen.getByRole('button', { name: '手机号' }));
+        chinese((onResult.mock.lastCall?.[0] as { message: string }).message);
+      }
+    });
+
+    it('the avatar button', () => {
+      const onResult = vi.fn();
+      render(
+        <platform.AvatarButton label="更换头像" onResult={onResult}>
+          头像
+        </platform.AvatarButton>,
+      );
+      const tap = (detail: { errMsg: string }) => {
+        taroFake.avatarDetail = detail;
+        fireEvent.click(screen.getByRole('button', { name: '更换头像' }));
+        return (onResult.mock.lastCall?.[0] as { message: string }).message;
+      };
+      expect(tap({ errMsg: 'chooseAvatar:fail cancel' })).toBe('');
+      expect(tap({ errMsg: 'chooseAvatar:fail privacy permission is not authorized' })).toBe(
+        '未同意隐私保护指引，无法设置头像',
+      );
+      chinese(tap({ errMsg: 'chooseAvatar:fail system error' }));
+      chinese(tap({ errMsg: '' }));
+    });
   });
 
   it("opens WeChat's 确认收货 component with its own keys and maps how it ended", async () => {

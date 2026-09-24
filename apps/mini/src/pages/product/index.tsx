@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button as TaroButton, Swiper, SwiperItem, Text, View } from '@tarojs/components';
 import { isApiError, type ResponseOf } from '@shop/api-client';
 import { useRouteMutation, useRouteQuery } from '@shop/api-client/react';
@@ -96,7 +96,7 @@ export default function ProductPage() {
               description="这件商品已经下架或不存在，去看看别的吧"
               actions={
                 <Button onClick={() => void navigate({ route: 'home', params: {} })}>
-                  去首页逛逛
+                  回到首页
                 </Button>
               }
             />
@@ -122,13 +122,15 @@ function Detail({ product }: { product: Product }) {
   const display = useDisplay();
   const posterEnabled = useProductPosterEnabled();
   const addItem = useRouteMutation('cart.addItem', { invalidate: ['cart.list', 'cart.count'] });
-  // 我的收藏 may sit under this page (opened from it).
+  // 我的收藏 may sit under this page (opened from it), and so may another 商品详情 of the same
+  // product (recommended from a product it was opened from), which would still say 收藏.
   const favoriteAdd = useRouteMutation('catalog.favoriteAdd', {
-    invalidate: ['catalog.favoriteList'],
+    invalidate: ['catalog.favoriteList', 'catalog.productDetail'],
   });
   const favoriteRemove = useRouteMutation('catalog.favoriteRemove', {
-    invalidate: ['catalog.favoriteList'],
+    invalidate: ['catalog.favoriteList', 'catalog.productDetail'],
   });
+  const favoriteInFlight = useRef(false);
 
   const [sheet, setSheet] = useState<'sku' | 'service' | 'params' | 'share' | null>(null);
   const [actions, setActions] = useState<readonly SkuAction[]>(['cart', 'buy']);
@@ -153,18 +155,25 @@ function Detail({ product }: { product: Product }) {
   };
 
   const toggleFavorite = async () => {
-    if (!(await requireLogin(route))) return;
-    const next = !isFavorite;
-    setFavorited(next);
-    const done = {
-      onSuccess: () => toast.text(next ? '已收藏' : '已取消收藏'),
-      onError: (error: Error) => {
+    // A second tap before the first is answered would race a remove against the add (or the
+    // other way round), and the heart could end up saying the opposite of the server.
+    if (favoriteInFlight.current) return;
+    favoriteInFlight.current = true;
+    try {
+      if (!(await requireLogin(route))) return;
+      const next = !isFavorite;
+      setFavorited(next);
+      try {
+        if (next) await favoriteAdd.mutateAsync({ body: { productId: product.id } });
+        else await favoriteRemove.mutateAsync({ params: { productId: product.id } });
+        toast.text(next ? '已收藏' : '已取消收藏');
+      } catch (error) {
         setFavorited(!next);
-        toast.text(error.message);
-      },
-    };
-    if (next) favoriteAdd.mutate({ body: { productId: product.id } }, done);
-    else favoriteRemove.mutate({ params: { productId: product.id } }, done);
+        toast.text(error instanceof Error ? error.message : '操作失败，请稍后重试');
+      }
+    } finally {
+      favoriteInFlight.current = false;
+    }
   };
 
   const confirm = (action: SkuAction | 'confirm', sku: { id: string }, quantity: number) => {

@@ -7,7 +7,9 @@
     color: var(--color-text-secondary);
   }
 
+  // Inline, so the link stays in the sentence (a Pressable is a View).
   &__link {
+    display: inline;
     color: var(--color-link);
   }
 

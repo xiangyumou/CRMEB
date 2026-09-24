@@ -22,4 +22,8 @@ module.exports = {
   Text: ARIA,
   Image: { 'aria-role': "''", 'aria-label': "''", 'aria-hidden': "''" },
   Button: { 'aria-label': "''", 'aria-disabled': "''" },
+  // Field, Textarea, SearchBar and Stepper name their inputs for a screen reader; without these
+  // entries WeChat's input templates dropped the label.
+  Input: { 'aria-label': "''" },
+  Textarea: { 'aria-label': "''" },
 };

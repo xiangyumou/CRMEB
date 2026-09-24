@@ -17,6 +17,7 @@ import type {
   Shipment,
 } from '@shop/contracts/order/order.fulfil.schemas';
 import type { DbOrTx } from '@shop/db';
+import { hasPermission } from '../auth/rbac';
 import { requireAdminId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId, toIdOrNull } from '../kernel/ids';
@@ -25,6 +26,7 @@ import { notify } from '../notification';
 import { closeOrderPayments, openPaymentState } from './order.cancel.service';
 import type { PaymentState } from './ports';
 import { orderFulfilConfig } from './order.fulfil.config';
+import { orderPermissions } from './permissions';
 import * as fulfilRepo from './order.fulfil.repo';
 import * as rules from './order.fulfil.rules';
 import { receiveOrder, shipmentContextFor, toWireShipment } from './order.fulfil.service';
@@ -258,7 +260,7 @@ export async function adminDetail(ctx: Ctx, params: { id: string }): Promise<Adm
     customForm: row.customForm,
     userCouponId: toIdOrNull(row.userCouponId),
     cancelReason: row.cancelReason,
-    costAmount: row.costAmount,
+    costAmount: seesCost(ctx) ? row.costAmount : null,
     operatorDiscount: row.operatorDiscount,
     transactionNo: row.transactionNo,
     autoReceiveAt: iso(row.autoReceiveAt),
@@ -267,6 +269,19 @@ export async function adminDetail(ctx: Ctx, params: { id: string }): Promise<Adm
     ),
     refundIds: refundIds.map((refund) => toId(refund.id)),
   };
+}
+
+/**
+ * 成本 is the shop's margin, and catalog's rule for 成本价 holds here too: a
+ * role that works orders (`order:write`) or takes them out of the building
+ * (`order:export`) sees it; a role that may only look orders up (support,
+ * say) gets `null`, which the console already renders as "no cost recorded".
+ */
+function seesCost(ctx: Ctx): boolean {
+  return (
+    hasPermission(ctx.actor, orderPermissions['order:write']) ||
+    hasPermission(ctx.actor, orderPermissions['order:export'])
+  );
 }
 
 export async function adminTimeline(ctx: Ctx, params: { id: string }): Promise<OrderTimeline> {

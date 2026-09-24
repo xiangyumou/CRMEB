@@ -8,7 +8,7 @@ import MyCouponsPage from './index';
 
 const coupon = (id: string, title: string) => ({
   id,
-  templateId: `t${id}`,
+  templateId: `9${id}`,
   title,
   discountAmount: '5.00',
   minSpend: '0.00',
@@ -40,7 +40,7 @@ describe('我的优惠券', () => {
     fireEvent.click(await screen.findByRole('button', { name: '去使用 满减券' }));
     expect(taroFake.calls.at(-1)).toEqual({
       api: 'navigateTo',
-      args: { url: '/packages/goods/list/index?couponId=t1' },
+      args: { url: '/packages/goods/list/index?couponId=91' },
     });
     expect(seen[0]?.query).toMatchObject({ state: 'unused' });
   });
@@ -51,6 +51,14 @@ describe('我的优惠券', () => {
     await renderPage(<MyCouponsPage />);
     await screen.findByText('已使用', { selector: '.shop-coupon__stamp' });
     expect(seen[0]?.query).toMatchObject({ state: 'used' });
+  });
+
+  it('asks again when it comes back, as an order may have used or given back a coupon', async () => {
+    const seen = serve();
+    await renderPage(<MyCouponsPage />);
+    await screen.findByRole('button', { name: '去使用 满减券' });
+    taroFake.showPage();
+    await waitFor(() => expect(seen).toHaveLength(2));
   });
 
   it('switches tabs', async () => {

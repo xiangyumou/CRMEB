@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Button as TaroButton, View } from '@tarojs/components';
 import { cx } from '@/lib/cx';
 import './button.scss';
@@ -41,7 +41,8 @@ export function buttonClassName({
 
 export interface ButtonProps extends ButtonLook {
   children?: ReactNode;
-  onClick?: (() => void) | undefined;
+  /** Return the promise of an async action: the button stays busy until it settles. */
+  onClick?: (() => void | Promise<unknown>) | undefined;
   /** For icon-only buttons, or when the text alone would be unclear to a screen reader. */
   label?: string | undefined;
   /** Open-types the kit may use; phone number and avatar go through `@/platform`. */
@@ -65,6 +66,10 @@ export const H5_BUTTON_ROLE: { role?: 'button' } =
  * `variant`: `primary` (one per page), `secondary` (accent), `soft`, `outline`,
  * `outline-primary`, `text`, `danger`. `size`: `lg` 88 / `md` 72 / `sm` 56. While `loading`,
  * the label keeps its width under a spinner and taps are ignored (no double submit).
+ *
+ * An `onClick` that returns a promise keeps the button loading until it settles. A caller's own
+ * `loading={mutation.isPending}` is not enough: TanStack sets `isPending` on a later tick, so a
+ * quick second tap lands before the re-render. The ref drops it synchronously.
  */
 export function Button({
   children,
@@ -75,21 +80,42 @@ export function Button({
   id,
   ...look
 }: ButtonProps) {
-  const inert = Boolean(look.disabled || look.loading);
+  const running = useRef(false);
+  const [settling, setSettling] = useState(false);
+  const loading = Boolean(look.loading) || settling;
+  const inert = Boolean(look.disabled) || loading;
+
+  const tap = () => {
+    if (!onClick || running.current) return;
+    const result = onClick();
+    if (!(result instanceof Promise)) return;
+    running.current = true;
+    setSettling(true);
+    const done = () => {
+      running.current = false;
+      setSettling(false);
+    };
+    // The caller shows its own error; one it did not catch still reaches the console.
+    result.then(done, (error: unknown) => {
+      done();
+      console.error(error);
+    });
+  };
+
   return (
     <TaroButton
       {...(id ? { id } : {})}
-      className={buttonClassName(look)}
+      className={buttonClassName({ ...look, loading })}
       {...H5_BUTTON_ROLE}
       hoverClass={inert ? 'none' : 'shop-btn--pressed'}
       {...(openType && !inert ? { openType } : {})}
       {...(sessionFrom ? { sessionFrom } : {})}
       {...(label ? { ariaLabel: label } : {})}
       {...(inert ? { ariaDisabled: true } : {})}
-      {...(inert || !onClick ? {} : { onClick: () => onClick() })}
+      {...(inert || !onClick ? {} : { onClick: tap })}
     >
       <View className="shop-btn__label">{children}</View>
-      {look.loading ? (
+      {loading ? (
         <View className="shop-btn__spinner">
           <View className="shop-spinner" />
         </View>

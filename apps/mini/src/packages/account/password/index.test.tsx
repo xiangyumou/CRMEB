@@ -11,7 +11,7 @@ const type = (label: string, value: string) =>
 
 const miniLogin = {
   status: 'signed-in',
-  session: { token: 't2', expiresAt: '2026-10-23T00:00:00.000Z', user: { id: '7' } },
+  session: { token: 't2', expiresAt: '2026-10-23T00:00:00.000Z', user: profileFixture },
   registered: false,
   bindToken: null,
   bindTokenExpiresInSec: null,
@@ -23,7 +23,7 @@ describe('修改密码', () => {
     const seen = serveApi({
       'GET /api/v1/profile': () => ({ body: profileFixture }),
       'PUT /api/v1/auth/password': () => ({ body: { ok: true } }),
-      'POST /api/v1/auth/sessions/wechat-mini': () => ({ body: miniLogin }),
+      'POST /api/v1/auth/sessions/wechat-mini': () => ({ status: 201, body: miniLogin }),
     });
     await renderPage(<PasswordPage />);
     await screen.findByLabelText('原密码');
@@ -63,7 +63,10 @@ describe('修改密码', () => {
     signIn();
     const seen = serveApi({
       'GET /api/v1/profile': () => ({ body: { ...profileFixture, hasPassword: false } }),
-      'POST /api/v1/auth/sms-codes': () => ({ body: { expiresInSec: 300, resendAfterSec: 60 } }),
+      'POST /api/v1/auth/sms-codes': () => ({
+        status: 202,
+        body: { expiresInSec: 300, resendAfterSec: 60 },
+      }),
     });
     await renderPage(<PasswordPage />);
 

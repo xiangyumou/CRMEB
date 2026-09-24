@@ -22,7 +22,7 @@ import {
   addressBody,
   checkAddress,
   draftFromChosen,
-  useImportedAddress,
+  handOffImportedAddress,
   type UserAddress,
 } from '../shared/address';
 import { SubmitBar, errorMessage } from '../shared/form';
@@ -62,7 +62,7 @@ function AddressBook() {
     const draft = draftFromChosen(chosen, tree.data?.items ?? []);
     if (Object.keys(checkAddress(draft)).length > 0 || !draft.region) {
       // The region did not resolve (or a field is off): finish it in the form.
-      useImportedAddress.setState({ draft });
+      handOffImportedAddress(draft);
       void navigate({ route: 'addressEdit', params: {} });
       return;
     }

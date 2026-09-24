@@ -46,6 +46,13 @@ describe('PrivacySheet', () => {
     expect(second).toHaveLength(1);
   });
 
+  it('opens the privacy guide from a link a screen reader can name', async () => {
+    render(<PrivacySheet />);
+    act(() => void taroFake.needPrivacy());
+    fireEvent.click(await screen.findByRole('link', { name: '用户隐私保护指引' }));
+    expect(taroFake.calls.some((call) => call.api === 'openPrivacyContract')).toBe(true);
+  });
+
   it('cannot be dismissed by the mask or a close button', async () => {
     const { container } = render(<PrivacySheet />);
     act(() => void taroFake.needPrivacy());

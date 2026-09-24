@@ -11,11 +11,8 @@ export function SubmitBar({ children }: { children: ReactNode }) {
   return <ActionBar className="account-submit-bar">{children}</ActionBar>;
 }
 
-/** What to tell the shopper about a failed call: the server's own words, or a generic line. */
-export function errorMessage(error: unknown): string {
-  if (isApiError(error)) return error.message;
-  return error instanceof Error && error.message ? error.message : '操作失败，请稍后再试';
-}
+/** What to tell the shopper about a failed call (one helper app-wide, re-exported for the forms). */
+export { errorMessage } from '@/lib/error-message';
 
 /**
  * A failed save's per-field messages: the 422's `details`, plus the codes that name one field

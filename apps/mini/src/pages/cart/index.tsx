@@ -90,8 +90,9 @@ export default function Cart() {
   const remove = useRouteMutation('cart.removeItems', {
     invalidate: ['cart.list', 'cart.count'],
   });
+  // A 商品详情 of a moved item may be cached (opened from here) and would still say 收藏.
   const favorite = useRouteMutation('catalog.favoriteAddBatch', {
-    invalidate: ['catalog.favoriteList'],
+    invalidate: ['catalog.favoriteList', 'catalog.productDetail'],
   });
 
   const setQuantity = (item: CartItem, quantity: number) => {
@@ -243,7 +244,7 @@ export default function Cart() {
       description="挑几件喜欢的放进来吧"
       actions={
         <Button size="md" variant="outline" onClick={() => void navigate(HOME)}>
-          去逛逛
+          回到首页
         </Button>
       }
     />

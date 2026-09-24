@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { Text, View } from '@tarojs/components';
-import { flattenPages, useInfiniteRouteQuery, useRouteMutation } from '@shop/api-client/react';
+import {
+  flattenPages,
+  routeKey,
+  useInfiniteRouteQuery,
+  useRouteMutation,
+} from '@shop/api-client/react';
+import { LIST_FULL_RELOAD_AFTER_MS, useRefetchOnShow } from '@/data/use-refetch-on-show';
 import { assetUrl } from '@/lib/asset-url';
 import { formatDate } from '@/lib/format';
 import { navigate, useRouteParams } from '@/platform';
@@ -23,6 +29,7 @@ import { SubmitBar, errorMessage } from '../shared/form';
 import {
   HEADER_TYPE_TEXT,
   INVOICE_STATUS_TEXT,
+  INVOICE_TITLE_READS,
   orderSummaryText,
   titleSummary,
   type InvoiceTitle,
@@ -39,12 +46,6 @@ const TABS = [
 
 /** The server keeps at most this many titles (`USER_INVOICE_TITLE_LIMIT_REACHED`). */
 const TITLE_LIMIT = 20;
-
-const INVALIDATE = [
-  'user.invoiceTitleList',
-  'user.invoiceTitleDefault',
-  'user.invoiceTitleDetail',
-] as const;
 
 /**
  * 发票 (`invoices { tab? }`, pages.md §2.6): two tabs as before — 发票抬头 (now kept on the
@@ -71,8 +72,12 @@ function Titles() {
     { query: { pageSize: 20 } },
     { enabled: signedIn },
   );
-  const remove = useRouteMutation('user.invoiceTitleDelete', { invalidate: INVALIDATE });
-  const setDefault = useRouteMutation('user.invoiceTitleSetDefault', { invalidate: INVALIDATE });
+  const remove = useRouteMutation('user.invoiceTitleDelete', {
+    invalidate: INVOICE_TITLE_READS,
+  });
+  const setDefault = useRouteMutation('user.invoiceTitleSetDefault', {
+    invalidate: INVOICE_TITLE_READS,
+  });
   const count = list.data?.pages[0]?.total ?? flattenPages(list.data).length;
   const full = count >= TITLE_LIMIT;
 
@@ -165,6 +170,11 @@ function Records() {
     { query: { pageSize: 20 } },
     { enabled: signedIn },
   );
+  // The merchant issues or rejects a request while the shopper is elsewhere.
+  useRefetchOnShow(routeKey('order.myInvoices'), {
+    pages: 'first',
+    allPagesAfter: LIST_FULL_RELOAD_AFTER_MS,
+  });
   return (
     <View className="account-page">
       <InfiniteList

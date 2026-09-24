@@ -1,35 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { applicableFixture, previewFixture } from '@/test/checkout-fixture';
 import {
-  addressFormFromChosen,
   couponLinesOf,
   couponReason,
   customFormBody,
   customFormProblem,
   resolveCoupon,
-  type CityTree,
   type CustomFormField,
 } from './checkout-view';
 import { checkoutBody, subscribeSceneOf } from './draft';
-
-const tree: CityTree = {
-  version: 'v1',
-  items: [
-    {
-      id: '330000',
-      name: '浙江省',
-      level: 0,
-      children: [
-        {
-          id: '330100',
-          name: '杭州市',
-          level: 1,
-          children: [{ id: '330106', name: '西湖区', level: 2 }],
-        },
-      ],
-    },
-  ],
-};
 
 const fields: CustomFormField[] = [
   { key: 'name', label: '刻字内容', type: 'text', required: true },
@@ -74,7 +53,7 @@ describe('checkout view', () => {
 
   it('picks the best usable coupon unless the shopper chose', () => {
     const coupons = applicableFixture();
-    expect(resolveCoupon({ mode: 'auto' }, coupons)).toBe('uc1');
+    expect(resolveCoupon({ mode: 'auto' }, coupons)).toBe('901');
     expect(resolveCoupon({ mode: 'auto' }, undefined)).toBeNull();
     expect(resolveCoupon({ mode: 'none' }, coupons)).toBeNull();
     expect(resolveCoupon({ mode: 'picked', id: 'uc9' }, coupons)).toBe('uc9');
@@ -100,33 +79,5 @@ describe('checkout view', () => {
       colors: ['红'],
     });
     expect(customFormBody(fields, {})).toBeUndefined();
-  });
-
-  it('maps WeChat’s address onto the city tree', () => {
-    const chosen = {
-      name: '林小姐',
-      phone: '13800138000',
-      province: '浙江',
-      city: '杭州市',
-      district: '西湖区',
-      detail: '文三路 100 号',
-      postCode: '310012',
-    };
-    expect(addressFormFromChosen(chosen, tree)).toEqual({
-      receiverName: '林小姐',
-      receiverPhone: '13800138000',
-      provinceName: '浙江',
-      cityName: '杭州市',
-      districtName: '西湖区',
-      detail: '文三路 100 号',
-      postCode: '310012',
-      provinceId: '330000',
-      cityId: '330100',
-      districtId: '330106',
-      isDefault: false,
-    });
-    const abroad = addressFormFromChosen({ ...chosen, province: '海外', postCode: 'N/A' }, tree);
-    expect(abroad.provinceId).toBeUndefined();
-    expect(abroad.postCode).toBeUndefined();
   });
 });

@@ -18,7 +18,7 @@ import { ShareSheet } from '@/features/share/share-sheet';
 import { assetUrl } from '@/lib/asset-url';
 import { cx } from '@/lib/cx';
 import { serverNow } from '@/lib/server-clock';
-import { navigate, usePullToRefresh, useRouteParams, useShare } from '@/platform';
+import { leaveFor, navigate, usePullToRefresh, useRouteParams, useShare } from '@/platform';
 import { requireLogin } from '@/session/session';
 import { Button } from '@/ui/button';
 import { Card } from '@/ui/card';
@@ -164,11 +164,13 @@ function Team({ view, onStale }: { view: TeamView; onStale: () => void }) {
       case 'poster':
         setSheet('poster');
         return;
+      // These leave the team for a page it was usually opened from (订单详情's 拼团进度, the
+      // activity's 查看团): back to that page rather than a second copy of it on the stack.
       case 'order':
-        await navigate({ route: 'order', params: { id: action.orderId } });
+        await leaveFor({ route: 'order', params: { id: action.orderId } });
         return;
       case 'again':
-        await navigate({ route: 'groupbuy', params: { id: view.activityId } });
+        await leaveFor({ route: 'groupbuy', params: { id: view.activityId } });
         return;
       case 'refresh':
         onStale();
@@ -187,7 +189,7 @@ function Team({ view, onStale }: { view: TeamView; onStale: () => void }) {
             role="link"
             label={`${view.title}，查看拼团商品`}
             className="groupbuy-team__product-row"
-            onClick={() => void navigate({ route: 'groupbuy', params: { id: view.activityId } })}
+            onClick={() => void leaveFor({ route: 'groupbuy', params: { id: view.activityId } })}
           >
             <View className="groupbuy-team__image">
               <Image src={view.imageUrl} label={view.title} radius="sm" lazy={false} size="small" />

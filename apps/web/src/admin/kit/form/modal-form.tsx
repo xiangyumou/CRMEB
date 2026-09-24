@@ -96,6 +96,12 @@ export interface EntityFormProps<
    * form is.
    */
   footerExtra?: ((form: FormInstance) => ReactNode) | undefined;
+  /**
+   * Show the record without offering to save it — for a role that may read but
+   * not write. The fields are disabled and there is no 保存 to press into a
+   * 403; `footerExtra` (a preview, say) still works on the values shown.
+   */
+  readOnly?: boolean | undefined;
 }
 
 export interface ModalFormProps<
@@ -264,6 +270,7 @@ function ModalFormChrome<S extends AnyObjectSchema, R extends AnyRouteDef, D ext
     width = 640,
     header,
     footerExtra,
+    readOnly = false,
   } = props;
 
   return (
@@ -279,12 +286,12 @@ function ModalFormChrome<S extends AnyObjectSchema, R extends AnyRouteDef, D ext
           <div>{loaded.ready && footerExtra ? footerExtra(form) : null}</div>
           <Space>
             <Button onClick={onClose} disabled={mutation.isPending}>
-              {cancelText}
+              {readOnly ? '关闭' : cancelText}
             </Button>
             {/* No 保存 until there is something to save: a submit from a form
                 that never received the record is the bug this whole path exists
                 to prevent. */}
-            {loaded.ready ? (
+            {loaded.ready && !readOnly ? (
               <Button type="primary" loading={mutation.isPending} onClick={() => form.submit()}>
                 {okText}
               </Button>
@@ -301,6 +308,7 @@ function ModalFormChrome<S extends AnyObjectSchema, R extends AnyRouteDef, D ext
           fields={fields}
           {...(loaded.values ? { initialValues: loaded.values } : {})}
           columns={columns}
+          disabled={readOnly}
           footer={false}
           submitting={mutation.isPending}
           error={mutation.error}
@@ -355,6 +363,7 @@ function DrawerFormChrome<S extends AnyObjectSchema, R extends AnyRouteDef, D ex
     placement = 'right',
     header,
     footerExtra,
+    readOnly = false,
   } = props;
 
   return (
@@ -371,9 +380,9 @@ function DrawerFormChrome<S extends AnyObjectSchema, R extends AnyRouteDef, D ex
           <div>{loaded.ready && footerExtra ? footerExtra(form) : null}</div>
           <Space>
             <Button onClick={onClose} disabled={mutation.isPending}>
-              {cancelText}
+              {readOnly ? '关闭' : cancelText}
             </Button>
-            {loaded.ready ? (
+            {loaded.ready && !readOnly ? (
               <Button type="primary" loading={mutation.isPending} onClick={() => form.submit()}>
                 {okText}
               </Button>
@@ -390,6 +399,7 @@ function DrawerFormChrome<S extends AnyObjectSchema, R extends AnyRouteDef, D ex
           fields={fields}
           {...(loaded.values ? { initialValues: loaded.values } : {})}
           columns={columns}
+          disabled={readOnly}
           footer={false}
           submitting={mutation.isPending}
           error={mutation.error}

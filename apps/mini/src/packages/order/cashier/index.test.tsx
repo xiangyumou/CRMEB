@@ -35,7 +35,7 @@ const intent = (alreadyPaid: boolean) => ({
 
 async function renderCashier(alreadyPaid = false, overrides: Routes = {}): Promise<SeenRequest[]> {
   const seen = serveApi({
-    'GET /api/v1/orders/9': () => ({ body: orderFixture() }),
+    'GET /api/v1/orders/9': () => ({ body: orderFixture({ userCouponId: null }) }),
     'POST /api/v1/orders/9/payments': () => ({ status: 201, body: intent(alreadyPaid) }),
     ...overrides,
   });
@@ -130,7 +130,7 @@ describe('收银台', () => {
   it('says a closed order is closed', async () => {
     await renderCashier(false, {
       'GET /api/v1/orders/9': () => ({
-        body: orderFixture({ status: 'cancelled', payExpiresAt: null }),
+        body: orderFixture({ status: 'cancelled', payExpiresAt: null, userCouponId: null }),
       }),
     });
     expect(await screen.findByText('订单已关闭')).toBeTruthy();

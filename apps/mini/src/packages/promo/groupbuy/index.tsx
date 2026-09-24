@@ -104,7 +104,7 @@ export default function GroupbuyListPage() {
                   variant="outline"
                   onClick={() => void navigate({ route: 'home', params: {} })}
                 >
-                  去首页逛逛
+                  回到首页
                 </Button>
               }
             />

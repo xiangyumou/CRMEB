@@ -20,7 +20,7 @@ import { startActivityCheckout } from '@/features/promo/checkout';
 import { ShareSheet } from '@/features/share/share-sheet';
 import { assetUrl } from '@/lib/asset-url';
 import { serverNow } from '@/lib/server-clock';
-import { navigate, useRouteParams, useShare } from '@/platform';
+import { leaveFor, navigate, useRouteParams, useShare } from '@/platform';
 import { requireLogin } from '@/session/session';
 import { ActionBar } from '@/ui/action-bar';
 import { Button } from '@/ui/button';
@@ -168,7 +168,8 @@ function Detail({ activity, onStale }: { activity: Activity; onStale: () => void
         <Button
           variant="secondary"
           block
-          onClick={() => void navigate({ route: 'product', params: { id: activity.productId } })}
+          // Back to 商品详情 when this activity was opened from its banner, not a second copy.
+          onClick={() => void leaveFor({ route: 'product', params: { id: activity.productId } })}
         >
           单独购买
         </Button>

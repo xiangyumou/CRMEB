@@ -19,7 +19,7 @@ const coupon = (templateId: string, scope: string, name: string) => ({
   discountAmount: '5.00',
   minSpend: '50.00',
   scope,
-  validityMode: 'fixed',
+  validityMode: 'fixed_window',
   validFrom: '2026-09-01T00:00:00+08:00',
   validTo: '2026-12-31T23:59:59+08:00',
   validDays: null,
@@ -254,6 +254,7 @@ describe('商品详情', () => {
     taroFake.loginCode = 'code-1';
     serve({
       'POST /api/v1/auth/sessions/wechat-mini': () => ({
+        status: 201,
         body: {
           status: 'phone-required',
           session: null,
@@ -279,7 +280,13 @@ describe('商品详情', () => {
 
   it('adds the chosen SKU to the cart', async () => {
     const seen = serve({
-      'POST /api/v1/cart/items': () => ({ status: 201, body: { id: '9', quantity: 1 } }),
+      'POST /api/v1/cart/items': () => ({
+        status: 201,
+        body: {
+          item: null,
+          cart: { items: 1, quantity: 1, availableCount: 1, unavailableCount: 0 },
+        },
+      }),
     });
     await signIn();
     await renderPage(<ProductPage />);
@@ -340,16 +347,34 @@ describe('商品详情', () => {
     // 我的收藏, under this page when the product was opened from it.
     const favorites = routeQueryKey('catalog.favoriteList', { query: { pageSize: 20 } });
     client.setQueryData(favorites, { items: [], page: 1, pageSize: 20, total: 0 });
+    // Another 商品详情 under this one, which says 收藏 or 已收藏 too.
+    const other = routeQueryKey('catalog.productDetail', { params: { id: '99' } });
+    client.setQueryData(other, productDetailFixture({ id: '99' }));
 
-    fireEvent.click(await screen.findByRole('button', { name: '收藏' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: '已收藏' })).toBeTruthy());
+    const heart = await screen.findByRole('button', { name: '收藏' });
+    fireEvent.click(heart);
+    // A second tap while the first is on its way is not a remove racing the add.
+    fireEvent.click(heart);
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'showToast',
+        args: expect.objectContaining({ title: '已收藏' }),
+      }),
+    );
+    const favoriteCalls = () =>
+      seen.map((r) => r.key).filter((key) => key.includes('/me/favorites'));
+    expect(favoriteCalls()).toEqual(['POST /api/v1/me/favorites']);
+    expect(client.getQueryState(other)?.isInvalidated).toBe(true);
+
     fireEvent.click(screen.getByRole('button', { name: '已收藏' }));
     await waitFor(() =>
-      expect(seen.map((r) => r.key)).toEqual(
-        expect.arrayContaining(['POST /api/v1/me/favorites', 'DELETE /api/v1/me/favorites/12']),
-      ),
+      expect(favoriteCalls()).toEqual([
+        'POST /api/v1/me/favorites',
+        'DELETE /api/v1/me/favorites/12',
+      ]),
     );
     await waitFor(() => expect(client.getQueryState(favorites)?.isInvalidated).toBe(true));
+    expect(await screen.findByRole('button', { name: '收藏' })).toBeTruthy();
   });
 
   it('shows a sold-out product with one disabled button', async () => {

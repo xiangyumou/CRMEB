@@ -187,7 +187,11 @@ export function Textarea({
       <Text className="shop-textarea__count">
         {value.length}/{maxLength}
       </Text>
-      {error ? <Text className="shop-field__error">{error}</Text> : null}
+      {/* Always rendered, as in Field: the error appearing or clearing must not make Taro send
+          the textarea again, which drops the keyboard mid-typing. */}
+      <Text className={cx('shop-field__error', !error && 'shop-field__error--hidden')}>
+        {error ?? ''}
+      </Text>
     </View>
   );
 }

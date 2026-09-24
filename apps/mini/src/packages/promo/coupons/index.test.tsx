@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { ClaimableCoupon } from '@/features/coupon/claim-state';
 import { useSession } from '@/session/session';
+import { userCouponFixture } from '@/test/checkout-fixture';
 import { serveApi } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
 import { routeQueryKey } from '@shop/api-client/react';
@@ -52,7 +53,10 @@ describe('领券中心', () => {
   it('claims a coupon', async () => {
     const seen = serve([coupon('1')], () => ({
       status: 201,
-      body: { coupon: {}, remainingCount: 9 },
+      body: {
+        coupon: { ...userCouponFixture('501', '0.00', '5.00'), templateId: '1' },
+        remainingCount: 9,
+      },
     }));
     const { client } = await renderPage(<CouponCenterPage />);
     // What other pages hold: 首页 (its 优惠券 block's states), 我的 (the coupon total), the
@@ -78,6 +82,29 @@ describe('领券中心', () => {
     }
     // Marked stale, not fetched while hidden: each page asks again when it is shown.
     expect(seen.some((r) => r.key === 'GET /api/v1/pages/home')).toBe(false);
+  });
+
+  it('claims once for two quick taps, before the busy state has rendered', async () => {
+    const seen = serve([coupon('1')], () => ({
+      status: 201,
+      body: {
+        coupon: { ...userCouponFixture('501', '0.00', '5.00'), templateId: '1' },
+        remainingCount: 9,
+      },
+    }));
+    await renderPage(<CouponCenterPage />);
+    const button = await screen.findByRole('button', { name: '立即领取 券 1' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual(
+        expect.objectContaining({
+          api: 'showToast',
+          args: expect.objectContaining({ title: '领取成功' }),
+        }),
+      ),
+    );
+    expect(seen.filter((r) => r.key === 'POST /api/v1/coupons/1/claims')).toHaveLength(1);
   });
 
   it('shows 去使用 at the per-user limit and 已抢光 when none are left', async () => {

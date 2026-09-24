@@ -13,16 +13,10 @@ import { PageShell } from '@/ui/page-shell';
 import { Pressable } from '@/ui/pressable';
 import { CellSkeleton } from '@/ui/skeleton';
 import { errorMessage } from '../shared/form';
-import { messageRoute } from '../shared/message';
+import { MESSAGE_READS, messageRoute } from '../shared/message';
 import './index.scss';
 
 type Message = ResponseOf<'notification.myList'>['items'][number];
-
-const INVALIDATE = [
-  'notification.myList',
-  'notification.myUnreadCount',
-  'notification.myDetail',
-] as const;
 
 /**
  * 消息中心 (`messages`, pages.md §2.6): the shopper's 站内信, newest first. A message with a
@@ -46,9 +40,9 @@ function Messages() {
     { enabled: signedIn },
   );
   const unread = useRouteQuery('notification.myUnreadCount', {}, { enabled: signedIn });
-  const markAll = useRouteMutation('notification.myMarkAllRead', { invalidate: INVALIDATE });
-  const markRead = useRouteMutation('notification.myMarkRead', { invalidate: INVALIDATE });
-  const remove = useRouteMutation('notification.myDelete', { invalidate: INVALIDATE });
+  const markAll = useRouteMutation('notification.myMarkAllRead', { invalidate: MESSAGE_READS });
+  const markRead = useRouteMutation('notification.myMarkRead', { invalidate: MESSAGE_READS });
+  const remove = useRouteMutation('notification.myDelete', { invalidate: MESSAGE_READS });
   const unreadCount = unread.data?.unread ?? 0;
 
   async function open(message: Message) {

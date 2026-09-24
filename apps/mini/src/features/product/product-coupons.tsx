@@ -47,6 +47,7 @@ export function ProductCoupons({
   const claim = useClaimCoupon();
   const [open, setOpen] = useState(false);
   const [claiming, setClaiming] = useState<string | null>(null);
+  const inFlight = useRef(false);
 
   // A sign-in changes `canClaim` from null to an answer.
   const lastSignedIn = useRef(signedIn);
@@ -61,14 +62,24 @@ export function ProductCoupons({
   if (coupons.length === 0) return null;
 
   const take = async (coupon: Claimable) => {
-    if (!(await requireLogin(redirect))) return;
+    // Set before the login check is awaited: `claiming` state lands a render later, so a quick
+    // second tap would otherwise claim twice. One claim at a time, as the decor host does.
+    if (inFlight.current) return;
+    inFlight.current = true;
+    if (!(await requireLogin(redirect).catch(() => false))) {
+      inFlight.current = false;
+      return;
+    }
     setClaiming(coupon.templateId);
     claim.mutate(
       { params: { id: coupon.templateId } },
       {
         onSuccess: () => toast.success('领取成功'),
         onError: (error) => toast.text(claimFailureText(error)),
-        onSettled: () => setClaiming(null),
+        onSettled: () => {
+          inFlight.current = false;
+          setClaiming(null);
+        },
       },
     );
   };

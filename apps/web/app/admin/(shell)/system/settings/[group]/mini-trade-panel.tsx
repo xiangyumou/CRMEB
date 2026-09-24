@@ -8,6 +8,7 @@ import {
 
 import { useRouteMutation, useRouteQuery } from '@/admin/api/hooks';
 import { InstantText } from '@/admin/kit/instant-text';
+import { useCan } from '@/admin/session/session-provider';
 
 /**
  * 小程序发货信息管理 — what WeChat was last told, and the 同步 button.
@@ -17,13 +18,19 @@ import { InstantText } from '@/admin/kit/instant-text';
  * answer (已纳入 / 未纳入, or a refusal) is something the operator has to read.
  */
 export function MiniTradePanel() {
-  const status = useRouteQuery(paymentMiniTradeStatus, {});
+  // Both routes are `payment:config:write`, a different atom from the
+  // settings group's own read. Without it the card would only be a failed
+  // query and a 同步 that answers 403, so a reader gets no card at all.
+  const mayWrite = useCan()('payment:config:write');
+  const status = useRouteQuery(paymentMiniTradeStatus, {}, { enabled: mayWrite });
   const sync = useRouteMutation(paymentMiniTradeSync, {
     invalidate: [paymentMiniTradeStatus],
     successMessage: '已同步',
   });
   const data = status.data;
   const stale = data !== undefined && data.msgJumpPath !== data.expectedMsgJumpPath;
+
+  if (!mayWrite) return null;
 
   return (
     <Card

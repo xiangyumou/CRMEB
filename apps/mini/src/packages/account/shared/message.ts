@@ -1,5 +1,16 @@
+import type { RouteId } from '@shop/api-client';
 import type { StorefrontRoute } from '@shop/api-client/routes';
 import { parseLoginRedirect } from '@/platform';
+
+/**
+ * Reads a message change makes stale (read, all read, deleted): the list, the 我的 badge, the
+ * message itself. The same on 消息中心 and 消息详情, which sit on top of each other.
+ */
+export const MESSAGE_READS: readonly RouteId[] = [
+  'notification.myList',
+  'notification.myUnreadCount',
+  'notification.myDetail',
+];
 
 /**
  * Where a message leads (pages.md §4): `data.route` is a `{ route, params }` from the route

@@ -215,7 +215,7 @@ export const groupbuyActivityFields: FieldSpec<Extract<keyof GroupbuyActivityFor
     span: 6,
     min: 2,
     max: 100,
-    help: '至少 2 人；1 人的团会自己成团',
+    help: '至少 2 人',
   },
   {
     kind: 'number',

@@ -19,6 +19,7 @@ import * as order from './index';
 import { installFulfilmentHooks } from './order.fulfil.effects';
 import { resetFulfilmentPorts } from './order.fulfil.ports';
 import { orderStateMachine } from './order.state-machine';
+import { orderPermissions } from './permissions';
 import { onOrderPaid, registerOrderStateMachine, resetOrderPorts } from './ports';
 
 /**
@@ -289,6 +290,32 @@ describe('one order', () => {
     expect(detail).toHaveProperty('costAmount');
     expect(detail.shipments).toEqual([]);
     expect(detail.refundIds).toEqual([]);
+  });
+
+  it('shows 成本 to whoever works or exports orders, not to a role that may only look', async () => {
+    const adminId = await makeAdmin();
+    const placed = await placeOrder();
+    await harness.ctx.db
+      .update(orders)
+      .set({ costAmount: '30.00' })
+      .where(eq(orders.id, placed.orderId));
+    const holding = (permissions: string[]): Ctx =>
+      harness.as({ kind: 'admin', id: adminId, permissions, isSuper: false });
+    const read = orderPermissions['order:read'];
+    const params = { id: String(placed.orderId) };
+
+    const looking = await order.orderConsole.adminDetail(holding([read]), params);
+    expect(looking.costAmount).toBeNull();
+    const working = await order.orderConsole.adminDetail(
+      holding([read, orderPermissions['order:write']]),
+      params,
+    );
+    expect(working.costAmount).toBe('30.00');
+    const exporting = await order.orderConsole.adminDetail(
+      holding([read, orderPermissions['order:export']]),
+      params,
+    );
+    expect(exporting.costAmount).toBe('30.00');
   });
 
   it('refuses an id that is not there', async () => {

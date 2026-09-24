@@ -1371,6 +1371,23 @@ describe('the admin surface', () => {
     expect(await readGroup(opened.groupId)).toMatchObject({ status: 'forming', seatsTaken: 1 });
   });
 
+  it('shows 成本价 to whoever edits the activity, not to a role that may only look', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    await harness.ctx.db
+      .update(groupbuyActivities)
+      .set({ cost: '31.00' })
+      .where(eq(groupbuyActivities.id, fixture.activityId));
+    const params = { id: String(fixture.activityId) };
+
+    const looking = await service.adminActivityDetail(asAdmin(['groupbuy:activity:read']), params);
+    expect(looking.cost).toBeNull();
+    const editing = await service.adminActivityDetail(
+      asAdmin(['groupbuy:activity:read', 'groupbuy:activity:write']),
+      params,
+    );
+    expect(editing.cost).toBe('31.00');
+  });
+
   it('keeps the sales counter across an edit', async () => {
     const fixture = await makeActivity({ stock: 10 });
     const leader = await makeUser();

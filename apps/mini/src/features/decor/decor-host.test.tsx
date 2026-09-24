@@ -13,7 +13,9 @@ import {
 } from '@shop/storefront-blocks/fixtures';
 import { useAppConfigStore, type AppConfig } from '@/app-config';
 import { useSession } from '@/session/session';
+import { profileFixture } from '@/test/account-fixture';
 import { appConfigFixture } from '@/test/app-config-fixture';
+import { userCouponFixture } from '@/test/checkout-fixture';
 import { resolvedPageFixture } from '@/test/decor-fixture';
 import { serveApi } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
@@ -102,7 +104,10 @@ describe('DecorPage host (decor.md §2.4)', () => {
       const seen = serveApi({
         'POST /api/v1/coupons/21/claims': () => ({
           status: 201,
-          body: { id: '9001', templateId: '21' },
+          body: {
+            coupon: { ...userCouponFixture('9001', '0.00', '5.00'), templateId: '21' },
+            remainingCount: null,
+          },
         }),
       });
       const reload = await draw(
@@ -154,7 +159,10 @@ describe('DecorPage host (decor.md §2.4)', () => {
       const seen = serveApi({
         'POST /api/v1/coupons/21/claims': () => ({
           status: 201,
-          body: { id: '9001', templateId: '21' },
+          body: {
+            coupon: { ...userCouponFixture('9001', '0.00', '5.00'), templateId: '21' },
+            remainingCount: null,
+          },
         }),
       });
       const reload = await draw(pageOf([couponBlock]));
@@ -200,12 +208,13 @@ describe('DecorPage host (decor.md §2.4)', () => {
       taroFake.loginCode = 'code-1';
       serveApi({
         'POST /api/v1/auth/sessions/wechat-mini': () => ({
+          status: 201,
           body: {
             status: 'signed-in',
             session: {
               token: 't1',
               expiresAt: '2026-10-24T00:00:00+08:00',
-              user: { id: '5', nickname: '小林', avatarUrl: null, phoneBound: true },
+              user: { ...profileFixture, id: '5', nickname: '小林' },
             },
             registered: false,
             bindToken: null,

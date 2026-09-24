@@ -29,6 +29,22 @@ describe('搜索', () => {
     expect(seen.some((request) => request.key.includes('search-history'))).toBe(false);
   });
 
+  it('keeps both sections in the tree while the words load, so the keyboard stays up', async () => {
+    serveApi(hot);
+    const { container } = await renderPage(<Search />);
+    const sections = () => container.querySelectorAll('.goods-search__section');
+    const before = sections();
+    expect(before).toHaveLength(2);
+    expect(before[1]?.className).toContain('goods-search__section--hidden');
+    await screen.findByRole('button', { name: '按摩油' });
+    const after = sections();
+    expect(after).toHaveLength(2);
+    // The same nodes, not new ones: Taro sends nothing beside the focused search bar.
+    expect(after[1]).toBe(before[1]);
+    expect(after[1]?.className).not.toContain('--hidden');
+    expect(after[0]?.className).toContain('goods-search__section--hidden');
+  });
+
   it('submits the typed keyword in place of this page, and refuses an empty one', async () => {
     taroFake.routerParams = { keyword: '礼盒' };
     serveApi(hot);

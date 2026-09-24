@@ -3,6 +3,10 @@
 .goods-search {
   &__section {
     padding: $space-5 $space-5 0;
+
+    &--hidden {
+      display: none;
+    }
   }
 
   &__head {

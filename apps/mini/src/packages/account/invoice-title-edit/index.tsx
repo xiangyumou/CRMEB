@@ -17,6 +17,7 @@ import { SubmitBar, errorMessage, fieldErrorsOf, firstError } from '../shared/fo
 import {
   EMPTY_INVOICE_DRAFT,
   INVOICE_FIELDS,
+  INVOICE_TITLE_READS as INVALIDATE,
   checkInvoiceDraft,
   draftFromChosen,
   draftFromTitle,
@@ -28,12 +29,6 @@ import {
   type InvoiceField,
 } from '../shared/invoice';
 import './index.scss';
-
-const INVALIDATE = [
-  'user.invoiceTitleList',
-  'user.invoiceTitleDefault',
-  'user.invoiceTitleDetail',
-] as const;
 
 /**
  * 新增 / 编辑发票抬头 (`invoiceTitleEdit { id? }`, pages.md §2.6). Titles are kept on the
@@ -134,6 +129,8 @@ function TitleForm({ id, initial }: { id?: string; initial: InvoiceDraft }) {
       type={extra.type}
       error={errors[key]}
       focus={focus === key}
+      // Cleared on blur: a second failed save on the same field must change it to focus again.
+      onBlur={() => setFocus(null)}
       onChange={(value) => change(key, value)}
     />
   );
@@ -219,12 +216,7 @@ function TitleForm({ id, initial }: { id?: string; initial: InvoiceDraft }) {
         />
       </CellGroup>
       <SubmitBar>
-        <Button
-          size="lg"
-          block
-          loading={create.isPending || update.isPending}
-          onClick={() => void submit()}
-        >
+        <Button size="lg" block loading={create.isPending || update.isPending} onClick={submit}>
           保存
         </Button>
       </SubmitBar>

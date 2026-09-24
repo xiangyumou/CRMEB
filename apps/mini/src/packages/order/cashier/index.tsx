@@ -99,7 +99,8 @@ function Cashier({ orderId }: { orderId: string }) {
           .call('payment.status', { params: { outTradeNo: intent.outTradeNo } })
           .catch(() => null);
         if (!status?.paid) {
-          setPhase({ kind: 'notice', text: `支付没有完成：${outcome.message}`, retry: true });
+          // The platform already words it for the shopper (「支付没有完成，…」).
+          setPhase({ kind: 'notice', text: outcome.message, retry: true });
           return;
         }
       }

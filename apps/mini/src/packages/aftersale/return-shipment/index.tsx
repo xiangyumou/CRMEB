@@ -4,7 +4,7 @@ import type { RefundDetail } from '@shop/contracts/refund/schemas';
 import type { ExpressCompany } from '@shop/contracts/shipping/schemas';
 import { isApiError } from '@shop/api-client';
 import { useApiClient, useInvalidateRoutes, useRouteQuery } from '@shop/api-client/react';
-import { copyText, goBack, navigate, subscribe, useRouteParams } from '@/platform';
+import { copyText, goBack, leaveFor, subscribe, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
 import { Button } from '@/ui/button';
@@ -83,7 +83,8 @@ function Body({ id }: { id: string }) {
           <Button
             variant="outline"
             size="md"
-            onClick={() => void navigate({ route: 'refund', params: { id } }, { replace: true })}
+            // Back to the 售后详情 this page was opened from, not a second copy of it on top.
+            onClick={() => void leaveFor({ route: 'refund', params: { id } })}
           >
             查看售后详情
           </Button>

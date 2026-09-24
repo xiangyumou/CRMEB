@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View } from '@tarojs/components';
-import { useInfiniteRouteQuery } from '@shop/api-client/react';
+import { routeKey, useInfiniteRouteQuery } from '@shop/api-client/react';
+import { LIST_FULL_RELOAD_AFTER_MS, useRefetchOnShow } from '@/data/use-refetch-on-show';
 import { walletCardState, type WalletTab } from '@/features/coupon/claim-state';
 import { navigate, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
@@ -54,6 +55,11 @@ function Wallet({ tab }: { tab: WalletTab }) {
     { query: { state: tab, pageSize: 20 } },
     { enabled: signedIn },
   );
+  // Coupons expire, or are used or given back by an order, while the shopper is elsewhere.
+  useRefetchOnShow(routeKey('coupon.myList'), {
+    pages: 'first',
+    allPagesAfter: LIST_FULL_RELOAD_AFTER_MS,
+  });
   return (
     <View className="my-coupons" id={`my-coupons-${tab}`}>
       <InfiniteList
