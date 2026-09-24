@@ -98,7 +98,7 @@
 
 ## Backend gaps / 交给其他任务
 
-- **B1 → H6（`session/`）**：续期换了账号时不要重放请求。
+- **B1 → H6（`session/`）**：续期换了账号时不要重放请求。**已修**：B1-renew-account（AUTH-010）。
 - **P4**：售后凭证图加 `isStoredImageUrl`（退款域，另起任务）。
 
 ## Open questions（等用户决定）
