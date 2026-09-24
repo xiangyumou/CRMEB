@@ -7,6 +7,7 @@ import {
   wechatOaReplyCreate,
   wechatOaReplyList,
   wechatOaReplySetStatus,
+  wechatOaReplySimulate,
   wechatOaReplyUpdate,
 } from '@shop/contracts/wechat-oa/wechat-oa.reply.contract';
 
@@ -45,6 +46,12 @@ function stubApi(): StubCall[] {
     on(wechatOaReplySetStatus, { ...reply, isEnabled: false }),
     on(wechatOaReplyCreate, reply),
     on(wechatOaReplyUpdate, reply),
+    on(wechatOaReplySimulate, {
+      source: 'keyword',
+      reply,
+      shadowed: [{ ...reply, id: '2', keyword: '券', sortOrder: 5 }],
+      explanation: '命中关键词「优惠券」（包含匹配）；另有 1 条规则也匹配，但优先级更低',
+    }),
   ]);
 }
 
@@ -145,4 +152,23 @@ describe('公众号自动回复', () => {
       });
     },
   );
+
+  it('simulates a message for a read-only admin and shows the rule that answers', async () => {
+    const calls = stubApi();
+    renderAdmin(<WechatAutoRepliesPage />, {
+      identity: { ...testIdentity, permissions: ['wechat-oa:reply:read'] },
+    });
+    await screen.findByText('关键词回复');
+
+    await user.click(screen.getByTestId('reply-simulate'));
+    const modal = await screen.findByRole('dialog');
+    await user.type(within(modal).getByPlaceholderText(/用户发来的消息/), '有优惠券吗{Enter}');
+
+    const result = await within(modal).findByTestId('reply-simulate-result');
+    expect(within(result).getByText(/命中关键词「优惠券」/)).toBeInTheDocument();
+    expect(within(result).getByText('也匹配、但没被选中的规则：')).toBeInTheDocument();
+    expect(within(result).getByText('#2')).toBeInTheDocument();
+    const call = calls.find((entry) => entry.path === '/admin-api/wechat-auto-replies/simulate');
+    expect(call?.body).toEqual({ kind: 'text', text: '有优惠券吗' });
+  });
 });

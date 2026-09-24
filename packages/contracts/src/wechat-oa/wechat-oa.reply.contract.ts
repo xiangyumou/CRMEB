@@ -7,6 +7,8 @@ import {
   wechatAutoReplyExample,
   wechatAutoReplyForm,
   wechatAutoReplyListQuery,
+  wechatReplySimulateBody,
+  wechatReplySimulateResult,
   wechatStatusBody,
 } from './schemas';
 
@@ -198,4 +200,42 @@ export const wechatOaReplyDelete = defineRoute({
   status: 204,
   errors: ['WECHAT_OA_REPLY_NOT_FOUND'],
   examples: [{ name: 'ok', params: { id: '1' }, response: undefined }],
+});
+
+/**
+ * 回复模拟 — which rule answers a message, and which others it beat. Asks the
+ * same query the webhook asks, so what it shows is what a follower would get.
+ */
+export const wechatOaReplySimulate = defineRoute({
+  id: 'wechatOa.replySimulate',
+  method: 'POST',
+  path: '/admin-api/wechat-auto-replies/simulate',
+  auth: 'admin',
+  permission: 'wechat-oa:reply:read',
+  summary: '模拟自动回复',
+  tags: ['wechat-oa'],
+  body: wechatReplySimulateBody,
+  response: wechatReplySimulateResult,
+  examples: [
+    {
+      name: 'keyword',
+      body: { kind: 'text', text: '有优惠券吗' },
+      response: {
+        source: 'keyword',
+        reply: wechatAutoReplyExample,
+        shadowed: [],
+        explanation: '命中关键词「优惠券」（包含匹配）',
+      },
+    },
+    {
+      name: 'nothing',
+      body: { kind: 'text', text: '你好' },
+      response: {
+        source: 'none',
+        reply: null,
+        shadowed: [],
+        explanation: '没有关键词规则匹配，也没有启用「默认回复」，公众号不会回复',
+      },
+    },
+  ],
 });

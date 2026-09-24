@@ -243,6 +243,34 @@ export const shippingTemplateOption = z.object({
 export const shippingTemplateOptions = z.object({ items: z.array(shippingTemplateOption) });
 export type ShippingTemplateOptions = z.infer<typeof shippingTemplateOptions>;
 
+/**
+ * 运费试算: the template as the editor holds it — saved or not — priced for one
+ * product sent to one division. `units` is in the template's own unit (件, kg
+ * or m³) and `amount` is the goods total the free-shipping rules compare with.
+ */
+export const shippingTemplateTrialBody = z.object({
+  template: shippingTemplateForm,
+  cityId: id,
+  units: unitAmount.refine((value) => value > 0, { message: '请输入大于 0 的数量' }),
+  amount: money,
+});
+export type ShippingTemplateTrialBody = z.infer<typeof shippingTemplateTrialBody>;
+
+export const shippingTemplateTrialOutcome = z.enum([
+  'charged',
+  'free-by-rule',
+  'free-by-threshold',
+  'undeliverable',
+]);
+
+/** The fee, and the path to it in the operator's words: 地址 → 命中规则 → 计算. */
+export const shippingTemplateTrialResult = z.object({
+  outcome: shippingTemplateTrialOutcome,
+  fee: money,
+  steps: z.array(z.string()),
+});
+export type ShippingTemplateTrialResult = z.infer<typeof shippingTemplateTrialResult>;
+
 export const shippingTemplateExample: ShippingTemplateListItem = {
   id: '1',
   name: '全国包邮（满 5 件）',

@@ -3,6 +3,8 @@ import type {
   WechatAutoReplyForm,
   WechatAutoReplyListQuery,
   WechatReplyPayload,
+  WechatReplySimulateBody,
+  WechatReplySimulateResult,
   WechatReplyType,
   WechatStatusBody,
 } from '@shop/contracts/wechat-oa/schemas';
@@ -158,6 +160,99 @@ export async function remove(ctx: Ctx, params: { id: string }): Promise<void> {
 }
 
 /** The 409s, reported before the constraint reports them as a 500. */
+/**
+ * 回复模拟: asks the webhook's own lookups — `findKeywordReplies` for a message
+ * or a menu click, the singletons otherwise — so the answer is the one a
+ * follower would get. A channel QR code's own reply is not modelled: it
+ * depends on which poster was scanned.
+ */
+export async function simulate(
+  ctx: Ctx,
+  body: WechatReplySimulateBody,
+): Promise<WechatReplySimulateResult> {
+  requirePermission(ctx, wechatOaPermissions['reply:read']);
+  const text = body.text.trim();
+  if (body.kind === 'subscribe') {
+    const row = await repo.findSingletonReply(ctx.db, 'subscribe');
+    return explainSimulation({
+      kind: 'subscribe',
+      text,
+      matches: [],
+      singleton: row ? toReply(row) : null,
+    });
+  }
+  const matches = text === '' ? [] : (await repo.findKeywordReplies(ctx.db, text)).map(toReply);
+  const fallback =
+    matches.length > 0 ? undefined : await repo.findSingletonReply(ctx.db, 'default');
+  return explainSimulation({
+    kind: body.kind,
+    text,
+    matches,
+    singleton: fallback ? toReply(fallback) : null,
+  });
+}
+
+/** The pure half of `simulate`: which reply wins, and the sentence that says why. */
+export function explainSimulation(input: {
+  kind: WechatReplySimulateBody['kind'];
+  text: string;
+  /** Keyword rules that matched, best first, as `findKeywordReplies` orders them. */
+  matches: WechatAutoReply[];
+  /** The `subscribe` reply for a follow, else the `default` reply; `null` when there is none. */
+  singleton: WechatAutoReply | null;
+}): WechatReplySimulateResult {
+  if (input.kind === 'subscribe') {
+    return input.singleton
+      ? {
+          source: 'subscribe',
+          reply: input.singleton,
+          shadowed: [],
+          explanation: '回复「关注回复」（从渠道二维码关注时，优先用该二维码自己的回复）',
+        }
+      : {
+          source: 'none',
+          reply: null,
+          shadowed: [],
+          explanation: '没有启用「关注回复」，新关注的用户收不到消息',
+        };
+  }
+  const [best, ...shadowed] = input.matches;
+  if (best) {
+    const mode = best.matchMode === 'exact' ? '完全匹配' : '包含匹配';
+    const others =
+      shadowed.length === 0
+        ? ''
+        : `；另有 ${shadowed.length} 条规则也匹配，但优先级更低（完全匹配优先，其次排序值小的优先）`;
+    return {
+      source: 'keyword',
+      reply: best,
+      shadowed,
+      explanation: `命中关键词「${best.keyword ?? ''}」（${mode}）${others}`,
+    };
+  }
+  const what =
+    input.text === ''
+      ? input.kind === 'click'
+        ? '菜单按钮没有 key'
+        : '空消息'
+      : input.kind === 'click'
+        ? `没有关键词规则匹配菜单 key「${input.text}」`
+        : '没有关键词规则匹配';
+  return input.singleton
+    ? {
+        source: 'default',
+        reply: input.singleton,
+        shadowed: [],
+        explanation: `${what}，回复「默认回复」`,
+      }
+    : {
+        source: 'none',
+        reply: null,
+        shadowed: [],
+        explanation: `${what}，也没有启用「默认回复」，公众号不会回复`,
+      };
+}
+
 async function assertFree(ctx: Ctx, body: WechatAutoReplyForm, exceptId?: number): Promise<void> {
   if (body.triggerKind === 'keyword') {
     const keyword = body.keyword ?? '';

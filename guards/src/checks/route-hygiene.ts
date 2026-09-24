@@ -48,6 +48,16 @@ const AUDIT_EXEMPT: readonly Exemption[] = [
     method: 'POST',
     why: 'a POST-shaped read: the spec axes go in the body and nothing is written',
   },
+  {
+    url: '/admin-api/shipping/template-trial',
+    method: 'POST',
+    why: '运费试算 — a POST-shaped read: the unsaved template goes in the body and nothing is written',
+  },
+  {
+    url: '/admin-api/wechat-auto-replies/simulate',
+    method: 'POST',
+    why: '回复模拟 — a POST-shaped read: the message goes in the body and nothing is written or sent',
+  },
 
   // The notification inbox: a decision, not a defect.
   {

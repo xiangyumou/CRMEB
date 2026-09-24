@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Button, Drawer, Form, Modal, Skeleton, Space } from 'antd';
+import { Alert, Button, Drawer, Form, Modal, Skeleton, Space, type FormInstance } from 'antd';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { z } from 'zod';
 
@@ -107,6 +107,11 @@ export interface DrawerFormProps<
 > extends EntityFormProps<S, R, D> {
   width?: number | string | undefined;
   placement?: 'right' | 'left' | undefined;
+  /**
+   * A tool at the left of the footer that works on the form as it stands —
+   * 运费试算 reads the unsaved template from `form`. Shown once the form is.
+   */
+  footerExtra?: ((form: FormInstance) => ReactNode) | undefined;
 }
 
 /**
@@ -344,6 +349,7 @@ function DrawerFormChrome<S extends AnyObjectSchema, R extends AnyRouteDef, D ex
     width = 720,
     placement = 'right',
     header,
+    footerExtra,
   } = props;
 
   return (
@@ -356,16 +362,19 @@ function DrawerFormChrome<S extends AnyObjectSchema, R extends AnyRouteDef, D ex
       destroyOnHidden
       maskClosable={false}
       footer={
-        <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button onClick={onClose} disabled={mutation.isPending}>
-            {cancelText}
-          </Button>
-          {loaded.ready ? (
-            <Button type="primary" loading={mutation.isPending} onClick={() => form.submit()}>
-              {okText}
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+          <div>{loaded.ready && footerExtra ? footerExtra(form) : null}</div>
+          <Space>
+            <Button onClick={onClose} disabled={mutation.isPending}>
+              {cancelText}
             </Button>
-          ) : null}
-        </Space>
+            {loaded.ready ? (
+              <Button type="primary" loading={mutation.isPending} onClick={() => form.submit()}>
+                {okText}
+              </Button>
+            ) : null}
+          </Space>
+        </div>
       }
     >
       {header}

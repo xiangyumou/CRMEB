@@ -9,6 +9,7 @@ import { cityTreeAdmin } from '@shop/contracts/shipping/shipping.city.contract';
 import {
   shippingTemplateDetailRoute,
   shippingTemplateList,
+  shippingTemplateTrial,
   shippingTemplateUpdate,
 } from '@shop/contracts/shipping/shipping.template.admin.contract';
 
@@ -58,10 +59,18 @@ const detail: ShippingTemplateDetail = {
 
 function stubApi(): StubCall[] {
   return stubRoutes([
-    on(cityTreeAdmin, { items: [], version: 'test' }),
+    on(cityTreeAdmin, {
+      items: [{ id: '330000', name: '浙江省', level: 0, children: [] }],
+      version: 'test',
+    }),
     on(shippingTemplateList, { items: [row], total: 1, page: 1, pageSize: 20 }),
     on(shippingTemplateDetailRoute, detail),
     on(shippingTemplateUpdate, detail),
+    on(shippingTemplateTrial, {
+      outcome: 'charged',
+      fee: '15.00',
+      steps: ['收货地区：浙江省', '没有命中任何地区规则，按「默认全国」计算'],
+    }),
   ]);
 }
 
@@ -116,5 +125,32 @@ describe('运费模板', () => {
     const drawer = await screen.findByRole('dialog');
     expect(within(drawer).getByText('编辑运费模板')).toBeInTheDocument();
     expect(calls.some((call) => call.url.includes('/admin-api/shipping/templates/1'))).toBe(true);
+  });
+
+  it('prices the template as the drawer holds it, unsaved edits included', async () => {
+    const calls = stubApi();
+    renderAdmin(<ShippingTemplatesPage />, { identity: writer });
+    await screen.findByText('全国包邮（满 5 件）');
+    await userEvent.click(screen.getByRole('button', { name: '编辑' }));
+    const drawer = await screen.findByRole('dialog');
+    const name = await within(drawer).findByLabelText('模板名称');
+    await userEvent.clear(name);
+    await userEvent.type(name, '改过还没保存');
+
+    await userEvent.click(within(drawer).getByTestId('freight-trial'));
+    const modal = (await screen.findAllByRole('dialog')).at(-1)!;
+    await userEvent.click(within(modal).getByRole('combobox'));
+    await userEvent.click(await screen.findByTitle('浙江省'));
+    await userEvent.click(within(modal).getByRole('button', { name: '试 算' }));
+
+    const result = await within(modal).findByTestId('freight-trial-result');
+    expect(within(result).getByText('¥15.00')).toBeInTheDocument();
+    expect(within(result).getByText(/按「默认全国」计算/)).toBeInTheDocument();
+    const trial = calls.find((call) => call.path === '/admin-api/shipping/template-trial');
+    expect(trial?.body).toMatchObject({
+      template: { name: '改过还没保存', chargeMode: 'quantity' },
+      cityId: '330000',
+      units: 1,
+    });
   });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Typography } from 'antd';
+import { Button, Space, Typography } from 'antd';
 import {
   wechatOaReplyCreate,
   wechatOaReplyDelete,
@@ -31,6 +31,7 @@ import {
   replyBodyFields,
   replySummary,
 } from '../wechat-oa-enums';
+import { ReplySimulator } from './reply-simulator';
 
 type FormKey = Extract<keyof WechatAutoReplyForm, string>;
 
@@ -56,7 +57,7 @@ export function WechatAutoRepliesPage() {
   });
 
   return (
-    <PageContainer subTitle="关注、关键词和兜底回复都在这里；关键词不区分大小写">
+    <PageContainer subTitle="关注、关键词和兜底回复都在这里；关键词区分大小写。不确定一条消息会得到哪条回复，用「回复模拟」试一下">
       <CrudTable
         route={wechatOaReplyList}
         scrollX={1200}
@@ -79,11 +80,14 @@ export function WechatAutoRepliesPage() {
           },
         ]}
         toolbar={
-          <Can permission="wechat-oa:reply:write">
-            <Button type="primary" onClick={() => modal.show()}>
-              新建回复
-            </Button>
-          </Can>
+          <Space>
+            <ReplySimulator />
+            <Can permission="wechat-oa:reply:write">
+              <Button type="primary" onClick={() => modal.show()}>
+                新建回复
+              </Button>
+            </Can>
+          </Space>
         }
         columns={[
           idColumn<WechatAutoReply>(),

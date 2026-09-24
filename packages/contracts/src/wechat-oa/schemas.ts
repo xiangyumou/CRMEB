@@ -207,6 +207,27 @@ export const wechatAutoReplyExample = {
   updatedAt: '2026-01-04T10:00:00+08:00',
 } satisfies z.input<typeof wechatAutoReply>;
 
+/**
+ * 回复模拟: what the account would say to a message, a menu click or a new
+ * follower, asked of the same lookup the live webhook uses.
+ */
+export const wechatReplySimulateBody = z.object({
+  kind: z.enum(['text', 'click', 'subscribe']),
+  /** The message, or the menu button's key for `click`. Ignored for `subscribe`. */
+  text: z.string().max(2048).default(''),
+});
+export type WechatReplySimulateBody = z.infer<typeof wechatReplySimulateBody>;
+
+export const wechatReplySimulateResult = z.object({
+  /** Which rule answered: a keyword rule, one of the two singletons, or nothing. */
+  source: z.enum(['keyword', 'subscribe', 'default', 'none']),
+  reply: wechatAutoReply.nullable(),
+  /** Keyword rules that also matched but lost on priority. */
+  shadowed: z.array(wechatAutoReply),
+  explanation: z.string(),
+});
+export type WechatReplySimulateResult = z.infer<typeof wechatReplySimulateResult>;
+
 export const wechatStatusBody = z.object({ isEnabled: z.boolean() });
 export type WechatStatusBody = z.infer<typeof wechatStatusBody>;
 

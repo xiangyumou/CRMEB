@@ -8,17 +8,13 @@ import {
   shippingTemplateList,
   shippingTemplateUpdate,
 } from '@shop/contracts/shipping/shipping.template.admin.contract';
-import { cityTreeAdmin } from '@shop/contracts/shipping/shipping.city.contract';
 import {
   shippingTemplateForm,
-  type CityProvince,
   type ShippingTemplateFreeRule,
   type ShippingTemplateListItem,
   type ShippingTemplateRegion,
 } from '@shop/contracts/shipping/schemas';
 
-import { callRoute } from '@/admin/api';
-import { useRouteQuery } from '@/admin/api/hooks';
 import { ConfirmButton } from '@/admin/kit/confirm-button';
 import { MoneyInput } from '@/admin/kit/form/money-input';
 import { TreeSelectField } from '@/admin/kit/form/select-fields';
@@ -36,6 +32,8 @@ import { CrudTable } from '@/admin/kit/table/crud-table';
 import { Can } from '@/admin/session/can';
 
 import { SHIPPING_CHARGE_MODE } from '../shipping-enums';
+import { loadCityOptions } from './city-options';
+import { FreightTrialButton } from './freight-trial';
 
 /**
  * 运费模板.
@@ -49,28 +47,6 @@ import { SHIPPING_CHARGE_MODE } from '../shipping-enums';
  * threshold on every free rule) come from the contract's own schema, so the
  * form refuses what the database would have refused.
  */
-
-interface TreeOption {
-  title: string;
-  value: string;
-  children?: TreeOption[] | undefined;
-}
-
-type CityNode =
-  | CityProvince
-  | CityProvince['children'][number]
-  | CityProvince['children'][number]['children'][number];
-
-function toOption(node: CityNode): TreeOption {
-  const children = 'children' in node ? (node.children as CityNode[]).map(toOption) : undefined;
-  return { title: node.name, value: node.id, ...(children ? { children } : {}) };
-}
-
-/** The 省市区 tree, fetched once and shared by every picker in the form. */
-async function loadCityOptions(): Promise<TreeOption[]> {
-  const tree = await callRoute(cityTreeAdmin);
-  return tree.items.map(toOption);
-}
 
 function CityPicker(props: {
   value: string[];
@@ -92,15 +68,12 @@ function CityPicker(props: {
 }
 
 export function ShippingTemplatesPage() {
-  const drawer = useFormModal<ShippingTemplateListItem>();
+  // The list row carries no rules, so the drawer loads the detail it edits —
+  // and mounts the form only once it has it.
+  const drawer = useFormModal<ShippingTemplateListItem, typeof shippingTemplateDetailRoute>({
+    detail: { route: shippingTemplateDetailRoute, params: (row) => ({ id: row.id }) },
+  });
   const editing = drawer.record;
-
-  // The list row carries no rules, so the drawer loads the detail it edits.
-  const detail = useRouteQuery(
-    shippingTemplateDetailRoute,
-    { params: { id: editing?.id ?? '0' } },
-    { enabled: drawer.open && editing !== undefined },
-  );
 
   return (
     <PageContainer subTitle="商品选中的模板决定运费；未命中任何地区规则时按「默认全国」计算">
@@ -315,7 +288,7 @@ export function ShippingTemplatesPage() {
         ]}
         initialValues={
           editing
-            ? detail.data
+            ? undefined
             : {
                 chargeMode: 'quantity',
                 sortOrder: 0,
@@ -341,6 +314,7 @@ export function ShippingTemplatesPage() {
         }
         invalidate={[shippingTemplateList]}
         successMessage="已保存"
+        footerExtra={(form) => <FreightTrialButton form={form} />}
       />
     </PageContainer>
   );

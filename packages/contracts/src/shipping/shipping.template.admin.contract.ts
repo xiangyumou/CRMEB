@@ -9,6 +9,8 @@ import {
   shippingTemplateForm,
   shippingTemplateListQuery,
   shippingTemplateOptions,
+  shippingTemplateTrialBody,
+  shippingTemplateTrialResult,
 } from './schemas';
 
 /**
@@ -221,4 +223,69 @@ export const shippingTemplateDelete = defineRoute({
   response: z.object({ deleted: z.literal(true) }),
   errors: ['SHIPPING_TEMPLATE_NOT_FOUND', 'SHIPPING_TEMPLATE_IN_USE'],
   examples: [{ name: 'ok', params: { id: '9' }, response: { deleted: true } }],
+});
+
+/**
+ * 运费试算 — prices one product to one address against the template as the
+ * drawer holds it, saved or not, and says which rule decided it. Nothing is
+ * written, so reading templates is permission enough.
+ */
+export const shippingTemplateTrial = defineRoute({
+  id: 'shipping.templateTrial',
+  method: 'POST',
+  path: '/admin-api/shipping/template-trial',
+  auth: 'admin',
+  permission: 'shipping:template:read',
+  summary: '运费试算',
+  tags: ['shipping'],
+  body: shippingTemplateTrialBody,
+  response: shippingTemplateTrialResult,
+  errors: ['SHIPPING_CITY_UNKNOWN'],
+  examples: [
+    {
+      name: 'charged',
+      body: {
+        template: {
+          name: '全国包邮（满 5 件）',
+          chargeMode: 'quantity',
+          regions: shippingTemplateDetailExample.regions,
+        },
+        cityId: '110105',
+        units: 3,
+        amount: '120.00',
+      },
+      response: {
+        outcome: 'charged',
+        fee: '8.00',
+        steps: [
+          '收货地区：北京市 › 北京市 › 朝阳区',
+          '命中第 2 条地区规则（北京市）',
+          '首 2 件 ¥6.00 + 续 1 次（每 1 件 ¥2.00）= ¥8.00',
+        ],
+      },
+    },
+    {
+      name: 'undeliverable',
+      body: {
+        template: {
+          name: '全国包邮（满 5 件）',
+          chargeMode: 'quantity',
+          hasNoDeliveryRules: true,
+          regions: shippingTemplateDetailExample.regions,
+          noDeliveryCityIds: ['820000'],
+        },
+        cityId: '820100',
+        units: 1,
+        amount: '10.00',
+      },
+      response: {
+        outcome: 'undeliverable',
+        fee: '0.00',
+        steps: [
+          '收货地区：澳门特别行政区 › 澳门半岛',
+          '「澳门特别行政区」在「不配送地区」里，下单会被拒绝',
+        ],
+      },
+    },
+  ],
 });

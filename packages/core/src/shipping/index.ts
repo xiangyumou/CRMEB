@@ -10,6 +10,7 @@
  * | `expressCompanies.*` | routes     | the 发货 picker and its management screen |
  * | `cityTree`           | routes     | 省市区 picker, storefront and admin       |
  * | `templates.*`        | routes     | 运费模板 management                        |
+ * | `freightTrial`       | routes     | 运费试算 in the template drawer            |
  *
  * Registering the `FreightPort` and the `LogisticsPort` is a **side effect of
  * importing this file**, exactly like the order domain's state machine:
@@ -37,6 +38,7 @@ export function registerShippingDomain(): void {
 
 export * as expressCompanies from './shipping.express.service';
 export * as templates from './shipping.template.service';
+export { trial as freightTrial } from './shipping.freight.trial';
 export { cityTree, resetCityTreeCache } from './shipping.city.service';
 export { freightPort, registerShippingFreightPort } from './shipping.freight.port';
 export {

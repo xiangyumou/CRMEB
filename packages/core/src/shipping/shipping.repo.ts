@@ -95,6 +95,16 @@ export async function existingCityIds(db: DbOrTx, ids: number[]): Promise<Set<nu
   return new Set(rows.map((row) => row.id));
 }
 
+/** Division names by id, for saying which rule an address hit. Unknown ids are absent. */
+export async function cityNames(db: DbOrTx, ids: number[]): Promise<Map<number, string>> {
+  if (ids.length === 0) return new Map();
+  const rows = await db
+    .select({ id: cities.id, name: cities.name })
+    .from(cities)
+    .where(sql`${cities.id} = any(${sql.param(ids)}::bigint[])`);
+  return new Map(rows.map((row) => [row.id, row.name]));
+}
+
 // ---------------------------------------------------------------------------
 // express companies
 // ---------------------------------------------------------------------------
