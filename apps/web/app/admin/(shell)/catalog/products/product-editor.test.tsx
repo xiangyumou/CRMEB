@@ -198,6 +198,20 @@ describe('商品编辑器', () => {
     });
   });
 
+  it('shows a look-only role the product without a 保存 to press into a 403', async () => {
+    const calls = stubApi();
+    renderAdmin(withStubAssets(<ProductEditorPage productId="1" />), {
+      identity: { ...testIdentity, permissions: ['catalog:product:read'] },
+    });
+
+    await waitFor(() => expect(screen.getByLabelText('商品名称')).toHaveValue('简约白 T 恤'));
+    expect(screen.getByLabelText('商品名称')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: zhName('保存') })).not.toBeInTheDocument();
+    expect(screen.getByText('你的身份只能查看商品，不能在这里修改')).toBeInTheDocument();
+    // Nor does it ask for the option lists it holds no atom for.
+    expect(calls.some((call) => call.url.includes('/admin-api/catalog/labels'))).toBe(false);
+  });
+
   /**
    * 运费模板 is a select over the shipping options route, not a typed id. The
    * 计费方式 is part of the label because two templates can

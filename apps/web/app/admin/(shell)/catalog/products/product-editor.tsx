@@ -26,6 +26,7 @@ import {
 } from '@shop/contracts/catalog/schemas';
 
 import { useRouteMutation, useRouteQuery } from '@/admin/api/hooks';
+import { useCan } from '@/admin/session/session-provider';
 import type { FieldSpec, SelectOption } from '@/admin/kit/form/types';
 import { ZodForm } from '@/admin/kit/form/zod-form';
 import { PageContainer } from '@/admin/kit/page-container';
@@ -59,6 +60,9 @@ import { ParamEditor, SkuMatrixEditor, SpecEditor, blankSku } from './product-sk
 export function ProductEditorPage({ productId }: { productId?: string | undefined }) {
   const router = useRouter();
   const [form] = Form.useForm();
+  // A role that may only look at products sees the form read-only, with no 保存
+  // to press into a 403 — and without the option lists it has no right to.
+  const mayWrite = useCan()('catalog:product:write');
 
   const detail = useRouteQuery(
     catalogAdminProductDetail,
@@ -68,17 +72,23 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
 
   // The three taxonomies the form offers as options. 200 is every label any
   // shop has; these are pickers, not searches.
-  const labels = useRouteQuery(catalogAdminLabelList, {
-    query: { page: 1, pageSize: 200, isEnabled: 'true' },
-  });
-  const protections = useRouteQuery(catalogAdminProtectionList, {
-    query: { page: 1, pageSize: 200, isEnabled: 'true' },
-  });
-  const paramTemplates = useRouteQuery(catalogAdminParamTemplateList, {
-    query: { page: 1, pageSize: 200, isEnabled: 'true' },
-  });
+  const labels = useRouteQuery(
+    catalogAdminLabelList,
+    { query: { page: 1, pageSize: 200, isEnabled: 'true' } },
+    { enabled: mayWrite },
+  );
+  const protections = useRouteQuery(
+    catalogAdminProtectionList,
+    { query: { page: 1, pageSize: 200, isEnabled: 'true' } },
+    { enabled: mayWrite },
+  );
+  const paramTemplates = useRouteQuery(
+    catalogAdminParamTemplateList,
+    { query: { page: 1, pageSize: 200, isEnabled: 'true' } },
+    { enabled: mayWrite },
+  );
   // The shipping options route: id, name and 计费方式, every template, no paging.
-  const shippingTemplates = useRouteQuery(shippingTemplateOptionList, {});
+  const shippingTemplates = useRouteQuery(shippingTemplateOptionList, {}, { enabled: mayWrite });
 
   const create = useRouteMutation(catalogAdminProductCreate, {
     presentError: false,
@@ -199,13 +209,24 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
       extra={
         <Space>
           <Button onClick={() => router.push('/admin/catalog/products')}>返回列表</Button>
-          <Button type="primary" loading={saving} onClick={() => form.submit()}>
-            保存
-          </Button>
+          {mayWrite ? (
+            <Button type="primary" loading={saving} onClick={() => form.submit()}>
+              保存
+            </Button>
+          ) : null}
         </Space>
       }
     >
+      {mayWrite ? null : (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="你的身份只能查看商品，不能在这里修改"
+        />
+      )}
       <ZodForm
+        disabled={!mayWrite}
         form={form}
         schema={adminProductForm}
         fields={fields}
