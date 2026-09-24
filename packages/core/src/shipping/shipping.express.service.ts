@@ -16,9 +16,9 @@ import * as repo from './shipping.repo';
  *
  * Two surfaces over one table:
  *
- *  - `pickerList` answers the 发货 form and the mobile staff console on the
- *    order paths those clients already call — enabled rows only, most used
- *    first — and costs only the order permission they already hold.
+ *  - `pickerList` answers the 发货 form on the order path it already calls —
+ *    enabled rows only, most used first — and costs only the order permission
+ *    it already holds.
  *  - the `admin*` functions are the management screen, which sees disabled rows
  *    too and costs `shipping:express:*`.
  *

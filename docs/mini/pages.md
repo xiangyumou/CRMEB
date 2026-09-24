@@ -183,7 +183,7 @@
 - **用不上：**
   - `auth.register`：短信登录会自动注册；
   - `storage.scanUpload`：后台扫码上传；
-  - `order.staffMe`、`shipping.staffExpressCompanies`：店员接口；
+  - `order.staffMe`、`shipping.staffExpressCompanies`：店员接口（切换时已随全部店员接口删除，见 [cutover.md](cutover.md) 2.5）；
   - `health.*`。
 - ~~有接口、但本期不做页面：`catalog.myReviews`、`groupbuy.myGroups`~~。2026-09-23 改为本期做：见第 2.5 节的我的拼团、第 2.6 节的我的评价。
 

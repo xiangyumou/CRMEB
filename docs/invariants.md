@@ -714,14 +714,6 @@ Token expiry and cross-user order read/write isolation through HTTP routes.
 - `packages/core/src/order/order.ref.int.test.ts::GET /api/v1/orders/:id > gives a stranger the same 404 for a number as for an id`
 - `packages/core/src/order/order.int.test.ts::hiding a finished order > answers a second tap, a stranger and an unknown id all with the same 404`
 
-### AUTH-004
-
-The staff console (mobile order management) admits exactly the shoppers on the order-staff roster; a shopper who is not on it is refused, and an empty roster closes it.
-
-- `apps/web/app/admin-api/orders/fulfilment.int.test.ts::the staff console > 403s a shopper who is not on the list`
-- `apps/web/app/admin-api/orders/fulfilment.int.test.ts::the staff console > lets somebody on the list in, and lets them ship`
-- `apps/web/app/admin-api/orders/fulfilment.int.test.ts::the staff console > tells an ordinary shopper they are not staff rather than 403ing them`
-
 ### AUTH-006
 
 The mini-program sign-in counts only codes WeChat refused against a per-address budget (20 per 10 minutes); past it the address is refused with `RATE_LIMITED` without asking WeChat, a code WeChat accepted never counts, and another address is untouched.
@@ -1800,14 +1792,13 @@ The last enabled super admin cannot be disabled or deleted, and nobody can lock 
 
 ### SYS-012
 
-A write is audited with its actor, route and target; every credential-named field and every field the config registry marks secret is stripped at any depth; a read is not audited, and the reader cannot undo the redaction. Staff-surface writes are audited with `actor_kind = 'staff'` and the 店员's user id, and every admin sign-in outcome is audited under `auth.adminLogin` without the body.
+A write is audited with its actor, route and target; every credential-named field and every field the config registry marks secret is stripped at any depth; a read is not audited, and the reader cannot undo the redaction. New rows are always `actor_kind = 'admin'`; the historic `actor_kind = 'staff'` rows (the mobile staff console, deleted at the cutover) stay readable and filterable, and every admin sign-in outcome is audited under `auth.adminLogin` without the body.
 
 - `apps/web/app/admin-api/admins/system.int.test.ts::/admin-api/admins > creates with 201 and writes an audit row without the password in it`
 - `apps/web/app/admin-api/admins/system.int.test.ts::/admin-api/audit-logs > does not record a read`
 - `packages/core/src/auth/audit.redact.test.ts::what the operation log keeps of a request body > redacts the same credential one level down, as the config form sends it`
 - `apps/web/src/server/handle.int.test.ts::what the operation log keeps of a config save > leaves no part of the payment keys in audit_logs`
 - `packages/core/src/auth/admin-login.trail.int.test.ts::what a password-guessing run leaves behind > leaves a readable trail of the failed attempts, without the password`
-- `apps/web/app/api/v1/staff/products/catalog-staff.int.test.ts::/api/v1/staff/products/:id/skus > records the reprice in the operation log, naming the 店员 and the product`
 - `apps/web/src/server/handle.int.test.ts::the 操作日志 reader lists both kinds of actor > returns admin and staff rows, each naming its actor, and filters by kind`
 
 ### SYS-013

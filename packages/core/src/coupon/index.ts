@@ -39,9 +39,6 @@ export {
   listHeldNewUser,
   listMine,
   listNewUser,
-  staffGrant,
-  staffListCoupons,
-  staffListUserCoupons,
   // the domain API other domains call
   grantNewUser,
   grantOrderGifts,

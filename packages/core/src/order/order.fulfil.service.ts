@@ -212,8 +212,8 @@ export interface ShipInput {
 }
 
 /**
- * The one dispatch. The admin console, the staff console and any future
- * bulk-import screen all come through here.
+ * The one dispatch. The admin console and any future bulk-import screen all
+ * come through here.
  */
 export async function shipOrder(ctx: Ctx, input: ShipInput): Promise<Shipment> {
   const now = ctx.clock.now();

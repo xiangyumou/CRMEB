@@ -284,9 +284,8 @@ export const shippingTemplateDetailExample: ShippingTemplateDetail = {
 // ---------------------------------------------------------------------------
 
 /**
- * The picker shape. `GET /admin-api/express-companies` and
- * `GET /api/v1/staff/express-companies` answer with this and nothing else, so
- * the console's 发货 form and the mobile staff console read the same list.
+ * The picker shape. `GET /admin-api/express-companies` answers with this and
+ * nothing else, so the console's 发货 form reads exactly the list it offers.
  */
 export const expressCompany = z.object({
   id,

@@ -264,7 +264,11 @@ export type PermissionTree = z.infer<typeof permissionTree>;
 // audit log
 // ---------------------------------------------------------------------------
 
-/** Who wrote an audit row: a console admin, or a 店员 on the staff surface. */
+/**
+ * Who wrote an audit row: a console admin, or — only on rows older than the
+ * cutover, which deleted the mobile staff console — a 店员. New rows are always
+ * `admin`; `staff` stays so the historic rows still read back.
+ */
 export const auditActorKind = z.enum(['admin', 'staff']);
 export type AuditActorKind = z.infer<typeof auditActorKind>;
 

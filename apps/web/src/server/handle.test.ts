@@ -8,7 +8,7 @@ import {
   memoryStorage,
   silentLogger,
 } from '@shop/core/kernel';
-import { registerStaffCheck, resetUserLookup } from '@shop/core/auth';
+import { resetUserLookup } from '@shop/core/auth';
 import { toApiError } from '../admin/api/errors';
 import { ADMIN_COOKIE, checkCsrf, handle, readCookie, searchParamsToObject } from './handle';
 import type { Container } from './container';
@@ -469,32 +469,6 @@ describe('authorisation', () => {
     );
     expect(response.status).toBe(204);
     expect(response.headers.get('content-type')).toBeNull();
-  });
-
-  it('403s a staff route until the order domain registers a StaffCheck', async () => {
-    const staffRoute = defineRoute({
-      id: 'test.staff',
-      method: 'GET',
-      path: '/api/v1/staff/orders',
-      auth: 'staff',
-      summary: 'staff',
-      tags: ['test'],
-      response: z.object({ ok: z.boolean() }),
-      examples: [{ name: 'ok', response: { ok: true } }],
-    });
-    const GET = handle(staffRoute, async () => ({ ok: true }), { container: container() });
-    const request = () =>
-      new Request('https://shop.example/api/v1/staff/orders', {
-        headers: { authorization: 'Bearer user-token' },
-      });
-
-    expect((await GET(request())).status).toBe(403);
-
-    registerStaffCheck({ isStaff: async () => true });
-    expect((await GET(request())).status).toBe(200);
-
-    registerStaffCheck({ isStaff: async () => false });
-    expect((await GET(request())).status).toBe(403);
   });
 });
 

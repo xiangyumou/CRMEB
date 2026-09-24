@@ -13,21 +13,19 @@ import {
   UserSessionService,
 } from '@shop/core/auth';
 import * as order from '@shop/core/order';
-import { Money } from '@shop/core/kernel';
 import { createTestCtx, fakeUserLookup, type TestCtx } from '@shop/testing';
 import { ADMIN_COOKIE } from '../../../src/server/handle';
 import { setContainer, type Container } from '../../../src/server/container';
 import type { Env } from '../../../src/server/env';
 
 /**
- * Fulfilment, the console, invoices and the staff console as HTTP.
+ * Fulfilment, the console and invoices as HTTP.
  *
  * The behaviour itself is pinned down in `@shop/core`; what is proved here is
  * only what a route file can get wrong — the contract bound to the wrong
  * method or path, `permission` not enforced before the service runs, a body
  * accepted before it was validated, a domain refusal answered with the wrong
- * status, a write that never reached `audit_logs`, and `auth: 'staff'` not
- * failing closed.
+ * status, and a write that never reached `audit_logs`.
  */
 
 let harness: TestCtx;
@@ -480,65 +478,5 @@ describe('invoices over HTTP', () => {
       { params: Promise.resolve({ id: String(placed.orderId) }) },
     );
     expect(response.status).toBe(401);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// the staff console
-// ---------------------------------------------------------------------------
-
-describe('the staff console', () => {
-  it('tells an ordinary shopper they are not staff rather than 403ing them', async () => {
-    const { headers } = await shopper();
-    const { GET } = await import('../../api/v1/staff/me/route');
-    const response = await GET(get('/api/v1/staff/me', headers));
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ isStaff: false });
-  });
-
-  /** `auth: 'staff'` fails closed: not on the list is a 403, not an empty list. */
-  it('403s a shopper who is not on the list', async () => {
-    const { headers } = await shopper();
-    const { GET } = await import('../../api/v1/staff/orders/route');
-    const response = await GET(get('/api/v1/staff/orders?page=1&pageSize=20', headers));
-    expect(response.status).toBe(403);
-    expect((await response.json()).code).toBe('FORBIDDEN');
-  });
-
-  it('lets somebody on the list in, and lets them ship', async () => {
-    const placed = await paidOrder();
-    const company = await makeExpressCompany();
-    await harness.ctx.config.set(order.orderStaffConfig, { staffUserIds: [placed.userId] });
-
-    const { GET: me } = await import('../../api/v1/staff/me/route');
-    expect(await (await me(get('/api/v1/staff/me', placed.headers))).json()).toMatchObject({
-      isStaff: true,
-    });
-
-    const { GET: list } = await import('../../api/v1/staff/orders/route');
-    const listed = await list(get('/api/v1/staff/orders?page=1&pageSize=20', placed.headers));
-    expect(listed.status).toBe(200);
-    expect((await listed.json()).total).toBe(1);
-
-    const { POST: ship } = await import('../../api/v1/staff/orders/[id]/shipments/route');
-    const shipped = await ship(
-      json(
-        'POST',
-        `/api/v1/staff/orders/${placed.orderId}/shipments`,
-        {
-          deliveryMode: 'express',
-          expressCompanyId: String(company),
-          trackingNo: 'SF-STAFF',
-          lines: [],
-        },
-        placed.headers,
-      ),
-      { params: Promise.resolve({ id: String(placed.orderId) }) },
-    );
-    expect(shipped.status).toBe(201);
-
-    const row = await orderById(placed.orderId);
-    expect(row.status).toBe('shipped');
-    expect(Money.parse(row.payableAmount).toString()).toBe('60.00');
   });
 });

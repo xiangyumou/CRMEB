@@ -138,7 +138,7 @@ export async function productList(
   if (keyword) {
     await ctx.withTx((tx) =>
       repo.recordSearch(tx, {
-        userId: ctx.actor.kind === 'user' || ctx.actor.kind === 'staff' ? ctx.actor.id : null,
+        userId: ctx.actor.kind === 'user' ? ctx.actor.id : null,
         keyword,
         resultCount: total,
         platform: platformOf(ctx),
@@ -176,7 +176,7 @@ export async function productDetail(ctx: Ctx, input: { id: string }): Promise<St
   const row = await repo.findSellableProduct(ctx.db, productId);
   if (!row) throw new DomainError('CATALOG_PRODUCT_NOT_FOUND');
 
-  const userId = ctx.actor.kind === 'user' || ctx.actor.kind === 'staff' ? ctx.actor.id : null;
+  const userId = ctx.actor.kind === 'user' ? ctx.actor.id : null;
 
   const [labels, specs, skus, params, protections, links, descriptionHtml, counts] =
     await Promise.all([

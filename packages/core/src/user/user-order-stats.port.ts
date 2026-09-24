@@ -3,7 +3,12 @@ import type { DbOrTx } from '@shop/db';
 /**
  * 累计订单 / 累计消费 for a customer, without this domain reading `orders`.
  *
- * The staff 用户 screen shows two numbers that are not the user domain's to
+ * Its one consumer, the 商家管理 (staff) 用户 screen, was deleted at the
+ * cutover (docs/mini/cutover.md §2.5); the port and the order domain's
+ * `statsForUsers` behind it are kept, unused, for a console screen that wants
+ * the numbers. What follows is why it is shaped this way.
+ *
+ * The staff 用户 screen showed two numbers that are not the user domain's to
  * compute: how many orders a customer has paid for, and what they came to. The
  * import boundary forbids `user.repo.ts` from touching the order tables, and
  * the boundary is not bureaucracy here — every rule about which orders "count"
@@ -19,7 +24,7 @@ import type { DbOrTx } from '@shop/db';
  *   interface it can read in one screen rather than having its own port file
  *   grown by somebody else.
  * - it is **optional**. `getUserOrderStatsPort()` returns `undefined` while
- *   nothing has registered an implementation, and the staff routes answer
+ *   nothing has registered an implementation, and the staff routes answered
  *   `orderCount: null, spendTotal: null` rather than `0`. Nothing else in this
  *   system is allowed to fail soft, but the alternatives here are both worse: a
  *   500 would take down the whole 用户 screen over two decorative numbers, and
@@ -27,8 +32,8 @@ import type { DbOrTx } from '@shop/db';
  *   first-time buyer. `null` says "not known", and the contract tells clients
  *   to render 「--」.
  *
- * `order/index.ts` registers it when the order domain loads; the tests here pin
- * the behaviour on the fake below.
+ * `order/index.ts` registers it when the order domain loads;
+ * `order/order.user-stats.int.test.ts` pins which orders count.
  */
 
 export interface UserOrderStats {

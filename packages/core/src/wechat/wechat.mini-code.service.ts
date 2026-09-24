@@ -78,7 +78,7 @@ const HOUR_MS = 60 * 60 * 1000;
  */
 async function spendMint(ctx: Ctx): Promise<void> {
   const actor = ctx.actor;
-  if (actor.kind !== 'user' && actor.kind !== 'staff') return;
+  if (actor.kind !== 'user') return;
   await enforce(
     fixedWindow(ctx.redis, {
       key: `wechat:mini-code:mint:u:${actor.id}`,

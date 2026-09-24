@@ -7,8 +7,9 @@ import * as repo from './system.repo';
  * The operation log viewer.
  *
  * Read-only, and there is no route that writes one: `handle()` writes a row for
- * every successful mutating admin request and every successful staff-surface
- * write (`actorKind: 'staff'`), the admin sign-in writes one per outcome, with
+ * every successful mutating admin request (rows from before the cutover may
+ * also be `actorKind: 'staff'`, the deleted mobile staff console's writes), the
+ * admin sign-in writes one per outcome, with
  * the body already redacted by `redactPayload`. A service that wants to name
  * what it touched calls `ctx.audit('coupon:42')` and the same writer picks it
  * up.

@@ -1,5 +1,3 @@
-import { registerStaffRefundPort } from '../order';
-import { staffApprove, staffDetail, staffList, staffReject, staffRemark } from './refund.admin';
 import { registerRefundEffects } from './refund.effects';
 import { registerRefundNotificationEvents } from './refund.notifications';
 
@@ -92,25 +90,4 @@ export function registerRefundDomain(): void {
   // A gateway answer that does not match the refund (wrong merchant, wrong
   // amount) is raised to an operator.
   registerRefundNotificationEvents();
-  // The order domain's staff console owns the phone-sized surface, this domain
-  // owns the money. The port gets the staff entry points rather than the admin
-  // services, whose admin atoms a staff actor can never hold (every staff
-  // request would answer 403). They accept only a `staff` actor (the
-  // `auth: 'staff'` allow-list is the gate), reach only what the phone has, and
-  // share the transition code with the console, so 同意 on the phone and 同意
-  // in the console still move the row the same way. Until this runs, the staff
-  // routes answer INTERNAL.
-  registerStaffRefundPort({
-    list: staffList,
-    detail: staffDetail,
-    approve: (ctx, params, body) =>
-      staffApprove(ctx, {
-        ...params,
-        ...(body.remark === undefined ? {} : { remark: body.remark }),
-      }),
-    reject: (ctx, params, body) => staffReject(ctx, { ...params, ...body }),
-    // 售后备注 is the one staff action that is not the console's: it appends to
-    // the refund's log instead of overwriting `refunds.admin_remark`.
-    remark: (ctx, params, body) => staffRemark(ctx, { ...params, ...body }),
-  });
 }

@@ -47,7 +47,7 @@ export function buildDocument(routes: readonly AnyRouteDef[]) {
     const security =
       route.auth === 'admin'
         ? [{ [adminSession.name]: [] }]
-        : route.auth === 'user' || route.auth === 'staff' || route.auth === 'user-optional'
+        : route.auth === 'user' || route.auth === 'user-optional'
           ? [{ [userBearer.name]: [] }]
           : [];
 

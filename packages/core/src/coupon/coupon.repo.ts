@@ -685,9 +685,8 @@ export async function expireOverdue(tx: Tx, args: { now: Date; limit: number }):
 export type WalletState = 'unused' | 'used' | 'expired';
 
 /**
- * Which wallet tab a row belongs to. One definition for the shopper's own
- * wallet and the staff view of it, so the two can never disagree on what
- * "unused" means.
+ * Which wallet tab a row belongs to. One definition, so every reader agrees on
+ * what "unused" means.
  */
 function walletStateFilter(state: WalletState, now: Date): SQL | undefined {
   return state === 'unused'
@@ -757,29 +756,6 @@ export async function listUnusedBySource(
       ),
     )
     .orderBy(asc(userCoupons.validTo), asc(userCoupons.id))
-    .limit(args.limit);
-}
-
-/**
- * One customer's wallet as a 店员 sees it: one tab, or every row with the
- * spendable ones first, newest first within each half. Capped by `limit` — the
- * staff drawer does not page.
- */
-export async function listUserCouponsForStaff(
-  db: DbOrTx,
-  args: { userId: number; state: WalletState | undefined; now: Date; limit: number },
-): Promise<UserCouponRow[]> {
-  const where =
-    args.state === undefined
-      ? eq(userCoupons.userId, args.userId)
-      : and(eq(userCoupons.userId, args.userId), walletStateFilter(args.state, args.now));
-  // The `unused` tab's own predicate, so "first" means exactly what that tab shows.
-  const spendableFirst = sql`case when ${walletStateFilter('unused', args.now)} then 0 else 1 end`;
-  return db
-    .select()
-    .from(userCoupons)
-    .where(where)
-    .orderBy(spendableFirst, desc(userCoupons.id))
     .limit(args.limit);
 }
 

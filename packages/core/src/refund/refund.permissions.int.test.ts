@@ -10,7 +10,6 @@ import { createTestCtx, flushTestRedis, forkTestCtx, type TestCtx } from '@shop/
 import { registerAllDomains } from '../domains.gen';
 import type { Actor, Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
-import { resolveStaffRefundPort } from '../order';
 import { configGet, configSave } from '../system';
 import { refundPermissions } from './permissions';
 import * as admin from './refund.admin';
@@ -24,9 +23,7 @@ import * as service from './refund.service';
  * Every other refund test builds its operator with `isSuper: true`. That
  * short-circuits `hasPermission` before it reads a single atom, so nothing
  * there shows what a narrow role can and cannot do.
- *
- * The staff half is here too: the staff entry points the 商家管理 console is
- * wired to, and the wall between them and the admin services.
+
  */
 
 let harness: TestCtx;
@@ -118,13 +115,10 @@ const ALL_REQUEST_ATOMS = [
 ];
 
 const userActor = (id: number): Actor => ({ kind: 'user', id, permissions: [], isSuper: false });
-/** What `handle()` builds for an `auth: 'staff'` route. */
-const staffActor = (id: number): Actor => ({ kind: 'staff', id, permissions: [], isSuper: false });
 const superAdmin = (id: number): Actor => ({ kind: 'admin', id, permissions: [], isSuper: true });
 
 interface Scene {
   ownerId: number;
-  staffUserId: number;
   adminId: number;
   refundId: number;
 }
@@ -139,10 +133,6 @@ async function scene(kind: 'refund_only' | 'return_and_refund'): Promise<Scene> 
   const [owner] = await db
     .insert(users)
     .values({ account: `perm-owner-${n}` })
-    .returning({ id: users.id });
-  const [staffUser] = await db
-    .insert(users)
-    .values({ account: `perm-staff-${n}` })
     .returning({ id: users.id });
   const [operator] = await db
     .insert(admins)
@@ -213,7 +203,6 @@ async function scene(kind: 'refund_only' | 'return_and_refund'): Promise<Scene> 
 
   return {
     ownerId: owner!.id,
-    staffUserId: staffUser!.id,
     adminId: operator!.id,
     refundId: Number(applied.id),
   };
@@ -349,121 +338,5 @@ describe('review and execute are separate grants', () => {
     await admin.adminApprove(as(superAdmin(s.adminId)), { id: String(s.refundId) });
     await admin.adminReceiveReturn(executor, { id: String(s.refundId) });
     expect((await refundRow(s.refundId)).status).toBe('processing');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// the staff entry points
-// ---------------------------------------------------------------------------
-
-describe('the staff console and the admin services stay apart', () => {
-  it('still refuses a staff actor on every admin service, whatever it is', async () => {
-    const s = await sceneAt('applied');
-    const before = await written(s.refundId);
-    for (const [, atom, , act] of ACTIONS.filter(([, , state]) => state === 'applied')) {
-      const refusal = await refusalOf(() => act(as(staffActor(s.staffUserId)), String(s.refundId)));
-      expect(refusal.code).toBe('FORBIDDEN');
-      expect(refusal.details).toEqual({ permission: atom });
-    }
-    expect(await written(s.refundId)).toEqual(before);
-  });
-
-  it.each([
-    ['a super admin', (s: Scene) => superAdmin(s.adminId)],
-    ['a shopper', (s: Scene) => userActor(s.ownerId)],
-  ])('refuses %s on the staff entry points, and writes nothing', async (_label, actorOf) => {
-    const s = await sceneAt('applied');
-    const ctx = as(actorOf(s));
-    const id = String(s.refundId);
-    const before = await written(s.refundId);
-
-    for (const act of [
-      () => admin.staffList(ctx, { page: 1, pageSize: 20 }),
-      () => admin.staffDetail(ctx, { id }),
-      () => admin.staffApprove(ctx, { id }),
-      () => admin.staffReject(ctx, { id, rejectReason: '不符合条件' }),
-      () => admin.staffRemark(ctx, { id, remark: '看一下' }),
-    ]) {
-      const refusal = await refusalOf(act);
-      expect(refusal.code).toBe('FORBIDDEN');
-      expect(refusal.details).toEqual({ reason: 'staff only' });
-    }
-    expect(await written(s.refundId)).toEqual(before);
-  });
-
-  it('is what the staff port is wired to, not the admin services', () => {
-    const port = resolveStaffRefundPort();
-    expect(port?.list).toBe(admin.staffList);
-    expect(port?.detail).toBe(admin.staffDetail);
-  });
-});
-
-describe('a staff member reviews through the same transitions', () => {
-  it('lists and reads the after-sale', async () => {
-    const s = await sceneAt('applied');
-    const ctx = as(staffActor(s.staffUserId));
-
-    const list = await admin.staffList(ctx, { page: 1, pageSize: 20 });
-    expect(list.items.map((item) => item.id)).toEqual([String(s.refundId)]);
-    const detail = await admin.staffDetail(ctx, { id: String(s.refundId) });
-    expect(detail.id).toBe(String(s.refundId));
-  });
-
-  it('approves a 仅退款: queued for the gateway, attributed to the staff user', async () => {
-    const s = await scene('refund_only');
-
-    await admin.staffApprove(as(staffActor(s.staffUserId)), {
-      id: String(s.refundId),
-      remark: '已核实',
-    });
-
-    const row = await refundRow(s.refundId);
-    expect(row.status).toBe('approved');
-    expect(row.reviewedByAdminId).toBeNull();
-    expect(row.reviewedAt).not.toBeNull();
-    const approval = (await logsOf(s.refundId)).find((log) => log.toStatus === 'approved');
-    expect(approval).toMatchObject({ operatorUserId: s.staffUserId, operatorAdminId: null });
-    expect(approval?.message).toMatch(/^店员同意退款：已核实/);
-    expect((await refundEffects()).map((effect) => effect.scopeId)).toContain(String(s.refundId));
-  });
-
-  it('rejects with the reason, attributed to the staff user', async () => {
-    const s = await scene('return_and_refund');
-
-    await admin.staffReject(as(staffActor(s.staffUserId)), {
-      id: String(s.refundId),
-      rejectReason: '商品已签收超过 7 天',
-    });
-
-    const row = await refundRow(s.refundId);
-    expect(row.status).toBe('rejected');
-    expect(row.rejectReason).toBe('商品已签收超过 7 天');
-    expect(row.reviewedByAdminId).toBeNull();
-    const rejection = (await logsOf(s.refundId)).find((log) => log.toStatus === 'rejected');
-    expect(rejection).toMatchObject({
-      operatorUserId: s.staffUserId,
-      message: '店员拒绝：商品已签收超过 7 天',
-    });
-  });
-
-  it('approves a return to the configured address, never one of its own', async () => {
-    await harness.ctx.config.set(refundConfig, {
-      returnName: '售后部',
-      returnPhone: '13800000000',
-      returnAddress: '浙江省杭州市西湖区文一西路 1 号',
-    });
-    const s = await scene('return_and_refund');
-
-    await admin.staffApprove(as(staffActor(s.staffUserId)), {
-      id: String(s.refundId),
-      // Not part of the staff signature; a caller that smuggles it in is ignored.
-      ...({ returnAddress: { name: '别人', phone: '1', address: '别处' } } as object),
-    });
-
-    expect((await refundRow(s.refundId)).returnAddress).toEqual({
-      name: '售后部',
-      phone: '13800000000',
-      address: '浙江省杭州市西湖区文一西路 1 号',
-    });
   });
 });

@@ -474,7 +474,7 @@ export const paymentEffectExample: PaymentEffectListItem = {
   id: '4410',
   scope: 'order',
   scopeId: '3001',
-  eventType: 'order.paid.notify-staff',
+  eventType: 'notification.send',
   status: 'unknown',
   attempts: 8,
   lastError: 'subscribe message send failed: 43004',

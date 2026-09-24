@@ -156,8 +156,9 @@ export const auditLogs = pgTable(
     ip: varchar({ length: 64 }),
     /**
      * Who acted: `admin` — a console account, `admin_id` — or
-     * `staff` — a 店员 on the storefront's staff surface, `user_id`. Rows
-     * written before the column existed are all console rows, hence the default.
+     * `staff` — a 店员 on the mobile staff console, `user_id` (that console was
+     * deleted at the cutover, so only historic rows carry it). Rows written
+     * before the column existed are all console rows, hence the default.
      */
     actorKind: varchar({ length: 16 }).notNull().default('admin'),
     /** The 店员's storefront user when `actor_kind = 'staff'`. */

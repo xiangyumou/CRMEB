@@ -18,7 +18,7 @@ import { withTx, type TxOptions } from './tx';
  * is what makes the whole system testable with `createTestCtx()`.
  */
 
-export type ActorKind = 'admin' | 'user' | 'staff' | 'anonymous' | 'system';
+export type ActorKind = 'admin' | 'user' | 'anonymous' | 'system';
 
 export interface Actor {
   kind: ActorKind;
@@ -95,7 +95,7 @@ export function requireActorId(ctx: Ctx): number {
 }
 
 export function requireUserId(ctx: Ctx): number {
-  if (ctx.actor.kind !== 'user' && ctx.actor.kind !== 'staff') {
+  if (ctx.actor.kind !== 'user') {
     throw new DomainError('UNAUTHENTICATED');
   }
   return requireActorId(ctx);

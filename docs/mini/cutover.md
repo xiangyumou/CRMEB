@@ -145,12 +145,23 @@ B：删除加落地页；C：删表）不再采用。
 
 ### 2.5 店员接口（计划第 10 节第 3 项：你已同意）
 
-- [ ] `apps/web/app/api/v1/staff/**`（32 个路由文件，共 36 个接口），契约 `order/order.staff.contract.ts`、
+- [x] `apps/web/app/api/v1/staff/**`（32 个路由文件，共 36 个接口），契约 `order/order.staff.contract.ts`、
       `user/user.staff.contract.ts`、`catalog/catalog.staff.contract.ts`、`catalog/catalog.staff.schemas.ts`、
       `shipping/shipping.express.contract.ts` 的 `staffExpressCompanyPicker`（`shipping.staffExpressCompanies`）。
-- [ ] `StaffCheck`（`packages/core/src/auth/user-lookup.ts`）和只被店员接口调用的 service（`order.staff.service.ts`、
+      （C1 补充：清单漏了 `coupon/coupon.staff.contract.ts` 里的三个店员接口 `GET /api/v1/staff/coupons`、
+      `POST /api/v1/staff/coupon-grants`、`GET /api/v1/staff/users/:uid/coupons`，一并删除；同一文件里的
+      `coupon.orderGiftCoupons`（`GET /api/v1/orders/:id/gift-coupons`，顾客自己的订单页在用）保留，文件改名为
+      `coupon/coupon.gift.contract.ts`，对应测试改名为 `apps/web/app/api/v1/gift-coupons.int.test.ts`。）
+- [x] `StaffCheck`（`packages/core/src/auth/user-lookup.ts`）和只被店员接口调用的 service（`order.staff.service.ts`、
       `user-staff.service.ts`）。**后台也在用的 service 保留**：删之前对每个导出 `grep` 一遍调用方。
-- [ ] `order.fulfil.config.ts`、`storage.service.ts` 中与店员相关的分支；`audit_logs.actor_kind = 'staff'` 的约束和已有数据保留。
+      （C1 结果：还删了 `catalog.staff.service.ts`、`refund.admin.ts` 的 `staff*` 函数和 `StaffRefundPort`、
+      `coupon.service.ts` 的店员发券函数、只给店员用的 schema 和错误码；`AuthMode` 和 `ActorKind` 去掉了 `staff`。
+      后台已无调用方但保留的：`UserOrderStatsPort`（和 `order.repo.statsForUsers`）、`refund.admin.ts` 的
+      `Reviewer` 里的 `staff` 分支、`coupon` 的 `activeOnly` 选项、`order.console.service.ts` 的 `operatorOf` 的
+      `user` 分支——都是订单、退款、优惠券逻辑，不在本次改写范围。）
+- [x] `order.fulfil.config.ts`、`storage.service.ts` 中与店员相关的分支；`audit_logs.actor_kind = 'staff'` 的约束和已有数据保留。
+      （C1 结果：配置组「店员与订单提醒」（`order-staff`）和存储设置里的「店员上传大小上限」「每店员每小时上传次数」
+      从后台消失；库里已存的这些配置行没有删。后台操作日志的「店员」筛选保留，用来看历史行。）
 
 ### 2.6 写死的旧小程序路径和旧小程序码接口
 

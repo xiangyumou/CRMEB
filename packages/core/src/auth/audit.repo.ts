@@ -7,7 +7,10 @@ import { allConfigGroups, type ConfigFieldUi } from '../kernel/config-registry';
 export type AuditActorKind = 'admin' | 'staff';
 
 export interface AuditEntry {
-  /** Defaults to `admin`. A `staff` row names the 店员 in `userId`. */
+  /**
+   * Defaults to `admin`. `staff` (the 店员 named in `userId`) is only on rows
+   * written before the cutover deleted the mobile staff console.
+   */
   actorKind?: AuditActorKind;
   adminId: number | null;
   userId?: number | null;

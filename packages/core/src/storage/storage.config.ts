@@ -54,19 +54,6 @@ export const storageConfig = defineConfigGroup({
       .default(5 * 1024 * 1024),
     /** Per shopper, per hour. Abuse control, not a quality gate. */
     userUploadsPerHour: z.number().int().min(1).max(500).default(30),
-    /**
-     * 商家管理 uploads (`purpose=staff`): a product photo is not a review
-     * snapshot, so it gets the admin ceiling and its own hourly budget — adding
-     * one product with eight images must not spend the allowance the same
-     * person shops with.
-     */
-    maxStaffUploadBytes: z
-      .number()
-      .int()
-      .min(64 * 1024)
-      .max(100 * 1024 * 1024)
-      .default(10 * 1024 * 1024),
-    staffUploadsPerHour: z.number().int().min(1).max(2000).default(120),
 
     /** How long a scan-upload QR code is good for. */
     scanTokenTtlSeconds: z.number().int().min(60).max(3600).default(600),
@@ -174,18 +161,6 @@ export const storageConfig = defineConfigGroup({
       type: 'number',
       section: '限制',
       order: 32,
-    },
-    maxStaffUploadBytes: {
-      label: '店员上传大小上限（字节）',
-      type: 'number',
-      section: '限制',
-      order: 33,
-    },
-    staffUploadsPerHour: {
-      label: '每店员每小时上传次数',
-      type: 'number',
-      section: '限制',
-      order: 34,
     },
 
     scanTokenTtlSeconds: {
