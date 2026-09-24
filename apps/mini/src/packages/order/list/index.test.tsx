@@ -62,6 +62,37 @@ describe('我的订单', () => {
     expect(requestedTabs()).toEqual(['all', 'cancelled']);
   });
 
+  it('coming back to a stale list, asks for page 1 only and keeps the pages scrolled through', async () => {
+    let round = 0;
+    const seen = serveApi({
+      'GET /api/v1/orders/counts': () => ({ body: counts }),
+      'GET /api/v1/orders': () => {
+        const page = Number(seen.at(-1)?.query.page);
+        if (page === 1) round += 1;
+        const ids = page === 1 ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [11, 12];
+        const items = ids.map((n) =>
+          orderListItem({
+            id: String(9000 + n),
+            orderNo: n === 1 ? `R${round}-000${n}` : `000${n}`,
+          }),
+        );
+        return { body: paged(items, 12, page) };
+      },
+    });
+    await renderPage(<OrderListPage />);
+    await screen.findByText('订单号 R1-0001');
+    taroFake.reachBottom();
+    await screen.findByText('订单号 00012');
+    const pages = () => seen.filter((r) => r.key === 'GET /api/v1/orders').map((r) => r.query.page);
+    expect(pages()).toEqual(['1', '2']);
+
+    // Back from another page after the 30 s staleTime (the test client's is 0).
+    taroFake.showPage();
+    await screen.findByText('订单号 R2-0001');
+    expect(pages()).toEqual(['1', '2', '1']);
+    expect(screen.getByText('订单号 00012')).toBeTruthy();
+  });
+
   it('lists the orders still to review under 待评价, with its count, and offers 去评价', async () => {
     taroFake.routerParams = { tab: 'unreviewed' };
     serveApi({

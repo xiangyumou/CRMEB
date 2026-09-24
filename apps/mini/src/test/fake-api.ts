@@ -41,3 +41,17 @@ export function serveApi(routes: Record<string, (body: unknown) => FakeReply>): 
   };
   return seen;
 }
+
+/**
+ * Holds every answer to a path ending in `path` (after `serveApi`) until `release()`: what went
+ * out while it was pending shows which requests ran side by side.
+ */
+export function holdRequests(path: string): { release: () => void } {
+  const answer = taroFake.onRequest;
+  const waiting: Array<() => void> = [];
+  taroFake.onRequest = (option) =>
+    option.url.split('?')[0]?.endsWith(path)
+      ? new Promise((resolve) => waiting.push(() => resolve(answer(option))))
+      : answer(option);
+  return { release: () => waiting.splice(0).forEach((go) => go()) };
+}

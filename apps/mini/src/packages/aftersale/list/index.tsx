@@ -61,7 +61,7 @@ function RefundList({ state }: { state: State }) {
     { query: { state, pageSize: 10 } },
     { enabled: signedIn },
   );
-  useRefetchOnShow(routeKey('refund.myList'));
+  useRefetchOnShow(routeKey('refund.myList'), { pages: 'first' });
   const actions = useRefundActions();
   return (
     <View className="refund-list">

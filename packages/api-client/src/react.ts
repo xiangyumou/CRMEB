@@ -15,6 +15,7 @@
  * Works with React 18 (Taro) and 19 (the admin); uses nothing newer than 18.
  */
 import {
+  infiniteQueryOptions,
   queryOptions,
   useInfiniteQuery,
   useMutation,
@@ -190,6 +191,51 @@ export function nextPageOf(last: PagedShape): number | undefined {
 }
 
 /**
+ * Query options for a paged list read page by page, for `useInfiniteQuery` or
+ * `queryClient.prefetchInfiniteQuery`: the key and page logic `useInfiniteRouteQuery` uses,
+ * so a prefetch lands in the cache entry the hook reads.
+ *
+ * ```ts
+ * void queryClient.prefetchInfiniteQuery(
+ *   infiniteRouteQueryOptions(client, 'catalog.productList', { query: { categoryIds, pageSize: 20 } }),
+ * );
+ * ```
+ */
+export function infiniteRouteQueryOptions<K extends PagedRouteId>(
+  client: ApiClient,
+  id: K,
+  ...args: InfiniteRouteArgs<K, UseInfiniteRouteQueryOptions<K>>
+) {
+  const [input, options] = args as [
+    InfiniteInputOf<K> | undefined,
+    UseInfiniteRouteQueryOptions<K>?,
+  ];
+  const { call, ...rest } = options ?? {};
+  const queryKey = [
+    id,
+    stableInput(input ?? {}) as Partial<InputOf<K>>,
+    'infinite',
+  ] as const satisfies InfiniteRouteQueryKey<K>;
+
+  return infiniteQueryOptions<
+    ResponseOf<K>,
+    RouteError<K>,
+    InfiniteData<ResponseOf<K>, number>,
+    InfiniteRouteQueryKey<K>,
+    number
+  >({
+    ...rest,
+    queryKey,
+    initialPageParam: 1,
+    getNextPageParam: (last) => nextPageOf(last as PagedShape),
+    queryFn: ({ pageParam, signal }) => {
+      const query = { ...input?.query, page: pageParam };
+      return callFor(client, id, { ...input, query } as unknown as InputOf<K>, { ...call, signal });
+    },
+  });
+}
+
+/**
  * A `paged(...)` list read page by page, for 上拉加载更多. Pages start at 1;
  * `fetchNextPage()` asks for `page + 1` until `page * pageSize >= total`.
  *
@@ -204,27 +250,7 @@ export function useInfiniteRouteQuery<K extends PagedRouteId>(
   ...args: InfiniteRouteArgs<K, UseInfiniteRouteQueryOptions<K>>
 ): UseInfiniteQueryResult<InfiniteData<ResponseOf<K>, number>, RouteError<K>> {
   const client = useApiClient();
-  const [input, options] = args as [
-    InfiniteInputOf<K> | undefined,
-    UseInfiniteRouteQueryOptions<K>?,
-  ];
-  const { call, ...rest } = options ?? {};
-  const queryKey = [
-    id,
-    stableInput(input ?? {}) as Partial<InputOf<K>>,
-    'infinite',
-  ] as const satisfies InfiniteRouteQueryKey<K>;
-
-  return useInfiniteQuery({
-    ...rest,
-    queryKey,
-    initialPageParam: 1,
-    getNextPageParam: (last) => nextPageOf(last as PagedShape),
-    queryFn: ({ pageParam, signal }) => {
-      const query = { ...input?.query, page: pageParam };
-      return callFor(client, id, { ...input, query } as unknown as InputOf<K>, { ...call, signal });
-    },
-  });
+  return useInfiniteQuery(infiniteRouteQueryOptions<K>(client, id, ...args));
 }
 
 /** Every item of every loaded page, in order. */

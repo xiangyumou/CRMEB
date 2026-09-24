@@ -6,6 +6,7 @@ import { createApiClient } from './client';
 import {
   ApiClientProvider,
   flattenPages,
+  infiniteRouteQueryOptions,
   invalidateRoutes,
   nextPageOf,
   routeKey,
@@ -34,7 +35,7 @@ function setup(respond: (request: TransportRequest) => TransportResponse) {
       createElement(ApiClientProvider, { client }, children),
     );
   const hits = (path: string) => fake.requests.filter((r) => r.url.includes(path)).length;
-  return { wrapper, queryClient, requests: fake.requests, hits };
+  return { wrapper, client, queryClient, requests: fake.requests, hits };
 }
 
 describe(`hooks on React ${version}`, () => {
@@ -112,6 +113,30 @@ describe('useInfiniteRouteQuery', () => {
       'keyword=%E8%8C%B6&page=1&pageSize=2',
       'keyword=%E8%8C%B6&page=2&pageSize=2',
       'keyword=%E8%8C%B6&page=3&pageSize=2',
+    ]);
+  });
+
+  it('fills, through infiniteRouteQueryOptions, the entry the hook reads (a prefetch)', async () => {
+    const { wrapper, client, queryClient, requests } = setup(pageOf);
+    // The app's staleTime: a copy just fetched is not asked for again on mount.
+    queryClient.setDefaultOptions({ queries: { retry: false, staleTime: 30_000 } });
+    const input = { query: { keyword: '茶', pageSize: 2 } };
+    await queryClient.prefetchInfiniteQuery(
+      infiniteRouteQueryOptions(client, 'catalog.productList', input),
+    );
+    expect(requests).toHaveLength(1);
+
+    const { result } = renderHook(
+      // Property order does not matter: the key is normalised the same way.
+      () => useInfiniteRouteQuery('catalog.productList', { query: { pageSize: 2, keyword: '茶' } }),
+      { wrapper },
+    );
+    expect(result.current.isSuccess).toBe(true);
+    expect(flattenPages(result.current.data).map((p) => p.id)).toEqual(['1', '2']);
+    await act(() => result.current.fetchNextPage());
+    expect(requests.map((r) => r.url.split('?')[1])).toEqual([
+      'keyword=%E8%8C%B6&page=1&pageSize=2',
+      'keyword=%E8%8C%B6&page=2&pageSize=2',
     ]);
   });
 

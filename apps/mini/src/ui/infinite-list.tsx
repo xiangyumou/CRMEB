@@ -55,8 +55,18 @@ export function InfiniteList<T>({
   refreshable = true,
   className,
 }: InfiniteListProps<T>) {
+  // Offset pages can overlap when rows move between two page loads (a new order on top, a
+  // page 1 fetched again on return): a row already shown is not shown twice.
   const items: T[] = [];
-  for (const page of query.data?.pages ?? []) items.push(...page.items);
+  const seen = new Set<string>();
+  for (const page of query.data?.pages ?? []) {
+    for (const item of page.items) {
+      const key = itemKey(item);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push(item);
+    }
+  }
 
   const loadMore = () => {
     if (query.hasNextPage && !query.isFetchingNextPage && !query.isFetchNextPageError) {
