@@ -14,8 +14,11 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   // `pg` and `ioredis` load optional native bits at runtime; bundling them is
-  // more trouble than the few hundred kilobytes are worth.
-  external: ['pg', 'pg-native', 'ioredis', 'bullmq'],
+  // more trouble than the few hundred kilobytes are worth. `sharp` is a native
+  // addon (libvips) that loads its platform's prebuilt `@img/sharp-*` package:
+  // it cannot be inlined, and `pnpm deploy --prod` installs it with the
+  // platform's binary (see `docker/worker.Dockerfile`).
+  external: ['pg', 'pg-native', 'ioredis', 'bullmq', 'sharp'],
   // The `@shop/*` packages publish TypeScript source, not build output, so
   // tsup's default "externalise everything in dependencies" would leave the
   // bundle importing files that node cannot load. Bundle them.
