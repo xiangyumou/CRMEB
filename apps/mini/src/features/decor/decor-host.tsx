@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useRef, type ReactNode } from 'react';
 import type { StorefrontRoute } from '@shop/api-client/routes';
-import type { BlockHost, BlockIntent } from '@shop/storefront-blocks';
+import type { BlockHost, BlockIntent, ImageResolver } from '@shop/storefront-blocks';
 import { claimFailureText, useClaimCoupon } from '@/features/coupon/use-claim';
+import { assetUrl, imageUrl } from '@/lib/asset-url';
 import { serverNow } from '@/lib/server-clock';
 import { callPhone, officialAccountBar } from '@/platform';
 import { requireLogin, useSignedIn } from '@/session/session';
@@ -41,6 +42,14 @@ export function useDecorRenderIntent(sessionFrom: string): RenderIntent {
   );
 }
 
+/**
+ * `BlockHost.resolveImage` for the mini-program: a stored `/uploads/…` path against the API
+ * origin (a block drew it as it was before, which loads nothing here), and the server's 360 or
+ * 750 px copy where one exists.
+ */
+export const resolveDecorImage: ImageResolver = (src, width) =>
+  (width === undefined ? assetUrl(src) : imageUrl(src, width === 360 ? 'small' : 'medium')) ?? src;
+
 export interface DecorHost {
   host: BlockHost;
   onIntent: (intent: BlockIntent) => void;
@@ -49,7 +58,7 @@ export interface DecorHost {
 
 /**
  * Everything a page drawing `BlockList` adds (docs/mini/decor.md §2.4): the `host` facts
- * (signed in, the server clock, a sheet open over the page) and the answers to the blocks'
+ * (signed in, the server clock, a sheet open over the page, how to load a picture) and the answers to the blocks'
  * intents.
  *
  * - `login`, `claimNewcomerCoupons`: through `requireLogin(route)`. Signed in on the spot (a
@@ -112,7 +121,7 @@ export function useDecorHost(route: StorefrontRoute, reload: () => unknown): Dec
   );
 
   const host = useMemo<BlockHost>(
-    () => ({ signedIn, serverNow, overlayOpen }),
+    () => ({ signedIn, serverNow, overlayOpen, resolveImage: resolveDecorImage }),
     [signedIn, overlayOpen],
   );
   return { host, onIntent, renderIntent };

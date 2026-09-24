@@ -53,7 +53,7 @@ export function RefundCard({
         {refund.items.map((item) => (
           <View key={item.orderItemId} className="refund-card__row">
             <View className="refund-card__thumb">
-              <Image src={item.productImageUrl} radius="sm" />
+              <Image src={item.productImageUrl} radius="sm" size="small" />
             </View>
             <View className="refund-card__info">
               <Text className="refund-card__name">{item.productName}</Text>

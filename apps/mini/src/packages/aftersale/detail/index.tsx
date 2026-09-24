@@ -148,7 +148,7 @@ function Body({ id }: { id: string }) {
           {refund.items.map((item) => (
             <View key={item.orderItemId} className="refund-detail__item">
               <View className="refund-detail__thumb">
-                <Image src={item.productImageUrl} radius="sm" />
+                <Image src={item.productImageUrl} radius="sm" size="small" />
               </View>
               <View className="refund-detail__info">
                 <Text className="refund-detail__name">{item.productName}</Text>
@@ -200,7 +200,7 @@ function Body({ id }: { id: string }) {
                   className="refund-detail__image"
                   onClick={() => previewImages(refund.images, url)}
                 >
-                  <Image src={url} radius="sm" />
+                  <Image src={url} radius="sm" size="small" />
                 </Pressable>
               ))}
             </View>

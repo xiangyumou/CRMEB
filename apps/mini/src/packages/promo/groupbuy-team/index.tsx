@@ -190,7 +190,7 @@ function Team({ view, onStale }: { view: TeamView; onStale: () => void }) {
             onClick={() => void navigate({ route: 'groupbuy', params: { id: view.activityId } })}
           >
             <View className="groupbuy-team__image">
-              <Image src={view.imageUrl} label={view.title} radius="sm" lazy={false} />
+              <Image src={view.imageUrl} label={view.title} radius="sm" lazy={false} size="small" />
             </View>
             <View className="groupbuy-team__product-body">
               <Text className="groupbuy-team__title">{view.title}</Text>

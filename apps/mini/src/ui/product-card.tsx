@@ -90,6 +90,7 @@ export function ProductCard({
           src={(layout === 'grid' ? product.cardImageUrl : null) ?? product.imageUrl}
           ratio={1}
           radius={layout === 'list' ? 'sm' : 'none'}
+          size={layout === 'grid' ? 'medium' : 'small'}
         />
         {activity ? <Text className="shop-product__activity">{activity}</Text> : null}
         {unavailable || soldOut ? (

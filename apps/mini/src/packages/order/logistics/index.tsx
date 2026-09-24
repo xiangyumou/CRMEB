@@ -119,7 +119,7 @@ function ParcelView({ parcel }: { parcel: Shipment }) {
           {parcel.lines.map((line) => (
             <View key={line.orderItemId} className="logistics__item">
               <View className="logistics__thumb">
-                <Image src={line.productImageUrl} radius="sm" />
+                <Image src={line.productImageUrl} radius="sm" size="small" />
               </View>
               <Text className="logistics__qty">×{line.quantity}</Text>
             </View>

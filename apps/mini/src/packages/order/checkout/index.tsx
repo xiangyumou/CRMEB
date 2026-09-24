@@ -264,7 +264,12 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
         {preview.lines.map((line) => (
           <View key={line.itemKey} className="checkout__line">
             <View className="checkout__line-image">
-              <Image src={line.skuImageUrl ?? line.productImageUrl} ratio={1} radius="sm" />
+              <Image
+                src={line.skuImageUrl ?? line.productImageUrl}
+                ratio={1}
+                radius="sm"
+                size="small"
+              />
             </View>
             <View className="checkout__line-body">
               <Text className="checkout__line-name">{line.productName}</Text>

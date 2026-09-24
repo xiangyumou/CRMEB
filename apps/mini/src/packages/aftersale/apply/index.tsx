@@ -236,7 +236,7 @@ function Form({
                 <View />
               </Checkbox>
               <View className="refund-apply__thumb">
-                <Image src={item.productImageUrl} radius="sm" />
+                <Image src={item.productImageUrl} radius="sm" size="small" />
               </View>
               <View className="refund-apply__info">
                 <Text className="refund-apply__name">{item.productName}</Text>
