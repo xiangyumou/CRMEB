@@ -761,14 +761,16 @@ A password sign-in that carries a parked WeChat sign-in's `bindToken` links that
 
 ### AUTH-010
 
-The mini-program replays a request that met a 401 only as the account that sent it. A renewal's `wx.login` signs in to whichever account holds the phone's openid; when that is not the account whose session ended — or that account is unknown (a token stored without its account) — the new session is revoked and not stored, the shopper is signed out, every request that shared the renewal keeps its 401 (a write goes out once, as its sender), and the login page opens once with「登录已过期，请重新登录」. A request whose token went stale is replayed with the current token only if it is the same account's. The same account replays exactly as before.
+The mini-program replays a request that met a 401 only as the account that sent it. A renewal's `wx.login` signs in to whichever account holds the phone's openid; when that is not the account whose session ended — or that account is unknown (a token stored without its account) — the new session is revoked and not stored, the shopper is signed out, every request that shared the renewal keeps its 401 (a write goes out once, as its sender), and the login page opens once, saying「登录已过期，请重新登录」on the page (not a toast) until the shopper signs in or leaves. A request whose token went stale is replayed with the current token only if it is the same account's. The same account replays exactly as before.
 
 - `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > replays a write as the same account, and opens no login page`
 - `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > sends a write once when WeChat signs in to another account: signed out, that session revoked, the 401 raised, the login page opened with a hint`
 - `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > gives every request that failed alongside the same answer: one wx.login, none replayed, one login page`
+- `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > drops the notice once the shopper signs in again`
 - `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > replays nothing after renewing a token stored with no account beside it`
 - `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > does not replay a stale token's request with another account's session, nor renew for it`
 - `apps/mini/src/session/session.test.ts::AUTH-010 — a request that met a 401 is replayed only as the account that sent it > undoes another account the same way for 修改密码, which leaves the page itself`
+- `apps/mini/src/pages/login/index.test.tsx::AUTH-010 — the notice of a renewal that reached another account > says why the shopper is here in place of the hint, and drops it on leaving`
 - `e2e/storefront/specs-mini/login.spec.ts::AUTH-010: a write that meets an ended password session is not replayed as the account this phone's WeChat belongs to, and the shopper is back at the login page`
 
 ## Fulfilment, the order console and invoices

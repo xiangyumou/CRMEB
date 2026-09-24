@@ -83,6 +83,7 @@ function ownerOf(token: string): string | null {
 }
 
 function signedIn(token: string, userId: string): void {
+  clearSessionNotice();
   storage.set(TOKEN_KEY, token);
   if (userId) {
     owners.set(token, userId);
@@ -217,17 +218,27 @@ export async function renewSession(): Promise<string | null> {
   return (await renew()).token;
 }
 
-/** Where the shopper goes when a renewal reached another account (AUTH-010). */
-const SESSION_ENDED = '登录已过期，请重新登录';
+/** What the login page says when a renewal reached another account (AUTH-010). */
+export const SESSION_ENDED = '登录已过期，请重新登录';
+
+/**
+ * Why the login page was opened for the shopper, if the session opened it: the login page shows
+ * it as a line of its own until the shopper signs in or leaves. Not a toast: the failed request's
+ * caller shows its own error toast about then, and a toast replaces the one before it (on H5 even
+ * a `hideLoading` hides it), so a toast here was not reliably seen.
+ */
+export const useSessionNotice = create<{ notice: string | null }>()(() => ({ notice: null }));
+
+export function clearSessionNotice(): void {
+  useSessionNotice.setState({ notice: null });
+}
 
 function sendToLogin(renewal: Renewal): void {
   if (renewal.sentToLogin) return;
   renewal.sentToLogin = true;
-  // Not awaited: the failed request's 401 reaches its caller first, and the hint shows last,
-  // on the login page.
-  void navigate({ route: 'login', params: {} })
-    .then(() => showToast(SESSION_ENDED))
-    .catch(() => undefined);
+  useSessionNotice.setState({ notice: SESSION_ENDED });
+  // Not awaited: the failed request's 401 reaches its caller meanwhile.
+  void navigate({ route: 'login', params: {} }).catch(() => undefined);
 }
 
 /**
@@ -242,7 +253,7 @@ function sendToLogin(renewal: Renewal): void {
  *   second `wx.login`.
  *
  * When the renewal reached another account the shopper is signed out and sent to the login
- * page, once, with「登录已过期，请重新登录」; the request is not replayed.
+ * page, once, which says「登录已过期，请重新登录」(`useSessionNotice`); the request is not replayed.
  */
 export async function renewFor(sent: string): Promise<string | null> {
   // Before renewing: the renewal forgets the stored token, and with it a stored token's account.
@@ -406,5 +417,6 @@ export async function logout({ everywhere = false }: { everywhere?: boolean } = 
     }
   }
   forgetStored();
+  clearSessionNotice();
   set({ status: 'signed-out' });
 }

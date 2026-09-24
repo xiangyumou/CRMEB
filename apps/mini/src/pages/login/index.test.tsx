@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { TOKEN_KEY, useSession } from '@/session/session';
+import { TOKEN_KEY, useSession, useSessionNotice } from '@/session/session';
 import { rejected } from '@/test/account-fixture';
 import { serveApi } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
@@ -143,5 +143,29 @@ describe('登录 · 手机号快速登录', () => {
       status: 'phone-required',
       bindToken: 'bind-1',
     });
+  });
+});
+
+describe('AUTH-010 — the notice of a renewal that reached another account', () => {
+  it('says why the shopper is here in place of the hint, and drops it on leaving', async () => {
+    useSession.setState({ session: { status: 'signed-out' } });
+    useSessionNotice.setState({ notice: '登录已过期，请重新登录' });
+
+    const { unmount } = await renderPage(<LoginPage />);
+
+    expect(screen.getByText('登录已过期，请重新登录')).toBeTruthy();
+    expect(screen.queryByText('登录后可以下单、查看订单和领取优惠券')).toBeNull();
+    unmount();
+    expect(useSessionNotice.getState().notice).toBeNull();
+  });
+
+  it('shows the usual hint when the session did not send the shopper here', async () => {
+    useSession.setState({ session: { status: 'signed-out' } });
+    useSessionNotice.setState({ notice: null });
+
+    await renderPage(<LoginPage />);
+
+    expect(screen.getByText('登录后可以下单、查看订单和领取优惠券')).toBeTruthy();
+    expect(screen.queryByText('登录已过期，请重新登录')).toBeNull();
   });
 });

@@ -36,6 +36,10 @@
     margin-top: $space-2;
     @include text($font-body);
     color: var(--color-text-tertiary);
+
+    &--notice {
+      color: var(--color-text-secondary);
+    }
   }
 
   &__form {

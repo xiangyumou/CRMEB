@@ -331,7 +331,8 @@ test("AUTH-010: a write that meets an ended password session is not replayed as 
   await product.sheetButton('加入购物车').click();
 
   // The renewal's wx.login reached the other account: not kept, the shopper signed out and
-  // asked to sign in again.
+  // asked to sign in again — a line on the login page, not a toast (the add-to-cart's own error
+  // toast replaced that one).
   await expect(page).toHaveURL(/pages\/login\/index/);
   await expect(shown(page).getByText('登录已过期，请重新登录')).toBeVisible();
   expect(signIns.count()).toBe(1);
