@@ -26,6 +26,7 @@ import type { z } from 'zod';
 /** The semantic kinds the admin renders with a control of its own. */
 export const SEMANTIC_FIELD_KINDS = [
   'image',
+  'video',
   'link',
   'color',
   'productSource',

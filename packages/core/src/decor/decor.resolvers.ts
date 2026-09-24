@@ -7,6 +7,7 @@ import type {
   CouponUserState,
   DataNeed,
   DataNeedKind,
+  HeldCoupon,
   OrderEntryCounts,
   ProductSource,
   ProductSummary,
@@ -116,15 +117,6 @@ function toArticleSummary(item: ArticleListItem): ArticleSummary {
   };
 }
 
-/** Keeps `items` whose id is in `ids`, in the order of `ids`. */
-function pick<T>(items: readonly T[], ids: readonly string[], idOf: (item: T) => string): T[] {
-  const byId = new Map(items.map((item) => [idOf(item), item]));
-  return ids.map((id) => byId.get(id)).filter((item): item is T => item !== undefined);
-}
-
-/** The campaign lists have no id filter; a manual pick reads one full page and picks. */
-const CAMPAIGN_PAGE = 100;
-
 export const defaultResolvers: DataResolvers = {
   products: (ctx, need) => resolveProducts(ctx, need.source),
 
@@ -148,9 +140,7 @@ export const defaultResolvers: DataResolvers = {
   async groupbuys(ctx, need) {
     const source = need.source;
     if (source.mode === 'manual') {
-      if (source.ids.length === 0) return [];
-      const { items } = await groupbuy.list(ctx, { page: 1, pageSize: CAMPAIGN_PAGE });
-      return pick(items, source.ids, (item) => item.activityId);
+      return groupbuy.cardsFor(ctx, source.ids);
     }
     return (await groupbuy.list(ctx, { page: 1, pageSize: source.limit })).items;
   },
@@ -158,9 +148,7 @@ export const defaultResolvers: DataResolvers = {
   async presales(ctx, need) {
     const source = need.source;
     if (source.mode === 'manual') {
-      if (source.ids.length === 0) return [];
-      const { items } = await presale.list(ctx, { page: 1, pageSize: CAMPAIGN_PAGE });
-      return pick(items, source.ids, (item) => item.activityId);
+      return presale.cardsFor(ctx, source.ids);
     }
     return (await presale.list(ctx, { page: 1, pageSize: source.limit })).items;
   },
@@ -255,4 +243,21 @@ export async function userSummaryFor(ctx: Ctx, stats: boolean): Promise<UserSumm
     history: history.total,
   };
   return summary;
+}
+
+/**
+ * The 新人券 the signed-in shopper still holds unused, soonest to expire
+ * first (DECOR-015): what decides whether a signed-in shopper sees the 新人券
+ * block at all.
+ */
+export async function heldNewcomerCouponsFor(ctx: Ctx, limit: number): Promise<HeldCoupon[]> {
+  const coupons = await coupon.listHeldNewUser(ctx, limit);
+  return coupons.map((item) => ({
+    id: item.id,
+    templateId: item.templateId,
+    title: item.title,
+    discountAmount: item.discountAmount,
+    minSpend: item.minSpend,
+    validTo: item.validTo,
+  }));
 }

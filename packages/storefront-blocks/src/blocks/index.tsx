@@ -2,10 +2,17 @@ import type { ComponentType, ReactNode } from 'react';
 
 import type { LinkTarget } from '@shop/contracts/decor/link';
 import type { BlockType } from '../schema';
+import { ArticleList } from './article-list/article-list';
+import { GroupbuyList } from './campaign-list/groupbuy-list';
+import { PresaleList } from './campaign-list/presale-list';
 import { Carousel } from './carousel/carousel';
+import { CouponList } from './coupon-list/coupon-list';
+import { FloatingContact } from './floating-contact/floating-contact';
+import { FollowOfficialAccount } from './follow-official-account/follow-official-account';
 import { HotspotImage } from './hotspot-image/hotspot-image';
 import { ImageCube } from './image-cube/image-cube';
 import { NavGrid } from './nav-grid/nav-grid';
+import { NewcomerCoupon } from './newcomer-coupon/newcomer-coupon';
 import { Notice } from './notice/notice';
 import { OrderEntry } from './order-entry/order-entry';
 import { ProductGrid } from './product-grid/product-grid';
@@ -14,15 +21,29 @@ import { RichText } from './rich-text/rich-text';
 import { SearchBar } from './search-bar/search-bar';
 import { ServiceGrid } from './service-grid/service-grid';
 import type { PersonalSlots } from './shared/personal';
-import type { BlockIntent, BlockProps } from './shared/types';
+import type { BlockHost, BlockIntent, BlockProps } from './shared/types';
 import { Spacer } from './spacer/spacer';
 import { TitleBar } from './title-bar/title-bar';
 import { UserCard } from './user-card/user-card';
+import { Video } from './video/video';
 
+export { ArticleList, type ArticleListData } from './article-list/article-list';
+export { CampaignCards, type CampaignCard } from './campaign-list/campaign-cards';
+export { GroupbuyList, type CampaignListData } from './campaign-list/groupbuy-list';
+export { PresaleList, presaleCountdown } from './campaign-list/presale-list';
 export { Carousel } from './carousel/carousel';
+export {
+  CouponList,
+  couponAction,
+  couponValidity,
+  type CouponListData,
+} from './coupon-list/coupon-list';
+export { FloatingContact } from './floating-contact/floating-contact';
+export { FollowOfficialAccount } from './follow-official-account/follow-official-account';
 export { HotspotImage } from './hotspot-image/hotspot-image';
 export { ImageCube } from './image-cube/image-cube';
 export { NavGrid } from './nav-grid/nav-grid';
+export { NewcomerCoupon, type NewcomerCouponData } from './newcomer-coupon/newcomer-coupon';
 export { Notice } from './notice/notice';
 export { OrderEntry, orderEntryLink } from './order-entry/order-entry';
 export { ProductCards, type ProductCardsProps } from './product-grid/product-cards';
@@ -34,9 +55,10 @@ export { ServiceGrid } from './service-grid/service-grid';
 export { Spacer } from './spacer/spacer';
 export { TitleBar } from './title-bar/title-bar';
 export { UserCard } from './user-card/user-card';
+export { Video } from './video/video';
 export { BlockFrame } from './shared/frame';
 export type { PersonalSlots } from './shared/personal';
-export type { BlockIntent, BlockProps } from './shared/types';
+export type { BlockHost, BlockIntent, BlockProps } from './shared/types';
 
 /**
  * Block type → component. A `Record` over `BlockType` (every registered
@@ -59,6 +81,14 @@ export const BLOCK_COMPONENTS: Record<BlockType, ComponentType<BlockProps<any, a
   userCard: UserCard,
   orderEntry: OrderEntry,
   serviceGrid: ServiceGrid,
+  couponList: CouponList,
+  newcomerCoupon: NewcomerCoupon,
+  groupbuyList: GroupbuyList,
+  presaleList: PresaleList,
+  articleList: ArticleList,
+  video: Video,
+  floatingContact: FloatingContact,
+  followOfficialAccount: FollowOfficialAccount,
 };
 
 export interface RenderedBlock {
@@ -77,6 +107,11 @@ export interface BlockListProps {
   onLink?: ((target: LinkTarget) => void) | undefined;
   onIntent?: ((intent: BlockIntent) => void) | undefined;
   renderIntent?: ((intent: BlockIntent, children: ReactNode) => ReactNode) | undefined;
+  /**
+   * Where the page is drawn (`BlockHost`). `signedIn`, when not given, is
+   * derived from `personal`: `null` / absent is a guest.
+   */
+  host?: BlockHost | undefined;
 }
 
 /**
@@ -91,7 +126,12 @@ export function BlockList({
   onLink,
   onIntent,
   renderIntent,
+  host,
 }: BlockListProps) {
+  const blockHost: BlockHost = {
+    ...host,
+    signedIn: host?.signedIn ?? (personal !== null && personal !== undefined),
+  };
   return (
     <>
       {blocks.map((block) => {
@@ -108,6 +148,7 @@ export function BlockList({
             onLink={onLink}
             onIntent={onIntent}
             renderIntent={renderIntent}
+            host={blockHost}
           />
         );
       })}

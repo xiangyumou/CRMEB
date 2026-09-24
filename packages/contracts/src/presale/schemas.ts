@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { id, instant, money, pageQuery, paged, sortQuery } from '../_conventions/common';
+import { id, idList, instant, money, pageQuery, paged, sortQuery } from '../_conventions/common';
 
 /**
  * Shapes shared by the presale routes.
@@ -211,6 +211,12 @@ export const presaleListQuery = pageQuery.extend({
    * 预售 right now. The list's own rule still holds: `active` and inside its window.
    */
   productId: id.optional(),
+  /**
+   * Exactly these activities, in this order — what a DIY 预售 component's
+   * 指定数据 saved. An activity the shopper cannot see now (paused, outside its
+   * window, deleted) is skipped, not an error.
+   */
+  ids: idList.optional(),
 });
 export type PresaleListQuery = z.infer<typeof presaleListQuery>;
 export const pagedPresaleCards = paged(presaleCard);

@@ -62,8 +62,9 @@ function heading(
 const productDisplay = { titleLines: 2, showMarketPrice: true, showTag: true } as const;
 
 /**
- * 首页 · 简约: search, hero, five quick entries, one line of notice, a feature
- * cube, new arrivals as a scroller and the rest under tabs.
+ * 首页 · 简约: search, hero, five quick entries, one line of notice, the
+ * coupons on offer, a feature cube, new arrivals as a scroller and the rest
+ * under tabs.
  */
 export const HOME_MODERN: StoredDocument = {
   schemaVersion: 2,
@@ -133,6 +134,20 @@ export const HOME_MODERN: StoredDocument = {
         lines: [{ text: '所有订单均以隐私包装发出，外包装不显示商品信息' }],
         mode: 'scroll',
         interval: 5000,
+        style: card,
+        visibility: everyone,
+      },
+    },
+    {
+      // All claimable coupons, first three; the row hides itself when there are none.
+      id: 'home-coupons',
+      type: 'couponList',
+      v: 1,
+      props: {
+        title: '领券中心',
+        showMore: true,
+        source: { mode: 'auto', limit: 3 },
+        layout: 'scroll',
         style: card,
         visibility: everyone,
       },

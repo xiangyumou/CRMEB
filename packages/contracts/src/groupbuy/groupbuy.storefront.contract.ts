@@ -57,6 +57,12 @@ export const groupbuyList = defineRoute({
       query: { page: 1, pageSize: 1, productId: '11' },
       response: { items: [groupbuyCardExample], total: 1, page: 1, pageSize: 1 },
     },
+    {
+      // A DIY 拼团 component's 指定数据: 9 has ended, so it is skipped.
+      name: 'picked',
+      query: { page: 1, pageSize: 20, ids: '9,1' },
+      response: { items: [groupbuyCardExample], total: 1, page: 1, pageSize: 20 },
+    },
   ],
 });
 

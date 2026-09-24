@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  articleListBlock,
+  couponListBlock,
+  couponListProps,
   decorBlocks,
+  floatingContactBlock,
+  floatingContactProps,
+  followOfficialAccountBlock,
+  groupbuyListBlock,
+  groupbuyListProps,
   hotspotImageProps,
+  newcomerCouponBlock,
+  newcomerCouponProps,
+  presaleListBlock,
   navGridProps,
   noticeProps,
   orderEntryBlock,
@@ -13,6 +24,8 @@ import {
   spacerProps,
   titleBarProps,
   userCardBlock,
+  videoBlock,
+  videoProps,
 } from './all-blocks';
 import { productTabSlot } from './constants';
 import { checkDocument, collectReferences, type StoredDocument } from './document';
@@ -192,5 +205,139 @@ describe('the 个人中心 blocks', () => {
       path: ['items', 0, 'link'],
       message: '请选择跳转链接',
     });
+  });
+});
+
+describe('the batch-2 blocks (G2)', () => {
+  const place = (type: string, props: Record<string, unknown>, id = `b-${type}`) => ({
+    id,
+    type,
+    v: 1,
+    props,
+  });
+
+  it('fill their defaults so a new block is valid, except a video, which waits for its file', () => {
+    expect(couponListBlock.props.parse({})).toMatchObject({
+      title: '领券中心',
+      showMore: true,
+      source: { mode: 'auto', limit: 3 },
+      layout: 'scroll',
+    });
+    expect(newcomerCouponBlock.props.parse({})).toMatchObject({ title: '新人专享', limit: 3 });
+    expect(groupbuyListBlock.props.parse({})).toMatchObject({
+      source: { mode: 'auto', limit: 3 },
+      layout: 'list',
+    });
+    expect(presaleListBlock.props.parse({})).toMatchObject({ showCountdown: true });
+    expect(articleListBlock.props.parse({})).toMatchObject({
+      source: { mode: 'category', limit: 3 },
+      layout: 'list',
+    });
+    expect(floatingContactBlock.props.parse({})).toMatchObject({
+      label: '客服',
+      side: 'right',
+      bottom: 240,
+    });
+    expect(followOfficialAccountBlock.props.parse({})).toEqual(base);
+
+    const video = videoBlock.props.safeParse({});
+    expect(video.success).toBe(false);
+    expect(videoBlock.props.parse({ src: '/uploads/a.mp4' })).toMatchObject({
+      ratio: '16:9',
+      autoplay: false,
+      muted: false,
+      loop: false,
+    });
+  });
+
+  it('asks for a video file before publishing, and only a web or uploaded address', () => {
+    const empty = checkDocument(doc([place('video', { ...base, src: '' })]));
+    if (!empty.ok) throw new Error('refused');
+    expect(empty.issues).toEqual([{ path: 'blocks.0.props.src', message: '请选择视频' }]);
+    expect(videoProps.safeParse({ src: 'javascript:alert(1)' }).success).toBe(false);
+    expect(videoProps.safeParse({ src: 'https://cdn.example.com/v.mp4' }).success).toBe(true);
+  });
+
+  it('declare their records as page data, and only the 新人券 asks for anything personal', () => {
+    expect(couponListBlock.data?.(couponListBlock.props.parse({}))).toEqual({
+      coupons: { kind: 'coupons', source: { mode: 'auto', limit: 3 } },
+    });
+    const newcomer = newcomerCouponBlock.props.parse({ limit: 2 });
+    expect(newcomerCouponBlock.data?.(newcomer)).toEqual({
+      coupons: { kind: 'newUserCoupons', limit: 2 },
+    });
+    expect(newcomerCouponBlock.personal?.(newcomer)).toEqual({
+      held: { kind: 'newcomerCoupons', limit: 2 },
+    });
+    expect(groupbuyListBlock.data?.(groupbuyListBlock.props.parse({}))).toEqual({
+      campaigns: { kind: 'groupbuys', source: { mode: 'auto', limit: 3 } },
+    });
+    expect(presaleListBlock.data?.(presaleListBlock.props.parse({}))).toEqual({
+      campaigns: { kind: 'presales', source: { mode: 'auto', limit: 3 } },
+    });
+    expect(articleListBlock.data?.(articleListBlock.props.parse({}))).toEqual({
+      articles: { kind: 'articles', source: { mode: 'category', limit: 3 } },
+    });
+    for (const definition of [
+      couponListBlock,
+      groupbuyListBlock,
+      presaleListBlock,
+      articleListBlock,
+      videoBlock,
+      floatingContactBlock,
+      followOfficialAccountBlock,
+    ]) {
+      expect(definition.personal, definition.type).toBeUndefined();
+    }
+  });
+
+  it('finds every picked coupon, campaign and article as a reference', () => {
+    const refs = collectReferences(
+      doc([
+        place('couponList', decorBlockExamples.couponList),
+        place('groupbuyList', {
+          ...decorBlockExamples.groupbuyList,
+          source: { mode: 'manual', ids: ['5'] },
+        }),
+        place('presaleList', decorBlockExamples.presaleList),
+        place('articleList', decorBlockExamples.articleList),
+      ]),
+    );
+    expect(refs.map((ref) => `${ref.kind}:${ref.id}`)).toEqual([
+      'coupon:1',
+      'coupon:2',
+      'groupbuy:5',
+      'presale:7',
+      'articleCategory:2',
+    ]);
+  });
+
+  it('allows one 悬浮客服 and one 关注公众号 per page — DECOR-018', () => {
+    for (const type of ['floatingContact', 'followOfficialAccount'] as const) {
+      const props = decorBlockExamples[type];
+      const once = checkDocument(doc([place(type, props, 'a')]), { kind: 'home' });
+      if (!once.ok) throw new Error('refused');
+      expect(once.issues, type).toEqual([]);
+      const twice = checkDocument(doc([place(type, props, 'a'), place(type, props, 'b')]), {
+        kind: 'home',
+      });
+      if (!twice.ok) throw new Error('refused');
+      expect(twice.issues, type).toEqual([
+        {
+          path: 'blocks.1.type',
+          message: `「${decorBlocks.get(type)?.meta.label}」一个页面最多 1 个`,
+        },
+      ]);
+    }
+  });
+
+  it('caps a manual pick and an automatic list at the record limit', () => {
+    const ids = Array.from({ length: 11 }, (_, index) => String(index + 1));
+    expect(couponListProps.safeParse({ source: { mode: 'manual', ids } }).success).toBe(false);
+    expect(groupbuyListProps.safeParse({ source: { mode: 'auto', limit: 11 } }).success).toBe(
+      false,
+    );
+    expect(newcomerCouponProps.safeParse({ limit: 11 }).success).toBe(false);
+    expect(floatingContactProps.safeParse({ bottom: 40 }).success).toBe(false);
   });
 });

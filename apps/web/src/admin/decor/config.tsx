@@ -104,9 +104,16 @@ export function ownProps(props: Record<string, unknown>): Record<string, unknown
   return own;
 }
 
-type AnyBlockComponent = ComponentType<{ props: any; data?: any }>;
+type AnyBlockComponent = ComponentType<{ props: any; data?: any; host?: { canvas?: boolean } }>;
 
 const COMPONENTS = BLOCK_COMPONENTS as unknown as Readonly<Record<string, AnyBlockComponent>>;
+
+/**
+ * What the canvas tells a block about its host: it is the editor, so a video
+ * shows its poster, a floating button sits in the flow where the operator can
+ * select it, and a list with nothing to show says so instead of vanishing.
+ */
+const CANVAS_HOST = { canvas: true } as const;
 
 function BlockCanvas({
   definition,
@@ -146,7 +153,7 @@ function BlockCanvas({
   }
   return (
     <BlockBoundary label={definition.meta.label} watch={props}>
-      <Block props={drawn} data={slots} />
+      <Block props={drawn} data={slots} host={CANVAS_HOST} />
     </BlockBoundary>
   );
 }

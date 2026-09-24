@@ -207,3 +207,11 @@
   display: block;
   user-select: none;
 }
+
+/* <video>: 300×225 by default, black behind the picture. */
+:where(.sbd-video) {
+  display: inline-block;
+  width: 300px;
+  height: 225px;
+  background: #000000;
+}

@@ -1,5 +1,5 @@
 /**
- * Fidelity check for the DIY v2 blocks (S3, extended to every block in G1). Not part of CI.
+ * Fidelity check for the DIY v2 blocks (S3, extended to every block in G1 and G2). Not part of CI.
  *
  * Screenshots each block, at a 375 px wide phone, from
  *
@@ -15,7 +15,11 @@
  *   pnpm --filter @shop/web build && pnpm --filter @shop/web start   # :3000
  *   pnpm --filter @shop/storefront-blocks fidelity -- \
  *     --admin http://localhost:3000 \
- *     [--h5 http://localhost:10086/#/pages/dev/blocks] [--out ../../docs/mini/spikes/S3]
+ *     [--h5 'http://localhost:10086/#/subpackages/demo/pages/blocks/index?canvas=1'] \
+ *     [--out ../../docs/mini/spikes/S3]
+ *
+ * The H5 page takes `?canvas=1` so it draws what the editor canvas draws (a
+ * guest, a video's poster, 悬浮客服 in the flow, no countdown).
  *
  * The admin session is client-side (`GET /admin-api/auth/me`); the script
  * answers every `/admin-api/*` request itself, so no database or sign-in is
@@ -45,8 +49,16 @@ const BLOCKS = [
   'userCard',
   'orderEntry',
   'serviceGrid',
+  'couponList',
+  'newcomerCoupon',
+  'groupbuyList',
+  'presaleList',
+  'articleList',
+  'video',
+  'floatingContact',
+  'followOfficialAccount',
 ] as const;
-const LAST_BLOCK: Block = 'serviceGrid';
+const LAST_BLOCK: Block = 'followOfficialAccount';
 /** Tall enough for the whole fixture page at 375 px, so no block is clipped. */
 const PAGE_HEIGHT = 6000;
 type Block = (typeof BLOCKS)[number];
@@ -106,6 +118,16 @@ async function imagesSettled(frame: Frame | Page): Promise<void> {
 }
 
 /**
+ * Waits until every record list has its records: the canvas answers its data
+ * needs asynchronously, and until then a list says it is empty.
+ */
+async function recordsSettled(frame: Frame | Page): Promise<void> {
+  await frame.waitForFunction(
+    () => !(document.body.textContent ?? '').includes('商城中不显示此组件'),
+  );
+}
+
+/**
  * Screenshots a block, clipped to its box snapped to device pixels (DPR 2).
  * Not an element screenshot: that rounds the box out to whole CSS pixels, and
  * vw lengths come out a hair short (169.98 px for 170), so the two sides would
@@ -134,7 +156,7 @@ async function shootAdmin(): Promise<Record<Block, Buffer>> {
     const frame = await frameElement.contentFrame();
     if (!frame) throw new Error('the editor canvas iframe has no frame');
     await frame.waitForSelector(`[data-block="${LAST_BLOCK}"]`);
-    await imagesSettled(frame);
+    await recordsSettled(frame);
     // Nothing hovered or selected: Puck draws outlines over the canvas otherwise.
     await page.mouse.move(0, 0);
     const width = await frame.evaluate(() => document.documentElement.clientWidth);
@@ -166,6 +188,9 @@ async function shootAdmin(): Promise<Record<Block, Buffer>> {
       (element as HTMLElement).style.marginTop = `${px}px`;
     }, nudge);
     await page.waitForTimeout(200);
+    // Only now: list pictures load lazily, and the lower ones only come into
+    // range once the editor is stretched to the whole page.
+    await imagesSettled(frame);
     const shots = {} as Record<Block, Buffer>;
     for (const block of BLOCKS) {
       shots[block] = await shootBlock(page, frame.locator(`[data-block="${block}"]`).first());
@@ -189,6 +214,7 @@ async function shootH5(url: string): Promise<Record<Block, Buffer>> {
     });
     await page.goto(url);
     await page.waitForSelector(`[data-block="${LAST_BLOCK}"]`, { timeout: 60_000 });
+    await recordsSettled(page);
     await imagesSettled(page);
     const shots = {} as Record<Block, Buffer>;
     for (const block of BLOCKS) {

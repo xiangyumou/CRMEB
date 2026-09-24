@@ -4,12 +4,24 @@ import { decorBlocks } from '@shop/contracts/decor/all-blocks';
 import { DOCUMENT_KINDS, type DocumentKind } from '@shop/contracts/decor/constants';
 import { checkDocument, pageRootProps, type StoredDocument } from '@shop/contracts/decor/document';
 import {
+  fixtureArticleList,
+  fixtureArticles,
   fixtureCarousel,
+  fixtureCouponList,
+  fixtureCoupons,
+  fixtureFloatingContact,
+  fixtureFollowOfficialAccount,
+  fixtureGroupbuyList,
+  fixtureGroupbuys,
   fixtureHotspotImage,
   fixtureImageCube,
   fixtureNavGrid,
+  fixtureNewcomerCoupon,
+  fixtureNewUserCoupons,
   fixtureNotice,
   fixtureOrderEntry,
+  fixturePresaleList,
+  fixturePresales,
   fixtureProductGrid,
   fixtureProductTabs,
   fixtureRichText,
@@ -18,6 +30,7 @@ import {
   fixtureSpacer,
   fixtureTitleBar,
   fixtureUserCard,
+  fixtureVideo,
   resolveFixtureProducts,
 } from '@shop/storefront-blocks/fixtures';
 import { BLOCKS, type BlockType } from '@shop/storefront-blocks/schema';
@@ -42,7 +55,7 @@ import { createDecorDemoRecordSource } from './demo-data-source';
  * `/admin/dev/decor-spike` — the decor component sandbox (was spike S3).
  *
  * The real editor (`DecorEditor`, every registered block, every inspector
- * control) over in-memory sources: fixture products for the canvas, fixture
+ * control) over in-memory sources: fixture records for the canvas, fixture
  * records for the pickers, the demo 素材库. Beside it, the document the editor
  * would save and what `checkDocument` says of it. No route is called, so a
  * block or a control can be tried without a shop behind it; the storefront
@@ -65,6 +78,14 @@ const FIXTURE_BLOCKS: [BlockType, string, Record<string, unknown>][] = [
   ['userCard', 'user-card-1', fixtureUserCard],
   ['orderEntry', 'order-entry-1', fixtureOrderEntry],
   ['serviceGrid', 'service-grid-1', fixtureServiceGrid],
+  ['couponList', 'coupon-list-1', fixtureCouponList],
+  ['newcomerCoupon', 'newcomer-coupon-1', fixtureNewcomerCoupon],
+  ['groupbuyList', 'groupbuy-list-1', fixtureGroupbuyList],
+  ['presaleList', 'presale-list-1', fixturePresaleList],
+  ['articleList', 'article-list-1', fixtureArticleList],
+  ['video', 'video-1', fixtureVideo],
+  ['floatingContact', 'floating-contact-1', fixtureFloatingContact],
+  ['followOfficialAccount', 'follow-official-account-1', fixtureFollowOfficialAccount],
 ];
 
 const FIXTURE_DOCUMENT: StoredDocument = {
@@ -73,8 +94,26 @@ const FIXTURE_DOCUMENT: StoredDocument = {
   blocks: FIXTURE_BLOCKS.map(([type, id, props]) => ({ id, type, v: BLOCKS[type].v, props })),
 };
 
+/** Each need answered from the fixtures, as the storefront resolver would a guest. */
 const canvasData: DecorCanvasData = {
-  resolve: async (need) => (need.kind === 'products' ? resolveFixtureProducts(need.source) : null),
+  resolve: async (need) => {
+    switch (need.kind) {
+      case 'products':
+        return resolveFixtureProducts(need.source);
+      case 'coupons':
+        return fixtureCoupons;
+      case 'newUserCoupons':
+        return fixtureNewUserCoupons.slice(0, need.limit);
+      case 'groupbuys':
+        return fixtureGroupbuys;
+      case 'presales':
+        return fixturePresales;
+      case 'articles':
+        return fixtureArticles;
+      default:
+        return null;
+    }
+  },
 };
 const assets = createDemoAssetSource();
 const records = createDecorDemoRecordSource();

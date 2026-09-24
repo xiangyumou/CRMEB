@@ -1,5 +1,16 @@
 import { catalogAdminProductList } from '@shop/contracts/catalog/catalog.product.admin.contract';
 import { adminProductListItemExample } from '@shop/contracts/catalog/schemas';
+import { articleListPublic } from '@shop/contracts/cms/cms.storefront.contract';
+import { articleListItemExample } from '@shop/contracts/cms/schemas';
+import {
+  couponClaimableList,
+  couponNewUserList,
+} from '@shop/contracts/coupon/coupon.storefront.contract';
+import { claimableCouponExample } from '@shop/contracts/coupon/schemas';
+import { groupbuyList } from '@shop/contracts/groupbuy/groupbuy.storefront.contract';
+import { groupbuyCardExample } from '@shop/contracts/groupbuy/schemas';
+import { presaleList } from '@shop/contracts/presale/presale.storefront.contract';
+import { presaleCardExample } from '@shop/contracts/presale/schemas';
 import { DECOR_BLOCK_DEFINITIONS, decorBlocks } from '@shop/contracts/decor/all-blocks';
 import { blockProps } from '@shop/contracts/decor/base';
 import { createBlockRegistry, defineBlock } from '@shop/contracts/decor/registry';
@@ -182,7 +193,8 @@ describe('admin canvas data', () => {
     expect(calls[0]?.url).toContain('sortBy=sales');
   });
 
-  it('previews nothing for a rule not set up yet, or a need it does not preview', async () => {
+  it('previews nothing for a rule not set up yet, or a manual pick with nothing picked', async () => {
+    const calls = stubRoutes([]);
     const data = createAdminCanvasData();
     await expect(
       data.resolve({
@@ -191,7 +203,93 @@ describe('admin canvas data', () => {
       }),
     ).resolves.toEqual([]);
     await expect(
-      data.resolve({ kind: 'coupons', source: { mode: 'auto', limit: 3 } }),
-    ).resolves.toBe(null);
+      data.resolve({ kind: 'coupons', source: { mode: 'manual', ids: [] } }),
+    ).resolves.toEqual([]);
+    await expect(
+      data.resolve({ kind: 'groupbuys', source: { mode: 'manual', ids: [] } }),
+    ).resolves.toEqual([]);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('previews coupons through the storefront list, without any caller state', async () => {
+    const calls = stubRoutes([
+      on(couponClaimableList, {
+        items: [{ ...claimableCouponExample, templateId: '9' }, claimableCouponExample],
+        total: 2,
+        page: 1,
+        pageSize: 2,
+      }),
+    ]);
+    const data = createAdminCanvasData();
+    const coupons = (await data.resolve({
+      kind: 'coupons',
+      source: { mode: 'manual', ids: ['9', claimableCouponExample.templateId] },
+    })) as Record<string, unknown>[];
+    expect(coupons.map((coupon) => coupon.templateId)).toEqual([
+      '9',
+      claimableCouponExample.templateId,
+    ]);
+    expect(coupons[0]).not.toHaveProperty('canClaim');
+    expect(coupons[0]).not.toHaveProperty('claimedCount');
+    expect(calls[0]?.url).toContain(
+      `ids=${encodeURIComponent(`9,${claimableCouponExample.templateId}`)}`,
+    );
+  });
+
+  it('previews at most limit 新人券', async () => {
+    stubRoutes([
+      on(couponNewUserList, {
+        items: [
+          { ...claimableCouponExample, templateId: '1', canClaim: null, claimedCount: null },
+          { ...claimableCouponExample, templateId: '2', canClaim: null, claimedCount: null },
+        ],
+      }),
+    ]);
+    const coupons = (await createAdminCanvasData().resolve({
+      kind: 'newUserCoupons',
+      limit: 1,
+    })) as { templateId: string }[];
+    expect(coupons.map((coupon) => coupon.templateId)).toEqual(['1']);
+  });
+
+  it('previews picked 拼团 and 预售 through the ids filter, and the rule by limit', async () => {
+    const calls = stubRoutes([
+      on(groupbuyList, { items: [groupbuyCardExample], total: 1, page: 1, pageSize: 2 }),
+      on(presaleList, { items: [presaleCardExample], total: 1, page: 1, pageSize: 4 }),
+    ]);
+    const data = createAdminCanvasData();
+    await expect(
+      data.resolve({ kind: 'groupbuys', source: { mode: 'manual', ids: ['1', 'x', '8'] } }),
+    ).resolves.toEqual([groupbuyCardExample]);
+    await expect(
+      data.resolve({ kind: 'presales', source: { mode: 'auto', limit: 4 } }),
+    ).resolves.toEqual([presaleCardExample]);
+    expect(calls[0]?.url).toContain(`ids=${encodeURIComponent('1,8')}`);
+    expect(calls[0]?.url).toContain('pageSize=2');
+    expect(calls[1]?.url).toContain('pageSize=4');
+    expect(calls[1]?.url).not.toContain('ids=');
+  });
+
+  it('previews a category’s published articles as the resolver summarises them', async () => {
+    const calls = stubRoutes([
+      on(articleListPublic, { items: [articleListItemExample], total: 1, page: 1, pageSize: 3 }),
+    ]);
+    const articles = (await createAdminCanvasData().resolve({
+      kind: 'articles',
+      source: { mode: 'category', categoryId: '3', limit: 3 },
+    })) as Record<string, unknown>[];
+    expect(Object.keys(articles[0]!).sort()).toEqual(
+      [
+        'author',
+        'categoryTitle',
+        'coverImageUrl',
+        'id',
+        'publishedAt',
+        'summary',
+        'title',
+        'views',
+      ].sort(),
+    );
+    expect(calls[0]?.url).toContain('categoryId=3');
   });
 });

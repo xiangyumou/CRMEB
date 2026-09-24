@@ -100,6 +100,101 @@ export function ImageField({
   );
 }
 
+// ─── video ───────────────────────────────────────────────────────────────────
+
+/** Whether a picked asset is a video the mini-program's `<Video>` can play. */
+export function isPlayableVideo(asset: { mime: string }): boolean {
+  return asset.mime === 'video/mp4' || asset.mime === 'video/quicktime';
+}
+
+/**
+ * A video from the 素材库 (mp4), or a pasted address. The preview is a muted,
+ * paused `<video>` that only loads metadata, so the inspector never plays or
+ * downloads the whole file. A pick that is not a video is refused with a
+ * message rather than stored.
+ */
+export function VideoField({
+  field,
+  name,
+  value,
+  onChange,
+  readOnly = false,
+}: DecorFieldProps<string | undefined>) {
+  const [open, setOpen] = useState(false);
+  const [refused, setRefused] = useState<string | null>(null);
+  const { optional } = metaOf(field);
+  return (
+    <FieldShell field={field} name={name} readOnly={readOnly}>
+      <Space direction="vertical" size={4} style={{ width: '100%' }}>
+        {value ? (
+          <video
+            src={value}
+            muted
+            preload="metadata"
+            controls={false}
+            data-testid="video-field-preview"
+            style={{
+              width: '100%',
+              maxHeight: 120,
+              borderRadius: 6,
+              background: '#000',
+              display: 'block',
+            }}
+          />
+        ) : null}
+        <Space size={4}>
+          <Button size="small" disabled={readOnly} onClick={() => setOpen(true)}>
+            {value ? '更换视频' : '选择视频'}
+          </Button>
+          {optional && value ? (
+            <Button
+              size="small"
+              type="text"
+              disabled={readOnly}
+              onClick={() => onChange(undefined)}
+            >
+              清除
+            </Button>
+          ) : null}
+        </Space>
+        <Input
+          size="small"
+          value={value ?? ''}
+          placeholder="或粘贴视频地址（mp4）"
+          disabled={readOnly}
+          aria-label={`${field.label ?? name}地址`}
+          onChange={(event) => {
+            setRefused(null);
+            const next = event.target.value.trim();
+            onChange(next === '' && optional ? undefined : next);
+          }}
+        />
+        {refused ? (
+          <Typography.Text type="danger" style={{ fontSize: 12 }}>
+            {refused}
+          </Typography.Text>
+        ) : null}
+      </Space>
+      <AssetPicker
+        open={open}
+        title="选择视频"
+        accept="video/mp4"
+        onClose={() => setOpen(false)}
+        onSelect={(assets) => {
+          const picked = assets[0];
+          if (picked && isPlayableVideo(picked)) {
+            setRefused(null);
+            onChange(picked.url);
+          } else if (picked) {
+            setRefused(`「${picked.name}」不是 mp4 视频，请另选`);
+          }
+          setOpen(false);
+        }}
+      />
+    </FieldShell>
+  );
+}
+
 // ─── colour ──────────────────────────────────────────────────────────────────
 
 /** A restrained palette: neutrals, the brand's muted rose and a few soft tones. */

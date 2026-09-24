@@ -20,6 +20,14 @@ const BLOCK_FIXTURES: Record<string, unknown> = {
   userCard: fixtures.fixtureUserCard,
   orderEntry: fixtures.fixtureOrderEntry,
   serviceGrid: fixtures.fixtureServiceGrid,
+  couponList: fixtures.fixtureCouponList,
+  newcomerCoupon: fixtures.fixtureNewcomerCoupon,
+  groupbuyList: fixtures.fixtureGroupbuyList,
+  presaleList: fixtures.fixturePresaleList,
+  articleList: fixtures.fixtureArticleList,
+  video: fixtures.fixtureVideo,
+  floatingContact: fixtures.fixtureFloatingContact,
+  followOfficialAccount: fixtures.fixtureFollowOfficialAccount,
 };
 
 describe('the contracts block registry', () => {

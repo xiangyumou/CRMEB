@@ -517,6 +517,26 @@ export async function listMine(
   };
 }
 
+/**
+ * The 新人券 the signed-in shopper still holds unused, soonest to expire
+ * first, at most `limit`. What the DIY 新人券 block shows a shopper who has
+ * registered (DECOR-015: per shopper, never cached). Read-only.
+ */
+export async function listHeldNewUser(ctx: Ctx, limit: number): Promise<UserCoupon[]> {
+  const userId = requireUserId(ctx);
+  const rows = await repo.listUnusedBySource(ctx.db, {
+    userId,
+    sourceKind: 'gift_new_user',
+    now: ctx.clock.now(),
+    limit,
+  });
+  const terms = await repo.templateTermsFor(
+    ctx.db,
+    rows.map((r) => r.templateId),
+  );
+  return rows.map((row) => toUserCoupon(row, termsOf(terms, row.templateId)));
+}
+
 /** How many coupons the checkout picker will consider. Beyond this nobody scrolls. */
 const PICKER_LIMIT = 100;
 

@@ -48,3 +48,8 @@ $hairline: 1PX;
 /** The smallest tap target (design.md §touch). */
 $hit: 88px;
 $z-sticky: 100;
+
+/** Floating buttons (回到顶部, 悬浮客服): design.md §2.5. */
+$shadow-float: 0 8px 24px rgba(0, 0, 0, 0.12);
+/** Fixed bars and floating buttons: design.md §2.6. */
+$z-bar: 200;

@@ -561,3 +561,49 @@ export function RichText(props: RichTextProps) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Video
+
+export interface VideoProps extends StandardProps {
+  src: string;
+  poster?: string | undefined;
+  controls?: boolean | undefined;
+  autoplay?: boolean | undefined;
+  loop?: boolean | undefined;
+  muted?: boolean | undefined;
+  /** How the picture fits the box: WeChat's `object-fit`, default `contain`. */
+  objectFit?: 'contain' | 'fill' | 'cover' | undefined;
+  showCenterPlayBtn?: boolean | undefined;
+  showFullscreenBtn?: boolean | undefined;
+  enablePlayGesture?: boolean | undefined;
+}
+
+/**
+ * `<video>`: a 300×225 box by default, like WeChat's; the picture contained.
+ * The admin canvas never mounts one (the 视频 block draws its poster there);
+ * this exists for tests and for a host that wants a real player in the DOM.
+ * `autoplay` is honoured only when muted, as browsers do.
+ */
+export function Video(props: VideoProps) {
+  const { id, className, style, hidden, ariaLabel, onClick, src, poster } = props;
+  return (
+    <video
+      {...dataAttributes(props)}
+      id={id}
+      className={cx('sbd-video', className)}
+      style={{ objectFit: props.objectFit ?? 'contain', ...style }}
+      hidden={hidden}
+      aria-label={ariaLabel}
+      onClick={tapHandler(onClick)}
+      src={src}
+      poster={poster}
+      controls={props.controls ?? true}
+      autoPlay={props.autoplay === true && props.muted === true}
+      loop={props.loop}
+      muted={props.muted}
+      playsInline
+      preload="metadata"
+    />
+  );
+}

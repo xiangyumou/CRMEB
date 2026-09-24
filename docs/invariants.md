@@ -2144,6 +2144,7 @@ A link or a data source naming a record the shopper cannot see (off the shelf, d
 
 - `packages/contracts/src/decor/decor.test.ts::collectReferences — DECOR-004 > finds links and sources through the editor metadata, not by block name`
 - `packages/core/src/decor/decor.int.test.ts::references — DECOR-004 > DECOR-004: a record the shopper cannot see is a warning on save, never an error`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-004: a picked campaign that is not running is a warning, checked by id`
 
 ### DECOR-005
 
@@ -2225,6 +2226,9 @@ A page serves only what the shopper could see, by each domain's own rule, throug
 - `packages/core/src/decor/decor.int.test.ts::resolved data — DECOR-013 > DECOR-013: coupons, 新人券 and articles come back only when the shopper could see them`
 - `packages/core/src/decor/decor.int.test.ts::resolved data — DECOR-013 > DECOR-013: a resolver that fails costs its slot, not the page`
 - `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > DECOR-013: a 商品选项卡 resolves every tab’s products with the page, each by its own rule`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-013: 优惠券 shows only what can be claimed now, in the operator’s order`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-013: a manual 拼团 / 预售 pick is found by id, however far down the list it sits`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-013: 资讯 resolves a category’s newest published articles`
 
 ### DECOR-014
 
@@ -2238,7 +2242,7 @@ The public part of a page is cached per revision (`decor:page:rev:<id>`, `DECOR_
 
 ### DECOR-015
 
-Per-shopper state — coupons claimed / claimable, and what a block declares with `personal` (the 订单入口 counts, the 用户卡片 nickname, avatar and coupon / favourite / history totals) — is resolved only when a shopper's session comes with the request, for that shopper, is never part of the cached page (which keeps only _which_ state to fetch), and is `null` for a guest or an admin. A lookup that fails costs its slot, never the page.
+Per-shopper state — coupons claimed / claimable, and what a block declares with `personal` (the 订单入口 counts, the 用户卡片 nickname, avatar and coupon / favourite / history totals, the 新人券 the shopper still holds) — is resolved only when a shopper's session comes with the request, for that shopper, is never part of the cached page (which keeps only _which_ state to fetch), and is `null` for a guest or an admin. A lookup that fails costs its slot, never the page.
 
 - `packages/core/src/decor/decor.int.test.ts::per-shopper state — DECOR-015 > DECOR-015: with a session the page carries the coupon state of that shopper; without one, none`
 - `packages/core/src/decor/decor.int.test.ts::per-shopper state — DECOR-015 > DECOR-015: the cached public page holds nothing per shopper`
@@ -2246,6 +2250,9 @@ Per-shopper state — coupons claimed / claimable, and what a block declares wit
 - `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > per-shopper state of the 个人中心 blocks — DECOR-015 > DECOR-015: the totals are read only when the card shows them`
 - `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > per-shopper state of the 个人中心 blocks — DECOR-015 > DECOR-015: a live 个人中心 is cached without anyone’s state, and each shopper still gets theirs`
 - `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > per-shopper state of the 个人中心 blocks — DECOR-015 > DECOR-015: a personal lookup that fails costs its slot, not the page`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-015: 优惠券 claim state is each shopper’s own, and never in the cached page`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-015: 新人券 shows a guest the templates, and a shopper only the 新人券 they still hold`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-015: a live 新人券 block is cached without anyone’s wallet`
 
 ### DECOR-016
 
@@ -2269,3 +2276,10 @@ Blocks are filtered per request from the one cached page: `visibility.audience` 
 - `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > is idempotent: sanitising clean output changes nothing`
 - `packages/contracts/src/decor/rich-text.test.ts::the rich-text allow-list — DECOR-017 > is applied by the block schema, so a save stores only the clean form`
 - `packages/core/src/decor/decor.int.test.ts::the batch-1 blocks (G1) > DECOR-017: rich text is stored sanitised, and served sanitised even when the row was not`
+
+### DECOR-018
+
+A page holds at most one 悬浮客服 (`floatingContact`: a fixed button, so a second would sit on the first) and at most one 关注公众号 (`followOfficialAccount`: WeChat allows one `<official-account>` per page). A draft with more saves with an issue on the extra block, and publishing it is refused.
+
+- `packages/contracts/src/decor/blocks.test.ts::the batch-2 blocks (G2) > allows one 悬浮客服 and one 关注公众号 per page — DECOR-018`
+- `packages/core/src/decor/decor.int.test.ts::the batch-2 blocks (G2) > DECOR-018: a page takes one 悬浮客服 and one 关注公众号, and publishing more is refused`

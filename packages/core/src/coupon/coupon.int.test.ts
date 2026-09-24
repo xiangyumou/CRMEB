@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { productCategories, productCategoriesMap, products } from '@shop/db/schema/catalog';
 import { couponTemplates, productGiftCoupons, userCoupons } from '@shop/db/schema/coupon';
 import { orders } from '@shop/db/schema/order';
@@ -1211,6 +1211,43 @@ describe('grantNewUser', () => {
     // And it left no half-issued row behind.
     expect(await harness.ctx.db.select().from(userCoupons)).toHaveLength(0);
     expect((await templateRow(id)).remainingCount).toBe(0);
+  });
+});
+
+describe('listHeldNewUser', () => {
+  const grant = (userId: number) =>
+    withTx(harness.ctx.db, (tx) => service.grantNewUser(tx, harness.ctx, userId));
+
+  it('lists only the unused, unexpired 新人券 the shopper holds, soonest to expire first', async () => {
+    const long = await makeTemplate({ name: '新人长', claimMode: 'new_user', validDays: 30 });
+    const short = await makeTemplate({ name: '新人短', claimMode: 'new_user', validDays: 3 });
+    const spent = await makeTemplate({ name: '新人用', claimMode: 'new_user', validDays: 10 });
+    const manual = await makeTemplate({ name: '手领', claimMode: 'manual' });
+    const [userId, other] = [await makeUser(), await makeUser()];
+    expect(await grant(userId)).toBe(3);
+    await grant(other);
+    await service.claim(asUser(userId), { id: String(manual) });
+
+    const [spentCoupon] = await harness.ctx.db
+      .select()
+      .from(userCoupons)
+      .where(and(eq(userCoupons.userId, userId), eq(userCoupons.templateId, spent)));
+    await withTx(harness.ctx.db, (tx) =>
+      service.redeem(tx, harness.ctx, { userCouponId: spentCoupon!.id, userId, orderId: 1 }),
+    );
+
+    const held = await service.listHeldNewUser(asUser(userId), 10);
+    expect(held.map((c) => c.templateId)).toEqual([String(short), String(long)]);
+    expect(held.every((c) => c.sourceKind === 'gift_new_user' && c.status === 'unused')).toBe(true);
+    expect(await service.listHeldNewUser(asUser(userId), 1)).toHaveLength(1);
+
+    harness.clock.advance(5 * 24 * 60 * 60 * 1000);
+    const later = await service.listHeldNewUser(asUser(userId), 10);
+    expect(later.map((c) => c.templateId)).toEqual([String(long)]);
+  });
+
+  it('refuses a visitor without a session', async () => {
+    await expect(service.listHeldNewUser(harness.ctx, 3)).rejects.toThrow();
   });
 });
 

@@ -1,31 +1,63 @@
-import { View } from '@tarojs/components';
-import { BlockList, type RenderedBlock } from '@shop/storefront-blocks';
+import { Button, OfficialAccount, View } from '@tarojs/components';
+import { useRouter } from '@tarojs/taro';
+import type { ReactNode } from 'react';
 import {
+  BlockList,
+  type BlockHost,
+  type BlockIntent,
+  type RenderedBlock,
+} from '@shop/storefront-blocks';
+import {
+  fixtureArticleList,
+  fixtureArticles,
   fixtureCarousel,
+  fixtureCouponList,
+  fixtureCoupons,
+  fixtureFloatingContact,
+  fixtureFollowOfficialAccount,
+  fixtureGroupbuyList,
+  fixtureGroupbuys,
   fixtureHotspotImage,
   fixtureImageCube,
   fixtureNavGrid,
+  fixtureNewcomerCoupon,
+  fixtureNewUserCoupons,
   fixtureNotice,
   fixtureOrderEntry,
+  fixturePersonalG2,
+  fixturePresaleList,
+  fixturePresales,
   fixtureProductGrid,
   fixtureProductTabs,
   fixtureProductTabsData,
   fixtureRichText,
   fixtureSearchBar,
+  fixtureServerNow,
   fixtureServiceGrid,
   fixtureSpacer,
   fixtureTitleBar,
   fixtureUserCard,
+  fixtureVideo,
   resolveFixtureProducts,
 } from '@shop/storefront-blocks/fixtures';
+import { showToast } from '@/platform';
 
 /**
- * Dev-only (spike S3, batch G1): every DIY v2 block from `@shop/storefront-blocks`,
- * on the same fixtures and in the same order as the admin editor's canvas
- * (`/admin/dev/decor-spike`), for the pixel comparison in
+ * Dev-only (spike S3, batches G1 and G2): every DIY v2 block from
+ * `@shop/storefront-blocks`, on the same fixtures and in the same order as the
+ * admin editor's canvas (`/admin/dev/decor-spike`), for the pixel comparison in
  * `packages/storefront-blocks/fidelity`. The background is the page document's
- * default (`#f5f5f5`), as in the canvas. The 个人中心 blocks show a guest, as the
- * canvas does.
+ * default (`#f5f5f5`), as in the canvas.
+ *
+ * Two modes:
+ *
+ * - `?canvas=1` draws what the canvas draws, for the comparison: a guest, the
+ *   video as its poster, 悬浮客服 in the flow, the 关注公众号 explanation, the
+ *   预售 end time instead of a countdown.
+ * - Without it, the live look: a signed-in shopper's coupon states and held
+ *   新人券, the countdown against the fixture server time, the floating button,
+ *   and the host wrappers a real page adds (`renderIntent`: WeChat's contact
+ *   button and `<OfficialAccount />` in the mini-program).
  */
 const BLOCKS: RenderedBlock[] = [
   { id: 'search-bar-1', type: 'searchBar', props: fixtureSearchBar },
@@ -42,17 +74,73 @@ const BLOCKS: RenderedBlock[] = [
   { id: 'user-card-1', type: 'userCard', props: fixtureUserCard },
   { id: 'order-entry-1', type: 'orderEntry', props: fixtureOrderEntry },
   { id: 'service-grid-1', type: 'serviceGrid', props: fixtureServiceGrid },
+  { id: 'coupon-list-1', type: 'couponList', props: fixtureCouponList },
+  { id: 'newcomer-coupon-1', type: 'newcomerCoupon', props: fixtureNewcomerCoupon },
+  { id: 'groupbuy-list-1', type: 'groupbuyList', props: fixtureGroupbuyList },
+  { id: 'presale-list-1', type: 'presaleList', props: fixturePresaleList },
+  { id: 'article-list-1', type: 'articleList', props: fixtureArticleList },
+  { id: 'video-1', type: 'video', props: fixtureVideo },
+  { id: 'floating-contact-1', type: 'floatingContact', props: fixtureFloatingContact },
+  {
+    id: 'follow-official-account-1',
+    type: 'followOfficialAccount',
+    props: fixtureFollowOfficialAccount,
+  },
 ];
 
 const DATA = {
   'product-grid-1': { products: resolveFixtureProducts(fixtureProductGrid.source) },
   'product-tabs-1': fixtureProductTabsData,
+  'coupon-list-1': { coupons: fixtureCoupons },
+  'newcomer-coupon-1': { coupons: fixtureNewUserCoupons },
+  'groupbuy-list-1': { campaigns: fixtureGroupbuys },
+  'presale-list-1': { campaigns: fixturePresales },
+  'article-list-1': { articles: fixtureArticles },
 };
 
+const PERSONAL = {
+  'coupon-list-1': fixturePersonalG2.couponList,
+  'newcomer-coupon-1': fixturePersonalG2.newcomerCoupon,
+};
+
+const WEAPP = process.env.TARO_ENV === 'weapp';
+
+/** The host wrappers a real page adds; see `docs/mini/decor.md` §2.4 (host wrappers). */
+function renderIntent(intent: BlockIntent, children: ReactNode): ReactNode {
+  if (intent.kind === 'contact') {
+    if (!WEAPP) return children;
+    return (
+      <Button
+        openType="contact"
+        sessionFrom="route:demo"
+        style={{ padding: 0, margin: 0, background: 'transparent', lineHeight: 'inherit' }}
+      >
+        {children}
+      </Button>
+    );
+  }
+  if (intent.kind === 'officialAccount') return WEAPP ? <OfficialAccount /> : null;
+  return children;
+}
+
+/** The demo only names the intent a real page would handle. */
+function onIntent(intent: BlockIntent): void {
+  showToast(`intent: ${intent.kind}`);
+}
+
 export default function BlocksDemo() {
+  const canvas = useRouter().params.canvas === '1';
+  const host: BlockHost = canvas ? { canvas: true } : { serverNow: fixtureServerNow };
   return (
     <View style={{ background: '#f5f5f5', minHeight: '100vh' }}>
-      <BlockList blocks={BLOCKS} data={DATA} />
+      <BlockList
+        blocks={BLOCKS}
+        data={DATA}
+        personal={canvas ? null : PERSONAL}
+        host={host}
+        onIntent={onIntent}
+        {...(canvas ? {} : { renderIntent })}
+      />
     </View>
   );
 }

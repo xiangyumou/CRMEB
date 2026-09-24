@@ -9,15 +9,18 @@ import {
 } from '@shop/db/schema/catalog';
 import { articleCategories, articles } from '@shop/db/schema/cms';
 import { couponTemplates } from '@shop/db/schema/coupon';
+import { groupbuyActivities } from '@shop/db/schema/groupbuy';
+import { presaleActivities } from '@shop/db/schema/presale';
 import { AdminAuthService, UserSessionService } from '@shop/core/auth';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import { setContainer, type Container } from '../../../src/server/container';
 import type { Env } from '../../../src/server/env';
 
 /**
- * The three storefront lists a DIY component reads when the operator picked
- * its records (指定数据): `/api/v1/articles`, `/api/v1/coupons` and
- * `/api/v1/catalog/products`, each with `ids`.
+ * The storefront lists a DIY component reads when the operator picked its
+ * records (指定数据): `/api/v1/articles`, `/api/v1/coupons`,
+ * `/api/v1/catalog/products`, `/api/v1/groupbuy/activities` and
+ * `/api/v1/presale/activities`, each with `ids`.
  *
  * Three promises per list, and all three are only visible over HTTP:
  *
@@ -93,8 +96,10 @@ const tooMany = Array.from({ length: 101 }, (_unused, i) => String(i + 1)).join(
 
 async function idsOf(response: Response): Promise<string[]> {
   expect(response.status).toBe(200);
-  const body = (await response.json()) as { items: { id?: string; templateId?: string }[] };
-  return body.items.map((item) => String(item.templateId ?? item.id));
+  const body = (await response.json()) as {
+    items: { id?: string; templateId?: string; activityId?: string }[];
+  };
+  return body.items.map((item) => String(item.templateId ?? item.activityId ?? item.id));
 }
 
 let sequence = 0;
@@ -326,6 +331,114 @@ describe('GET /api/v1/catalog/products?ids=', () => {
   it('refuses more than 100 ids', async () => {
     const { GET } = await import('./catalog/products/route');
     const response = await GET(get(`/api/v1/catalog/products?ids=${tooMany}`));
+    expect(response.status).toBe(422);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/groupbuy/activities and /api/v1/presale/activities
+// ---------------------------------------------------------------------------
+
+const OPEN = new Date('2026-05-01T00:00:00.000Z');
+const CLOSE = new Date('2026-07-01T00:00:00.000Z');
+
+async function groupbuyActivity(
+  values: Partial<typeof groupbuyActivities.$inferInsert> = {},
+): Promise<string> {
+  const productId = Number(await product());
+  const [row] = await harness.ctx.db
+    .insert(groupbuyActivities)
+    .values({
+      productId,
+      title: `拼团${sequence}`,
+      status: 'active',
+      price: '39.00',
+      originalPrice: '60.00',
+      seatsRequired: 2,
+      groupTtlSeconds: 86_400,
+      stock: 10,
+      perOrderQuantity: 1,
+      startAt: OPEN,
+      endAt: CLOSE,
+      ...values,
+    })
+    .returning({ id: groupbuyActivities.id });
+  return String(row!.id);
+}
+
+async function presaleActivity(
+  values: Partial<typeof presaleActivities.$inferInsert> = {},
+): Promise<string> {
+  const productId = Number(await product());
+  const [row] = await harness.ctx.db
+    .insert(presaleActivities)
+    .values({
+      productId,
+      title: `预售${sequence}`,
+      status: 'active',
+      paymentMode: 'full',
+      price: '49.00',
+      originalPrice: '60.00',
+      stock: 10,
+      perOrderQuantity: 1,
+      shipAfterDays: 7,
+      startAt: OPEN,
+      endAt: CLOSE,
+      ...values,
+    })
+    .returning({ id: presaleActivities.id });
+  return String(row!.id);
+}
+
+describe('GET /api/v1/groupbuy/activities?ids=', () => {
+  it('answers the picked activities in the order picked, skipping the invisible', async () => {
+    const first = await groupbuyActivity({ sortOrder: 1 });
+    const paused = await groupbuyActivity({ status: 'paused' });
+    const ended = await groupbuyActivity({ endAt: new Date('2026-05-20T00:00:00.000Z') });
+    const last = await groupbuyActivity({ sortOrder: 9 });
+    await groupbuyActivity({ sortOrder: 5 }); // visible, not picked
+
+    const { GET } = await import('./groupbuy/activities/route');
+    const picked = [first, paused, ended, last];
+    const response = await GET(get(`/api/v1/groupbuy/activities?ids=${picked.join(',')}`));
+    expect(await idsOf(response)).toEqual([first, last]);
+
+    // The list's own order is `sortOrder DESC`; `ids` overrides it.
+    const reversed = await GET(get(`/api/v1/groupbuy/activities?ids=${last}&ids=${first}`));
+    expect(await idsOf(reversed)).toEqual([last, first]);
+    const paged = await GET(
+      get(`/api/v1/groupbuy/activities?ids=${first},${last}&pageSize=1&page=2`),
+    );
+    expect(await idsOf(paged)).toEqual([last]);
+  });
+
+  it('refuses more than 100 ids', async () => {
+    const { GET } = await import('./groupbuy/activities/route');
+    const response = await GET(get(`/api/v1/groupbuy/activities?ids=${tooMany}`));
+    expect(response.status).toBe(422);
+  });
+});
+
+describe('GET /api/v1/presale/activities?ids=', () => {
+  it('answers the picked activities in the order picked, skipping the invisible', async () => {
+    const first = await presaleActivity({ sortOrder: 1 });
+    const draft = await presaleActivity({ status: 'draft' });
+    const later = await presaleActivity({ startAt: new Date('2026-06-10T00:00:00.000Z') });
+    const last = await presaleActivity({ sortOrder: 9 });
+    await presaleActivity({ sortOrder: 5 }); // visible, not picked
+
+    const { GET } = await import('./presale/activities/route');
+    const picked = [first, draft, later, last];
+    const response = await GET(get(`/api/v1/presale/activities?ids=${picked.join(',')}`));
+    expect(await idsOf(response)).toEqual([first, last]);
+
+    const reversed = await GET(get(`/api/v1/presale/activities?ids=${last},${first}`));
+    expect(await idsOf(reversed)).toEqual([last, first]);
+  });
+
+  it('refuses more than 100 ids', async () => {
+    const { GET } = await import('./presale/activities/route');
+    const response = await GET(get(`/api/v1/presale/activities?ids=${tooMany}`));
     expect(response.status).toBe(422);
   });
 });

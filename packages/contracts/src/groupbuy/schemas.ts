@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { id, instant, money, pageQuery, paged, sortQuery } from '../_conventions/common';
+import { id, idList, instant, money, pageQuery, paged, sortQuery } from '../_conventions/common';
 import { storefrontRoute } from '../system/storefront-routes';
 
 /**
@@ -319,6 +319,12 @@ export const groupbuyListQuery = pageQuery.extend({
    * 拼团 right now. The list's own rule still holds: `active` and inside its window.
    */
   productId: id.optional(),
+  /**
+   * Exactly these activities, in this order — what a DIY 拼团 component's
+   * 指定数据 saved. An activity the shopper cannot see now (paused, outside its
+   * window, deleted) is skipped, not an error.
+   */
+  ids: idList.optional(),
 });
 export type GroupbuyListQuery = z.infer<typeof groupbuyListQuery>;
 export const pagedGroupbuyCards = paged(groupbuyCard);

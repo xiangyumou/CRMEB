@@ -21,6 +21,7 @@ export {
   adminActivityList,
   adminActivitySetStatus,
   adminActivityUpdate,
+  cardsFor,
   adminOrderList,
   detail,
   list,

@@ -1,10 +1,18 @@
-import { fixtureProducts } from '@shop/storefront-blocks/fixtures';
+import {
+  fixtureArticles,
+  fixtureCoupons,
+  fixtureGroupbuys,
+  fixtureNewUserCoupons,
+  fixturePresales,
+  fixtureProducts,
+} from '@shop/storefront-blocks/fixtures';
 
 import type { DecorRecord, DecorRecordSource, DecorTreeNode } from '@/admin/decor';
 
 /**
- * The sandbox's record source: the storefront-blocks fixture products (ids
- * 12–17), a few articles and labels and a small category tree, in memory.
+ * The sandbox's record source: the storefront-blocks fixtures (products 12–17,
+ * coupons, 拼团, 预售, articles), a few labels and a small category tree, in
+ * memory.
  * The editor's pickers read it unchanged; nothing reaches a route.
  */
 
@@ -15,10 +23,37 @@ const PRODUCTS: DecorRecord[] = fixtureProducts.map((product) => ({
   subtitle: `¥${product.price}`,
 }));
 
-const ARTICLES: DecorRecord[] = Array.from({ length: 8 }, (_unused, index) => ({
-  id: String(index + 1),
-  name: `示例资讯 ${index + 1}`,
-  subtitle: '2026-09-01',
+const ARTICLES: DecorRecord[] = [
+  ...fixtureArticles.map((article) => ({
+    id: article.id,
+    name: article.title,
+    subtitle: article.categoryTitle ?? undefined,
+  })),
+  ...Array.from({ length: 8 }, (_unused, index) => ({
+    id: String(index + 1),
+    name: `示例资讯 ${index + 1}`,
+    subtitle: '2026-09-01',
+  })),
+];
+
+const COUPONS: DecorRecord[] = [...fixtureCoupons, ...fixtureNewUserCoupons].map((coupon) => ({
+  id: coupon.templateId,
+  name: coupon.name,
+  subtitle: `减 ¥${coupon.discountAmount}`,
+}));
+
+const GROUPBUYS: DecorRecord[] = fixtureGroupbuys.map((card) => ({
+  id: card.activityId,
+  name: card.title,
+  image: card.imageUrl ?? undefined,
+  subtitle: `${card.seatsRequired}人团 ¥${card.price}`,
+}));
+
+const PRESALES: DecorRecord[] = fixturePresales.map((card) => ({
+  id: card.activityId,
+  name: card.title,
+  image: card.imageUrl ?? undefined,
+  subtitle: `预售 ¥${card.price}`,
 }));
 
 const LABELS: DecorRecord[] = [
@@ -42,6 +77,9 @@ function rowsOf(kind: string): DecorRecord[] {
   if (kind === 'product') return PRODUCTS;
   if (kind === 'article') return ARTICLES;
   if (kind === 'label') return LABELS;
+  if (kind === 'coupon') return COUPONS;
+  if (kind === 'groupbuy') return GROUPBUYS;
+  if (kind === 'presale') return PRESALES;
   return [];
 }
 

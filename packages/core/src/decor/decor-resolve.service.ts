@@ -19,6 +19,7 @@ import type { BlockVisibility } from '@shop/contracts/decor/base';
 import type {
   DataNeed,
   DataNeedKind,
+  HeldCoupon,
   OrderEntryCounts,
   PersonalNeed,
   PersonalSlot,
@@ -33,6 +34,7 @@ import { assertPreviewToken } from './decor.preview';
 import {
   couponStatesFor,
   defaultResolvers,
+  heldNewcomerCouponsFor,
   orderEntryCountsFor,
   userSummaryFor,
   type DataResolvers,
@@ -56,7 +58,7 @@ import * as repo from './decor.repo';
  * 3. **Per shopper, never cached** (DECOR-015). With a session, the shopper's
  *    own state for what the page shows (coupons claimed / claimable), and
  *    what the blocks declare with `personal` (订单入口 counts, 用户卡片
- *    profile and totals), in `personal`.
+ *    profile and totals, the 新人券 still held), in `personal`.
  *
  * A resolver that fails costs its slot (`null`), never the page.
  */
@@ -271,12 +273,21 @@ async function declaredLayer(ctx: Ctx, blocks: readonly PublicBlock[]): Promise<
     }
   };
   const needsStats = wanted.some(({ need }) => need.kind === 'userSummary' && need.stats);
-  const [counts, user] = await Promise.all([
+  const heldLimit = Math.max(
+    0,
+    ...wanted.map(({ need }) => (need.kind === 'newcomerCoupons' ? need.limit : 0)),
+  );
+  const [counts, user, held] = await Promise.all([
     wanted.some(({ need }) => need.kind === 'orderCounts')
       ? guarded<OrderEntryCounts>('orderCounts', () => orderEntryCountsFor(ctx))
       : null,
     wanted.some(({ need }) => need.kind === 'userSummary')
       ? guarded<UserSummary>('userSummary', () => userSummaryFor(ctx, needsStats))
+      : null,
+    heldLimit > 0
+      ? guarded<HeldCoupon[]>('newcomerCoupons', () =>
+          heldNewcomerCouponsFor(ctx, Math.min(heldLimit, DECOR_LIMITS.records)),
+        )
       : null,
   ]);
   const out: PersonalByBlock = {};
@@ -289,6 +300,9 @@ async function declaredLayer(ctx: Ctx, blocks: readonly PublicBlock[]): Promise<
         kind: 'userSummary',
         user: need.stats ? user : { ...user, stats: null },
       };
+    }
+    if (need.kind === 'newcomerCoupons' && held) {
+      (out[block] ??= {})[slot] = { kind: 'newcomerCoupons', coupons: held.slice(0, need.limit) };
     }
   }
   return out;

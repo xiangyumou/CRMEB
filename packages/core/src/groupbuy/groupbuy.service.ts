@@ -351,6 +351,34 @@ export async function list(ctx: Ctx, query: GroupbuyListQuery): Promise<Paged<Gr
   };
 }
 
+/**
+ * The storefront cards of exactly these activities, in the order given — what
+ * a DIY 拼团 block's manual pick shows. Read-only and additive: the same
+ * visibility as `list` (active, inside its window, not deleted), so an id the
+ * shopper could not see there is skipped here, as is a malformed or repeated
+ * one. At most `DECOR_LIMITS.records` ids arrive, so one query answers it.
+ */
+export async function cardsFor(ctx: Ctx, ids: readonly string[]): Promise<GroupbuyCard[]> {
+  const wanted = [...new Set(ids.filter((id) => /^[1-9]\d{0,14}$/.test(id)))].map(Number);
+  if (wanted.length === 0) return [];
+  const now = ctx.clock.now();
+  const { rows } = await repo.listActivities(ctx.db, {
+    visibleAt: now,
+    ids: wanted,
+    limit: wanted.length,
+    offset: 0,
+  });
+  const forming = await repo.countFormingGroupsByActivity(
+    ctx.db,
+    rows.map((row) => row.id),
+  );
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return wanted.flatMap((id) => {
+    const row = byId.get(id);
+    return row ? [toCard(row, forming.get(row.id) ?? 0, now)] : [];
+  });
+}
+
 /** How long the 人气条 may be stale. A minute, and the strip says nothing that needs to be exact. */
 const SUMMARY_CACHE_SECONDS = 60;
 const SUMMARY_CACHE_KEY = 'groupbuy:summary';
