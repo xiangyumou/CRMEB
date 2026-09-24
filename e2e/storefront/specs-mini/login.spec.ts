@@ -1,3 +1,4 @@
+import { hashPassword } from '@shop/core/auth';
 import { codeKey } from '@shop/core/sms';
 import { userSessions } from '@shop/db/schema/auth';
 import { users } from '@shop/db/schema/user';
@@ -5,7 +6,7 @@ import { wechatIdentities } from '@shop/db/schema/wechat';
 import type { Page } from '@playwright/test';
 import { and, eq, isNull } from 'drizzle-orm';
 
-import { miniRoute, sessionToken, test, expect } from '../src/mini';
+import { miniRoute, newWechatUser, sessionToken, test, expect } from '../src/mini';
 import type { Stack } from '../src/stack';
 import { CartPage, openTab } from '../src/mini-pages/shopping-pages';
 import {
@@ -20,12 +21,10 @@ import { openFresh, shown } from '../src/mini-pages/shown';
  * How a WeChat shopper gets and keeps a session in the mini-program (docs/mini/auth.md):
  * silently, with `wx.login`, when the shop knows the openid; with an SMS code when the shop
  * wants a phone number and WeChat's quick phone button is not used (手机号快速登录 itself is
- * `new-shopper-buys.spec.ts`'s); and, when the server stops honouring the token, renewed once
- * with a fresh `wx.login` and the failed request replayed — reads and writes alike.
- *
- * There is no password sign-in in the mini-program (the plan's 「其他方式」 was not built), so
- * the legacy `login.spec.ts` password case has no counterpart here; `docs/mini/e2e-coverage.md`
- * lists it as a gap.
+ * `new-shopper-buys.spec.ts`'s); with the account's password under 其他方式; through the
+ * privacy sheet WeChat raises before sharing the phone number with a shop the shopper has not
+ * agreed with yet; and, when the server stops honouring the token, renewed once with a fresh
+ * `wx.login` and the failed request replayed — reads and writes alike.
  */
 
 const MINI_LOGIN = '/api/v1/auth/sessions/wechat-mini';
@@ -155,6 +154,171 @@ test('a new WeChat user ticks the terms, signs up with an SMS code, and a wrong 
   expect(await shop.redis.exists(codeKey('login', phone))).toBe(0);
 
   expect(consoleErrors).toEqual([]);
+});
+
+const PASSWORD = 'Mini-pass-1';
+
+/** A shopper's account with a password and a phone of its own, known to no WeChat openid. */
+async function passwordAccount(
+  shop: Stack,
+): Promise<{ id: number; account: string; phone: string }> {
+  const { phone } = newWechatUser();
+  const account = `pw-${phone}`;
+  const [row] = await shop.db
+    .insert(users)
+    .values({
+      account,
+      phone,
+      nickname: '密码顾客',
+      passwordHash: await hashPassword(PASSWORD, 4),
+      passwordAlgo: 'bcrypt',
+      passwordVersion: 1,
+      registerSource: 'h5',
+    })
+    .returning({ id: users.id });
+  return { id: row!.id, account, phone };
+}
+
+test("SMOKE-004: 密码登录 under 其他方式 reaches an authenticated screen, and a wrong password is its field's error", async ({
+  miniPage: page,
+  wechatUser,
+  shop,
+  playwright,
+  consoleErrors,
+  failedRequests,
+}) => {
+  const owner = await passwordAccount(shop);
+
+  // The silent sign-in finds no account for this openid; 其他方式 offers the password.
+  await page.goto(miniRoute('pages/login/index'));
+  await shown(page).getByRole('button', { name: '密码登录' }).click();
+  await shown(page).locator('input[placeholder="手机号或账号"]').fill(owner.phone);
+  await shown(page).locator('input[placeholder="请输入密码"]').fill('not-the-password');
+  await shown(page).getByRole('checkbox', { name: '我已阅读并同意用户协议和隐私政策' }).click();
+  const login = shown(page)
+    .locator('.login__actions')
+    .getByRole('button', { name: '登录', exact: true });
+  await login.click();
+  await expect(shown(page).getByText('账号或密码不正确')).toBeVisible();
+  await expect(page).toHaveURL(/pages\/login\/index/);
+
+  await shown(page).locator('input[placeholder="请输入密码"]').fill(PASSWORD);
+  await login.click();
+
+  // Signed in, and home (the login page had no redirect).
+  await expect(page).toHaveURL(/pages\/index\/index/);
+  const token = await signedInToken(page);
+  const api = await playwright.request.newContext({
+    baseURL: shop.baseUrl,
+    extraHTTPHeaders: { Authorization: `Bearer ${token}`, 'X-Client-Platform': 'wechat-mini' },
+  });
+  const profile = await api.get('/api/v1/profile');
+  expect(profile.status(), await profile.text()).toBe(200);
+  expect(((await profile.json()) as { phone: string }).phone).toBe(owner.phone);
+  await api.dispose();
+
+  // A mini-program session of that account. The openid is not linked: auth.passwordLogin
+  // takes no bindToken (docs/mini/auth.md「密码登录」).
+  const live = await shop.db
+    .select({ platform: userSessions.platform })
+    .from(userSessions)
+    .where(and(eq(userSessions.userId, owner.id), isNull(userSessions.revokedAt)));
+  expect(live).toEqual([{ platform: 'wechat-mini' }]);
+  const linked = await shop.db
+    .select({ userId: wechatIdentities.userId })
+    .from(wechatIdentities)
+    .where(eq(wechatIdentities.openid, wechatUser.openid));
+  expect(linked).toEqual([]);
+
+  expect(consoleErrors).toEqual([]);
+  expect(failedRequests).toEqual(['POST /api/v1/auth/sessions/password 401']);
+});
+
+test.describe('the privacy sheet WeChat raises before 手机号快速登录', () => {
+  // This WeChat user has not agreed to the shop's 用户隐私保护指引 yet.
+  // eslint-disable-next-line no-empty-pattern
+  test.use({ wechatUser: async ({}, use) => use(newWechatUser({ privacy: 'undecided' })) });
+
+  /** What the harness hands out for `getPhoneNumber`, as the page asks for it. */
+  function countPhoneCodes(page: Page): { count: () => number } {
+    let count = 0;
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/__e2e/mini/phone-code') count += 1;
+    });
+    return { count: () => count };
+  }
+
+  test('同意 lets the phone number through and the shopper is signed in', async ({
+    miniPage: page,
+    wechatUser,
+    shop,
+    consoleErrors,
+    failedRequests,
+  }) => {
+    const phoneCodes = countPhoneCodes(page);
+    await page.goto(miniRoute('pages/login/index'));
+    await shown(page).getByRole('checkbox', { name: '我已阅读并同意用户协议和隐私政策' }).click();
+    await shown(page).getByRole('button', { name: '手机号快速登录' }).click();
+
+    // WeChat holds getPhoneNumber; the app's sheet says why it is asking.
+    const sheet = shown(page).getByRole('dialog', { name: '用户隐私保护提示' });
+    await expect(sheet).toBeVisible();
+    await expect(sheet).toContainText('为了登录和绑定手机号，我们需要你同意《用户隐私保护指引》');
+    expect(phoneCodes.count()).toBe(0);
+
+    await sheet.getByRole('button', { name: '同意' }).click();
+
+    // The number goes through and the sign-up finishes: home, with the openid bound.
+    await expect(page).toHaveURL(/pages\/index\/index/);
+    await signedInToken(page);
+    expect(phoneCodes.count()).toBe(1);
+    const [user] = await shop.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.phone, wechatUser.phone));
+    expect(user, `no user with phone ${wechatUser.phone}`).toBeDefined();
+    await expect(shown(page).getByRole('dialog', { name: '用户隐私保护提示' })).toHaveCount(0);
+
+    expect(consoleErrors).toEqual([]);
+    expect(failedRequests).toEqual([]);
+  });
+
+  test('拒绝 fails only that tap; the next tap asks again, and 同意 then goes on', async ({
+    miniPage: page,
+    wechatUser,
+    shop,
+    consoleErrors,
+  }) => {
+    const phoneCodes = countPhoneCodes(page);
+    await page.goto(miniRoute('pages/login/index'));
+    await shown(page).getByRole('checkbox', { name: '我已阅读并同意用户协议和隐私政策' }).click();
+    const quick = shown(page).getByRole('button', { name: '手机号快速登录' });
+    await quick.click();
+
+    const sheet = shown(page).getByRole('dialog', { name: '用户隐私保护提示' });
+    await sheet.getByRole('button', { name: '拒绝' }).click();
+
+    // Nothing was shared: no phone code, no account, still on the login page, told why.
+    await expect(shown(page).getByText('未同意隐私保护指引，可改用短信验证码登录')).toBeVisible();
+    await expect(sheet).toHaveCount(0);
+    expect(phoneCodes.count()).toBe(0);
+    await expect(page).toHaveURL(/pages\/login\/index/);
+    const none = await shop.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.phone, wechatUser.phone));
+    expect(none).toEqual([]);
+
+    // Browsing goes on; the next tap on the button asks again (WeChat did not remember a no).
+    await quick.click();
+    await expect(sheet).toBeVisible();
+    await sheet.getByRole('button', { name: '同意' }).click();
+    await expect(page).toHaveURL(/pages\/index\/index/);
+    await signedInToken(page);
+    expect(phoneCodes.count()).toBe(1);
+
+    expect(consoleErrors).toEqual([]);
+  });
 });
 
 test('a session the server stopped honouring is renewed once, and the reads that failed are replayed', async ({
