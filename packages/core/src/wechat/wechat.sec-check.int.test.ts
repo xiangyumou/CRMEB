@@ -280,6 +280,9 @@ describe('review text is held for a person, never refused', () => {
       moderationReason: 'sec_check_risky',
     });
     expect((await publicReviews(productId)).total).toBe(0);
+    // Its author still finds it under 我的评价, marked as waiting.
+    const mine = await catalog.myReviews(as(userId), { page: 1, pageSize: 20 });
+    expect(mine.items.map((item) => [item.id, item.status])).toEqual([[review.id, 'pending']]);
   });
 
   it('holds a review WeChat wants a person to look at — CONTENT-001', async () => {

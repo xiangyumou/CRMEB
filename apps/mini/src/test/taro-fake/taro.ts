@@ -114,6 +114,8 @@ export const taroFake = {
   subscribeAnswer: 'accept' as 'accept' | 'reject' | 'ban' | 'filter',
   /** `chooseAddress` resolves with this, or rejects (`null`: the shopper cancelled). */
   address: null as Record<string, string> | null,
+  /** `chooseInvoiceTitle` resolves with this, or rejects (`null`: the shopper cancelled). */
+  invoiceTitle: null as Record<string, string> | null,
   /** What the 确认收货 component (`openBusinessView`) reports as `extraData.status`. */
   businessViewStatus: 'success' as 'success' | 'fail' | 'cancel',
   /** `chooseMedia` temp paths, or `null` for a cancel. */
@@ -173,6 +175,7 @@ export const taroFake = {
     this.clipboardError = null;
     this.subscribeAnswer = 'accept';
     this.address = null;
+    this.invoiceTitle = null;
     this.media = ['wxfile://tmp/1.jpg'];
     this.album = 'ok';
     this.albumSettingGranted = true;
@@ -354,6 +357,11 @@ const Taro = {
     taroFake.calls.push({ api: 'chooseAddress', args: undefined });
     const address = taroFake.address;
     return address ? Promise.resolve(address) : rejectWith('chooseAddress:fail cancel');
+  },
+  chooseInvoiceTitle() {
+    taroFake.calls.push({ api: 'chooseInvoiceTitle', args: undefined });
+    const title = taroFake.invoiceTitle;
+    return title ? Promise.resolve(title) : rejectWith('chooseInvoiceTitle:fail cancel');
   },
   chooseMedia(args: unknown) {
     taroFake.calls.push({ api: 'chooseMedia', args });

@@ -260,3 +260,8 @@ export function RichText(
     </div>
   );
 }
+
+/** `<web-view src>`: a marker element carrying the address it would open. */
+export function WebView(props: { src: string; onMessage?: unknown; onLoad?: unknown }) {
+  return <div data-testid="web-view" data-src={props.src} />;
+}

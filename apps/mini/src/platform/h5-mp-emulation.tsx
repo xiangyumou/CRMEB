@@ -10,6 +10,7 @@ import type {
   PhoneNumberButtonProps,
   SubscribeResult,
 } from './types';
+import type { WechatInvoiceTitle } from './invoice-title-map';
 
 /**
  * "模拟小程序" (plan §1): the H5 build behaving, towards the server, exactly like the
@@ -52,6 +53,11 @@ export interface EmulatedWechatUser {
   address?: ChosenAddress | null | undefined;
   /** How the 确认收货 component ends. Default `confirm`. */
   receipt?: 'confirm' | 'cancel' | 'fail' | undefined;
+  /**
+   * What 从微信导入 (`chooseInvoiceTitle`) returns, in WeChat's own shape; `null` = the shopper
+   * cancels. Default: a fixed company title (`invoice-title.h5.ts`).
+   */
+  invoiceTitle?: WechatInvoiceTitle | null | undefined;
 }
 
 const DEFAULT_ADDRESS: ChosenAddress = {

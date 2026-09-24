@@ -4,6 +4,7 @@ import type {
   AdminReviewForm,
   AdminReviewListQuery,
   ProductReview,
+  ProductReviewStatus,
   ReviewSubmitBody,
   ReviewSummary,
   SubmittedReview,
@@ -369,7 +370,12 @@ export async function myReviews(
   ctx: Ctx,
   query: PageQuery,
 ): Promise<{
-  items: (ProductReview & { productId: string; productName: string; productImageUrl: string })[];
+  items: (ProductReview & {
+    productId: string;
+    productName: string;
+    productImageUrl: string;
+    status: ProductReviewStatus;
+  })[];
   total: number;
   page: number;
   pageSize: number;
@@ -389,6 +395,7 @@ export async function myReviews(
         productId: String(row.productId),
         productName: product?.name ?? '',
         productImageUrl: product?.imageUrl ?? '',
+        status: row.status,
       };
     }),
     total,

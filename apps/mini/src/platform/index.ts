@@ -16,6 +16,8 @@ export {
   useLaunchContext,
   type LaunchContext,
 } from './launch';
+export { chooseInvoiceTitle } from './invoice-title';
+export { fromWechatInvoiceTitle, type ChosenInvoiceTitle } from './invoice-title-map';
 export { onAppVisibility } from './lifecycle';
 export { openLinkTarget } from './link';
 export {
@@ -59,6 +61,7 @@ export {
   useShare,
   type ShareContent,
 } from './share';
+export { NicknameField } from './nickname-field';
 export { storage } from './storage';
 export {
   MAX_TEMPLATES,
