@@ -43,6 +43,22 @@ resolve_digest() {
     return 1
 }
 
+# Echo the digest of a ref this run just wrote. The registry can answer "not
+# found" for a few seconds after the write, so an empty answer is retried
+# before it is believed.
+resolve_written_digest() {
+    local ref="$1" out attempt
+    for attempt in 1 2 3 4 5 6; do
+        out="$(resolve_digest "$ref")" || return 1
+        if [ -n "$out" ]; then
+            printf '%s\n' "$out"
+            return 0
+        fi
+        sleep $((attempt * 2))
+    done
+    return 0
+}
+
 # Publish a commit-scoped tag and refuse to let it change value.
 #
 # Build into a temporary registry reference first. A conflict is rejected while
@@ -57,7 +73,7 @@ publish_tag() {
     tag="${target##*:}"
     candidate="$repo:__publish_${tag}_${BASHPID}_${RANDOM}"
     docker buildx imagetools create -t "$candidate" "$@"
-    candidate_digest="$(resolve_digest "$candidate")"
+    candidate_digest="$(resolve_written_digest "$candidate")"
     if [ -z "$candidate_digest" ]; then
         echo "Published temporary candidate $candidate but could not resolve its digest" >&2
         return 1
@@ -77,7 +93,7 @@ publish_tag() {
         return 1
     fi
     docker buildx imagetools create -t "$target" "$candidate"
-    after="$(resolve_digest "$target")"
+    after="$(resolve_written_digest "$target")"
     if [ -z "$after" ]; then
         echo "Published $target but could not read its digest back; refusing to continue" >&2
         return 1
@@ -110,7 +126,7 @@ tags)
         arch_tags+=("$image:$tag")
     done
     publish_tag "$image:sha-$sha" "${arch_tags[@]}"
-    digest="$(resolve_digest "$image:sha-$sha")"
+    digest="$(resolve_written_digest "$image:sha-$sha")"
     test -n "$digest" || { echo "could not resolve the published digest for $sha" >&2; exit 1; }
     printf '%s\n' "$digest"
     ;;
