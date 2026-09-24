@@ -21,7 +21,11 @@ export default function Search() {
   const signedIn = useSignedIn();
   const [value, setValue] = useState(params.keyword ?? '');
   const hot = useRouteQuery('catalog.hotKeywords', undefined, { staleTime: 10 * 60_000 });
-  const history = useRouteQuery('catalog.searchHistory', undefined, { enabled: signedIn });
+  // Every search adds to it on the server: never show the copy from the last visit first.
+  const history = useRouteQuery('catalog.searchHistory', undefined, {
+    enabled: signedIn,
+    refetchOnMount: 'always',
+  });
   const clear = useRouteMutation('catalog.clearSearchHistory', {
     invalidate: ['catalog.searchHistory'],
   });

@@ -66,10 +66,19 @@ function PaymentStatus({ orderId, outTradeNo }: { orderId: string; outTradeNo: s
   const id = orderId || status.data?.orderId || '';
   const paid = status.data?.paid === true;
   // Every order read cached before the payment (订单详情 under 收银台, 我的订单, the 我的 counts)
-  // still says 待付款: drop them once the server says paid.
+  // still says 待付款, and a 拼团 still shows the seat as open: drop them once the server says
+  // paid.
   const invalidate = useInvalidateRoutes();
   useEffect(() => {
-    if (paid) void invalidate('order.detail', 'order.list', 'order.counts');
+    if (paid) {
+      void invalidate(
+        'order.detail',
+        'order.list',
+        'order.counts',
+        'groupbuy.groupDetail',
+        'groupbuy.myGroups',
+      );
+    }
   }, [paid, invalidate]);
   const order = useRouteQuery(
     'order.detail',

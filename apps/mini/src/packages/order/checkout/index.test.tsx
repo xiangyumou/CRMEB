@@ -13,6 +13,7 @@ import {
 } from '@/test/checkout-fixture';
 import { serveApi, type FakeReply } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
+import { routeQueryKey } from '@shop/api-client/react';
 import { taroFake } from '@/test/taro-fake/taro';
 import CheckoutPage from './index';
 
@@ -42,7 +43,7 @@ async function open(draft: CheckoutDraft = buyNow) {
   useCheckoutDraft.setState({ draft });
   taroFake.storage.set('shop.session.token', 't1');
   await startSession();
-  await renderPage(<CheckoutPage />);
+  return renderPage(<CheckoutPage />);
 }
 
 const submitButton = () => screen.getByRole('button', { name: '提交订单' });
@@ -73,7 +74,9 @@ describe('确认订单', () => {
         return { status: 201, body: orderFixture() };
       },
     });
-    await open();
+    const { client } = await open();
+    const wallet = routeQueryKey('coupon.myList', { query: { state: 'unused' } });
+    client.setQueryData(wallet, { items: [], page: 1, pageSize: 20, total: 0 });
 
     expect(await screen.findByText('-¥10.00')).toBeTruthy();
     await ready();
@@ -107,6 +110,8 @@ describe('确认订单', () => {
     });
     expect(String(created.idempotencyKey)).toMatch(/^mini-/);
     expect(useCheckoutDraft.getState().draft).toBeNull();
+    // The coupon went onto the order: 我的优惠券 must not offer it.
+    expect(client.getQueryState(wallet)?.isInvalidated).toBe(true);
   });
 
   it('lets the shopper drop the coupon', async () => {

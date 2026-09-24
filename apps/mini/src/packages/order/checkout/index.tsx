@@ -128,7 +128,8 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
     invalidate: ['user.addressList', 'user.defaultAddress'],
   });
   const create = useRouteMutation('order.create', {
-    invalidate: ['cart.list', 'cart.count', 'order.list', 'order.counts'],
+    // The coupon now sits on the order: out of the wallet's 可使用.
+    invalidate: ['cart.list', 'cart.count', 'order.list', 'order.counts', 'coupon.myList'],
   });
 
   const importAddress = (chosen: ChosenAddress) => {

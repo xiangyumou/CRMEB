@@ -66,11 +66,15 @@ describe('支付结果', () => {
     serve('paid');
     const client = testQueryClient();
     const listKey = routeQueryKey('order.list', { query: {} });
+    const teamsKey = routeQueryKey('groupbuy.myGroups', { query: {} });
     client.setQueryData(listKey, { items: [], page: 1, pageSize: 20, total: 0 });
+    client.setQueryData(teamsKey, { items: [], page: 1, pageSize: 20, total: 0 });
     await renderPage(<PayResultPage />, client);
 
     expect(await screen.findByText('支付成功')).toBeTruthy();
     await waitFor(() => expect(client.getQueryState(listKey)?.isInvalidated).toBe(true));
+    // A 拼团 seat is taken once paid.
+    expect(client.getQueryState(teamsKey)?.isInvalidated).toBe(true);
   });
 
   it('sends a group buyer to invite friends', async () => {

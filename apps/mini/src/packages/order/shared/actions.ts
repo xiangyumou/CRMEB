@@ -13,6 +13,9 @@ export const ORDER_READS: readonly RouteId[] = [
   'order.myShipments',
 ];
 
+/** A cancelled unpaid order puts its coupon back in the wallet. */
+const CANCEL_READS: readonly RouteId[] = [...ORDER_READS, 'coupon.myList'];
+
 export interface OrderRef {
   id: string;
 }
@@ -101,10 +104,10 @@ export function useOrderActions(options: OrderActionsOptions = {}): OrderActions
             try {
               await client.call('order.cancel', { params: { id: orderId }, body: {} });
               toast.success('订单已取消');
-              await invalidate(...ORDER_READS);
+              await invalidate(...CANCEL_READS);
             } catch (error) {
               toast.text(messageOf(error, '取消失败，请稍后重试'));
-              await invalidate(...ORDER_READS);
+              await invalidate(...CANCEL_READS);
             }
           });
           return;
