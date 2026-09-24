@@ -121,6 +121,8 @@ CASE_IDS=(
   ship/dry-run-changes-nothing
   ship/into-a-fresh-dir
   ship/removes-what-it-no-longer-ships
+  ship/refuses-while-another-release-runs
+  ship/failed-upgrade-puts-the-files-back
   ship/forwards-host-commands
 )
 CASE_FNS=(
@@ -156,6 +158,8 @@ CASE_FNS=(
   case_ship_dry_run
   case_ship_fresh_dir
   case_ship_removes
+  case_ship_locked
+  case_ship_failed_upgrade
   case_ship_forwards
 )
 
@@ -1394,6 +1398,84 @@ case_ship_removes() {
   check 'a file no release shipped is left alone' [ "$(cat "$ship_dir/operator-notes.txt")" = 'mine' ]
   check 'deployment.env and data/ survived' host_owned_intact
   check 'the same release again recreated nothing' [ "$(container_of web)" = "$web_before" ]
+}
+
+# Somebody else's upgrade or rollback holds the host's lock: a release is
+# refused before it touches a file, and so is a rollback typed on the host.
+case_ship_locked() {
+  ensure_ship || return 1
+  [ -x "$ship_dir/shop" ] || {
+    note 'nothing has been shipped yet (run without --only)'
+    return 77
+  }
+  local lock="$ship_dir/data/shop.lock" holder before web_before tries=0
+  # `-o`: sleep does not inherit the lock, so killing flock releases it.
+  flock -o "$lock" sleep 600 &
+  holder=$!
+  while flock -n "$lock" true; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 50 ] || {
+      kill "$holder" 2>/dev/null
+      note 'could not take the lock for the case'
+      return 1
+    }
+    sleep 0.1
+  done
+  before="$(tree_of "$ship_dir" | grep -v ' data/')"
+  web_before="$(container_of web)"
+  local code=0
+  run_expect 4 "$workdir/ship-locked.log" ship "$ship_sha" || code=1
+  run_expect 4 "$workdir/rollback-locked.log" \
+    env NEXT_DEPLOYMENT_ENV="$ship_dir/deployment.env" "$ship_dir/shop" rollback --last-upgrade || code=1
+  kill "$holder" 2>/dev/null
+  wait "$holder" 2>/dev/null || true
+  [ "$code" -eq 0 ] || return 1
+  check 'it says another release is running' grep -q 'another upgrade or rollback is running' "$workdir/ship-locked.log"
+  check 'the rollback on the host says so too' grep -q 'another upgrade or rollback is running' "$workdir/rollback-locked.log"
+  check 'no shipped file changed' [ "$before" = "$(tree_of "$ship_dir" | grep -v ' data/')" ]
+  check 'the stack was not touched' [ "$(container_of web)" = "$web_before" ]
+}
+
+# The upgrade fails and the images go back; so must the Compose files and the
+# scripts, or the host describes a release it is not running.
+case_ship_failed_upgrade() {
+  ensure_ship || return 1
+  [ -f "$ship_dir/data/shipped.list" ] || {
+    note 'nothing has been shipped yet (run without --only)'
+    return 77
+  }
+  # The previous release, made different from this one in both directions: a
+  # file this release changes, and one it no longer ships.
+  printf '# drill: the previous release\n' >>"$ship_dir/lib/commands/status.sh"
+  printf 'old\n' >"$ship_dir/previous-only.yml"
+  printf 'previous-only.yml\n' >>"$ship_dir/data/shipped.list"
+  local status_before list_before worker_before
+  status_before="$(cat "$ship_dir/lib/commands/status.sh")"
+  list_before="$(cat "$ship_dir/data/shipped.list")"
+  worker_before="$(running worker)"
+
+  # CI "published" a worker that starts and never becomes healthy.
+  publish crmeb-next-worker:drill-broken crmeb-next-worker "sha-$ship_sha" >/dev/null || return 1
+  local code=0
+  run_expect 1 "$workdir/ship-failed.log" ship "$ship_sha" || code=1
+  publish "$worker_src" crmeb-next-worker "sha-$ship_sha" >/dev/null || return 1
+  [ "$code" -eq 0 ] || return 1
+
+  check 'the upgrade failed on the worker' grep -q 'did not become healthy' "$workdir/ship-failed.log"
+  check 'it says the files were put back' grep -q 'previous release files again' "$workdir/ship-failed.log"
+  check 'the changed file is the previous one again' \
+    [ "$(cat "$ship_dir/lib/commands/status.sh")" = "$status_before" ]
+  check 'the file it no longer ships is back' [ "$(cat "$ship_dir/previous-only.yml" 2>/dev/null)" = 'old' ]
+  check 'shipped.list is the previous one' [ "$(cat "$ship_dir/data/shipped.list")" = "$list_before" ]
+  check 'the worker runs what it ran before' [ "$(running worker)" = "$worker_before" ]
+  check 'REVISION still names the previous release' [ "$(cat "$ship_dir/REVISION")" = "$ship_sha" ]
+  check 'no snapshot is left behind' [ -z "$(find "$ship_dir/data/releases" -name '*.previous.tar')" ]
+  check 'deployment.env and data/ survived' host_owned_intact
+
+  # And the same release, healthy this time, ships over it cleanly.
+  run_expect 0 "$workdir/ship-after-failed.log" ship "$ship_sha" || return 1
+  check 'the next release removes the file again' test ! -e "$ship_dir/previous-only.yml"
+  check 'and restores this release status.sh' lacks 'drill: the previous release' "$ship_dir/lib/commands/status.sh"
 }
 
 case_ship_forwards() {

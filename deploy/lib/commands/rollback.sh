@@ -17,6 +17,7 @@
 #
 # Exit codes: 0 rolled back · 1 the target did not come up (the previously
 #             running images were restored) · 2 misuse · 3 needs a human.
+#             4 another upgrade or rollback holds the lock (`shop`); nothing changed.
 set -Eeuo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

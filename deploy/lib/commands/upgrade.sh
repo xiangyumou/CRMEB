@@ -54,6 +54,7 @@
 #
 # Exit codes: 0 deployed · 1 failed, rolled back to the previous images ·
 #             2 misuse · 3 failed AND the rollback failed — needs a human.
+#             4 another upgrade or rollback holds the lock (`shop`); nothing changed.
 set -Eeuo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

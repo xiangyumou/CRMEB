@@ -14,15 +14,21 @@
 #   3. the runtime files — `git archive <commit> deploy`, without the drill,
 #      the docs and this script — are staged on the host, and that staged
 #      `shop upgrade --dry-run` runs against the host's settings;
-#   4. the files are synced into the release directory. A file the previous
-#      release shipped and this one does not is removed; `data/shipped.list`
-#      on the host is what makes that exact. `deployment.env`, `data/` and
-#      `REVISION` are never touched;
-#   5. `shop upgrade` runs for real, detached from this connection, so a
-#      dropped SSH session cannot kill it halfway; its output is streamed and
-#      its exit code is this script's;
-#   6. `REVISION` names the commit, written only after the upgrade passed;
-#   7. from here: `https://<NEXT_HOST>/` answers 2xx and `http://<NEXT_HOST>/`
+#   4. on the host, in one process detached from this connection — so a
+#      dropped SSH session cannot kill it halfway — and holding the host's
+#      `data/shop.lock` for all of it, so a second release or a rollback
+#      cannot interleave with this one:
+#        a. the files the previous release shipped are snapshotted, and this
+#           release's are synced into the release directory. A file the
+#           previous release shipped and this one does not is removed;
+#           `data/shipped.list` on the host is what makes that exact.
+#           `deployment.env`, `data/` and `REVISION` are never touched;
+#        b. `shop upgrade` runs for real; its output is streamed here;
+#        c. if it passed, `REVISION` names the commit. If it failed and the
+#           previous images are running again, the previous files are put
+#           back from the snapshot, so the Compose files on the host always
+#           describe what runs;
+#   5. from here: `https://<NEXT_HOST>/` answers 2xx and `http://<NEXT_HOST>/`
 #      redirects to https. The host name is read with `shop hostname`, which
 #      prints that one setting and only while the Traefik overlay is applied.
 #
@@ -42,11 +48,14 @@
 # that is how the drill ships. SHIP_REMOTE and SHIP_BRANCH (origin, master)
 # name where a release must come from.
 #
-# Exit codes: 0 shipped · 1 the upgrade failed and the previous images are
-#             running again · 2 misuse · 3 the upgrade and its rollback failed:
-#             a person is needed · 4 refused before anything on the host
-#             changed · 5 deployed, but the site does not answer as it should
-#             from outside. A forwarded command exits with its own code.
+# Exit codes: 0 shipped · 1 the upgrade failed and the previous images and
+#             files are back · 2 misuse · 3 the upgrade and its rollback
+#             failed: a person is needed · 4 refused before anything on the
+#             host changed (including: another release or rollback is running)
+#             · 5 deployed, but the site does not answer as it should from
+#             outside · 6 the connection dropped; the release carries on on
+#             the host and `deploy/ship.sh status` shows how it ended. A
+#             forwarded command exits with its own code.
 
 # shellcheck disable=SC2016  # the host scripts below are single-quoted on
 # purpose: they are expanded by bash on the host, from their own arguments.
@@ -92,7 +101,7 @@ case "${1-}" in
     shift
     ;;
   help | -h | --help)
-    sed -n '2,52p' "$0"
+    sed -n '2,/^set -Eeuo/p' "$0" | sed '$d'
     exit 0
     ;;
 esac
@@ -241,7 +250,13 @@ on_host '[ -f "$1/deployment.env" ]' "$dir" ||
 
 stage="$(on_host 'mktemp -d "${TMPDIR:-/tmp}/shop-release.XXXXXX"')" ||
   refuse "could not make a staging directory on $host"
-cleanup() { on_host 'rm -rf -- "$1"' "$stage" >/dev/null 2>&1 || true; }
+# Once the host process owns the staging directory it removes it itself: this
+# side may lose the connection while that process still reads it.
+handed_off=0
+cleanup() {
+  [ "$handed_off" -eq 0 ] || return 0
+  on_host 'rm -rf -- "$1"' "$stage" >/dev/null 2>&1 || true
+}
 trap cleanup EXIT
 
 git archive --format=tar "$sha" -- "${files[@]}" |
@@ -265,8 +280,10 @@ say "  edge:   $edge"
 # The one place that writes into the release directory. `plan` prints what
 # `apply` would do; `apply` does it. Each file is copied beside its target and
 # renamed over it, so a `shop` that is running reads either the old file or the
-# new one, never half of each.
-sync_script='set -Eeuo pipefail
+# new one, never half of each. A subshell function, so its `exit` and `cd` stay
+# its own inside the release process below.
+sync_fn='sync_release() (
+set -Eeuo pipefail
 stage="$1" dir="$2" mode="$3"
 list="$dir/data/shipped.list"
 cd "$stage"
@@ -313,11 +330,12 @@ for f in "${gone[@]}"; do
 done
 printf "%s\n" "$new" >"$list.shipping"
 mv -f "$list.shipping" "$list"
+)
 '
 
 say ''
 say "files, against $dir:"
-on_host "$sync_script" "$stage" "$dir" plan || refuse 'the release files cannot be synced'
+on_host "$sync_fn"$'\nsync_release "$@"' "$stage" "$dir" plan || refuse 'the release files cannot be synced'
 
 upgrade_args=(upgrade --app-version "$sha" --web "$web" --worker "$worker" --edge "$edge")
 [ "$first_deploy" -eq 0 ] || upgrade_args+=(--first-deploy)
@@ -333,29 +351,118 @@ if [ "$dry_run" -eq 1 ]; then
 fi
 [ "$code" -eq 0 ] || refuse "the dry run failed (exit $code)"
 
-# --- 4. sync -------------------------------------------------------------------------
+# --- 4. release, on the host --------------------------------------------------------
 
-say ''
-say "syncing the release files into $dir"
-on_host "$sync_script" "$stage" "$dir" apply >/dev/null || {
-  warn "the sync into $dir failed part-way. Nothing was deployed; ship again."
-  exit 1
+# Detached: the release runs in one process on the host, its output goes to a
+# log there, and this connection only follows it. If the connection drops, the
+# release finishes regardless — REVISION included — and its log and the
+# upgrade's manifest say how it ended.
+#
+# That process holds `data/shop.lock` from before the first file is touched to
+# after REVISION is written, and hands it to `shop upgrade` (SHOP_LOCK_HELD).
+# 75 means it never got the lock, or could not snapshot, and changed nothing.
+release_script='
+dir="$1" stage="$2" log="$3" sha="$4"
+shift 4
+lock="$dir/data/shop.lock"
+snap="$log.previous.tar"
+list="$dir/data/shipped.list"
+
+say() { printf "%s\n" "$*"; }
+
+# Every file the previous release shipped, and the list naming them.
+snapshot() {
+  rm -f "$snap"
+  [ -f "$list" ] || return 0
+  (
+    cd "$dir" || exit 1
+    {
+      while IFS= read -r f; do
+        if [ -n "$f" ] && { [ -e "$f" ] || [ -L "$f" ]; }; then printf "%s\n" "$f"; fi
+      done <data/shipped.list
+      printf "%s\n" data/shipped.list
+    } | tar -cf "$snap" --verbatim-files-from -T -
+  )
 }
 
-# --- 5. upgrade ------------------------------------------------------------------------
+# The snapshot back over this release: what this release added is removed,
+# what it changed or removed is extracted again, shipped.list included.
+restore() {
+  local old f parent
+  old="$(tar -tf "$snap" | LC_ALL=C sort)" || return 1
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    rm -f "$dir/$f" || return 1
+    parent="$(dirname "$f")"
+    [ "$parent" = . ] || (cd "$dir" && rmdir -p --ignore-fail-on-non-empty "$parent" 2>/dev/null) || true
+  done < <(LC_ALL=C comm -13 <(printf "%s\n" "$old") <(LC_ALL=C sort "$list"))
+  tar -C "$dir" -xpf "$snap"
+}
 
-# Detached: the upgrade's output goes to a log on the host and this connection
-# only follows it. If the connection drops, the upgrade finishes regardless and
-# its log and manifest say how it ended.
-run_script='dir="$1" log="$2"
-shift 2
-mkdir -p "${log%/*}"
+put_back() {
+  if [ ! -f "$snap" ]; then
+    say "this was the first release here: there are no previous files, so these stay"
+    return 0
+  fi
+  if restore; then
+    say "the files in $dir are the previous release files again"
+    return 0
+  fi
+  say "could not put the previous release files back; they are in $snap"
+  return 1
+}
+
+release() {
+  if ! flock -n 9; then
+    say "refused: another upgrade or rollback is running on this host ($lock is held)."
+    say "Nothing was changed. Ship again when it has finished."
+    return 75
+  fi
+  snapshot || {
+    say "refused: could not snapshot the files of the previous release. Nothing was changed."
+    return 75
+  }
+
+  say "syncing the release files into $dir"
+  if ! sync_release "$stage" "$dir" apply >/dev/null; then
+    say "the sync into $dir failed part-way; nothing was deployed"
+    put_back || return 3
+    rm -f "$snap"
+    return 1
+  fi
+
+  local code=0
+  SHOP_LOCK_HELD=1 NEXT_DEPLOYMENT_ENV="$dir/deployment.env" "$dir/shop" "$@" || code=$?
+  case "$code" in
+    0)
+      printf "%s\n" "$sha" >"$dir/REVISION.shipping" && mv -f "$dir/REVISION.shipping" "$dir/REVISION"
+      say "REVISION: $sha"
+      ;;
+    3)
+      say ""
+      say "the files in $dir are this release files; the previous ones are in $snap"
+      return 3
+      ;;
+    *)
+      say ""
+      say "putting the previous release files back, to match the images running again"
+      put_back || return 3
+      ;;
+  esac
+  rm -f "$snap"
+  return "$code"
+}
+
+mkdir -p "$dir/data" "${log%/*}"
 rm -f "$log.exit"
 : >"$log"
 (
   trap "" HUP
-  NEXT_DEPLOYMENT_ENV="$dir/deployment.env" "$dir/shop" "$@" >"$log" 2>&1 </dev/null
-  printf "%s\n" "$?" >"$log.exit"
+  exec 9>>"$lock"
+  release "$@" >"$log" 2>&1 </dev/null
+  code=$?
+  rm -rf -- "$stage"
+  printf "%s\n" "$code" >"$log.exit"
 ) &
 pid=$!
 tail -n +1 -f --pid="$pid" "$log"
@@ -364,29 +471,29 @@ exit "$(cat "$log.exit" 2>/dev/null || printf 3)"
 '
 log="$dir/data/releases/$(date -u +%Y%m%dT%H%M%SZ)-${sha:0:12}.log"
 say ''
-say "upgrading (log on the host: $log)"
+say "releasing (log on the host: $log)"
+handed_off=1
 code=0
-on_host "$run_script" "$dir" "$log" "${upgrade_args[@]}" || code=$?
-if [ "$code" -ne 0 ]; then
-  warn ''
-  if [ "$code" -eq 255 ] && [ "$host" != 'local' ]; then
-    warn "the connection to $host was lost. The upgrade carries on there; its log is"
+on_host "$sync_fn"$'\n'"$release_script" "$dir" "$stage" "$log" "$sha" "${upgrade_args[@]}" || code=$?
+case "$code" in
+  0) ;;
+  75) exit 4 ;;
+  255)
+    [ "$host" != 'local' ] || exit 3
+    warn ''
+    warn "the connection to $host was lost. The release carries on there; its log is"
     warn "  $log"
     warn "and \`deploy/ship.sh status\` shows how it ended."
-    exit 3
-  fi
-  warn "the upgrade did not deploy $sha (exit $code). REVISION still names the previous release;"
-  warn "the files in $dir are this release's."
-  exit "$code"
-fi
+    exit 6
+    ;;
+  *)
+    warn ''
+    warn "the upgrade did not deploy $sha (exit $code). REVISION still names the previous release."
+    exit "$code"
+    ;;
+esac
 
-# --- 6. REVISION ---------------------------------------------------------------------------
-
-on_host 'printf "%s\n" "$2" >"$1/REVISION.shipping" && mv -f "$1/REVISION.shipping" "$1/REVISION"' \
-  "$dir" "$sha"
-say "REVISION: $sha"
-
-# --- 7. from outside -----------------------------------------------------------------------
+# --- 5. from outside -----------------------------------------------------------------------
 
 name="$(on_host 'NEXT_DEPLOYMENT_ENV="$1/deployment.env" "$1/shop" hostname' "$dir")" || name=''
 if [ -z "$name" ]; then
