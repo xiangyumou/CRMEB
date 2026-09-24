@@ -10,7 +10,7 @@ import { DomainError } from '../kernel/errors';
 import { cleanOrphanAttachments } from './storage.jobs';
 import { backfillImageVariants, generateImageVariants } from './image-variants';
 import type { Transport } from './safe-fetch';
-import { siteConfig } from '../system/site.config';
+import { siteConfig } from '../system';
 import { storageConfig } from './storage.config';
 import { createScanTokenStore } from './scan-token';
 import {
