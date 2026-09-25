@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { adminUserListQuery, userLabelForm } from '../user/schemas';
 import { adminProductForm } from './schemas';
 
 const base = {
@@ -39,5 +40,24 @@ describe('a 卡密 product in the editor', () => {
     const fresh = adminProductForm.safeParse({ ...base, skus: [{ ...sku, stock: 5 }] });
     expect(fresh.success).toBe(false);
     expect(fresh.error?.issues[0]?.message).toContain('卡密');
+  });
+});
+
+describe('what an API client (MCP, the CLI) sends is trimmed too', () => {
+  it('saves 「 T恤 」 as 「T恤」 and refuses a name that is only spaces', () => {
+    const parsed = adminProductForm.parse({
+      ...base,
+      name: '  T恤 ',
+      skus: [{ ...sku, stock: 0 }],
+    });
+    expect(parsed.name).toBe('T恤');
+    expect(
+      adminProductForm.safeParse({ ...base, name: '   ', skus: [{ ...sku, stock: 0 }] }).success,
+    ).toBe(false);
+  });
+
+  it('searches for the keyword without the space an input method left behind', () => {
+    expect(adminUserListQuery.parse({ keyword: '小明 ' }).keyword).toBe('小明');
+    expect(userLabelForm.safeParse({ name: '  ' }).success).toBe(false);
   });
 });
