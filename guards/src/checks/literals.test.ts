@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { literals, pageSizeCap, pageSizeLiterals, timeCuts } from './literals';
 
+/** A whole-tree scan: seconds on a CI runner, far past the 5 s unit default. */
+const WHOLE_TREE_MS = 60_000;
+
 /** The `literals` readers against small sources, then the check over the tree. */
 
 describe('pageSize literals', () => {
@@ -58,8 +61,12 @@ describe('instants cut as dates', () => {
 });
 
 describe('literals over the tree', () => {
-  it('GUARD-002 GUARD-003 — the tree sends only accepted page sizes and cuts no UTC dates', async () => {
-    const failures = (await literals.run()).findings.filter((f) => f.level === 'fail');
-    expect(failures.map((f) => `${f.where}: ${f.message}`).join('\n')).toBe('');
-  });
+  it(
+    'GUARD-002 GUARD-003 — the tree sends only accepted page sizes and cuts no UTC dates',
+    { timeout: WHOLE_TREE_MS },
+    async () => {
+      const failures = (await literals.run()).findings.filter((f) => f.level === 'fail');
+      expect(failures.map((f) => `${f.where}: ${f.message}`).join('\n')).toBe('');
+    },
+  );
 });

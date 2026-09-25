@@ -10,6 +10,9 @@ import {
   type Tree,
 } from './admin-permissions';
 
+/** A whole-tree scan: seconds on a CI runner, far past the 5 s unit default. */
+const WHOLE_TREE_MS = 60_000;
+
 /**
  * The `admin-permissions` walk over small made-up admin trees: a page, the
  * components it imports, and the contract routes each file uses.
@@ -208,8 +211,12 @@ const helper = () => 1;
 });
 
 describe('admin-permissions over the tree', () => {
-  it('GUARD-005 — every admin control and picker read is gated or granted with its screen', async () => {
-    const failures = (await adminPermissions.run()).findings.filter((f) => f.level === 'fail');
-    expect(failures.map((f) => `${f.where}: ${f.message}`).join('\n')).toBe('');
-  });
+  it(
+    'GUARD-005 — every admin control and picker read is gated or granted with its screen',
+    { timeout: WHOLE_TREE_MS },
+    async () => {
+      const failures = (await adminPermissions.run()).findings.filter((f) => f.level === 'fail');
+      expect(failures.map((f) => `${f.where}: ${f.message}`).join('\n')).toBe('');
+    },
+  );
 });

@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { judge, personalData, sensitiveFields } from './personal-data';
 
+/** A whole-tree scan: seconds on a CI runner, far past the 5 s unit default. */
+const WHOLE_TREE_MS = 60_000;
+
 /** The `personal-data` walk and verdict over small contracts, then over the tree. */
 
 const route = (id: string, auth: string, response: z.ZodType) => ({ id, auth, response });
@@ -43,8 +46,12 @@ describe('personal data in responses', () => {
 });
 
 describe('personal-data over the tree', () => {
-  it('GUARD-004 — no response carries a credential or another person’s data unexplained', async () => {
-    const failures = (await personalData.run()).findings.filter((f) => f.level === 'fail');
-    expect(failures.map((f) => `${f.where}: ${f.message}`).join('\n')).toBe('');
-  });
+  it(
+    'GUARD-004 — no response carries a credential or another person’s data unexplained',
+    { timeout: WHOLE_TREE_MS },
+    async () => {
+      const failures = (await personalData.run()).findings.filter((f) => f.level === 'fail');
+      expect(failures.map((f) => `${f.where}: ${f.message}`).join('\n')).toBe('');
+    },
+  );
 });

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { counters, findCounterWrites } from './counters';
 
+/** A whole-tree scan: seconds on a CI runner, far past the 5 s unit default. */
+const WHOLE_TREE_MS = 60_000;
+
 /**
  * The `counters` reader against small sources: each case is one way of
  * writing a counter, and says whether it may be stale.
@@ -57,8 +60,12 @@ describe('findCounterWrites', () => {
 });
 
 describe('counters over the tree', () => {
-  it('GUARD-001 — every counter write in the server is sql, compare-and-set or excused', async () => {
-    const failures = (await counters.run()).findings.filter((f) => f.level === 'fail');
-    expect(failures.map((f) => `${f.where}: ${f.message}`).join('\n')).toBe('');
-  });
+  it(
+    'GUARD-001 — every counter write in the server is sql, compare-and-set or excused',
+    { timeout: WHOLE_TREE_MS },
+    async () => {
+      const failures = (await counters.run()).findings.filter((f) => f.level === 'fail');
+      expect(failures.map((f) => `${f.where}: ${f.message}`).join('\n')).toBe('');
+    },
+  );
 });
