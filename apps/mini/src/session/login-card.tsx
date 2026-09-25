@@ -7,6 +7,7 @@ import { Empty } from '@/ui/empty';
 import { toast } from '@/ui/feedback';
 import { bindPhone, startSession, useSession } from './session';
 import './login-card.scss';
+import { errorMessage } from '@/lib/error-message';
 
 const PRIVACY_REFUSED = '未同意隐私保护指引，可改用短信验证码登录';
 
@@ -53,7 +54,7 @@ export function LoginCard({ children, reason, redirect }: LoginCardProps) {
                 return;
               }
               bindPhone(result.code).catch((error: unknown) => {
-                toast.text(error instanceof Error ? error.message : String(error));
+                toast.text(errorMessage(error, '登录失败，请重试'));
               });
             }}
           >
@@ -66,7 +67,7 @@ export function LoginCard({ children, reason, redirect }: LoginCardProps) {
       ) : session.status === 'failed' ? (
         <>
           <Text className="shop-login-card__reason">{session.message}</Text>
-          <Button variant="primary" size="lg" block onClick={() => void startSession()}>
+          <Button variant="primary" size="lg" block onClick={() => startSession()}>
             重新登录
           </Button>
           <Button variant="text" size="sm" onClick={() => toLoginPage()}>
@@ -76,7 +77,7 @@ export function LoginCard({ children, reason, redirect }: LoginCardProps) {
       ) : session.status === 'signed-out' ? (
         <>
           <Text className="shop-login-card__reason">{reason}</Text>
-          <Button variant="primary" size="lg" block onClick={() => void startSession()}>
+          <Button variant="primary" size="lg" block onClick={() => startSession()}>
             登录
           </Button>
           <Button variant="text" size="sm" onClick={() => toLoginPage()}>

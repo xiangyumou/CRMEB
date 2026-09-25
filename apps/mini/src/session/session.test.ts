@@ -237,6 +237,17 @@ describe('session', () => {
     });
   });
 
+  it("says 登录失败 in Chinese when wx.login itself fails with WeChat's plain errMsg object", async () => {
+    const { startSession, taroFake, useSession } = await load();
+    taroFake.loginError = 'login:fail timeout';
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    await startSession();
+    expect(useSession.getState().session).toEqual({
+      status: 'failed',
+      message: '登录失败，请重试',
+    });
+  });
+
   it('signs in with a password from a parked sign-in, as wechat-mini, passing its bindToken (AUTH-009)', async () => {
     const { serveApi, signInWithPassword, startSession, taroFake, useSession } = await load();
     const seen = serveApi({
@@ -449,6 +460,27 @@ describe('AUTH-010 — a request that met a 401 is replayed only as the account 
     const url = (loginPages(taroFake.calls)[0]?.args as { url: string }).url;
     const redirect = new URLSearchParams(url.split('?')[1]).get('redirect');
     expect(JSON.parse(redirect ?? 'null')).toEqual({ route: 'product', params: { id: '12' } });
+  });
+
+  it('opens no second login page when the 401 came from the login page itself', async () => {
+    const { serveApi, startSession, taroFake, useSessionNotice } = await expiredAs7();
+    taroFake.pageStack = [{ route: 'pages/login/index', options: {} }];
+    serveApi({
+      'POST /api/v1/cart/items': () => unauthenticated,
+      'POST /api/v1/auth/sessions/wechat-mini': () => ({
+        status: 201,
+        body: signedIn('b-token', other),
+      }),
+      'DELETE /api/v1/auth/sessions/current': () => ({ body: { ok: true } }),
+    });
+    const { api } = await import('@/data/api');
+
+    await startSession();
+    await expect(api.call('cart.addItem', addToCart)).rejects.toMatchObject({ status: 401 });
+    await vi.waitFor(() =>
+      expect(useSessionNotice.getState().notice).toBe('登录已过期，请重新登录'),
+    );
+    expect(loginPages(taroFake.calls)).toEqual([]);
   });
 
   it('gives every request that failed alongside the same answer: one wx.login, none replayed, one login page', async () => {

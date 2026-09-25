@@ -18,6 +18,7 @@ import { Pressable } from '@/ui/pressable';
 import { Sheet } from '@/ui/sheet';
 import { posterLayout, type PosterColors } from './poster-layout';
 import './poster-sheet.scss';
+import { errorMessage } from '@/lib/error-message';
 
 /** What a poster is of: a catalogue route a 小程序码 can open, and what it shows. */
 export interface PosterSubject {
@@ -136,7 +137,7 @@ export function PosterSheet({ visible, onClose, subject }: PosterSheetProps) {
       } catch (error) {
         settle({
           kind: 'failed',
-          message: error instanceof Error ? error.message : '海报生成失败',
+          message: errorMessage(error, '海报生成失败'),
         });
       }
     })();
@@ -233,7 +234,7 @@ export function PosterSheet({ visible, onClose, subject }: PosterSheetProps) {
             <Text className="shop-poster__note">
               保存海报需要「添加到相册」权限，可在设置中开启；也可点开海报后长按保存
             </Text>
-            <Button variant="primary" block onClick={() => void openSettings(phase.path)}>
+            <Button variant="primary" block onClick={() => openSettings(phase.path)}>
               去设置
             </Button>
           </View>

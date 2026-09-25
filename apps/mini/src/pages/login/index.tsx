@@ -28,6 +28,7 @@ import { toast } from '@/ui/feedback';
 import { PageShell } from '@/ui/page-shell';
 import { SmsCodeField } from '@/ui/sms-code-field';
 import './index.scss';
+import { errorMessage } from '@/lib/error-message';
 
 /** The privacy sheet's 拒绝 before 手机号快速登录 (WeChat's errMsg is English). */
 const PRIVACY_REFUSED = '未同意隐私保护指引，可改用短信验证码登录';
@@ -94,7 +95,7 @@ export default function LoginPage() {
     try {
       await bindPhoneWithSms(phone, code);
     } catch (error) {
-      setCodeError(error instanceof Error ? error.message : String(error));
+      setCodeError(errorMessage(error, '登录失败，请重试'));
     } finally {
       setSubmitting(false);
     }
@@ -144,7 +145,7 @@ export default function LoginPage() {
               />
             </CellGroup>
             <View className="login__actions">
-              <Button size="lg" block loading={submitting} onClick={() => void submitSms()}>
+              <Button size="lg" block loading={submitting} onClick={() => submitSms()}>
                 登录
               </Button>
               <Button variant="text" size="sm" onClick={() => setMode('wechat')}>
@@ -166,21 +167,27 @@ export default function LoginPage() {
                       return;
                     }
                     bindPhone(result.code).catch((error: unknown) =>
-                      toast.text(error instanceof Error ? error.message : String(error)),
+                      toast.text(errorMessage(error, '登录失败，请重试')),
                     );
                   }}
                 >
                   手机号快速登录
                 </platform.PhoneNumberButton>
               ) : (
-                <Button size="lg" block onClick={() => void needAgreement()}>
+                <Button
+                  size="lg"
+                  block
+                  onClick={() => {
+                    needAgreement();
+                  }}
+                >
                   手机号快速登录
                 </Button>
               )
             ) : session.status === 'failed' ? (
               <>
                 <Text className="login__error">{session.message}</Text>
-                <Button size="lg" block onClick={() => void startSession()}>
+                <Button size="lg" block onClick={() => startSession()}>
                   重新登录
                 </Button>
               </>
@@ -209,7 +216,7 @@ export default function LoginPage() {
                 </Button>
               </View>
             )}
-            <Button variant="text" size="sm" onClick={() => void goBack()}>
+            <Button variant="text" size="sm" onClick={() => goBack()}>
               暂不登录
             </Button>
           </View>

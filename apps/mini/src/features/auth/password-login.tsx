@@ -7,6 +7,7 @@ import { Button } from '@/ui/button';
 import { CellGroup } from '@/ui/cell';
 import { toast } from '@/ui/feedback';
 import { Field } from '@/ui/field';
+import { errorMessage } from '@/lib/error-message';
 
 /** The server's bounds (`passwordLoginBody`). */
 const ACCOUNT_MAX = 64;
@@ -50,7 +51,7 @@ export function PasswordLoginForm({ canSubmit, onCancel }: PasswordLoginFormProp
         // No slider in the mini-program: the shopper waits, or signs in another way.
         toast.text('尝试次数较多，请稍后再试或使用短信验证码登录');
       } else {
-        toast.text(error instanceof Error ? error.message : String(error));
+        toast.text(errorMessage(error, '登录失败，请重试'));
       }
     } finally {
       setSubmitting(false);
@@ -88,7 +89,7 @@ export function PasswordLoginForm({ canSubmit, onCancel }: PasswordLoginFormProp
         />
       </CellGroup>
       <View className="login__actions">
-        <Button size="lg" block loading={submitting} onClick={() => void submit()}>
+        <Button size="lg" block loading={submitting} onClick={() => submit()}>
           登录
         </Button>
         <View className="login__links">
@@ -98,7 +99,7 @@ export function PasswordLoginForm({ canSubmit, onCancel }: PasswordLoginFormProp
           <Button
             variant="text"
             size="sm"
-            onClick={() => void navigate({ route: 'passwordReset', params: {} })}
+            onClick={() => navigate({ route: 'passwordReset', params: {} })}
           >
             忘记密码
           </Button>

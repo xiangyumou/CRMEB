@@ -7,6 +7,7 @@ import {
   type StorefrontRouteKey,
 } from '@shop/api-client/routes';
 import { parseQuery } from '@/lib/query';
+import { fromPairs } from '@/lib/defined';
 
 /**
  * Navigation by route key (docs/mini/pages.md §3). Pages, DIY links, messages and shares name a
@@ -156,7 +157,7 @@ export async function navigate(
   const entry = entryOf(route.route);
   if (!entry || entry.tab) {
     const key = (entry ? route.route : 'home') as StorefrontRouteKey;
-    const params = entry ? Object.fromEntries(definedParams(key, route.params ?? {})) : {};
+    const params = entry ? fromPairs(definedParams(key, route.params ?? {})) : {};
     usePendingTabParams.setState((state) => ({ byKey: { ...state.byKey, [key]: params } }));
     await Taro.switchTab({ url: `/${storefrontRoutes[key].path}` });
     return;
@@ -265,7 +266,7 @@ export function parseLoginRedirect(value: string | undefined): StorefrontRoute |
   const { route, params } = parsed as { route?: unknown; params?: unknown };
   if (typeof route !== 'string' || route === 'login' || !entryOf(route)) return null;
   const key = route as StorefrontRouteKey;
-  const clean = Object.fromEntries(
+  const clean = fromPairs(
     definedParams(key, typeof params === 'object' && params !== null ? params : {}),
   );
   return { route: key, params: clean } as StorefrontRoute;
@@ -319,6 +320,15 @@ function routeOfPage(page: StackPage | undefined): StorefrontRoute | null {
     ...page.options,
   };
   return { route: key, params: readRouteParams(key, options) } as StorefrontRoute;
+}
+
+/** Whether the shopper is on the login page now (a second one must not open over it). */
+export function onLoginPage(): boolean {
+  const stack = stackPages();
+  const page = stack[stack.length - 1];
+  if (!page) return false;
+  const [path = ''] = (page.route ?? page.path ?? '').replace(/^\//, '').split('?');
+  return routeKeyOfPath(path) === 'login';
 }
 
 /** The page the shopper is on, as a route (the login page's `redirect`); `null` on login. */

@@ -9,6 +9,7 @@ import { requireLogin, useSignedIn } from '@/session/session';
 import { ContactArea, sessionFromOf, useSupport } from '@/ui/contact-button';
 import { toast } from '@/ui/feedback';
 import { useOverlayStore } from '@/ui/overlay-store';
+import { errorMessage } from '@/lib/error-message';
 
 /** 客服's session source for a decorated page: the route, and the 微页面's id. */
 export function decorSessionFrom(route: StorefrontRoute): string {
@@ -84,30 +85,38 @@ export function useDecorHost(route: StorefrontRoute, reload: () => unknown): Dec
       switch (intent.kind) {
         case 'login':
         case 'claimNewcomerCoupons':
-          void requireLogin(route).then((signed) => {
-            if (signed) void reload();
-          });
+          requireLogin(route)
+            .then((signed) => {
+              if (signed) void reload();
+            })
+            .catch((error: unknown) => toast.text(errorMessage(error)));
           return;
         case 'claimCoupon': {
           if (claiming.current) return;
           claiming.current = true;
-          void requireLogin(route).then((signed) => {
-            if (!signed) {
-              claiming.current = false;
-              return;
-            }
-            claim(
-              { params: { id: intent.templateId } },
-              {
-                onSuccess: () => toast.success('领取成功'),
-                onError: (error) => toast.text(claimFailureText(error)),
-                onSettled: () => {
-                  claiming.current = false;
-                  void reload();
+          requireLogin(route)
+            .then((signed) => {
+              if (!signed) {
+                claiming.current = false;
+                return;
+              }
+              claim(
+                { params: { id: intent.templateId } },
+                {
+                  onSuccess: () => toast.success('领取成功'),
+                  onError: (error) => toast.text(claimFailureText(error)),
+                  onSettled: () => {
+                    claiming.current = false;
+                    void reload();
+                  },
                 },
-              },
-            );
-          });
+              );
+            })
+            .catch((error: unknown) => {
+              // A sign-in that threw must not leave 领取 locked for the rest of the visit.
+              claiming.current = false;
+              toast.text(errorMessage(error));
+            });
           return;
         }
         case 'contact':

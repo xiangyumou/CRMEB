@@ -7,6 +7,7 @@ import { specsOf, type SkuMatrix } from '@/features/product/sku-select';
 import { requireLogin } from '@/session/session';
 import { toast } from '@/ui/feedback';
 import type { ProductCardData } from '@/ui/product-card';
+import { errorMessage } from '@/lib/error-message';
 
 /** The product a list's 加购 button was tapped on. */
 export type QuickAddProduct = Pick<ProductCardData, 'id' | 'name' | 'imageUrl' | 'price'>;
@@ -55,7 +56,7 @@ export function useQuickAdd(redirect: StorefrontRoute): QuickAdd {
         routeQueryOptions(api, 'catalog.productSkus', { params: { id: product.id } }),
       );
     } catch (error) {
-      toast.text(error instanceof Error ? error.message : '商品信息加载失败');
+      toast.text(errorMessage(error, '商品信息加载失败'));
       return;
     }
     const only = loaded.skus.length === 1 ? loaded.skus[0] : undefined;

@@ -3,6 +3,7 @@ import { View } from '@tarojs/components';
 import type { ResponseOf } from '@shop/api-client';
 import type { StorefrontRoute } from '@shop/api-client/routes';
 import { BlockList, type PersonalSlots } from '@shop/storefront-blocks';
+import { fromPairs } from '@/lib/defined';
 import { openLinkTarget } from '@/platform';
 import { useDecorHost } from './decor-host';
 import './decor-page.scss';
@@ -34,7 +35,7 @@ export interface DecorPageProps {
  */
 export function DecorPage({ page, route, reload }: DecorPageProps) {
   const data = useMemo(
-    () => Object.fromEntries(page.blocks.map((block) => [block.id, block.data])),
+    () => fromPairs(page.blocks.map((block) => [block.id, block.data] as const)),
     [page.blocks],
   );
   const { host, onIntent, renderIntent } = useDecorHost(route, reload);

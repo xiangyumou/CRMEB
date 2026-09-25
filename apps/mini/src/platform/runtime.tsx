@@ -126,7 +126,7 @@ export const platform: MiniPlatform = {
   },
   async login() {
     const { code } = await Taro.login();
-    if (!code) throw new Error('wx.login 没有返回 code');
+    if (!code) throw new Error('微信登录没有完成，请重试');
     return code;
   },
   PhoneNumberButton,

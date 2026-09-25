@@ -92,6 +92,11 @@ const MISSING_METHODS = [
     message: 'iOS 12 没有 Object.hasOwn；用 Object.prototype.hasOwnProperty.call',
   },
   { object: 'Promise', property: 'any', message: 'iOS 12 没有 Promise.any' },
+  {
+    object: 'Object',
+    property: 'fromEntries',
+    message: 'iOS 12.0/12.1 没有 Object.fromEntries；用 src/lib/defined.ts 的 fromPairs',
+  },
 ];
 
 /** `@shop/contracts` modules with no zod import, allowed at runtime. */
@@ -160,6 +165,9 @@ export default [
   {
     files: ['src/**/*.ts', 'src/**/*.tsx'],
     ignores: [
+      // Build time, in Node: the app and page configs become app.json / page .json files.
+      'src/app.config.ts',
+      'src/**/index.config.ts',
       // H5-only: the e2e emulation and the DIY preview run in a browser.
       'src/platform/*.h5.ts',
       'src/platform/*.h5.tsx',

@@ -3,6 +3,7 @@ import { useRouteMutation } from '@shop/api-client/react';
 import { isApiError } from '@shop/api-client';
 import { COUPON_READS, DECOR_PAGE_READS, markStale } from '@/data/stale-reads';
 import { claimErrorText } from './claim-state';
+import { errorMessage } from '@/lib/error-message';
 
 /**
  * `coupon.claim`, the same wherever 领取 is: 领券中心, 商品详情's 领券 and the decor 优惠券 block.
@@ -20,6 +21,6 @@ export function useClaimCoupon() {
 
 /** A refused claim in the shop's words, the same on every page that has 领取. */
 export function claimFailureText(error: unknown): string {
-  const fallback = error instanceof Error && error.message ? error.message : '领取失败，请稍后重试';
+  const fallback = errorMessage(error, '领取失败，请稍后重试');
   return claimErrorText(isApiError(error) ? error.code : undefined, fallback);
 }

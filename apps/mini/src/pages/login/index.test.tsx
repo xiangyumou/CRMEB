@@ -36,15 +36,18 @@ describe('登录 · 其他方式 · 密码登录', () => {
 
     type('账号', ' 13800138000 ');
     type('密码', 'secret-1');
-    fireEvent.click(screen.getByRole('button', { name: '登录' }));
+    const login = screen.getByRole('button', { name: '登录' });
+    fireEvent.click(login);
     expect(taroFake.calls).toContainEqual({
       api: 'showToast',
       args: expect.objectContaining({ title: '请先阅读并同意用户协议和隐私政策' }),
     });
     expect(seen).toHaveLength(0);
+    // The refused tap's handler settles before the button takes another.
+    await waitFor(() => expect(login.className).not.toContain('shop-btn--loading'));
 
     fireEvent.click(screen.getByRole('checkbox', { name: '我已阅读并同意用户协议和隐私政策' }));
-    fireEvent.click(screen.getByRole('button', { name: '登录' }));
+    fireEvent.click(login);
 
     await waitFor(() =>
       expect(useSession.getState().session).toEqual({ status: 'signed-in', token: 'pw-token' }),

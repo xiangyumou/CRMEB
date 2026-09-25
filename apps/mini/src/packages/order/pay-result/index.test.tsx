@@ -25,7 +25,13 @@ function serve(status: Status, kind: 'normal' | 'groupbuy' = 'normal') {
       },
     }),
     'GET /api/v1/orders/9': () => ({
-      body: orderFixture({ kind, status: 'paid', paidAmount: '116.00', payExpiresAt: null }),
+      body: orderFixture({
+        kind,
+        status: 'paid',
+        paidAmount: '116.00',
+        payExpiresAt: null,
+        groupbuyTeamId: kind === 'groupbuy' ? '5' : null,
+      }),
     }),
     'GET /api/v1/catalog/products': () => ({
       body: pageOf([cardFixture({ id: '31', name: '温感按摩油' })]),
@@ -96,10 +102,11 @@ describe('支付结果', () => {
     serve('paid', 'groupbuy');
     await renderPage(<PayResultPage />);
     fireEvent.click(await screen.findByRole('button', { name: '邀请好友参团' }));
+    // In place of 支付结果 (Back from the team does not come back here), to this order's team.
     await waitFor(() =>
       expect(taroFake.calls).toContainEqual({
-        api: 'navigateTo',
-        args: { url: '/packages/promo/my-groupbuys/index' },
+        api: 'redirectTo',
+        args: { url: '/packages/promo/groupbuy-team/index?id=5' },
       }),
     );
   });

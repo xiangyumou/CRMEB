@@ -75,6 +75,7 @@ function PaymentStatus({ orderId, outTradeNo }: { orderId: string; outTradeNo: s
         'order.detail',
         'order.list',
         'order.counts',
+        'groupbuy.detail',
         'groupbuy.groupDetail',
         'groupbuy.myGroups',
       );
@@ -89,9 +90,7 @@ function PaymentStatus({ orderId, outTradeNo }: { orderId: string; outTradeNo: s
   // Back to 订单详情 when 收银台 was opened from it (支付结果 replaced 收银台), rather than a
   // second copy of the same order on the stack.
   const toOrder = () =>
-    void leaveFor(
-      id ? { route: 'order', params: { id } } : { route: 'order', params: { outTradeNo } },
-    );
+    leaveFor(id ? { route: 'order', params: { id } } : { route: 'order', params: { outTradeNo } });
   const orderButton = (
     <Button variant="outline" onClick={toOrder}>
       查看订单
@@ -117,11 +116,20 @@ function PaymentStatus({ orderId, outTradeNo }: { orderId: string; outTradeNo: s
           <>
             {orderButton}
             {groupbuy ? (
-              <Button onClick={() => void navigate({ route: 'myGroupbuys', params: {} })}>
+              <Button
+                onClick={() =>
+                  // Instead of 支付结果, not over it: Back from the team must not come back here.
+                  leaveFor(
+                    order.data?.groupbuyTeamId
+                      ? { route: 'groupbuyTeam', params: { id: order.data.groupbuyTeamId } }
+                      : { route: 'myGroupbuys', params: {} },
+                  )
+                }
+              >
                 邀请好友参团
               </Button>
             ) : (
-              <Button onClick={() => void navigate({ route: 'home', params: {} })}>继续购物</Button>
+              <Button onClick={() => navigate({ route: 'home', params: {} })}>继续购物</Button>
             )}
           </>
         }

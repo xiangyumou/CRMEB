@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Field } from './field';
 import { Button } from './button';
+import { errorMessage } from '@/lib/error-message';
 
 /** 11 digits starting with 1: what the server takes as a mainland mobile number. */
 export const PHONE_PATTERN = /^1\d{10}$/;
@@ -60,7 +61,7 @@ export function SmsCodeField({
       setPhase(wait > 0 ? { kind: 'countdown', left: wait } : { kind: 'idle' });
     } catch (error) {
       setPhase({ kind: 'idle' });
-      setPhoneError(error instanceof Error ? error.message : String(error));
+      setPhoneError(errorMessage(error, '验证码发送失败，请稍后再试'));
     }
   }
 
@@ -92,7 +93,7 @@ export function SmsCodeField({
             size="sm"
             disabled={counting}
             loading={phase.kind === 'sending'}
-            onClick={() => void send()}
+            onClick={() => send()}
           >
             {phase.kind === 'countdown' ? `${phase.left} 秒后重发` : '获取验证码'}
           </Button>

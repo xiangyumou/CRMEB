@@ -87,6 +87,8 @@ export const taroFake = {
   calls: [] as RecordedCall[],
   /** `Taro.login()` answers `{ code: loginCode }`. */
   loginCode: DEFAULT_LOGIN_CODE,
+  /** `Taro.login()` rejects with WeChat's plain `{ errMsg }` object (not an `Error`). */
+  loginError: null as string | null,
   onRequest: unhandledRequest,
   /** `Taro.requestPayment()` resolves, or rejects with this `errMsg`. */
   paymentError: null as string | null,
@@ -169,6 +171,7 @@ export const taroFake = {
   reset() {
     this.calls = [];
     this.loginCode = DEFAULT_LOGIN_CODE;
+    this.loginError = null;
     this.onRequest = unhandledRequest;
     this.paymentError = null;
     this.routerParams = {};
@@ -435,7 +438,13 @@ const Taro = {
     onUpdateFailed: () => undefined,
     applyUpdate: () => undefined,
   }),
-  login: () => record('login', undefined, { code: taroFake.loginCode, errMsg: 'login:ok' }),
+  login() {
+    if (taroFake.loginError !== null) {
+      taroFake.calls.push({ api: 'login', args: undefined });
+      return Promise.reject({ errMsg: taroFake.loginError });
+    }
+    return record('login', undefined, { code: taroFake.loginCode, errMsg: 'login:ok' });
+  },
   requestPayment(args: unknown) {
     taroFake.calls.push({ api: 'requestPayment', args });
     const errMsg = taroFake.paymentError;

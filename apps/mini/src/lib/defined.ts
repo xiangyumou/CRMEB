@@ -16,3 +16,13 @@ export function defined<T extends object>(props: T): Defined<T> {
   }
   return out as Defined<T>;
 }
+
+/**
+ * `Object.fromEntries` for the phone: iOS before 12.2 has no `Object.fromEntries`, and Babel
+ * does not polyfill it here (`useBuiltIns: false`), so a page that called it crashed there.
+ */
+export function fromPairs<V>(pairs: Iterable<readonly [string, V]>): Record<string, V> {
+  const out: Record<string, V> = {};
+  for (const [key, value] of pairs) out[key] = value;
+  return out;
+}

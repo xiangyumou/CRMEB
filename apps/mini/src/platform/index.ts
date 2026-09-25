@@ -22,6 +22,7 @@ export { onAppVisibility } from './lifecycle';
 export { openLinkTarget } from './link';
 export {
   currentRoute,
+  onLoginPage,
   goBack,
   leaveFor,
   loginReturn,
