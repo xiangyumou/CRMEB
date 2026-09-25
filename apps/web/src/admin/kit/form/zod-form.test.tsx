@@ -125,7 +125,7 @@ describe('<ZodForm> empty and cleared fields', () => {
         schema={clearable as never}
         fields={clearableFields}
         onSubmit={onSubmit}
-        initialValues={initialValues}
+        initialValues={initialValues as never}
       />,
     );
     return { onSubmit };
