@@ -33,6 +33,12 @@ export interface AdminSession {
   permissions: string[];
   passwordVersion: number;
   createdAt: number;
+  /**
+   * 「记住登录状态」: the session lives `REMEMBERED_ADMIN_SESSION_TTL_MS` idle
+   * instead of the store's TTL, and its cookie is a persistent one. Absent on
+   * sessions created before the flag existed, which then keep the store's TTL.
+   */
+  remember?: boolean;
 }
 
 export interface AdminSessionStoreOptions {
@@ -42,12 +48,27 @@ export interface AdminSessionStoreOptions {
   keyPrefix?: string;
 }
 
+/** Idle lifetime of a session: eight hours without a request and it is gone. */
 export const DEFAULT_ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+
+/** Idle lifetime of a session signed in with 「记住登录状态」. */
+export const REMEMBERED_ADMIN_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * The per-admin index outlives the longest session it can list, whichever
+ * kind slid it last: an eight-hour session sliding the index to 32 h must not
+ * let it expire under an idle remembered one, which would then survive a
+ * password change.
+ */
+const INDEX_TTL_MS = REMEMBERED_ADMIN_SESSION_TTL_MS * 4;
 
 export interface AdminSessionStore {
   create(session: Omit<AdminSession, 'createdAt'>, nowMs: number): Promise<string>;
-  /** Returns the session and slides its TTL forward, or `null`. */
-  resolve(token: string): Promise<(AdminSession & { sessionId: string }) | null>;
+  /**
+   * Returns the session and slides its TTL forward, or `null`. `ttlMs` is the
+   * idle lifetime it was slid to, for the cookie that has to follow it.
+   */
+  resolve(token: string): Promise<(AdminSession & { sessionId: string; ttlMs: number }) | null>;
   /**
    * Reads the session **without** sliding it. For a long-lived connection that
    * re-checks its session (the bell's SSE stream): an open tab must not keep an
@@ -78,6 +99,8 @@ export function createAdminSessionStore(options: AdminSessionStoreOptions): Admi
   const { redis, ttlMs = DEFAULT_ADMIN_SESSION_TTL_MS, keyPrefix = 'admin:sess:' } = options;
   const sessionKey = (token: string) => `${keyPrefix}${sha256Hex(token)}`;
   const indexKey = (adminId: number) => `${keyPrefix}index:${adminId}`;
+  const ttlOf = (session: Pick<AdminSession, 'remember'>) =>
+    session.remember === true ? REMEMBERED_ADMIN_SESSION_TTL_MS : ttlMs;
 
   return {
     async create(session, nowMs) {
@@ -86,10 +109,10 @@ export function createAdminSessionStore(options: AdminSessionStoreOptions): Admi
       const value: AdminSession = { ...session, createdAt: nowMs };
       await redis
         .multi()
-        .set(`${keyPrefix}${hashed}`, JSON.stringify(value), 'PX', ttlMs)
+        .set(`${keyPrefix}${hashed}`, JSON.stringify(value), 'PX', ttlOf(session))
         .sadd(indexKey(session.adminId), hashed)
         // The index must outlive the longest possible sliding session.
-        .pexpire(indexKey(session.adminId), ttlMs * 4)
+        .pexpire(indexKey(session.adminId), Math.max(INDEX_TTL_MS, ttlMs * 4))
         .exec();
       return token;
     },
@@ -108,16 +131,17 @@ export function createAdminSessionStore(options: AdminSessionStoreOptions): Admi
       }
       // Sliding expiry: an admin who keeps working never gets logged out — and
       // the index slides with the session, so a revoke always reaches it.
+      const lifetime = ttlOf(session);
       await redis.eval(
         SLIDE_LUA,
         2,
         key,
         indexKey(session.adminId),
         sha256Hex(token),
-        String(ttlMs),
-        String(ttlMs * 4),
+        String(lifetime),
+        String(Math.max(INDEX_TTL_MS, ttlMs * 4)),
       );
-      return { ...session, sessionId: sha256Hex(token).slice(0, 16) };
+      return { ...session, sessionId: sha256Hex(token).slice(0, 16), ttlMs: lifetime };
     },
 
     async peek(token) {

@@ -7,7 +7,14 @@
  *     export const POST = handle(coupon.adminCreate, (ctx, { body }) =>
  *       couponService.create(ctx, body));
  */
-export { handle, ADMIN_COOKIE, checkCsrf, readCookie, searchParamsToObject } from './handle';
+export {
+  handle,
+  ADMIN_COOKIE,
+  adminCookieMaxAge,
+  checkCsrf,
+  readCookie,
+  searchParamsToObject,
+} from './handle';
 export type {
   CookieOptions,
   HandleOptions,

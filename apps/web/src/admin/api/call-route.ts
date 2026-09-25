@@ -122,7 +122,7 @@ export async function callRoute<R extends AnyRouteDef>(
   if (!response.ok) {
     const error = toApiError(response.status, payload);
     if (response.status === 401 && options.onUnauthorized !== 'throw') {
-      cfg.onUnauthenticated();
+      cfg.onUnauthenticated(error);
     }
     throw error;
   }

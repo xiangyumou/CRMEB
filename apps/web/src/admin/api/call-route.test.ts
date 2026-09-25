@@ -201,6 +201,8 @@ describe('callRoute', () => {
 
     await callRoute(listRoute, { query: { page: 1, pageSize: 20 } }).catch(() => {});
     expect(onUnauthenticated).toHaveBeenCalledTimes(1);
+    // The error goes along, so the login page can tell 登录已过期 from never signed in.
+    expect(onUnauthenticated.mock.calls[0]?.[0]).toMatchObject({ code: 'UNAUTHENTICATED' });
 
     await callRoute(
       listRoute,

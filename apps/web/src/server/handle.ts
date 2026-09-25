@@ -46,6 +46,20 @@ import { clientIp } from './request-meta';
 
 export const ADMIN_COOKIE = 'admin_session';
 
+/**
+ * Max-Age of a remembered admin cookie: the session's idle lifetime plus a
+ * day, so the browser still sends it after the server let the session go and
+ * the shell can say 登录已过期 instead of a bare login page. A session that
+ * is not remembered gets a browser-session cookie instead (no Max-Age).
+ */
+export function adminCookieMaxAge(session: {
+  remember: boolean;
+  ttlMs: number;
+}): number | undefined {
+  if (!session.remember) return undefined;
+  return Math.floor(session.ttlMs / 1000) + 24 * 60 * 60;
+}
+
 export interface CookieOptions {
   maxAge?: number;
   path?: string;
@@ -253,7 +267,18 @@ export function handle<
     let auditTarget: string | null = null;
     let parsedBody: unknown;
 
+    // The cookie of a remembered session slides with the server session, so
+    // seven idle days means seven days since the last request, not since
+    // sign-in. Skipped when the route sets the cookie itself (logout).
+    let slideAdminCookie: string | null = null;
+
     const finish = (status: number, body: unknown): Response => {
+      if (
+        slideAdminCookie !== null &&
+        !cookies.some((cookie) => cookie.startsWith(`${ADMIN_COOKIE}=`))
+      ) {
+        cookies.push(slideAdminCookie);
+      }
       for (const cookie of cookies) headers.append('set-cookie', cookie);
       // A status the route declares as an ordinary answer is logged as one
       // (`/readyz`'s 503 during a rolling start is "not yet", not a fault, and
@@ -354,6 +379,19 @@ export function handle<
         if (!token) return fail(new DomainError('UNAUTHENTICATED'));
         const session = await container.adminAuth.resolve(token);
         if (!session) return fail(new DomainError('AUTH_SESSION_EXPIRED'));
+        const maxAge = adminCookieMaxAge({
+          remember: session.remember === true,
+          ttlMs: session.ttlMs,
+        });
+        if (maxAge !== undefined) {
+          slideAdminCookie = serialiseCookie(ADMIN_COOKIE, token, {
+            maxAge,
+            path: '/',
+            httpOnly: true,
+            sameSite: 'Lax',
+            secure: isProduction(container.env),
+          });
+        }
         actor = {
           kind: 'admin',
           id: session.adminId,

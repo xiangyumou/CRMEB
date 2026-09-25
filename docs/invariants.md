@@ -774,6 +774,17 @@ The mini-program replays a request that met a 401 only as the account that sent 
 - `apps/mini/src/pages/login/index.test.tsx::AUTH-010 — the notice of a renewal that reached another account > says why the shopper is here in place of the hint, and drops it on leaving`
 - `e2e/storefront/specs-mini/login.spec.ts::AUTH-010: a write that meets an ended password session is not replayed as the account this phone's WeChat belongs to, and the shopper is back at the login page`
 
+### AUTH-011
+
+An admin session ends after eight idle hours, or seven idle days when 「记住登录状态」 was ticked; every request slides it, and a remembered session's cookie slides with it (a plain one is a browser-session cookie). The revoke index outlives the longest session. A session that ran out sends the admin to the login page with 「登录已过期，请重新登录」.
+
+- `packages/core/src/auth/admin-session.store.test.ts::admin session lifetimes > AUTH-011: a remembered session lives and slides seven days, a plain one eight hours`
+- `packages/core/src/auth/admin-session.store.test.ts::admin session lifetimes > AUTH-011: the revoke index outlives a remembered session whichever session slid it last`
+- `packages/core/src/auth/auth.int.test.ts::admin sessions > AUTH-011: 记住登录状态 keeps the session seven idle days, otherwise eight hours`
+- `apps/web/src/server/handle.test.ts::authentication > AUTH-011 — slides the cookie of a remembered session with it, and leaves a browser-session one alone`
+- `apps/web/app/admin/login/login-form.test.tsx::admin login > AUTH-011: sends 记住登录状态 with the credentials`
+- `apps/web/app/admin/login/login-form.test.tsx::admin login > AUTH-011 — says 登录已过期 when a session ran out, and nothing when there was none`
+
 ## Fulfilment, the order console and invoices
 
 ### FULFILL-001

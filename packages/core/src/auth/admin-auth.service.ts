@@ -7,6 +7,7 @@ import * as adminRepo from './admin.repo';
 import {
   createAdminSessionStore,
   DEFAULT_ADMIN_SESSION_TTL_MS,
+  REMEMBERED_ADMIN_SESSION_TTL_MS,
   type AdminSession,
   type AdminSessionStore,
 } from './admin-session.store';
@@ -82,7 +83,10 @@ export interface LoginResult {
   /** Opaque token for the `admin_session` cookie. Never logged, never returned in a body. */
   token: string;
   profile: AdminProfile;
+  /** Idle lifetime of the session: eight hours, or seven days when remembered. */
   expiresInMs: number;
+  /** 「记住登录状态」 was ticked: the cookie outlives the browser window. */
+  remember: boolean;
 }
 
 export class AdminAuthService {
@@ -262,6 +266,7 @@ export class AdminAuthService {
         isSuper: admin.isSuper,
         permissions,
         passwordVersion: admin.passwordVersion,
+        ...(input.remember === true ? { remember: true } : {}),
       },
       ctx.clock.nowMs(),
     );
@@ -284,12 +289,16 @@ export class AdminAuthService {
         passwordVersion: admin.passwordVersion,
         createdAt: ctx.clock.nowMs(),
       }),
-      expiresInMs: this.options.sessionTtlMs,
+      expiresInMs:
+        input.remember === true ? REMEMBERED_ADMIN_SESSION_TTL_MS : this.options.sessionTtlMs,
+      remember: input.remember === true,
     };
   }
 
   /** Resolves a cookie value to a session, sliding its TTL. `null` when invalid. */
-  async resolve(token: string): Promise<(AdminSession & { sessionId: string }) | null> {
+  async resolve(
+    token: string,
+  ): Promise<(AdminSession & { sessionId: string; ttlMs: number }) | null> {
     return this.store.resolve(token);
   }
 
