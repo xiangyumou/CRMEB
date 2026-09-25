@@ -22,6 +22,13 @@ import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { ProductListPage } from './product-list';
 
+let search = new URLSearchParams();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => '/admin/catalog/products',
+  useSearchParams: () => search,
+}));
+
 /**
  * The product list as a component test: no browser, no server, one stub
  * `fetch`.
@@ -91,6 +98,7 @@ function stubApi(): StubCall[] {
 
 afterEach(() => {
   resetApiConfig();
+  search = new URLSearchParams();
 });
 
 const allPermissions = {
@@ -115,6 +123,19 @@ describe('商品列表', () => {
     const list = calls.find((call) => call.url.includes('/admin-api/catalog/products'));
     expect(list?.url).toContain('tab=all');
     expect(list?.url).toContain('page=1');
+  });
+
+  it('编辑 opens the editor with this tab and filters, so its 返回列表 comes back here', async () => {
+    search = new URLSearchParams('tab=on_shelf&keyword=T恤');
+    stubApi();
+    renderAdmin(<ProductListPage />, { identity: allPermissions });
+    await screen.findByText('简约白 T 恤');
+
+    const edit = screen.getByRole('button', { name: zhName('编辑') }).closest('a');
+    const href = new URL(edit!.getAttribute('href')!, 'https://shop.example');
+    expect(href.pathname).toBe('/admin/catalog/products/1');
+    expect(new URLSearchParams(href.searchParams.get('list')!).get('keyword')).toBe('T恤');
+    expect(new URLSearchParams(href.searchParams.get('list')!).get('tab')).toBe('on_shelf');
   });
 
   it('separates the real sales count from the number the storefront shows', async () => {

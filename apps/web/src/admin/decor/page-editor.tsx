@@ -45,7 +45,7 @@ import {
   useRouteMutation,
   useRouteQuery,
 } from '../api';
-import { InstantText, StatusTag } from '../kit';
+import { InstantText, StatusTag, useListReturn } from '../kit';
 import { useCan } from '../session';
 import { createAdminCanvasData, DecorCanvasDataProvider } from './canvas-data';
 import { toPuckData } from './document';
@@ -97,6 +97,7 @@ function Overlay({ children }: { children: ReactNode }) {
 
 export function DecorPageEditor({ id, previewUrl }: { id: string; previewUrl: string | null }) {
   const router = useRouter();
+  const { listHref } = useListReturn('/admin/decor');
   const detail = useRouteQuery(decorDocumentGet, { params: { id } });
   const [generation, setGeneration] = useState(0);
   const records = useMemo(() => createDecorRecordSource(), []);
@@ -113,7 +114,7 @@ export function DecorPageEditor({ id, previewUrl }: { id: string; previewUrl: st
           <Result
             status="warning"
             title="页面不存在或已删除"
-            extra={<Button onClick={() => router.push('/admin/decor')}>返回列表</Button>}
+            extra={<Button onClick={() => router.push(listHref)}>返回列表</Button>}
           />
         ) : (
           <Spin style={{ display: 'block', margin: '120px auto' }} />
@@ -196,6 +197,7 @@ function EditorSession({
 }) {
   const { id, kind } = loaded;
   const router = useRouter();
+  const { listHref } = useListReturn('/admin/decor');
   const { message, modal } = App.useApp();
   const can = useCan();
   const canWrite = can('decor:page:write');
@@ -345,7 +347,7 @@ function EditorSession({
 
   const leave = () => {
     if (!dirty) {
-      router.push('/admin/decor');
+      router.push(listHref);
       return;
     }
     modal.confirm({
@@ -355,7 +357,7 @@ function EditorSession({
       okButtonProps: { danger: true },
       cancelText: '继续编辑',
       zIndex: 1100,
-      onOk: () => router.push('/admin/decor'),
+      onOk: () => router.push(listHref),
     });
   };
 

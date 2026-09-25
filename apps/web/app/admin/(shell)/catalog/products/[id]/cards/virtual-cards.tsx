@@ -16,6 +16,7 @@ import { PageContainer } from '@/admin/kit/page-container';
 import { StatusTag } from '@/admin/kit/status-tag';
 import { idColumn, instantColumn, textColumn } from '@/admin/kit/table/columns';
 import { CrudTable } from '@/admin/kit/table/crud-table';
+import { useListReturn } from '@/admin/kit/table/list-return';
 import { ConfirmAction } from '@/admin/kit/confirm-action';
 import { Can } from '@/admin/session/can';
 
@@ -38,6 +39,7 @@ export function VirtualCardsPage({ productId }: { productId: string }) {
   const [importing, setImporting] = useState(false);
 
   const product = useRouteQuery(catalogAdminProductDetail, { params: { id: productId } });
+  const { listHref, keepList } = useListReturn('/admin/catalog/products');
   const skus = product.data?.skus ?? [];
 
   const voidCards = useRouteMutation(catalogAdminVirtualCardVoid, {
@@ -48,10 +50,10 @@ export function VirtualCardsPage({ productId }: { productId: string }) {
     <PageContainer
       title={product.data ? `卡密库存：${product.data.name}` : '卡密库存'}
       subTitle="导入的卡密数量就是该规格的库存；已发放的卡密不能作废"
-      breadcrumb={[{ label: '商品', href: '/admin/catalog/products' }, { label: '卡密库存' }]}
+      breadcrumb={[{ label: '商品', href: listHref }, { label: '卡密库存' }]}
       extra={
         <Space>
-          <Link href={`/admin/catalog/products/${productId}`}>
+          <Link href={keepList(`/admin/catalog/products/${productId}`)}>
             <Button>编辑商品</Button>
           </Link>
           <Can permission="catalog:card:write">

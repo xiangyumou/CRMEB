@@ -26,6 +26,7 @@ import { StatusTag } from '@/admin/kit/status-tag';
 import { idColumn, imageColumn, instantColumn, moneyColumn } from '@/admin/kit/table/columns';
 import { CrudTable } from '@/admin/kit/table/crud-table';
 import type { FilterSpec } from '@/admin/kit/table/filter-bar';
+import { useDetailHref } from '@/admin/kit/table/list-return';
 import { useNextUrlState } from '@/admin/kit/table/url-state';
 import { Can } from '@/admin/session/can';
 import { useCan } from '@/admin/session/session-provider';
@@ -67,6 +68,8 @@ function isTab(value: string | undefined): value is AdminProductTab {
  */
 export function ProductListPage() {
   const urlState = useNextUrlState();
+  // 编辑 and 卡密 come back to this tab, these filters and this page.
+  const detailHref = useDetailHref();
   // The 分类 filter loads the category tree: only for a role that may read it.
   const mayReadCategories = useCan()('catalog:category:read');
   const categoryFilter: FilterSpec[] = mayReadCategories
@@ -135,7 +138,7 @@ export function ProductListPage() {
         toolbar={
           <>
             <Can permission="catalog:product:write">
-              <Link href="/admin/catalog/products/new">
+              <Link href={detailHref('/admin/catalog/products/new')}>
                 <Button type="primary">新建商品</Button>
               </Link>
             </Can>
@@ -150,7 +153,7 @@ export function ProductListPage() {
             key: 'name',
             render: (_value: unknown, row: AdminProductListItem) => (
               <Space direction="vertical" size={0} style={{ maxWidth: 320 }}>
-                <Link href={`/admin/catalog/products/${row.id}`}>
+                <Link href={detailHref(`/admin/catalog/products/${row.id}`)}>
                   <Typography.Text ellipsis={{ tooltip: row.name }}>{row.name}</Typography.Text>
                 </Link>
                 {row.subtitle ? (
@@ -259,7 +262,7 @@ export function ProductListPage() {
               ) : (
                 <Space size={4} wrap>
                   <Can permission="catalog:product:write">
-                    <Link href={`/admin/catalog/products/${row.id}`}>
+                    <Link href={detailHref(`/admin/catalog/products/${row.id}`)}>
                       <Button type="link" size="small">
                         编辑
                       </Button>
@@ -289,7 +292,7 @@ export function ProductListPage() {
                   </Can>
                   {row.kind === 'virtual_card' ? (
                     <Can permission="catalog:card:read">
-                      <Link href={`/admin/catalog/products/${row.id}/cards`}>
+                      <Link href={detailHref(`/admin/catalog/products/${row.id}/cards`)}>
                         <Button type="link" size="small">
                           卡密
                         </Button>

@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { useRouteMutation } from '../api';
+import { useDetailHref } from '../kit/table/list-return';
 import { toPuckData } from './document';
 import { BLANK_TEMPLATE_KEY, templatesFor, type DecorTemplate } from './templates';
 
@@ -139,6 +140,7 @@ export function CreateDecorDocumentModal({
   initialKind?: DocumentKind;
 }) {
   const router = useRouter();
+  const detailHref = useDetailHref();
   const [form] = Form.useForm<CreateValues>();
   const kind = Form.useWatch('kind', form) ?? initialKind;
   const [templateKey, setTemplateKey] = useState(BLANK_TEMPLATE_KEY);
@@ -159,7 +161,7 @@ export function CreateDecorDocumentModal({
       },
     });
     onClose();
-    router.push(`/admin/decor/${created.id}`);
+    router.push(detailHref(`/admin/decor/${created.id}`));
   };
 
   return (

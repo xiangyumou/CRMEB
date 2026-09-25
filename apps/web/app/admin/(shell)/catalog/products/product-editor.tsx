@@ -30,6 +30,7 @@ import { useCan } from '@/admin/session/session-provider';
 import type { FieldSpec, SelectOption } from '@/admin/kit/form/types';
 import { ZodForm } from '@/admin/kit/form/zod-form';
 import { PageContainer } from '@/admin/kit/page-container';
+import { useListReturn } from '@/admin/kit/table/list-return';
 
 import {
   CATEGORY_TREE_CACHE_KEY,
@@ -59,6 +60,7 @@ import { ParamEditor, SkuMatrixEditor, SpecEditor, blankSku } from './product-sk
  */
 export function ProductEditorPage({ productId }: { productId?: string | undefined }) {
   const router = useRouter();
+  const { listHref, keepList } = useListReturn('/admin/catalog/products');
   const [form] = Form.useForm();
   // A role that may only look at products sees the form read-only, with no 保存
   // to press into a 403 — and without the option lists it has no right to.
@@ -97,7 +99,7 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
     presentError: false,
     invalidate: [catalogAdminProductList],
     successMessage: '已创建',
-    onSuccess: (data) => router.replace(`/admin/catalog/products/${data.id}`),
+    onSuccess: (data) => router.replace(keepList(`/admin/catalog/products/${data.id}`)),
   });
   const update = useRouteMutation(catalogAdminProductUpdate, {
     presentError: false,
@@ -205,13 +207,10 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
     <PageContainer
       title={record ? `编辑商品：${record.name}` : '新建商品'}
       subTitle="规格一旦有销量就不要删；改名和改价不会影响已下单的订单"
-      breadcrumb={[
-        { label: '商品', href: '/admin/catalog/products' },
-        { label: record ? '编辑商品' : '新建商品' },
-      ]}
+      breadcrumb={[{ label: '商品', href: listHref }, { label: record ? '编辑商品' : '新建商品' }]}
       extra={
         <Space>
-          <Button onClick={() => router.push('/admin/catalog/products')}>返回列表</Button>
+          <Button onClick={() => router.push(listHref)}>返回列表</Button>
           {mayWrite ? (
             <Button type="primary" loading={saving} onClick={() => form.submit()}>
               保存

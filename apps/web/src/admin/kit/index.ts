@@ -43,6 +43,7 @@ export {
 export { FilterBar, filterKeys } from './table/filter-bar';
 export type { FilterBarProps, FilterSpec } from './table/filter-bar';
 export { prefixKey, useMemoryUrlState, useNextUrlState } from './table/url-state';
+export { listReturnHref, useDetailHref, useListReturn, withListReturn } from './table/list-return';
 export type { MemoryUrlState, TableUrlState } from './table/url-state';
 
 // ── Forms ───────────────────────────────────────────────────────────────────
