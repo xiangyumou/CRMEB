@@ -102,6 +102,29 @@ export interface SweepReport {
 }
 
 /**
+ * RISK-D-014: an `active` campaign whose 结束时间 has passed becomes `ended`, as presale's
+ * window sweep does, so the admin list says 已结束 and the status filter finds it. The
+ * storefront does not wait for this: its list and checkout already test the window. Teams
+ * still forming run out their own clock. One transaction per campaign, conditional on
+ * `status = 'active' AND end_at <= now`, so a second sweep or an operator pressing 结束 at
+ * the same moment converge.
+ */
+export async function closeEndedActivities(ctx: Ctx): Promise<{ scanned: number; closed: number }> {
+  const config = await ctx.config.get(groupbuyConfig);
+  const now = ctx.clock.now();
+  const ids = await repo.findClosableActivityIds(ctx.db, {
+    now,
+    limit: config.groupExpirySweepLimit,
+  });
+  let closed = 0;
+  for (const id of ids) {
+    const result = await ctx.withTx((tx) => repo.closeActivity(tx, { id, now }));
+    if (result.won) closed += 1;
+  }
+  return { scanned: ids.length, closed };
+}
+
+/**
  * The repeatable sweep. Reads `groupbuy_groups_expiry_idx` and settles each
  * team in its own transaction, so one stuck group cannot hold the others.
  */

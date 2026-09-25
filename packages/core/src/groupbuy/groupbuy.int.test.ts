@@ -35,7 +35,7 @@ import {
 } from '../order/ports';
 import { groupbuyConfig } from './groupbuy.config';
 import { clearAutoRefundPort, registerAutoRefundPort } from './groupbuy.effects';
-import { settleExpiredGroups, settleGroup } from './groupbuy.jobs';
+import { closeEndedActivities, settleExpiredGroups, settleGroup } from './groupbuy.jobs';
 import { groupbuyKindHandler } from './groupbuy.order';
 import * as repo from './groupbuy.repo';
 import * as service from './groupbuy.service';
@@ -918,6 +918,30 @@ describe('refunding a paid order', () => {
 });
 
 describe('the expiry sweep', () => {
+  it('RISK-D-014 — ends a campaign whose 结束时间 has passed, and leaves a running one alone', async () => {
+    // NOW is 2026-06-01.
+    const over = await makeActivity({ endAt: new Date('2026-05-31T16:00:00.000Z') });
+    const running = await makeActivity();
+    const paused = await makeActivity({
+      status: 'paused',
+      endAt: new Date('2026-05-31T16:00:00.000Z'),
+    });
+
+    expect(await closeEndedActivities(harness.ctx)).toEqual({ scanned: 1, closed: 1 });
+    const statusOf = async (activityId: number) =>
+      (
+        await harness.ctx.db
+          .select({ status: groupbuyActivities.status })
+          .from(groupbuyActivities)
+          .where(eq(groupbuyActivities.id, activityId))
+      )[0]?.status;
+    expect(await statusOf(over.activityId)).toBe('ended');
+    expect(await statusOf(running.activityId)).toBe('active');
+    expect(await statusOf(paused.activityId)).toBe('paused');
+    // A second pass finds nothing left to do.
+    expect(await closeEndedActivities(harness.ctx)).toEqual({ scanned: 0, closed: 0 });
+  });
+
   it('fails an under-filled team and asks for one refund per paid member', async () => {
     const fixture = await makeActivity({ seatsRequired: 3, ttlSeconds: 3_600, stock: 10 });
     const leader = await makeUser();

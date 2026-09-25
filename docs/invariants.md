@@ -1456,6 +1456,12 @@ An activity SKU that orders still depend on is never removed by an edit of its �
 
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > RISK-D-013 — 取消拼团 closes the leader’s unpaid order with the team`
 
+### RISK-D-014
+
+A running 拼团 campaign whose 结束时间 has passed becomes `ended` (the `groupbuy.sweepEndedActivities` job, every minute, as presale's window sweep), conditionally, so a second pass changes nothing; a paused one is left for the operator.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > RISK-D-014 — ends a campaign whose 结束时间 has passed, and leaves a running one alone`
+
 ## Storefront end to end
 
 ### SMOKE-002

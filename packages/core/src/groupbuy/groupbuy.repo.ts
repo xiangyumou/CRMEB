@@ -184,6 +184,41 @@ export async function setActivityStatus(
   });
 }
 
+/** `active` campaigns whose window has passed, oldest end first — the close sweep's work. */
+export async function findClosableActivityIds(
+  db: DbOrTx,
+  args: { now: Date; limit: number },
+): Promise<number[]> {
+  const rows = await db
+    .select({ id: groupbuyActivities.id })
+    .from(groupbuyActivities)
+    .where(
+      and(
+        eq(groupbuyActivities.status, 'active'),
+        isNull(groupbuyActivities.deletedAt),
+        lte(groupbuyActivities.endAt, args.now),
+      ),
+    )
+    .orderBy(asc(groupbuyActivities.endAt))
+    .limit(args.limit);
+  return rows.map((row) => row.id);
+}
+
+/** `active -> ended` once `end_at` has passed; conditional, so two sweeps converge. */
+export async function closeActivity(
+  tx: Tx,
+  args: { id: number; now: Date },
+): Promise<ConditionalUpdateResult> {
+  return conditionalUpdate(tx, groupbuyActivities, {
+    where: and(
+      eq(groupbuyActivities.id, args.id),
+      eq(groupbuyActivities.status, 'active'),
+      lte(groupbuyActivities.endAt, args.now),
+    ),
+    set: { status: 'ended', updatedAt: args.now },
+  });
+}
+
 export async function softDeleteActivity(
   tx: Tx,
   args: { id: number; now: Date },
