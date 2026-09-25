@@ -70,21 +70,21 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
     { enabled: productId !== undefined },
   );
 
-  // The three taxonomies the form offers as options. 200 is every label any
-  // shop has; these are pickers, not searches.
+  // The three taxonomies the form offers as options: the first 100 enabled,
+  // which is the list cap and more than any shop has.
   const labels = useRouteQuery(
     catalogAdminLabelList,
-    { query: { page: 1, pageSize: 200, isEnabled: 'true' } },
+    { query: { page: 1, pageSize: 100, isEnabled: 'true' } },
     { enabled: mayWrite },
   );
   const protections = useRouteQuery(
     catalogAdminProtectionList,
-    { query: { page: 1, pageSize: 200, isEnabled: 'true' } },
+    { query: { page: 1, pageSize: 100, isEnabled: 'true' } },
     { enabled: mayWrite },
   );
   const paramTemplates = useRouteQuery(
     catalogAdminParamTemplateList,
-    { query: { page: 1, pageSize: 200, isEnabled: 'true' } },
+    { query: { page: 1, pageSize: 100, isEnabled: 'true' } },
     { enabled: mayWrite },
   );
   // The shipping options route: id, name and 计费方式, every template, no paging.

@@ -1,4 +1,4 @@
-import { defineRoute, id } from '@shop/contracts';
+import { defineRoute, id, pageQuery } from '@shop/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -55,6 +55,20 @@ const widgetRename = defineRoute({
       response: { id: '1', name: 'b', note: null },
     },
   ],
+});
+
+const widgetList = defineRoute({
+  id: 'test.widgetList',
+  method: 'GET',
+  path: '/admin-api/widgets',
+  auth: 'admin',
+  permission: 'test:widget:read',
+  summary: '列表',
+  tags: ['test'],
+  query: pageQuery,
+  response: z.object({ items: z.array(widget) }),
+  errors: ['WIDGET_LOCKED'],
+  examples: [{ name: 'ok', response: { items: [] } }],
 });
 
 afterEach(() => {
@@ -167,6 +181,70 @@ describe('stubRoutes', () => {
       expect(takeFixtureFailures()).toEqual([
         expect.stringMatching(/does not declare:\n {2}- retiredCode/),
       ]);
+    });
+  });
+
+  describe('query strings and path params', () => {
+    it('passes a query the contract accepts', async () => {
+      stubRoutes([on(widgetList, { items: [] })]);
+      await callRoute(widgetList, { query: { page: 1, pageSize: 100 } });
+      expect(takeFixtureFailures()).toEqual([]);
+    });
+
+    it('fails the test, and answers 422, for a pageSize over the cap', async () => {
+      stubRoutes([on(widgetList, { items: [] })]);
+      await expect(
+        callRoute(widgetList, { query: { page: 1, pageSize: 200 } }),
+      ).rejects.toMatchObject({ status: 422 });
+      expect(takeFixtureFailures()).toEqual([
+        expect.stringMatching(/query for test\.widgetList does not match[\s\S]*- pageSize:/),
+      ]);
+    });
+
+    it('fails the test for a path param the contract refuses', async () => {
+      stubRoutes([on(widgetDetail, { id: '1', name: 'a', note: null })]);
+      await expect(callRoute(widgetDetail, { params: { id: 'abc' } })).rejects.toMatchObject({
+        status: 422,
+      });
+      expect(takeFixtureFailures()).toEqual([
+        expect.stringMatching(/path params for test\.widgetDetail/),
+      ]);
+    });
+  });
+
+  describe('error replies', () => {
+    it('accepts a declared code, and a code any route may give', async () => {
+      stubRoutes([
+        on(widgetList, () => respondWithError(409, { code: 'WIDGET_LOCKED', message: '锁定' })),
+        on(widgetDetail, () => respondWithError(404, { code: 'NOT_FOUND', message: '不存在' })),
+      ]);
+      await expect(callRoute(widgetList, { query: {} })).rejects.toMatchObject({ status: 409 });
+      await expect(callRoute(widgetDetail, { params: { id: '1' } })).rejects.toMatchObject({
+        status: 404,
+      });
+      expect(takeFixtureFailures()).toEqual([]);
+    });
+
+    it('fails the test for a code the route does not declare', async () => {
+      stubRoutes([
+        on(widgetDetail, () => respondWithError(409, { code: 'WIDGET_LOCKED', message: '锁定' })),
+      ]);
+      await expect(callRoute(widgetDetail, { params: { id: '1' } })).rejects.toMatchObject({
+        status: 409,
+      });
+      expect(takeFixtureFailures()).toEqual([
+        expect.stringMatching(/test\.widgetDetail does not declare WIDGET_LOCKED/),
+      ]);
+    });
+
+    it('fails the test for a registered code answered with another status', async () => {
+      stubRoutes([
+        on(widgetDetail, () => respondWithError(500, { code: 'NOT_FOUND', message: '不存在' })),
+      ]);
+      await expect(callRoute(widgetDetail, { params: { id: '1' } })).rejects.toMatchObject({
+        status: 500,
+      });
+      expect(takeFixtureFailures()).toEqual([expect.stringMatching(/NOT_FOUND is a 404/)]);
     });
   });
 });

@@ -35,6 +35,7 @@ import {
 } from '@/admin/kit/table/columns';
 import { CrudTable } from '@/admin/kit/table/crud-table';
 import { Can } from '@/admin/session/can';
+import { useCan } from '@/admin/session/session-provider';
 
 import { REGISTER_SOURCE, USER_STATUS } from '../user-enums';
 
@@ -65,8 +66,19 @@ export function CustomersPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [resetting, setResetting] = useState<AdminUserListItem | null>(null);
 
-  const groups = useRouteQuery(userGroupList, { query: { page: 1, pageSize: 100 } });
-  const labels = useRouteQuery(userLabelList, { query: { page: 1, pageSize: 200 } });
+  // Options for the filters and the form. 100 is the list cap; a role that may
+  // not read groups or labels gets no options rather than a 403 toast.
+  const can = useCan();
+  const groups = useRouteQuery(
+    userGroupList,
+    { query: { page: 1, pageSize: 100 } },
+    { enabled: can('user:group:read') },
+  );
+  const labels = useRouteQuery(
+    userLabelList,
+    { query: { page: 1, pageSize: 100 } },
+    { enabled: can('user:label:read') },
+  );
 
   const groupOptions = (groups.data?.items ?? []).map((group) => ({
     value: group.id,

@@ -120,7 +120,7 @@ const detail: AdminProductDetail = {
 };
 
 function stubApi(): StubCall[] {
-  const empty = { items: [], total: 0, page: 1, pageSize: 200 };
+  const empty = { items: [], total: 0, page: 1, pageSize: 100 };
   return stubRoutes([
     on(catalogAdminCategoryTree, { items: [] }),
     on(shippingTemplateOptionList, {

@@ -87,7 +87,7 @@ function stubApi(): StubCall[] {
       ],
       total: 1,
       page: 1,
-      pageSize: 200,
+      pageSize: 100,
     }),
     on(userAdminList, { items: [row], total: 1, page: 1, pageSize: 20 }),
     on(userAdminDetail, detail),

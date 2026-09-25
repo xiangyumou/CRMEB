@@ -55,7 +55,7 @@ export function WechatQrcodesPage() {
   const [viewing, setViewing] = useState<WechatQrcode | null>(null);
 
   const categories = useRouteQuery(wechatOaQrcodeCategoryList, {
-    query: { page: 1, pageSize: 200 },
+    query: { page: 1, pageSize: 100 },
   });
   const categoryOptions: SelectOption[] = (categories.data?.items ?? []).map((item) => ({
     value: item.id,

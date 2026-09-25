@@ -65,7 +65,7 @@ function stubApi(): StubCall[] {
       points: [{ date: '2026-01-06', scans: 77, newFollowers: 28 }],
     }),
     on(wechatOaQrcodeScans, { items: [], total: 0, page: 1, pageSize: 20 }),
-    on(wechatOaQrcodeCategoryList, { items: [category], total: 1, page: 1, pageSize: 200 }),
+    on(wechatOaQrcodeCategoryList, { items: [category], total: 1, page: 1, pageSize: 100 }),
     on(wechatOaMediaList, { items: [], total: 0, page: 1, pageSize: 100 }),
     on(wechatOaQrcodeList, { items: [qrcode], total: 1, page: 1, pageSize: 20 }),
     on(wechatOaQrcodeSetStatus, { ...qrcode, status: 'disabled' }),

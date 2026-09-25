@@ -1,4 +1,5 @@
 import { errorBody, type AnyRouteDef, type ErrorBody, type ResponseOf } from '@shop/contracts';
+import { errorRegistry } from '@shop/contracts/errors';
 import type { z } from 'zod';
 
 import { configureApi } from '@/admin/api/config';
@@ -22,9 +23,15 @@ import { configureApi } from '@/admin/api/config';
  *   - `respondWithError(status, body)` does the same for the error envelope;
  *   - `stubRoutes([...])` wires a set of `on(route, reply)` answers into the
  *     client, matching on method and path, and records every call — and parses
- *     each JSON request body with `route.body`, the way the server would, so a
- *     form that sends what the contract refuses fails its test instead of
- *     passing until the server answers 422.
+ *     each request the way the server would (path params with `route.params`,
+ *     the query string with `route.query`, a JSON body with `route.body`), so a
+ *     page that sends what the contract refuses — a picker asking for
+ *     `pageSize: 200` against a cap of 100 — fails its test instead of passing
+ *     until the server answers 400/422 in production;
+ *   - an error a stub answers must be one the route can give: a code the route
+ *     declares in `errors` (or one any route may return), with the status the
+ *     code is registered under. A test of a failure the server never sends
+ *     proves nothing.
  *
  * `pnpm guards fixtures` keeps this the only way: a test that stubs `fetch`
  * does not build a `Response` by hand.
@@ -93,6 +100,58 @@ function checkRequestBody(schema: z.ZodType, value: unknown, what: string): stri
   const stray = strayKeys(value, parsed.data);
   if (stray.length > 0) {
     return `request body for ${what} carries keys its contract does not declare:\n${stray.map((key) => `  - ${key}`).join('\n')}`;
+  }
+  return null;
+}
+
+/** The request's query string as the server hands it to `route.query` (see `handle()`). */
+function queryObject(query: URLSearchParams): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of new Set(query.keys())) {
+    const values = query.getAll(key);
+    out[key] = values.length > 1 ? values : values[0];
+  }
+  return out;
+}
+
+function checkRequestPart(schema: z.ZodType, value: unknown, what: string): string | null {
+  const parsed = schema.safeParse(value);
+  return parsed.success
+    ? null
+    : `${what} does not match its contract:\n${describeIssues(parsed.error.issues)}`;
+}
+
+/**
+ * Codes `handle()` itself may answer on any route, whatever the route lists:
+ * the common ones, plus the session and CSRF refusals of an admin route.
+ */
+const ALWAYS_POSSIBLE = new Set([
+  'UNAUTHENTICATED',
+  'FORBIDDEN',
+  'NOT_FOUND',
+  'VALIDATION_FAILED',
+  'RATE_LIMITED',
+  'INTERNAL',
+  'AUTH_SESSION_EXPIRED',
+  'AUTH_TOKEN_INVALID',
+  'AUTH_CROSS_SITE_BLOCKED',
+]);
+
+/**
+ * An error the stub answers, compared with what the route can answer: the code
+ * must be declared on the route (or be one any route may give), and its status
+ * the one the code is registered with. `null` when it is fine.
+ */
+export function checkErrorReply(route: AnyRouteDef, status: number, body: unknown): string | null {
+  const parsed = errorBody.safeParse(body);
+  if (!parsed.success) return `error answered for ${route.id} is not an error envelope`;
+  const { code } = parsed.data;
+  if (!ALWAYS_POSSIBLE.has(code) && !(route.errors ?? []).includes(code)) {
+    return `${route.id} does not declare ${code} in its errors; the server never answers it there`;
+  }
+  const registered = errorRegistry[code];
+  if (registered !== undefined && registered.status !== status) {
+    return `${code} is a ${registered.status}, but the stub for ${route.id} answered ${status}`;
   }
   return null;
 }
@@ -276,18 +335,40 @@ export function stubRoutes(stubs: readonly RouteStub[]): StubCall[] {
         message: `no stub answers ${method} ${path}`,
       });
     }
-    // A multipart upload is not JSON and its schema is the server's to apply
-    // to the parts; every other body is checked as the server would check it.
-    const bodySchema = stub.route.body as z.ZodType | undefined;
-    if (bodySchema !== undefined && !(init?.body instanceof FormData)) {
-      const failure = checkRequestBody(bodySchema, call.body, stub.route.id);
-      if (failure !== null) {
-        fixtureFailures.push(failure);
-        // What the server would say, so the component is not led further on.
-        return respondWithError(422, { code: 'VALIDATION_FAILED', message: failure });
-      }
+    const route = stub.route;
+    const paramsSchema = route.params as z.ZodType | undefined;
+    const querySchema = route.query as z.ZodType | undefined;
+    const bodySchema = route.body as z.ZodType | undefined;
+    const failure =
+      (paramsSchema === undefined
+        ? null
+        : checkRequestPart(paramsSchema, params, `path params for ${route.id}`)) ??
+      (querySchema === undefined
+        ? null
+        : checkRequestPart(querySchema, queryObject(query), `query for ${route.id}`)) ??
+      // A multipart upload is not JSON and its schema is the server's to apply
+      // to the parts; every other body is checked as the server would check it.
+      (bodySchema === undefined || init?.body instanceof FormData
+        ? null
+        : checkRequestBody(bodySchema, call.body, route.id));
+    if (failure !== null) {
+      fixtureFailures.push(failure);
+      // What the server would say, so the component is not led further on.
+      return respondWithError(422, { code: 'VALIDATION_FAILED', message: failure });
     }
-    return stub.answer(call);
+    const response = await stub.answer(call);
+    if (response.status >= 400) {
+      const text = await response.clone().text();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text) as unknown;
+      } catch {
+        parsed = text;
+      }
+      const problem = checkErrorReply(route, response.status, parsed);
+      if (problem !== null) fixtureFailures.push(problem);
+    }
+    return response;
   }
   configureApi({ fetch: answer });
   return calls;
