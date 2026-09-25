@@ -35,7 +35,18 @@ export interface S3Options {
   /** Required: domain code injects a `Clock`, it never reads the system time. */
   now: () => Date;
   fetchImpl?: typeof fetch;
+  /**
+   * Per-request ceilings, body included. Without one, a bucket that accepts the
+   * connection and then stalls holds the upload request — and its advisory
+   * lock and database connection — open until the socket gives up, minutes later.
+   */
+  timeoutMs?: { transfer?: number; control?: number } | undefined;
 }
+
+/** `PUT`/`GET`: a whole file moves, so this is generous. */
+export const S3_TRANSFER_TIMEOUT_MS = 120_000;
+/** `HEAD`/`DELETE`: nothing moves but headers. */
+export const S3_CONTROL_TIMEOUT_MS = 15_000;
 
 const SERVICE = 's3';
 const UNSIGNED = 'UNSIGNED-PAYLOAD';
@@ -170,6 +181,8 @@ export function createS3Storage(options: S3Options): Storage {
     options.endpoint ?? `https://${SERVICE}.${options.region}.amazonaws.com`,
   );
   const publicBase = options.publicBaseUrl.replace(/\/+$/, '');
+  const transferTimeoutMs = options.timeoutMs?.transfer ?? S3_TRANSFER_TIMEOUT_MS;
+  const controlTimeoutMs = options.timeoutMs?.control ?? S3_CONTROL_TIMEOUT_MS;
 
   const locate = (key: string): { url: string; host: string; path: string } => {
     const encoded = key
@@ -211,7 +224,12 @@ export function createS3Storage(options: S3Options): Storage {
     // `Uint8Array` is an acceptable body. Build the init untyped and hand it to
     // `fetch` once — it is a `Uint8Array` either way, and both agree on that.
     type FetchInit = NonNullable<Parameters<typeof fetch>[1]>;
-    const init: Record<string, unknown> = { method, headers };
+    const timeoutMs = method === 'PUT' || method === 'GET' ? transferTimeoutMs : controlTimeoutMs;
+    const init: Record<string, unknown> = {
+      method,
+      headers,
+      signal: AbortSignal.timeout(timeoutMs),
+    };
     if (body) init['body'] = body;
     return doFetch(url, init as unknown as FetchInit);
   };

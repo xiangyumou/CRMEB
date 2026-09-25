@@ -2246,6 +2246,12 @@ Every multipart upload route refuses a body over the ceiling that applies to its
 - `packages/core/src/storage/multipart.test.ts::STOR-013 — a body over the ceiling is refused before it is buffered > refuses a Content-Length over the ceiling without reading the body`
 - `packages/core/src/storage/multipart.test.ts::STOR-013 — a body over the ceiling is refused before it is buffered > stops reading a body with no length once it passes the ceiling`
 
+### STOR-014
+
+Every object-storage request has a deadline, body included, so a bucket that accepts the connection and stalls fails the request instead of holding it open.
+
+- `packages/core/src/storage/s3.test.ts::createS3Storage > STOR-014 — gives up on a bucket that stalls instead of holding the upload open`
+
 ### STORC-001
 
 Six uploads of identical bytes at once store the object once and hand every caller the same row.

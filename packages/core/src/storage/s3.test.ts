@@ -191,4 +191,29 @@ describe('createS3Storage', () => {
       'https://cdn.example.com/attachment/2026/09/abc.png',
     );
   });
+
+  it('STOR-014 — gives up on a bucket that stalls instead of holding the upload open', async () => {
+    const seen: Array<{ method: string; signal: AbortSignal | undefined }> = [];
+    const stalling = (async (
+      _url: string | URL,
+      init?: { method?: string; signal?: AbortSignal },
+    ) => {
+      seen.push({ method: init?.method ?? 'GET', signal: init?.signal });
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      });
+    }) as unknown as typeof fetch;
+    const storage = createS3Storage({
+      ...baseOptions,
+      fetchImpl: stalling,
+      timeoutMs: { transfer: 30, control: 10 },
+    });
+
+    await expect(
+      storage.put(new Uint8Array([1, 2, 3]), { contentType: 'image/png' }),
+    ).rejects.toThrow();
+    await expect(storage.exists('a/b.png')).rejects.toThrow();
+    expect(seen.map((call) => call.method)).toEqual(['PUT', 'HEAD']);
+    expect(seen.every((call) => call.signal?.aborted)).toBe(true);
+  });
 });
