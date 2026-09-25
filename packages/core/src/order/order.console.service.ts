@@ -22,7 +22,7 @@ import { requireAdminId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId, toIdOrNull } from '../kernel/ids';
 import { Money } from '../kernel/money';
-import { shopDateTime, shopDay } from '../kernel/shop-time';
+import { SHOP_DAY_MS, shopDateTime, shopDay, shopDayStart } from '../kernel/shop-time';
 import { notify } from '../notification';
 import { maskPhone } from '../user';
 import { closeOrderPayments, openPaymentState } from './order.cancel.service';
@@ -668,11 +668,19 @@ export async function adminDeleteMany(
 // statistics
 // ---------------------------------------------------------------------------
 
-/** Default window: the last 30 days, which is what the console opens on. */
-function windowOf(ctx: Ctx, query: OrderStatisticsQuery): { from: Date; to: Date } {
-  const to = query.to === undefined ? ctx.clock.now() : new Date(query.to);
+/**
+ * The window in whole Shanghai days, as 交易统计 draws it: `to` is exclusive
+ * and opens the day after the last one, and the default is today and the 29
+ * days before — so 近 30 天实付 here and 支付金额 there are the same number.
+ */
+export function windowOf(now: Date, query: OrderStatisticsQuery): { from: Date; to: Date } {
+  const to = new Date(
+    shopDayStart(query.to === undefined ? now : new Date(query.to)).getTime() + SHOP_DAY_MS,
+  );
   const from =
-    query.from === undefined ? new Date(to.getTime() - 30 * 86_400_000) : new Date(query.from);
+    query.from === undefined
+      ? new Date(to.getTime() - 30 * SHOP_DAY_MS)
+      : shopDayStart(new Date(query.from));
   return { from, to };
 }
 
@@ -680,7 +688,7 @@ export async function adminStatistics(
   ctx: Ctx,
   query: OrderStatisticsQuery,
 ): Promise<OrderStatistics> {
-  const range = windowOf(ctx, query);
+  const range = windowOf(ctx.clock.now(), query);
   const [queue, totals] = await Promise.all([
     fulfilRepo.workQueueCounts(ctx.db),
     fulfilRepo.rangeTotals(ctx.db, range),

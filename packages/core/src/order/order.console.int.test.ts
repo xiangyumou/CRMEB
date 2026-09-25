@@ -814,6 +814,33 @@ describe('the work queue and the totals', () => {
     expect(stats.refundedAmount).toBe('0.00');
   });
 
+  it('近 30 天实付 counts what was paid and refunded in the window, as 交易统计 does', async () => {
+    const adminId = await makeAdmin();
+    const placed = await placeOrder();
+    // Paid at the test clock, 08:00 on 1 June in Shanghai; `created_at` is the
+    // database's own now(), so only a `paid_at` population finds it.
+    await pay(placed, '60.50');
+    sequence += 1;
+    await harness.ctx.db.insert(refunds).values({
+      refundNo: `RF-${sequence}`,
+      outRefundNo: `ORF-${sequence}`,
+      orderId: placed.orderId,
+      userId: placed.userId,
+      kind: 'refund_only',
+      status: 'succeeded',
+      quantity: 1,
+      amount: '10.00',
+      refundedAmount: '10.00',
+      succeededAt: new Date(NOW),
+    });
+
+    const stats = await order.orderConsole.adminStatistics(asAdmin(adminId), {});
+    expect(stats.range.to).toBe('2026-06-01T16:00:00.000Z');
+    expect(stats.paidOrderCount).toBe(1);
+    expect(stats.paidAmount).toBe('60.50');
+    expect(stats.refundedAmount).toBe('10.00');
+  });
+
   it('counts nothing at all without dividing by zero', async () => {
     const adminId = await makeAdmin();
     const stats = await order.orderConsole.adminStatistics(asAdmin(adminId), {});

@@ -4,6 +4,7 @@
  * names — where an ISO string in UTC puts an 00:30 order on the previous day.
  */
 const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
+export const SHOP_DAY_MS = 24 * 60 * 60 * 1000;
 
 function shifted(at: Date): string {
   return new Date(at.getTime() + SHANGHAI_OFFSET_MS).toISOString();
@@ -13,6 +14,14 @@ function shifted(at: Date): string {
 export function shopDateTime(at: Date): string {
   const text = shifted(at);
   return `${text.slice(0, 10)} ${text.slice(11, 19)}`;
+}
+
+/** The Shanghai midnight that opens the day containing `at`. */
+export function shopDayStart(at: Date): Date {
+  const local = at.getTime() + SHANGHAI_OFFSET_MS;
+  return new Date(
+    local - (((local % SHOP_DAY_MS) + SHOP_DAY_MS) % SHOP_DAY_MS) - SHANGHAI_OFFSET_MS,
+  );
 }
 
 /** `2026-02-03T16:30:00Z` -> `2026-02-04`: the shop's calendar day. */

@@ -21,6 +21,7 @@ import {
   inArray,
   isNull,
   isNotNull,
+  lt,
   lte,
   or,
   sql,
@@ -594,32 +595,45 @@ export interface RangeTotals {
   refundedAmount: string;
 }
 
-/** One pass over the window, so the four totals cannot disagree with each other. */
+/** The window's totals, counted the way 交易统计 counts them. */
 export async function rangeTotals(
   db: DbOrTx,
   args: { from: Date; to: Date },
 ): Promise<RangeTotals> {
-  const rows = await db
-    .select({
-      orderCount: sql<number>`count(*)::int`,
-      paidOrderCount: sql<number>`count(*) filter (where ${orders.paidAt} is not null)::int`,
-      paidAmount: sql<string>`coalesce(sum(${orders.paidAmount}), 0)::text`,
-      refundedAmount: sql<string>`coalesce(sum(${orders.refundedAmount}), 0)::text`,
-    })
-    .from(orders)
-    .where(
-      and(
-        gte(orders.createdAt, args.from),
-        lte(orders.createdAt, args.to),
-        isNull(orders.deletedAt),
+  // The populations 交易统计 uses: placed in the window by `created_at`, paid
+  // in it by `paid_at`, refunded in it by the refund's `succeeded_at` — each
+  // over orders an operator has not deleted, `to` exclusive.
+  const placed = and(gte(orders.createdAt, args.from), lt(orders.createdAt, args.to));
+  const paid = and(gte(orders.paidAt, args.from), lt(orders.paidAt, args.to));
+  const [rows, refunded] = await Promise.all([
+    db
+      .select({
+        orderCount: sql<number>`count(*) filter (where ${placed})::int`,
+        paidOrderCount: sql<number>`count(*) filter (where ${paid})::int`,
+        paidAmount: sql<string>`coalesce(sum(${orders.paidAmount}) filter (where ${paid}), 0)::text`,
+      })
+      .from(orders)
+      .where(and(isNull(orders.deletedAt), or(placed, paid))),
+    db
+      .select({ amount: sql<string>`coalesce(sum(${refunds.refundedAmount}), 0)::text` })
+      .from(refunds)
+      .innerJoin(orders, eq(orders.id, refunds.orderId))
+      .where(
+        and(
+          eq(refunds.status, 'succeeded'),
+          isNull(refunds.deletedAt),
+          isNull(orders.deletedAt),
+          gte(refunds.succeededAt, args.from),
+          lt(refunds.succeededAt, args.to),
+        ),
       ),
-    );
+  ]);
   const row = rows[0];
   return {
     orderCount: Number(row?.orderCount ?? 0),
     paidOrderCount: Number(row?.paidOrderCount ?? 0),
     paidAmount: row?.paidAmount ?? '0',
-    refundedAmount: row?.refundedAmount ?? '0',
+    refundedAmount: refunded[0]?.amount ?? '0',
   };
 }
 
