@@ -115,7 +115,7 @@ export function ParamTemplatesPage() {
                 <ConfirmButton
                   route={catalogAdminParamTemplateDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该参数？"
+                  title={`删除参数模板「${row.name}」？`}
                   description="已填写到商品上的参数不受影响。"
                   invalidate={[catalogAdminParamTemplateList]}
                   successMessage="已删除"

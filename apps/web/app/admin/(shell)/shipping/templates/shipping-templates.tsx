@@ -137,7 +137,7 @@ export function ShippingTemplatesPage() {
                 <ConfirmButton
                   route={shippingTemplateDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该运费模板？"
+                  title={`删除运费模板「${row.name}」？`}
                   description="仍被商品使用的模板无法删除。"
                   invalidate={[shippingTemplateList]}
                   successMessage="已删除"

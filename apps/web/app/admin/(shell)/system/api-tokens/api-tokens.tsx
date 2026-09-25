@@ -149,7 +149,7 @@ export function ApiTokensPage() {
                   <ConfirmButton
                     route={authApiTokenRevoke}
                     input={{ params: { id: row.id } }}
-                    title="确认吊销该令牌？"
+                    title={`吊销令牌「${row.name}」？`}
                     description="使用它的 AI 助手或命令行会立刻失去访问权限，无法恢复。"
                     invalidate={[authApiTokenList]}
                     successMessage="已吊销"

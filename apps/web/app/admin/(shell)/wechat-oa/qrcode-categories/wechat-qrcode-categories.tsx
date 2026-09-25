@@ -73,7 +73,7 @@ export function WechatQrcodeCategoriesPage() {
                     <ConfirmButton
                       route={wechatOaQrcodeCategoryDelete}
                       input={{ params: { id: row.id } }}
-                      title="确认删除该分类？"
+                      title={`删除分类「${row.name}」？`}
                       invalidate={[wechatOaQrcodeCategoryList]}
                       successMessage="已删除"
                       permission="wechat-oa:qrcode:write"

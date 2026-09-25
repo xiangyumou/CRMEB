@@ -166,7 +166,7 @@ export function WechatQrcodesPage() {
                 <ConfirmButton
                   route={wechatOaQrcodeDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该渠道码？"
+                  title={`删除渠道码「${row.name}」？`}
                   description="已经印出去的海报还会被扫到，但扫码将不再归因到任何渠道。"
                   invalidate={[wechatOaQrcodeList]}
                   successMessage="已删除"

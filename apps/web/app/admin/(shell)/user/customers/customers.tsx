@@ -34,6 +34,7 @@ import {
   textColumn,
 } from '@/admin/kit/table/columns';
 import { CrudTable } from '@/admin/kit/table/crud-table';
+import { ConfirmAction } from '@/admin/kit/confirm-action';
 import { Can } from '@/admin/session/can';
 import { useCan } from '@/admin/session/session-provider';
 
@@ -226,12 +227,21 @@ export function CustomersPage() {
                   </Button>
                 </Can>
                 <Can permission="user:customer:status">
-                  <Button
+                  <ConfirmAction
                     type="link"
                     size="small"
                     danger={row.status === 'active'}
-                    loading={setStatus.isPending}
-                    onClick={() =>
+                    loading={setStatus.isPending && setStatus.variables?.params?.id === row.id}
+                    confirm={
+                      row.status === 'active'
+                        ? {
+                            title: `禁用用户「${row.nickname ?? row.account}」？`,
+                            description: '禁用后该用户立即退出登录，无法下单。',
+                            okText: '禁用',
+                          }
+                        : undefined
+                    }
+                    onAction={() =>
                       setStatus.mutate({
                         params: { id: row.id },
                         body: { status: row.status === 'active' ? 'disabled' : 'active' },
@@ -239,7 +249,7 @@ export function CustomersPage() {
                     }
                   >
                     {row.status === 'active' ? '禁用' : '启用'}
-                  </Button>
+                  </ConfirmAction>
                 </Can>
                 <Can permission="user:customer:password">
                   <Button type="link" size="small" onClick={() => setResetting(row)}>

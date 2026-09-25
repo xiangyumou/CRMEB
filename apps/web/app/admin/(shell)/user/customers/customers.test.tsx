@@ -17,7 +17,7 @@ import type { AdminUserDetail, AdminUserListItem } from '@shop/contracts/user/sc
 
 import { resetApiConfig } from '@/admin/api/config';
 import { on, stubRoutes, type StubCall } from '@/test/api';
-import { renderAdmin, testIdentity } from '@/test/render';
+import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { CustomersPage } from './customers';
 
@@ -176,12 +176,17 @@ describe('用户列表', () => {
     expect(screen.queryByRole('button', { name: '新增用户' })).not.toBeInTheDocument();
   });
 
-  it('disables through the status sub-resource, not the edit form', async () => {
+  it('disables through the status sub-resource after asking, not the edit form', async () => {
     const calls = stubApi();
     renderAdmin(<CustomersPage />, { identity: allPermissions });
     await screen.findByText('小明');
 
-    await userEvent.click(screen.getByRole('button', { name: '禁用' }));
+    await userEvent.click(screen.getByRole('button', { name: zhName('禁用') }));
+    // Asks first, naming the customer; nothing is sent until confirmed.
+    const ask = await screen.findByText(/禁用用户「小明」？/);
+    expect(calls.some((call) => call.url.includes('/status'))).toBe(false);
+    const popup = ask.closest('.ant-popover') as HTMLElement;
+    await userEvent.click(within(popup).getByRole('button', { name: zhName('禁用') }));
 
     await waitFor(() => {
       const toggle = calls.find((call) => call.url.includes('/admin-api/users/1001/status'));

@@ -115,7 +115,7 @@ export function ArticleCategoriesPage() {
                 <ConfirmButton
                   route={cmsCategoryDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该分类？"
+                  title={`删除分类「${row.title}」？`}
                   description="还有子分类或文章时无法删除，改用隐藏。"
                   invalidate={[cmsCategoryList]}
                   successMessage="已删除"

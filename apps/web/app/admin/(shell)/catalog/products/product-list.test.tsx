@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { catalogAdminCategoryTree } from '@shop/contracts/catalog/catalog.category.admin.contract';
@@ -141,18 +141,48 @@ describe('商品列表', () => {
     expect(screen.queryByRole('button', { name: zhName('导出') })).not.toBeInTheDocument();
   });
 
-  it('takes a product off the shelf through the status sub-resource', async () => {
+  it('offers the 分类 filter only to a role that may read categories, instead of a 403', async () => {
+    const calls = stubApi();
+    const { unmount } = renderAdmin(<ProductListPage />, { identity: allPermissions });
+    await screen.findByText('简约白 T 恤');
+    expect(calls.some((call) => call.url.includes('/admin-api/catalog/categories'))).toBe(false);
+    expect(screen.queryByText('全部分类')).toBeNull();
+    unmount();
+
+    renderAdmin(<ProductListPage />, {
+      identity: {
+        ...allPermissions,
+        permissions: [...allPermissions.permissions, 'catalog:category:read'],
+      },
+    });
+    expect(await screen.findByText('全部分类')).toBeInTheDocument();
+  });
+
+  it('takes a product off the shelf through the status sub-resource, after asking by name', async () => {
     const calls = stubApi();
     renderAdmin(<ProductListPage />, { identity: allPermissions });
     await screen.findByText('简约白 T 恤');
 
     await userEvent.click(screen.getByRole('button', { name: zhName('下架') }));
+    const ask = await screen.findByText('下架「简约白 T 恤」？');
+    expect(calls.some((call) => call.method === 'POST')).toBe(false);
+    const popup = ask.closest('.ant-popover') as HTMLElement;
+    await userEvent.click(within(popup).getByRole('button', { name: zhName('下架') }));
 
     await waitFor(() => {
       const toggle = calls.find((call) => call.method === 'POST');
       expect(toggle?.url).toContain('/admin-api/catalog/products/1/status');
       expect(toggle?.body).toEqual({ status: 'off_shelf' });
     });
+  });
+
+  it('names the product when asking to move it to 回收站', async () => {
+    stubApi();
+    renderAdmin(<ProductListPage />, { identity: allPermissions });
+    await screen.findByText('简约白 T 恤');
+
+    await userEvent.click(screen.getByRole('button', { name: zhName('删除') }));
+    expect(await screen.findByText('将「简约白 T 恤」移入回收站？')).toBeInTheDocument();
   });
 
   it('switching to 回收站 re-asks with that tab and offers 恢复 instead of 删除', async () => {

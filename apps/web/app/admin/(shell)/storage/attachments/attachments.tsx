@@ -247,7 +247,7 @@ export function AttachmentsPage() {
                     <ConfirmButton
                       route={storageAttachmentDeleteMany}
                       input={{ body: { ids: [row.id] } }}
-                      title="确认删除该素材？"
+                      title={`删除素材「${row.name}」？`}
                       description="已经引用它的商品或页面会跟着失效。"
                       invalidate={[storageAttachmentList, storageCategoryTree]}
                       successMessage="已删除"

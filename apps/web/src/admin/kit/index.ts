@@ -1,4 +1,6 @@
 // ── Display primitives ──────────────────────────────────────────────────────
+export { ConfirmAction } from './confirm-action';
+export type { ConfirmActionProps } from './confirm-action';
 export { ConfirmButton } from './confirm-button';
 export type { ConfirmButtonProps } from './confirm-button';
 export { DescriptionsCard } from './descriptions-card';

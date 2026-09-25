@@ -178,7 +178,7 @@ export function ArticlesPage() {
                 <ConfirmButton
                   route={cmsArticleDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该文章？"
+                  title={`删除文章「${row.title}」？`}
                   description="删除后前台链接立即失效，别名会被释放。"
                   invalidate={[cmsArticleList]}
                   successMessage="已删除"

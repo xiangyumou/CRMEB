@@ -151,7 +151,7 @@ export function ProductCategoriesPage() {
                 <ConfirmButton
                   route={catalogAdminCategoryDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该分类？"
+                  title={`删除分类「${row.name}」？`}
                   description="有子分类或仍有商品在用时会被拒绝，先移走再删。"
                   invalidate={[catalogAdminCategoryList]}
                   successMessage="已删除"

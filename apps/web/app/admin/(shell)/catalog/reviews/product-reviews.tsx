@@ -229,7 +229,7 @@ export function ProductReviewsPage() {
                 <ConfirmButton
                   route={catalogAdminReviewDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该评价？"
+                  title={`删除「${row.authorNickname}」的评价？`}
                   description="删除后商品的评分统计会重新计算，且不可恢复。"
                   invalidate={[catalogAdminReviewList]}
                   successMessage="已删除"
