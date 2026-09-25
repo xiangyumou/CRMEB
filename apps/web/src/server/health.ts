@@ -1,6 +1,7 @@
 import type { HealthPayload, ReadinessPayload } from '@shop/contracts/health/health.contract';
 import { effectsBacklogMs } from '@shop/core/effects';
 import { DomainError, type Ctx } from '@shop/core/kernel';
+import migrationsJournal from '@shop/db/migrations/journal';
 
 /**
  * The health payload, shared by both surfaces.
@@ -27,17 +28,20 @@ export function healthPayload(ctx: Ctx): HealthPayload {
 const READY_TIMEOUT_MS = 2000;
 
 /**
- * How many migrations `packages/db` ships at the commit this image was built
- * from.
+ * How many migrations the drizzle journal lists: what `packages/db` ships at
+ * the commit this image was built from.
  *
- * A constant rather than an import: the standalone web bundle does not carry
- * `packages/db/migrations` — the worker image runs the migrator, the web image
- * only has to know what to expect. `health.test.ts` reads the drizzle journal
- * off disk and fails when this number drifts, so adding a migration and
- * forgetting this line is a merge-gate failure rather than a surprise during a
- * release.
+ * Read from the journal, never typed by hand. The standalone web bundle does
+ * not carry `packages/db/migrations` — the worker image runs the migrator — so
+ * the journal is imported as JSON and the bundler inlines it at build time:
+ * the number is fixed when `next build` runs, from the same checkout the
+ * worker image's migrations come from.
  */
-export const EXPECTED_MIGRATIONS = 16;
+export function expectedMigrations(journal: { entries: readonly { idx: number }[] }): number {
+  return journal.entries.length;
+}
+
+export const EXPECTED_MIGRATIONS = expectedMigrations(migrationsJournal);
 
 /** The key the worker refreshes from the same loop that runs the jobs. */
 const HEARTBEAT_KEY = 'worker:heartbeat';

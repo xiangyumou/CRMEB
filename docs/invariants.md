@@ -1964,6 +1964,14 @@ Work that stopped and waits for a person is on the admin home page. The first ti
 - `apps/web/app/admin/(shell)/dashboard.test.tsx::工作台 > OPS-020 — shows 「异常待处理」 in the danger colour while there is work, linking to it`
 - `apps/web/app/admin/(shell)/system/failed-jobs/failed-jobs.test.tsx::失败的后台任务 > OPS-020 — says so when somebody else marked the row first`
 
+### OPS-021
+
+The readiness probe's expected migration count is the number of entries in the drizzle journal `packages/db` ships, inlined into the web bundle at build time; no number is typed by hand, so adding a migration cannot leave the probe expecting the old schema.
+
+- `apps/web/src/server/health.test.ts::readiness / EXPECTED_MIGRATIONS > OPS-021 — is the number of entries in the journal packages/db ships`
+- `apps/web/src/server/health.test.ts::readiness / EXPECTED_MIGRATIONS > OPS-021 — follows the journal: one more migration is one more expected`
+- `apps/web/src/server/health.test.ts::readiness / EXPECTED_MIGRATIONS > OPS-021 — health.ts carries no hand-typed count`
+
 ## Route integrity
 
 ### ROUTE-001
@@ -1972,6 +1980,13 @@ Every contract has a route file that exports its method, and every route file is
 
 - `guards/src/checks/contracts.test.ts::contracts and route files > matches every contract to a route file that exports its method`
 - `guards/src/checks/contracts.test.ts::leaves no route file that no contract describes`
+
+### ROUTE-002
+
+A foreign-key violation that no service turned into its own code answers 409, never 500: `REFERENCE_IN_USE` (请求删除的数据仍被其他记录使用) for a delete of a row live rows point at, `REFERENCE_MISSING` for a write pointing at a row that is gone. The body carries the common Chinese message only; the constraint and table names go to the log.
+
+- `apps/web/src/server/handle.test.ts::error mapping > ROUTE-002 — a foreign-key violation on delete is a 409 REFERENCE_IN_USE that names no constraint`
+- `apps/web/src/server/handle.test.ts::error mapping > ROUTE-002 — a write pointing at a row that is gone is a 409 REFERENCE_MISSING`
 
 ## Storefront share codes (小程序码)
 
