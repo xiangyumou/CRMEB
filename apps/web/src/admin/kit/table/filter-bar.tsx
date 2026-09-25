@@ -5,6 +5,7 @@ import { Button, Col, Form, Input, InputNumber, Row, Select, Space } from 'antd'
 import { useState, type ReactNode } from 'react';
 
 import { DateRangeField } from '../form/date-fields';
+import { MoneyInput } from '../form/money-input';
 import type { SelectOption } from '../form/types';
 import { defined } from '../props';
 
@@ -21,6 +22,14 @@ export type FilterSpec =
       placeholder?: string | undefined;
       min?: number | undefined;
       max?: number | undefined;
+      width?: number | undefined;
+    }
+  | {
+      /** An amount, sent as the contract's money string (`"100.00"`), never `"100"`. */
+      kind: 'money';
+      name: string;
+      label: string;
+      placeholder?: string | undefined;
       width?: number | undefined;
     }
   | {
@@ -82,6 +91,17 @@ export function FilterBar({ filters, values, onApply, loading = false }: FilterB
     setDraft(values);
   }
 
+  // A pasted order number with a trailing space finds nothing; what a search
+  // box sends is what the operator meant.
+  const apply = (next: Record<string, string | undefined>): void => {
+    const trimmed: Record<string, string | undefined> = {};
+    for (const [key, value] of Object.entries(next)) {
+      const text = value?.trim();
+      trimmed[key] = text === '' ? undefined : text;
+    }
+    onApply(trimmed);
+  };
+
   const set = (patch: Record<string, string | undefined>): void =>
     setDraft((prev) => ({ ...prev, ...patch }));
 
@@ -99,7 +119,7 @@ export function FilterBar({ filters, values, onApply, loading = false }: FilterB
       layout="inline"
       onSubmitCapture={(event) => {
         event.preventDefault();
-        onApply(draft);
+        apply(draft);
       }}
       style={{ marginBottom: 16, rowGap: 12 }}
     >
@@ -107,7 +127,7 @@ export function FilterBar({ filters, values, onApply, loading = false }: FilterB
         {filters.map((spec) => (
           <Col key={filterKeys(spec).join('|')} xs={24} sm={12} lg={spec.width ?? 6}>
             <Form.Item label={spec.label} style={{ marginInlineEnd: 0, width: '100%' }}>
-              {renderFilter(spec, draft, set, () => onApply(draft))}
+              {renderFilter(spec, draft, set, () => apply(draft))}
             </Form.Item>
           </Col>
         ))}
@@ -117,7 +137,7 @@ export function FilterBar({ filters, values, onApply, loading = false }: FilterB
               type="primary"
               icon={<SearchOutlined />}
               loading={loading}
-              onClick={() => onApply(draft)}
+              onClick={() => apply(draft)}
             >
               查询
             </Button>
@@ -160,6 +180,16 @@ function renderFilter(
           value={draft[spec.name] === undefined ? null : Number(draft[spec.name])}
           onChange={(next) => set({ [spec.name]: next === null ? undefined : String(next) })}
           onPressEnter={submit}
+        />
+      );
+
+    case 'money':
+      return (
+        <MoneyInput
+          style={{ width: '100%' }}
+          placeholder={spec.placeholder ?? '0.00'}
+          value={draft[spec.name]}
+          onChange={(next) => set({ [spec.name]: next })}
         />
       );
 

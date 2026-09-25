@@ -1,4 +1,5 @@
 import { defineRoute, id } from '@shop/contracts';
+import { QueryClient } from '@tanstack/react-query';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -216,5 +217,60 @@ describe('<ModalForm> save', () => {
     await waitFor(() => expect(item).toHaveTextContent('该名称已被占用'));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByRole('dialog').querySelector('.ant-alert')).toBeNull();
+  });
+});
+
+describe('<ModalForm> never edits a cached record', () => {
+  it('reopened after a save, shows the saved record, not the detail cached before it', async () => {
+    let stored = { id: '7', name: '旧名称', note: '备注' };
+    const calls = stubRoutes([
+      on(detailRoute, () => stored),
+      on(updateRoute, (call) => {
+        stored = { id: '7', ...(call.body as { name: string; note: string }) };
+        return { id: '7' };
+      }),
+    ]);
+    // The admin's own cache settings: a detail stays fresh for 30 s, which is
+    // what let a reopened form mount on the record from before the save.
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 30_000, gcTime: 300_000 } },
+    });
+    const user = userEvent.setup();
+    renderAdmin(<Harness row={{ id: '7', name: '列表里的名称' }} />, { queryClient });
+
+    await user.click(screen.getByRole('button', { name: zhName('打开') }));
+    const name = await screen.findByDisplayValue('旧名称');
+    await user.clear(name);
+    await user.type(name, '新名称');
+    await user.click(screen.getByRole('button', { name: zhName('保存') }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: zhName('打开') }));
+    expect(await screen.findByDisplayValue('新名称')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('旧名称')).not.toBeInTheDocument();
+    expect(calls.filter((call) => call.routeId === detailRoute.id).length).toBeGreaterThanOrEqual(
+      2,
+    );
+  });
+
+  it('reopened without a save, still reads the record again before showing the fields', async () => {
+    let name = '第一次';
+    const calls = stubRoutes([on(detailRoute, () => ({ id: '7', name, note: '' }))]);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 30_000, gcTime: 300_000 } },
+    });
+    const user = userEvent.setup();
+    renderAdmin(<Harness row={{ id: '7', name: '列表里的名称' }} />, { queryClient });
+
+    await user.click(screen.getByRole('button', { name: zhName('打开') }));
+    await screen.findByDisplayValue('第一次');
+    await user.click(screen.getByRole('button', { name: zhName('取消') }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // Changed elsewhere — a 停用 toggle on the list, another tab.
+    name = '列表上改过';
+    await user.click(screen.getByRole('button', { name: zhName('打开') }));
+    expect(await screen.findByDisplayValue('列表上改过')).toBeInTheDocument();
+    expect(calls.filter((call) => call.routeId === detailRoute.id)).toHaveLength(2);
   });
 });

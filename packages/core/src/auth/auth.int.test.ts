@@ -297,6 +297,30 @@ describe('admin sessions', () => {
     expect(ttl).toBeGreaterThan(0);
   });
 
+  it('AUTH-011: 记住登录状态 keeps the session seven idle days, otherwise eight hours', async () => {
+    await seedAdmin({ isSuper: true });
+    const plain = await auth.login(harness.ctx, { account: 'admin', password: PASSWORD });
+    expect(plain).toMatchObject({ remember: false, expiresInMs: 8 * 60 * 60 * 1000 });
+    const plainTtl = await harness.redis.pttl(`admin:sess:${sha256Hex(plain.token)}`);
+    expect(plainTtl).toBeLessThanOrEqual(8 * 60 * 60 * 1000);
+
+    const kept = await auth.login(harness.ctx, {
+      account: 'admin',
+      password: PASSWORD,
+      remember: true,
+    });
+    expect(kept).toMatchObject({ remember: true, expiresInMs: 7 * 24 * 60 * 60 * 1000 });
+    expect(await auth.resolve(kept.token)).toMatchObject({
+      remember: true,
+      ttlMs: 7 * 24 * 60 * 60 * 1000,
+    });
+    const keptTtl = await harness.redis.pttl(`admin:sess:${sha256Hex(kept.token)}`);
+    expect(keptTtl).toBeGreaterThan(8 * 60 * 60 * 1000);
+    // The revoke index outlives the remembered session.
+    const indexTtl = await harness.redis.pttl(`admin:sess:index:${kept.profile.id}`);
+    expect(indexTtl).toBeGreaterThan(7 * 24 * 60 * 60 * 1000);
+  });
+
   it('stores only the hash of the token', async () => {
     await seedAdmin();
     const { token } = await auth.login(harness.ctx, { account: 'admin', password: PASSWORD });

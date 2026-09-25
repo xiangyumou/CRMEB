@@ -184,7 +184,7 @@ function LabelsTable() {
                 <ConfirmButton
                   route={catalogAdminLabelDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该标签？"
+                  title={`删除标签「${row.name}」？`}
                   description="仍有商品在用时会被拒绝，先停用或解除绑定。"
                   invalidate={[catalogAdminLabelList]}
                   successMessage="已删除"
@@ -310,9 +310,9 @@ function LabelCategoriesTable() {
                 <ConfirmButton
                   route={catalogAdminLabelCategoryDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该标签分类？"
+                  title={`删除标签分类「${row.name}」？`}
                   description="分类下仍有标签时会被拒绝。"
-                  invalidate={[catalogAdminLabelCategoryList]}
+                  invalidate={[catalogAdminLabelCategoryList, catalogAdminLabelList]}
                   successMessage="已删除"
                   permission="catalog:label:write"
                   buttonProps={{ type: 'link', size: 'small', danger: true }}
@@ -339,7 +339,7 @@ function LabelCategoriesTable() {
         toInput={(values) =>
           modal.record ? { params: { id: modal.record.id }, body: values } : { body: values }
         }
-        invalidate={[catalogAdminLabelCategoryList]}
+        invalidate={[catalogAdminLabelCategoryList, catalogAdminLabelList]}
         successMessage="已保存"
       />
     </>

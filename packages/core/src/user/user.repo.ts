@@ -26,6 +26,7 @@ import {
   sql,
   type SQL,
 } from 'drizzle-orm';
+import { containsPattern } from '../kernel/like';
 import { conditionalDelete, conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
 
 /**
@@ -288,9 +289,9 @@ export async function updateProfile(
     id: number;
     nickname?: string | undefined;
     avatarUrl?: string | null | undefined;
-    realName?: string | undefined;
+    realName?: string | null | undefined;
     birthday?: Date | null | undefined;
-    adminRemark?: string | undefined;
+    adminRemark?: string | null | undefined;
     now: Date;
   },
 ): Promise<ConditionalUpdateResult> {
@@ -1123,7 +1124,7 @@ export interface LabelFilters {
 function labelWhere(args: LabelFilters): SQL | undefined {
   const conditions: SQL[] = [];
   if (args.categoryId !== undefined) conditions.push(eq(userLabels.categoryId, args.categoryId));
-  if (args.keyword) conditions.push(ilike(userLabels.name, `%${args.keyword}%`));
+  if (args.keyword) conditions.push(ilike(userLabels.name, containsPattern(args.keyword)));
   return conditions.length > 0 ? and(...conditions) : undefined;
 }
 
@@ -1313,7 +1314,7 @@ export interface AdminListFilters {
 function adminListWhere(filters: AdminListFilters): SQL | undefined {
   const conditions: SQL[] = [isNull(users.deletedAt)];
   if (filters.keyword) {
-    const like = `%${filters.keyword}%`;
+    const like = containsPattern(filters.keyword);
     const keyword = or(
       ilike(users.account, like),
       ilike(users.phone, like),
@@ -1502,7 +1503,7 @@ function cancellationWhere(filters: {
   const conditions: SQL[] = [];
   if (filters.status) conditions.push(eq(userCancellationRequests.status, filters.status));
   if (filters.keyword) {
-    const like = `%${filters.keyword}%`;
+    const like = containsPattern(filters.keyword);
     const keyword = or(
       ilike(userCancellationRequests.nickname, like),
       ilike(userCancellationRequests.phone, like),

@@ -55,7 +55,11 @@ export function LoginForm() {
       await callRoute(
         adminLogin,
         {
-          body: { account: values.account, password: values.password },
+          body: {
+            account: values.account,
+            password: values.password,
+            remember: values.remember === true,
+          },
         },
         // A 401 here means "wrong password", not "session expired" — showing it
         // inline beats bouncing the browser back to this very page.
@@ -89,6 +93,16 @@ export function LoginForm() {
           <Typography.Text type="secondary">请使用管理员账号登录</Typography.Text>
         </div>
 
+        {error === null && params.get('expired') === '1' ? (
+          <Alert
+            type="info"
+            showIcon
+            message="登录已过期，请重新登录"
+            style={{ marginBottom: 16 }}
+            data-testid="login-expired"
+          />
+        ) : null}
+
         {error ? (
           <Alert
             type="error"
@@ -104,7 +118,9 @@ export function LoginForm() {
           layout="vertical"
           requiredMark={false}
           onFinish={(values) => void onFinish(values)}
-          initialValues={{ remember: true }}
+          // Off by default: seven days signed in is a choice for one's own
+          // computer, not what a shared counter PC should get unasked.
+          initialValues={{ remember: false }}
         >
           <Form.Item
             name="account"
@@ -133,7 +149,7 @@ export function LoginForm() {
           </Form.Item>
 
           <Form.Item name="remember" valuePropName="checked" style={{ marginBottom: 12 }}>
-            <Checkbox>记住登录状态</Checkbox>
+            <Checkbox>记住登录状态（7 天）</Checkbox>
           </Form.Item>
 
           <Button type="primary" size="large" htmlType="submit" block loading={submitting}>

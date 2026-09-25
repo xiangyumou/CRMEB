@@ -295,7 +295,7 @@ export type CancellationRemarkBody = z.infer<typeof cancellationRemarkBody>;
 export const cancellationListQuery = pageQuery
   .extend({
     status: cancellationStatus.optional(),
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
   })
   .extend(sortQuery(['id', 'createdAt']).shape);
 export type CancellationListQuery = z.infer<typeof cancellationListQuery>;
@@ -317,7 +317,7 @@ export const userGroup = z.object({
 export type UserGroup = z.infer<typeof userGroup>;
 
 export const userGroupForm = z.object({
-  name: z.string().min(1).max(64),
+  name: z.string().trim().min(1).max(64),
   sortOrder: z.number().int().min(0).max(9999).default(0),
 });
 export type UserGroupForm = z.infer<typeof userGroupForm>;
@@ -334,7 +334,7 @@ export const userLabelCategory = z.object({
 export type UserLabelCategory = z.infer<typeof userLabelCategory>;
 
 export const userLabelCategoryForm = z.object({
-  name: z.string().min(1).max(64),
+  name: z.string().trim().min(1).max(64),
   sortOrder: z.number().int().min(0).max(9999).default(0),
 });
 export type UserLabelCategoryForm = z.infer<typeof userLabelCategoryForm>;
@@ -357,13 +357,13 @@ export type UserLabel = z.infer<typeof userLabel>;
 
 export const userLabelForm = z.object({
   categoryId: id.nullish(),
-  name: z.string().min(1).max(64),
+  name: z.string().trim().min(1).max(64),
   sortOrder: z.number().int().min(0).max(9999).default(0),
 });
 export type UserLabelForm = z.infer<typeof userLabelForm>;
 
 export const userLabelListQuery = pageQuery
-  .extend({ categoryId: id.optional(), keyword: z.string().max(64).optional() })
+  .extend({ categoryId: id.optional(), keyword: z.string().trim().max(64).optional() })
   .extend(sortQuery(['id', 'name', 'sortOrder']).shape);
 export type UserLabelListQuery = z.infer<typeof userLabelListQuery>;
 
@@ -425,10 +425,12 @@ export type AdminUserDetail = z.infer<typeof adminUserDetail>;
  * handset would own every account in the shop.
  */
 export const adminUserForm = z.object({
-  nickname: z.string().min(1).max(64).optional(),
-  realName: z.string().max(32).optional(),
+  nickname: z.string().trim().min(1).max(64).optional(),
+  /** `null` clears it; absent leaves it as it is. */
+  realName: z.string().trim().max(32).nullish(),
   birthday: instant.nullish(),
-  adminRemark: z.string().max(255).optional(),
+  /** `null` clears it; absent leaves it as it is. */
+  adminRemark: z.string().trim().max(255).nullish(),
   groupIds: z.array(id).max(50).default([]),
   labelIds: z.array(id).max(50).default([]),
 });
@@ -449,7 +451,7 @@ export type AdminUserCreateBody = z.infer<typeof adminUserCreateBody>;
 export const adminUserListQuery = pageQuery
   .extend({
     /** Matches account, phone, nickname or real name. */
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     groupId: id.optional(),
     labelId: id.optional(),
     status: userStatus.optional(),

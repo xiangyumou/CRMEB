@@ -16,6 +16,8 @@ import { PageContainer } from '@/admin/kit/page-container';
 import { StatusTag } from '@/admin/kit/status-tag';
 import { idColumn, instantColumn, textColumn } from '@/admin/kit/table/columns';
 import { CrudTable } from '@/admin/kit/table/crud-table';
+import { useListReturn } from '@/admin/kit/table/list-return';
+import { ConfirmAction } from '@/admin/kit/confirm-action';
 import { Can } from '@/admin/session/can';
 
 import { VIRTUAL_CARD_STATE, options } from '../../../catalog-enums';
@@ -37,6 +39,7 @@ export function VirtualCardsPage({ productId }: { productId: string }) {
   const [importing, setImporting] = useState(false);
 
   const product = useRouteQuery(catalogAdminProductDetail, { params: { id: productId } });
+  const { listHref, keepList } = useListReturn('/admin/catalog/products');
   const skus = product.data?.skus ?? [];
 
   const voidCards = useRouteMutation(catalogAdminVirtualCardVoid, {
@@ -47,10 +50,10 @@ export function VirtualCardsPage({ productId }: { productId: string }) {
     <PageContainer
       title={product.data ? `卡密库存：${product.data.name}` : '卡密库存'}
       subTitle="导入的卡密数量就是该规格的库存；已发放的卡密不能作废"
-      breadcrumb={[{ label: '商品', href: '/admin/catalog/products' }, { label: '卡密库存' }]}
+      breadcrumb={[{ label: '商品', href: listHref }, { label: '卡密库存' }]}
       extra={
         <Space>
-          <Link href={`/admin/catalog/products/${productId}`}>
+          <Link href={keepList(`/admin/catalog/products/${productId}`)}>
             <Button>编辑商品</Button>
           </Link>
           <Can permission="catalog:card:write">
@@ -91,36 +94,50 @@ export function VirtualCardsPage({ productId }: { productId: string }) {
             options: options(VIRTUAL_CARD_STATE),
           },
         ]}
-        batchActions={({ selectedRows, clear }) => (
-          <Can permission="catalog:card:write">
-            <Button
-              size="small"
-              danger
-              loading={voidCards.isPending}
-              onClick={() => {
-                const voidable = selectedRows.filter((row) => row.state === 'unclaimed');
-                if (voidable.length === 0) {
-                  void message.warning('只有未发放的卡密可以作废');
-                  return;
+        batchActions={({ selectedRows, clear }) => {
+          const voidable = selectedRows.filter((row) => row.state === 'unclaimed');
+          return (
+            <Can permission="catalog:card:write">
+              <ConfirmAction
+                size="small"
+                danger
+                loading={voidCards.isPending}
+                // Nothing to void is said at once; voiding asks first — it cannot be undone.
+                confirm={
+                  voidable.length > 0
+                    ? {
+                        title: `作废选中的 ${voidable.length} 条未发放卡密？`,
+                        description: '作废后不能恢复，库存相应减少。',
+                        okText: '作废',
+                      }
+                    : undefined
                 }
-                voidCards.mutate(
-                  {
-                    params: { id: productId },
-                    body: { cardIds: voidable.map((row) => row.id) },
-                  },
-                  {
-                    onSuccess: (result) => {
-                      void message.success(`已作废 ${result.voided} 条，剩余库存 ${result.stock}`);
-                      clear();
+                onAction={() => {
+                  if (voidable.length === 0) {
+                    void message.warning('只有未发放的卡密可以作废');
+                    return;
+                  }
+                  voidCards.mutate(
+                    {
+                      params: { id: productId },
+                      body: { cardIds: voidable.map((row) => row.id) },
                     },
-                  },
-                );
-              }}
-            >
-              批量作废
-            </Button>
-          </Can>
-        )}
+                    {
+                      onSuccess: (result) => {
+                        void message.success(
+                          `已作废 ${result.voided} 条，剩余库存 ${result.stock}`,
+                        );
+                        clear();
+                      },
+                    },
+                  );
+                }}
+              >
+                批量作废
+              </ConfirmAction>
+            </Can>
+          );
+        }}
         columns={[
           idColumn<ProductVirtualCard>(),
           textColumn<ProductVirtualCard>({

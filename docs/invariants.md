@@ -818,6 +818,31 @@ The mini-program replays a request that met a 401 only as the account that sent 
 - `apps/mini/src/pages/login/index.test.tsx::AUTH-010 — the notice of a renewal that reached another account > says why the shopper is here in place of the hint, and drops it on leaving`
 - `e2e/storefront/specs-mini/login.spec.ts::AUTH-010: a write that meets an ended password session is not replayed as the account this phone's WeChat belongs to, and the shopper is back at the login page`
 
+### AUTH-011
+
+An admin session ends after eight idle hours, or seven idle days when 「记住登录状态」 was ticked; every request slides it, and a remembered session's cookie slides with it (a plain one is a browser-session cookie). The revoke index outlives the longest session. A session that ran out sends the admin to the login page with 「登录已过期，请重新登录」.
+
+- `packages/core/src/auth/admin-session.store.test.ts::admin session lifetimes > AUTH-011: a remembered session lives and slides seven days, a plain one eight hours`
+- `packages/core/src/auth/admin-session.store.test.ts::admin session lifetimes > AUTH-011: the revoke index outlives a remembered session whichever session slid it last`
+- `packages/core/src/auth/auth.int.test.ts::admin sessions > AUTH-011: 记住登录状态 keeps the session seven idle days, otherwise eight hours`
+- `apps/web/src/server/handle.test.ts::authentication > AUTH-011 — slides the cookie of a remembered session with it, and leaves a browser-session one alone`
+- `apps/web/app/admin/login/login-form.test.tsx::admin login > AUTH-011: sends 记住登录状态 with the credentials`
+- `apps/web/app/admin/login/login-form.test.tsx::admin login > AUTH-011 — says 登录已过期 when a session ran out, and nothing when there was none`
+
+### AUTH-012
+
+An API token (MCP, the `shop` CLI) cannot manage admins, roles or tokens, nor save the payment settings: those routes are `consoleOnly`, `handle()` answers a token `AUTH_TOKEN_CONSOLE_ONLY` before the handler runs, and the agent catalogue does not list them. Reading them stays open to a token with the atom.
+
+- `apps/web/src/server/handle.test.ts::authentication > AUTH-012 — refuses an API token on a console-only route, and serves it on the others`
+- `packages/admin-ops/src/admin-ops.test.ts::the operation catalogue > AUTH-012 — leaves out every console-only route: admins, roles and tokens are not an agent’s to manage`
+- `apps/web/src/server/api-token.int.test.ts::a personal API token > AUTH-012 — cannot create a role or an admin, nor save the payment settings`
+
+### AUTH-013
+
+Every export an admin takes — orders, products, 交易统计, 商品统计 — writes an operation-log row naming who took it and with which filters, although it is a GET: a handler that calls `ctx.audit` on a read asks `handle()` for the row. Other reads write none.
+
+- `apps/web/src/server/handle.test.ts::audit log > AUTH-013: records a GET the handler named with ctx.audit (an export), with its filters`
+
 ## Fulfilment, the order console and invoices
 
 ### FULFILL-001

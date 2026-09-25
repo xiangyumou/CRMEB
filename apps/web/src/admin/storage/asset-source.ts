@@ -24,6 +24,13 @@ import { uploadFile } from './upload';
  */
 export function createStorageAssetSource(): AssetSource {
   return {
+    // Read off the routes, so a contract that changes its atom changes this.
+    permissions: {
+      list: storageAttachmentList.permission,
+      upload: storageAttachmentUpload.permission,
+      categories: storageCategoryTree.permission,
+    },
+
     async listCategories(): Promise<AssetCategory[]> {
       const { items } = await callRoute(storageCategoryTree);
       return nestCategories(items);

@@ -393,7 +393,7 @@ export const orderStatsExample: OrderStats = {
 };
 
 export const statsExportExample: StatsExportResult = {
-  filename: 'trade-20260201-20260203.csv',
+  filename: '交易统计-2026-02-01至2026-02-03.csv',
   contentType: 'text/csv',
   rowCount: 3,
   truncated: false,

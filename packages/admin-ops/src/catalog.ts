@@ -15,15 +15,13 @@ import { allRoutes } from '@shop/contracts/routes';
 /**
  * Routes that are not operations for an agent:
  * - signing in and out is what the token replaces;
- * - tokens are console-only (the server refuses them anyway);
  * - changing one's own password would kill the very token making the call.
+ * Every route marked `consoleOnly` (admins, roles, tokens) is left out too —
+ * the server refuses a token on them anyway.
  */
 const EXCLUDED = new Set([
   'auth.adminLogin',
   'auth.adminLogout',
-  'auth.apiTokenList',
-  'auth.apiTokenCreate',
-  'auth.apiTokenRevoke',
   'system.profileChangePassword',
   'health.admin',
 ]);
@@ -98,7 +96,10 @@ function toOperation(route: AnyRouteDef): Operation {
 
 const adminRoutes: readonly AnyRouteDef[] = allRoutes.filter(
   (route) =>
-    route.path.startsWith('/admin-api/') && route.auth === 'admin' && !EXCLUDED.has(route.id),
+    route.path.startsWith('/admin-api/') &&
+    route.auth === 'admin' &&
+    !EXCLUDED.has(route.id) &&
+    route.consoleOnly !== true,
 );
 const byId = new Map(adminRoutes.map((route) => [route.id, route]));
 

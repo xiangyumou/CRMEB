@@ -19,6 +19,7 @@ import {
 } from '@shop/contracts/system/schemas';
 
 import { useRouteMutation, useRouteQuery } from '@/admin/api/hooks';
+import { ConfirmAction } from '@/admin/kit/confirm-action';
 import { ConfirmButton } from '@/admin/kit/confirm-button';
 import { ModalForm, useFormModal } from '@/admin/kit/form/modal-form';
 import type { FieldSpec } from '@/admin/kit/form/types';
@@ -27,6 +28,7 @@ import { StatusTag } from '@/admin/kit/status-tag';
 import { actionsColumn, idColumn, instantColumn, textColumn } from '@/admin/kit/table/columns';
 import { CrudTable } from '@/admin/kit/table/crud-table';
 import { Can } from '@/admin/session/can';
+import { useCan } from '@/admin/session/session-provider';
 
 const ENABLED = {
   true: { label: '启用', color: 'success' },
@@ -46,7 +48,14 @@ export function AdminsPage() {
   const modal = useFormModal<AdminListItem>();
   const [resetting, setResetting] = useState<AdminListItem | null>(null);
 
-  const roles = useRouteQuery(systemRoleList, { query: { page: 1, pageSize: 100 } });
+  // A role that may manage admins but not read roles gets no options rather
+  // than a 403 toast on every visit.
+  const mayReadRoles = useCan()('system:role:read');
+  const roles = useRouteQuery(
+    systemRoleList,
+    { query: { page: 1, pageSize: 100 } },
+    { enabled: mayReadRoles },
+  );
   const roleOptions = (roles.data?.items ?? []).map((role) => ({
     value: role.id,
     label: role.name,
@@ -86,7 +95,10 @@ export function AdminsPage() {
       label: '身份',
       mode: 'multiple',
       options: roleOptions,
-      help: '超级管理员不受身份限制，拥有全部权限',
+      help: mayReadRoles
+        ? '超级管理员不受身份限制，拥有全部权限'
+        : '没有查看身份的权限，无法选择身份',
+      disabled: !mayReadRoles,
       span: 24,
     },
     { kind: 'switch', name: 'enabled', label: '状态', checkedText: '启用', uncheckedText: '停用' },
@@ -108,7 +120,9 @@ export function AdminsPage() {
               { value: 'false', label: '停用' },
             ],
           },
-          { kind: 'select', name: 'roleId', label: '身份', options: roleOptions },
+          ...(mayReadRoles
+            ? [{ kind: 'select' as const, name: 'roleId', label: '身份', options: roleOptions }]
+            : []),
         ]}
         toolbar={
           <Can permission="system:admin:write">
@@ -152,11 +166,20 @@ export function AdminsPage() {
                   <Button type="link" size="small" onClick={() => modal.show(row)}>
                     编辑
                   </Button>
-                  <Button
+                  <ConfirmAction
                     type="link"
                     size="small"
-                    loading={setStatus.isPending}
-                    onClick={() =>
+                    loading={setStatus.isPending && setStatus.variables?.params?.id === row.id}
+                    confirm={
+                      row.enabled
+                        ? {
+                            title: `停用管理员「${row.account}」？`,
+                            description: '该账号的所有登录会话会立刻失效。',
+                            okText: '停用',
+                          }
+                        : undefined
+                    }
+                    onAction={() =>
                       setStatus.mutate({
                         params: { id: row.id },
                         body: { enabled: !row.enabled },
@@ -164,7 +187,7 @@ export function AdminsPage() {
                     }
                   >
                     {row.enabled ? '停用' : '启用'}
-                  </Button>
+                  </ConfirmAction>
                   <Button type="link" size="small" onClick={() => setResetting(row)}>
                     重置密码
                   </Button>
@@ -172,7 +195,7 @@ export function AdminsPage() {
                 <ConfirmButton
                   route={systemAdminDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该管理员？"
+                  title={`删除管理员「${row.account}」？`}
                   description="该账号的登录会话会立刻失效；操作日志仍会保留。"
                   invalidate={[systemAdminList]}
                   successMessage="已删除"

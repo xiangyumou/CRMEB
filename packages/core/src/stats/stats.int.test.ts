@@ -642,7 +642,7 @@ describe('exports', () => {
   it('writes the trade window as one CSV row per bucket', async () => {
     const file = await stats.tradeExport(harness.ctx, WINDOW);
 
-    expect(file.filename).toBe('trade-20260201-20260203.csv');
+    expect(file.filename).toBe('交易统计-2026-02-01至2026-02-03.csv');
     expect(file.contentType).toBe('text/csv');
     expect(file.rowCount).toBe(3);
     expect(file.truncated).toBe(false);
@@ -686,7 +686,7 @@ describe('exports', () => {
       limit: 1,
     });
 
-    expect(file.filename).toBe('products-20260201-20260203.csv');
+    expect(file.filename).toBe('商品统计-2026-02-01至2026-02-03.csv');
     // `limit: 1` sizes the table on screen; the file has both products.
     expect(file.rowCount).toBe(2);
     expect(file.truncated).toBe(false);

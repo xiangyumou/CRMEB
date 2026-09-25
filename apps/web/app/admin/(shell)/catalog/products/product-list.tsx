@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import {
   catalogAdminProductDelete,
+  catalogAdminProductDetail,
   catalogAdminProductExport,
   catalogAdminProductList,
   catalogAdminProductRestore,
@@ -17,14 +18,18 @@ import type {
 } from '@shop/contracts/catalog/schemas';
 
 import { useRouteMutation } from '@/admin/api/hooks';
+import { ConfirmAction } from '@/admin/kit/confirm-action';
 import { ConfirmButton } from '@/admin/kit/confirm-button';
 import { TreeSelectField } from '@/admin/kit/form/select-fields';
 import { PageContainer } from '@/admin/kit/page-container';
 import { StatusTag } from '@/admin/kit/status-tag';
 import { idColumn, imageColumn, instantColumn, moneyColumn } from '@/admin/kit/table/columns';
 import { CrudTable } from '@/admin/kit/table/crud-table';
+import type { FilterSpec } from '@/admin/kit/table/filter-bar';
+import { useDetailHref } from '@/admin/kit/table/list-return';
 import { useNextUrlState } from '@/admin/kit/table/url-state';
 import { Can } from '@/admin/session/can';
+import { useCan } from '@/admin/session/session-provider';
 
 import {
   CATEGORY_TREE_CACHE_KEY,
@@ -63,6 +68,29 @@ function isTab(value: string | undefined): value is AdminProductTab {
  */
 export function ProductListPage() {
   const urlState = useNextUrlState();
+  // 编辑 and 卡密 come back to this tab, these filters and this page.
+  const detailHref = useDetailHref();
+  // The 分类 filter loads the category tree: only for a role that may read it.
+  const mayReadCategories = useCan()('catalog:category:read');
+  const categoryFilter: FilterSpec[] = mayReadCategories
+    ? [
+        {
+          kind: 'custom',
+          name: 'categoryId',
+          label: '商品分类',
+          width: 220,
+          render: (value, onChange) => (
+            <TreeSelectField
+              value={value}
+              onChange={(next) => onChange(typeof next === 'string' ? next : undefined)}
+              loadOptions={loadCategoryTreeOptions}
+              cacheKey={CATEGORY_TREE_CACHE_KEY}
+              placeholder="全部分类"
+            />
+          ),
+        },
+      ]
+    : [];
   const initial = urlState.read('tab');
   const [tab, setTab] = useState<AdminProductTab>(isTab(initial) ? initial : 'all');
 
@@ -73,12 +101,12 @@ export function ProductListPage() {
   };
 
   const setStatus = useRouteMutation(catalogAdminProductSetStatus, {
-    invalidate: [catalogAdminProductList],
+    invalidate: [catalogAdminProductList, catalogAdminProductDetail],
     successMessage: '已更新上架状态',
   });
 
   const restore = useRouteMutation(catalogAdminProductRestore, {
-    invalidate: [catalogAdminProductList],
+    invalidate: [catalogAdminProductList, catalogAdminProductDetail],
     successMessage: '已恢复，商品处于下架状态',
   });
 
@@ -101,30 +129,16 @@ export function ProductListPage() {
         fixedQuery={{ tab }}
         filters={[
           { kind: 'text', name: 'keyword', label: '商品名称' },
-          {
-            kind: 'custom',
-            name: 'categoryId',
-            label: '商品分类',
-            width: 220,
-            render: (value, onChange) => (
-              <TreeSelectField
-                value={value}
-                onChange={(next) => onChange(typeof next === 'string' ? next : undefined)}
-                loadOptions={loadCategoryTreeOptions}
-                cacheKey={CATEGORY_TREE_CACHE_KEY}
-                placeholder="全部分类"
-              />
-            ),
-          },
+          ...categoryFilter,
           { kind: 'select', name: 'kind', label: '商品类型', options: options(PRODUCT_KIND) },
           { kind: 'text', name: 'labelId', label: '标签 ID' },
-          { kind: 'number', name: 'priceFrom', label: '价格从', min: 0, width: 120 },
-          { kind: 'number', name: 'priceTo', label: '价格到', min: 0, width: 120 },
+          { kind: 'money', name: 'priceFrom', label: '价格从', width: 120 },
+          { kind: 'money', name: 'priceTo', label: '价格到', width: 120 },
         ]}
         toolbar={
           <>
             <Can permission="catalog:product:write">
-              <Link href="/admin/catalog/products/new">
+              <Link href={detailHref('/admin/catalog/products/new')}>
                 <Button type="primary">新建商品</Button>
               </Link>
             </Can>
@@ -139,7 +153,7 @@ export function ProductListPage() {
             key: 'name',
             render: (_value: unknown, row: AdminProductListItem) => (
               <Space direction="vertical" size={0} style={{ maxWidth: 320 }}>
-                <Link href={`/admin/catalog/products/${row.id}`}>
+                <Link href={detailHref(`/admin/catalog/products/${row.id}`)}>
                   <Typography.Text ellipsis={{ tooltip: row.name }}>{row.name}</Typography.Text>
                 </Link>
                 {row.subtitle ? (
@@ -248,16 +262,25 @@ export function ProductListPage() {
               ) : (
                 <Space size={4} wrap>
                   <Can permission="catalog:product:write">
-                    <Link href={`/admin/catalog/products/${row.id}`}>
+                    <Link href={detailHref(`/admin/catalog/products/${row.id}`)}>
                       <Button type="link" size="small">
                         编辑
                       </Button>
                     </Link>
-                    <Button
+                    <ConfirmAction
                       type="link"
                       size="small"
-                      loading={setStatus.isPending}
-                      onClick={() =>
+                      loading={setStatus.isPending && setStatus.variables?.params?.id === row.id}
+                      confirm={
+                        row.status === 'on_shelf'
+                          ? {
+                              title: `下架「${row.name}」？`,
+                              description: '前台立即看不到该商品，已加入购物车的也无法结算。',
+                              okText: '下架',
+                            }
+                          : undefined
+                      }
+                      onAction={() =>
                         setStatus.mutate({
                           params: { id: row.id },
                           body: { status: row.status === 'on_shelf' ? 'off_shelf' : 'on_shelf' },
@@ -265,11 +288,11 @@ export function ProductListPage() {
                       }
                     >
                       {row.status === 'on_shelf' ? '下架' : '上架'}
-                    </Button>
+                    </ConfirmAction>
                   </Can>
                   {row.kind === 'virtual_card' ? (
                     <Can permission="catalog:card:read">
-                      <Link href={`/admin/catalog/products/${row.id}/cards`}>
+                      <Link href={detailHref(`/admin/catalog/products/${row.id}/cards`)}>
                         <Button type="link" size="small">
                           卡密
                         </Button>
@@ -279,7 +302,7 @@ export function ProductListPage() {
                   <ConfirmButton
                     route={catalogAdminProductDelete}
                     input={{ params: { id: row.id } }}
-                    title="确认将该商品移入回收站？"
+                    title={`将「${row.name}」移入回收站？`}
                     description="前台立即下架；有未完成订单时会被拒绝。"
                     invalidate={[catalogAdminProductList]}
                     successMessage="已移入回收站"

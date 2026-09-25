@@ -9,6 +9,25 @@ import {
   silentLogger,
 } from '@shop/core/kernel';
 import { resetUserLookup } from '@shop/core/auth';
+
+// One live API token, acting as a super admin; every other bearer is unknown.
+vi.mock('@shop/core/auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@shop/core/auth')>();
+  return {
+    ...actual,
+    resolveApiToken: async (_deps: unknown, token: string) =>
+      token === 'shp_live-test-token'
+        ? {
+            tokenId: 9,
+            tokenName: '助手',
+            adminId: 1,
+            account: 'admin',
+            isSuper: true,
+            permissions: [],
+          }
+        : null,
+  };
+});
 import { toApiError } from '../admin/api/errors';
 import { ADMIN_COOKIE, checkCsrf, handle, readCookie, searchParamsToObject } from './handle';
 import type { Container } from './container';
@@ -46,6 +65,8 @@ interface FakeSession {
   passwordVersion: number;
   createdAt: number;
   sessionId: string;
+  ttlMs: number;
+  remember?: boolean;
 }
 
 let adminSessions: Map<string, FakeSession>;
@@ -189,6 +210,7 @@ const superSession: FakeSession = {
   passwordVersion: 1,
   createdAt: 0,
   sessionId: 'sess-1',
+  ttlMs: 8 * 60 * 60 * 1000,
 };
 
 const limitedSession: FakeSession = {
@@ -338,6 +360,90 @@ describe('authentication', () => {
     );
     expect(response.status).toBe(401);
     expect((await body(response)).code).toBe('AUTH_SESSION_EXPIRED');
+  });
+
+  it('AUTH-011 — slides the cookie of a remembered session with it, and leaves a browser-session one alone', async () => {
+    adminSessions.set('remembered', {
+      ...superSession,
+      remember: true,
+      ttlMs: 7 * 24 * 60 * 60 * 1000,
+    });
+    const GET = handle(adminRoute, async () => ({ ok: true }), { container: container() });
+
+    const remembered = await GET(
+      new Request('https://shop.example/admin-api/things', {
+        headers: { cookie: `${ADMIN_COOKIE}=remembered` },
+      }),
+    );
+    const cookie = remembered.headers.get('set-cookie') ?? '';
+    expect(cookie).toContain(`${ADMIN_COOKIE}=remembered`);
+    // Seven days of idle life plus a day in which an expired one still says 登录已过期.
+    expect(cookie).toContain(`Max-Age=${8 * 24 * 60 * 60}`);
+    expect(cookie).toContain('HttpOnly');
+
+    const plain = await GET(
+      new Request('https://shop.example/admin-api/things', {
+        headers: { cookie: `${ADMIN_COOKIE}=good-super` },
+      }),
+    );
+    expect(plain.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('does not re-issue a remembered cookie over the one the route clears (logout)', async () => {
+    adminSessions.set('remembered', { ...superSession, remember: true, ttlMs: 1000 });
+    const GET = handle(
+      adminRoute,
+      async (ctx) => {
+        ctx.clearCookie(ADMIN_COOKIE);
+        return { ok: true };
+      },
+      { container: container() },
+    );
+    const response = await GET(
+      new Request('https://shop.example/admin-api/things', {
+        headers: { cookie: `${ADMIN_COOKIE}=remembered` },
+      }),
+    );
+    const cookie = response.headers.get('set-cookie') ?? '';
+    expect(cookie).toContain('Max-Age=0');
+    expect(cookie).not.toContain(`${ADMIN_COOKIE}=remembered`);
+  });
+
+  it('AUTH-012 — refuses an API token on a console-only route, and serves it on the others', async () => {
+    const consoleOnlyRoute = defineRoute({
+      id: 'test.consoleOnly',
+      method: 'POST',
+      path: '/admin-api/things/grant',
+      auth: 'admin',
+      permission: 'catalog:product:read',
+      consoleOnly: true,
+      summary: 'console only',
+      tags: ['test'],
+      response: z.object({ ok: z.boolean() }),
+      examples: [{ name: 'ok', response: { ok: true } }],
+    });
+    expect(consoleOnlyRoute.errors).toContain('AUTH_TOKEN_CONSOLE_ONLY');
+    let ran = false;
+    const POST = handle(
+      consoleOnlyRoute,
+      async () => {
+        ran = true;
+        return { ok: true };
+      },
+      { container: container() },
+    );
+    const withToken = { headers: { authorization: 'Bearer shp_live-test-token' } };
+
+    const refused = await POST(
+      new Request('https://shop.example/admin-api/things/grant', { method: 'POST', ...withToken }),
+    );
+    expect(refused.status).toBe(403);
+    expect((await body(refused)).code).toBe('AUTH_TOKEN_CONSOLE_ONLY');
+    expect(ran).toBe(false);
+
+    const GET = handle(adminRoute, async () => ({ ok: true }), { container: container() });
+    const served = await GET(new Request('https://shop.example/admin-api/things', withToken));
+    expect(served.status).toBe(200);
   });
 
   it('builds an admin actor from the session', async () => {
@@ -801,6 +907,44 @@ describe('audit log', () => {
       }),
     );
     expect(audits).toHaveLength(0);
+  });
+
+  it('AUTH-013: records a GET the handler named with ctx.audit (an export), with its filters', async () => {
+    const exportRoute = defineRoute({
+      id: 'test.adminExport',
+      method: 'GET',
+      path: '/admin-api/things/exports',
+      auth: 'admin',
+      permission: 'catalog:product:read',
+      summary: 'admin export',
+      tags: ['test'],
+      query: z.object({ status: z.string().optional() }),
+      response: z.object({ ok: z.boolean() }),
+      examples: [{ name: 'ok', query: {}, response: { ok: true } }],
+    });
+    const GET = handle(
+      exportRoute,
+      async (ctx) => {
+        ctx.audit('thing-export:3');
+        return { ok: true };
+      },
+      { container: container() },
+    );
+    const response = await GET(
+      new Request('https://shop.example/admin-api/things/exports?status=paid', {
+        headers: { cookie: `${ADMIN_COOKIE}=good-super` },
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      routeId: 'test.adminExport',
+      method: 'GET',
+      target: 'thing-export:3',
+    });
+    expect(JSON.parse(String((audits[0] as { payload: unknown }).payload))).toEqual({
+      status: 'paid',
+    });
   });
 
   it('never fails the request when the audit write fails', async () => {

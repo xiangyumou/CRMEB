@@ -30,6 +30,7 @@ import { useCan } from '@/admin/session/session-provider';
 import type { FieldSpec, SelectOption } from '@/admin/kit/form/types';
 import { ZodForm } from '@/admin/kit/form/zod-form';
 import { PageContainer } from '@/admin/kit/page-container';
+import { useListReturn } from '@/admin/kit/table/list-return';
 
 import {
   CATEGORY_TREE_CACHE_KEY,
@@ -59,32 +60,40 @@ import { ParamEditor, SkuMatrixEditor, SpecEditor, blankSku } from './product-sk
  */
 export function ProductEditorPage({ productId }: { productId?: string | undefined }) {
   const router = useRouter();
+  const { listHref, keepList } = useListReturn('/admin/catalog/products');
   const [form] = Form.useForm();
   // A role that may only look at products sees the form read-only, with no 保存
   // to press into a 403 — and without the option lists it has no right to.
-  const mayWrite = useCan()('catalog:product:write');
+  const can = useCan();
+  const mayWrite = can('catalog:product:write');
+  // The server blanks 成本价 for a role that may neither edit nor export; an
+  // empty box would read as "no cost recorded", so the column goes instead.
+  const showCost = mayWrite || can('catalog:product:export');
 
+  // Always a fresh read: the form takes its values once, at mount, and a
+  // cached detail from before a 下架 in the list would put the product back on
+  // the shelf on the next 保存.
   const detail = useRouteQuery(
     catalogAdminProductDetail,
     { params: { id: productId ?? '' } },
-    { enabled: productId !== undefined },
+    { enabled: productId !== undefined, refetchOnMount: 'always' },
   );
 
-  // The three taxonomies the form offers as options. 200 is every label any
-  // shop has; these are pickers, not searches.
+  // The three taxonomies the form offers as options: the first 100 enabled,
+  // which is the list cap and more than any shop has.
   const labels = useRouteQuery(
     catalogAdminLabelList,
-    { query: { page: 1, pageSize: 200, isEnabled: 'true' } },
+    { query: { page: 1, pageSize: 100, isEnabled: 'true' } },
     { enabled: mayWrite },
   );
   const protections = useRouteQuery(
     catalogAdminProtectionList,
-    { query: { page: 1, pageSize: 200, isEnabled: 'true' } },
+    { query: { page: 1, pageSize: 100, isEnabled: 'true' } },
     { enabled: mayWrite },
   );
   const paramTemplates = useRouteQuery(
     catalogAdminParamTemplateList,
-    { query: { page: 1, pageSize: 200, isEnabled: 'true' } },
+    { query: { page: 1, pageSize: 100, isEnabled: 'true' } },
     { enabled: mayWrite },
   );
   // The shipping options route: id, name and 计费方式, every template, no paging.
@@ -94,7 +103,7 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
     presentError: false,
     invalidate: [catalogAdminProductList],
     successMessage: '已创建',
-    onSuccess: (data) => router.replace(`/admin/catalog/products/${data.id}`),
+    onSuccess: (data) => router.replace(keepList(`/admin/catalog/products/${data.id}`)),
   });
   const update = useRouteMutation(catalogAdminProductUpdate, {
     presentError: false,
@@ -174,13 +183,23 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
         specs,
         specMode,
         kind,
+        showCost,
       }),
     // `labelOptions`/`protectionOptions` are rebuilt every render; their data is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [labels.data, protections.data, shippingTemplates.data, templates, specs, specMode, kind],
+    [
+      labels.data,
+      protections.data,
+      shippingTemplates.data,
+      templates,
+      specs,
+      specMode,
+      kind,
+      showCost,
+    ],
   );
 
-  if (productId !== undefined && detail.isPending) {
+  if (productId !== undefined && (detail.isPending || !detail.isFetchedAfterMount)) {
     return (
       <PageContainer title="编辑商品">
         <Skeleton active paragraph={{ rows: 8 }} />
@@ -202,13 +221,10 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
     <PageContainer
       title={record ? `编辑商品：${record.name}` : '新建商品'}
       subTitle="规格一旦有销量就不要删；改名和改价不会影响已下单的订单"
-      breadcrumb={[
-        { label: '商品', href: '/admin/catalog/products' },
-        { label: record ? '编辑商品' : '新建商品' },
-      ]}
+      breadcrumb={[{ label: '商品', href: listHref }, { label: record ? '编辑商品' : '新建商品' }]}
       extra={
         <Space>
-          <Button onClick={() => router.push('/admin/catalog/products')}>返回列表</Button>
+          <Button onClick={() => router.push(listHref)}>返回列表</Button>
           {mayWrite ? (
             <Button type="primary" loading={saving} onClick={() => form.submit()}>
               保存
@@ -280,6 +296,7 @@ function buildFields({
   specs,
   specMode,
   kind,
+  showCost,
 }: {
   labelOptions: SelectOption[];
   protectionOptions: SelectOption[];
@@ -288,6 +305,7 @@ function buildFields({
   specs: readonly ProductSpecInput[];
   specMode: boolean;
   kind: ProductKind;
+  showCost: boolean;
 }): FieldSpec<Extract<keyof AdminProductForm, string>>[] {
   return [
     { kind: 'text', name: 'name', label: '商品名称', span: 12, maxLength: 128 },
@@ -421,6 +439,7 @@ function buildFields({
           specs={specs}
           specMode={specMode}
           kind={kind}
+          showCost={showCost}
           disabled={disabled}
         />
       ),

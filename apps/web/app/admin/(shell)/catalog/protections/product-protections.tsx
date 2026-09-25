@@ -118,7 +118,7 @@ export function ProductProtectionsPage() {
                 <ConfirmButton
                   route={catalogAdminProtectionDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该保障服务？"
+                  title={`删除保障服务「${row.title}」？`}
                   description="仍有商品在用时会被拒绝，先解除绑定。"
                   invalidate={[catalogAdminProtectionList]}
                   successMessage="已删除"

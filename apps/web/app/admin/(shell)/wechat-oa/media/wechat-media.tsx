@@ -10,6 +10,7 @@ import {
 import { wechatMediaUploadBody, type WechatMedium } from '@shop/contracts/wechat-oa/schemas';
 
 import { ConfirmButton } from '@/admin/kit/confirm-button';
+import { formatInstant } from '@/admin/kit/instant';
 import { ModalForm, useFormModal } from '@/admin/kit/form/modal-form';
 import { PageContainer } from '@/admin/kit/page-container';
 import { statusOptions } from '@/admin/kit/status-tag';
@@ -90,7 +91,7 @@ export function WechatMediaPage() {
                 <Tag color="success">永久</Tag>
               ) : (
                 <Typography.Text type="secondary">
-                  临时{row.expiresAt ? `，至 ${row.expiresAt.slice(0, 10)}` : ''}
+                  临时{row.expiresAt ? `，至 ${formatInstant(row.expiresAt, 'date')}` : ''}
                 </Typography.Text>
               ),
           },

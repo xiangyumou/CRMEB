@@ -1,5 +1,8 @@
 'use client';
 
+// Side-effect import: the contract's messages in plain Chinese on the client
+// too (请填写此项, 最多 20 个字), not zod's English or its type-speak.
+import '@shop/contracts/locale';
 import { Button, Col, Form, Row, Space, type FormInstance } from 'antd';
 import { useMemo, useState, type ReactNode } from 'react';
 import type { z } from 'zod';
@@ -8,7 +11,7 @@ import { ApiError } from '../../api/errors';
 import { renderControl, valuePropNameOf } from './field-control';
 import { FormErrorBanner, useFieldErrors } from './form-errors';
 import { toNamePath, type FieldSpec } from './types';
-import { applyZodIssues, isFieldRequired, zodFieldRule } from './zod-bridge';
+import { applyZodIssues, isFieldRequired, normaliseFormValues, zodFieldRule } from './zod-bridge';
 import { defined } from '../props';
 
 type AnyObjectSchema = z.ZodObject<z.ZodRawShape>;
@@ -118,7 +121,8 @@ export function ZodForm<S extends AnyObjectSchema>({
   }, [error, serverMatch, clientUnmatched]);
 
   async function handleFinish(raw: unknown): Promise<void> {
-    const result = schema.safeParse(raw);
+    // Cleared fields become "nothing" the contract accepts, text is trimmed.
+    const result = schema.safeParse(normaliseFormValues(schema, raw, visibleFields));
     if (!result.success) {
       setClientUnmatched(applyZodIssues(form, result.error, errorFieldNames).unmatched);
       return;
@@ -151,7 +155,7 @@ export function ZodForm<S extends AnyObjectSchema>({
             );
           }
 
-          const rule = zodFieldRule(schema, spec.name);
+          const rule = zodFieldRule(schema, spec.name, spec);
           const valuePropName = valuePropNameOf(spec);
           const span = spec.span ?? defaultSpan;
 

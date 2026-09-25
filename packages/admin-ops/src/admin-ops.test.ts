@@ -26,9 +26,25 @@ describe('the operation catalogue', () => {
     expect([...ids].every((id) => !id.startsWith('health.'))).toBe(true);
   });
 
+  it('AUTH-012 — leaves out every console-only route: admins, roles and tokens are not an agent’s to manage', () => {
+    const ids = new Set(listOperations().map((op) => op.id));
+    const consoleOnly = allRoutes.filter((r) => r.consoleOnly === true).map((r) => r.id);
+    expect(consoleOnly).toEqual(
+      expect.arrayContaining([
+        'system.adminCreate',
+        'system.adminResetPassword',
+        'system.roleUpdate',
+        'auth.apiTokenCreate',
+      ]),
+    );
+    for (const id of consoleOnly) expect(ids.has(id)).toBe(false);
+    // Reading them stays an operation.
+    expect(ids.has('system.adminList')).toBe(true);
+  });
+
   it.each([
     ['加个商品', 'catalog.adminProductCreate'],
-    ['新建管理员', 'system.adminCreate'],
+    ['管理员列表', 'system.adminList'],
     ['改备案号', 'system.configSave'],
     ['保存草稿', 'decor.adminDraftSave'],
     ['从网址导入图片', 'storage.attachmentImport'],

@@ -2,8 +2,9 @@ import { fireEvent, renderHook, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createStubAssetSource } from '@/test/asset-source';
-import { renderAdmin } from '@/test/render';
+import { renderAdmin, testIdentity } from '@/test/render';
 
+import { AssetField } from '../form/asset-field';
 import { AssetPicker, selectRange } from './asset-picker';
 import { AssetSourceProvider, useAssetSource } from './asset-source-context';
 import type { AssetItem, AssetSource } from './types';
@@ -56,6 +57,47 @@ describe('AssetPicker', () => {
       '3',
       '2',
     ]);
+  });
+});
+
+describe('an admin without the whole material library', () => {
+  const permissioned = (): AssetSource => {
+    const stub = createStubAssetSource(3);
+    return {
+      ...stub,
+      permissions: {
+        list: 'storage:attachment:read',
+        upload: 'storage:attachment:write',
+        categories: 'storage:category:read',
+      },
+      listCategories: vi.fn(stub.listCategories),
+    };
+  };
+
+  it('browses without folders or upload when it may only read files', async () => {
+    const source = permissioned();
+    renderAdmin(
+      <AssetSourceProvider source={source}>
+        <AssetPicker open onClose={() => {}} onSelect={() => {}} />
+      </AssetSourceProvider>,
+      { identity: { ...testIdentity, permissions: ['storage:attachment:read'] } },
+    );
+
+    expect(await screen.findByAltText('示例素材-1.png')).toBeInTheDocument();
+    expect(source.listCategories).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /上\s*传/ })).toBeNull();
+  });
+
+  it('says there is no library instead of opening a picker of 403s (个人资料 头像)', () => {
+    renderAdmin(
+      <AssetSourceProvider source={permissioned()}>
+        <AssetField />
+      </AssetSourceProvider>,
+      { identity: { ...testIdentity, permissions: [] } },
+    );
+
+    expect(screen.getByTestId('asset-field-no-access')).toHaveTextContent('没有素材库权限');
+    expect(screen.queryByTestId('asset-field-add')).toBeNull();
   });
 });
 

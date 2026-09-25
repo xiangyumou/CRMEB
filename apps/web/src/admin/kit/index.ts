@@ -1,4 +1,6 @@
 // ── Display primitives ──────────────────────────────────────────────────────
+export { ConfirmAction } from './confirm-action';
+export type { ConfirmActionProps } from './confirm-action';
 export { ConfirmButton } from './confirm-button';
 export type { ConfirmButtonProps } from './confirm-button';
 export { DescriptionsCard } from './descriptions-card';
@@ -41,6 +43,7 @@ export {
 export { FilterBar, filterKeys } from './table/filter-bar';
 export type { FilterBarProps, FilterSpec } from './table/filter-bar';
 export { prefixKey, useMemoryUrlState, useNextUrlState } from './table/url-state';
+export { listReturnHref, useDetailHref, useListReturn, withListReturn } from './table/list-return';
 export type { MemoryUrlState, TableUrlState } from './table/url-state';
 
 // ── Forms ───────────────────────────────────────────────────────────────────
@@ -80,10 +83,12 @@ export type { FieldBase, FieldName, FieldSpec, SelectOption } from './form/types
 export {
   applyFieldErrors,
   applyZodIssues,
+  emptyValueFor,
   fieldSchemaOf,
   isFieldRequired,
   matchApiError,
   matchFieldErrors,
+  normaliseFormValues,
   zodFieldRule,
 } from './form/zod-bridge';
 export type { FieldErrorMatch } from './form/zod-bridge';

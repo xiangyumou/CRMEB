@@ -132,7 +132,7 @@ export const statsProductExport = defineRoute({
       query: { sortBy: 'paidAmount', limit: 20 },
       response: {
         ...statsExportExample,
-        filename: 'products-20260201-20260203.csv',
+        filename: '商品统计-2026-02-01至2026-02-03.csv',
         rowCount: 1,
         content:
           '商品ID,商品名称,浏览量,访客数,加购件数,下单件数,支付件数,支付金额,收藏数,访问-支付转化率\n' +

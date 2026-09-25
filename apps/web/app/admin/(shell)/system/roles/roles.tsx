@@ -176,7 +176,7 @@ export function RolesPage() {
                 <ConfirmButton
                   route={systemRoleDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该身份？"
+                  title={`删除身份「${row.name}」？`}
                   description={
                     row.adminCount > 0
                       ? `还有 ${row.adminCount} 位管理员持有该身份，需要先解除才能删除。`

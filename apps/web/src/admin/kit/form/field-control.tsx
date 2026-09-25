@@ -4,6 +4,7 @@ import { Checkbox, Input, InputNumber, Radio, Select, Switch } from 'antd';
 import type { ReactNode } from 'react';
 
 import { AssetField } from './asset-field';
+import { isEndOfWindow } from '../instant';
 import { DateField, DateRangeField } from './date-fields';
 import { LinkField } from './link-field';
 import { MoneyInput } from './money-input';
@@ -117,6 +118,7 @@ export function renderControl(spec: FieldSpec, disabled: boolean): ReactNode {
           showTime={spec.showTime ?? false}
           placeholder={spec.placeholder}
           disabled={off}
+          endOfDay={spec.endOfDay ?? isEndOfWindow(spec.name)}
         />
       );
 

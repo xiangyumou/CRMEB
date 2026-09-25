@@ -5,6 +5,7 @@ import { Button, Typography } from 'antd';
 import { useMemo, useState } from 'react';
 
 import { useAssetPicker } from '../asset/asset-picker';
+import { useAssetAccess } from '../asset/asset-source-context';
 import type { AssetItem } from '../asset/types';
 
 /** What the form value holds. `url` is the default because that is what most contracts carry. */
@@ -49,6 +50,9 @@ export function AssetField({
   size = 96,
 }: AssetFieldProps) {
   const picker = useAssetPicker();
+  // Without the library there is nothing to pick from: say so instead of
+  // opening a picker that answers with 403 toasts.
+  const access = useAssetAccess();
   // Remembers URLs for id-valued fields so a fresh pick still shows a preview.
   const [known, setKnown] = useState<Record<string, string>>({});
 
@@ -154,7 +158,13 @@ export function AssetField({
         </div>
       ))}
 
-      {canAdd ? (
+      {canAdd && !access.list ? (
+        <Typography.Text type="secondary" data-testid="asset-field-no-access">
+          没有素材库权限，无法选择图片
+        </Typography.Text>
+      ) : null}
+
+      {canAdd && access.list ? (
         <button
           type="button"
           onClick={() => void openPicker()}

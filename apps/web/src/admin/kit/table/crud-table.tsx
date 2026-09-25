@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import type { ParamsInputOf } from '../../api/call-route';
 import type { AnyRouteDef, ResponseOf } from '../../api/contracts';
 import { useRouteQuery } from '../../api/hooks';
+import { stableInput } from '../../api/query-keys';
 import { FilterBar, filterKeys, type FilterSpec } from './filter-bar';
 import { defined } from '../props';
 import { prefixKey, useNextUrlState, type TableUrlState } from './url-state';
@@ -125,8 +126,26 @@ function CrudTableInner<R extends AnyRouteDef, T>({
   const key = useCallback((name: string) => prefixKey(urlPrefix, name), [urlPrefix]);
   const { read, write } = urlState;
 
-  const page = toPositiveInt(read(key('page')), 1);
+  const urlPage = toPositiveInt(read(key('page')), 1);
   const pageSize = toPositiveInt(read(key('pageSize')), defaultPageSize);
+
+  // A page number belongs to the list it was chosen on. When the page swaps
+  // what the table lists (a status tab passes `fixedQuery`), page 3 of 待发货
+  // is not page 3 of 已完成: go back to 1 — in this render, so the old page is
+  // never requested for the new list, and in the URL just after.
+  const fixedSignature = JSON.stringify(stableInput(fixedQuery ?? {}));
+  const [listedUnder, setListedUnder] = useState(fixedSignature);
+  const [resetting, setResetting] = useState(false);
+  if (listedUnder !== fixedSignature) {
+    setListedUnder(fixedSignature);
+    setResetting(urlPage !== 1);
+  } else if (resetting && urlPage === 1) {
+    setResetting(false);
+  }
+  const page = resetting || listedUnder !== fixedSignature ? 1 : urlPage;
+  useEffect(() => {
+    if (resetting) write({ [key('page')]: '1' });
+  }, [resetting, write, key]);
   const sortRaw = read(key('sort'));
 
   const filterValues = useMemo(() => {
@@ -166,6 +185,16 @@ function CrudTableInner<R extends AnyRouteDef, T>({
   useEffect(() => {
     if (result.data) onData?.(result.data);
   }, [result.data, onData]);
+
+  // Deleting the last rows of the last page leaves an empty page past the end:
+  // step back to the last page that has rows instead of showing 暂无数据 over
+  // a pager that says there are some.
+  const lastPage = data ? Math.max(1, Math.ceil(data.total / pageSize)) : 1;
+  const pastTheEnd =
+    data !== undefined && !result.isPlaceholderData && data.items.length === 0 && page > lastPage;
+  useEffect(() => {
+    if (pastTheEnd) write({ [key('page')]: String(lastPage) });
+  }, [pastTheEnd, lastPage, write, key]);
 
   // Selection belongs to one page of results. Rather than clearing it in an
   // effect when the page or the filters move, it is stamped with the query it

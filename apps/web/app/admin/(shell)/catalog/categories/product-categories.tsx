@@ -10,6 +10,7 @@ import {
   catalogAdminCategoryTree,
   catalogAdminCategoryUpdate,
 } from '@shop/contracts/catalog/catalog.category.admin.contract';
+import { catalogAdminProductList } from '@shop/contracts/catalog/catalog.product.admin.contract';
 import { productCategoryForm, type ProductCategory } from '@shop/contracts/catalog/schemas';
 
 import { useRouteMutation } from '@/admin/api/hooks';
@@ -151,7 +152,7 @@ export function ProductCategoriesPage() {
                 <ConfirmButton
                   route={catalogAdminCategoryDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该分类？"
+                  title={`删除分类「${row.name}」？`}
                   description="有子分类或仍有商品在用时会被拒绝，先移走再删。"
                   invalidate={[catalogAdminCategoryList]}
                   successMessage="已删除"
@@ -179,7 +180,7 @@ export function ProductCategoriesPage() {
         toInput={(values) =>
           modal.record ? { params: { id: modal.record.id }, body: values } : { body: values }
         }
-        invalidate={[catalogAdminCategoryList]}
+        invalidate={[catalogAdminCategoryList, catalogAdminProductList]}
         successMessage="已保存"
         onSuccess={invalidateTree}
       />

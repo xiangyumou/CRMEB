@@ -63,10 +63,12 @@ function Harness({
   initial = {},
   onState,
   urlPrefix,
+  fixedQuery,
 }: {
   initial?: Record<string, string>;
   onState: (state: TableUrlState & { snapshot: Record<string, string> }) => void;
   urlPrefix?: string;
+  fixedQuery?: Record<string, unknown>;
 }) {
   const urlState = useMemoryUrlState(initial);
   onState(urlState);
@@ -76,6 +78,7 @@ function Harness({
       columns={columns}
       urlState={urlState}
       {...(urlPrefix ? { urlPrefix } : {})}
+      {...(fixedQuery ? { fixedQuery } : {})}
       filters={[
         { kind: 'text', name: 'keyword', label: '名称' },
         {
@@ -203,5 +206,51 @@ describe('<CrudTable>', () => {
     ]);
     renderAdmin(<Harness onState={() => {}} />);
     expect(await screen.findByText('服务器开小差了', {}, { timeout: 4000 })).toBeInTheDocument();
+  });
+
+  it('goes back to page 1 when the page swaps what it lists, without asking for the old page', async () => {
+    const { urls } = stubList();
+    let state!: { snapshot: Record<string, string> };
+    const view = renderAdmin(
+      <Harness
+        initial={{ page: '3' }}
+        fixedQuery={{ status: 'active' }}
+        onState={(next) => (state = next)}
+      />,
+    );
+    await waitFor(() => expect(urls).toHaveLength(1));
+    expect(urls[0]).toContain('page=3');
+
+    view.rerender(
+      <Harness
+        initial={{ page: '3' }}
+        fixedQuery={{ status: 'paused' }}
+        onState={(next) => (state = next)}
+      />,
+    );
+
+    await waitFor(() => expect(state.snapshot['page']).toBe('1'));
+    const paused = urls.filter((url) => url.includes('status=paused'));
+    expect(paused.length).toBeGreaterThan(0);
+    expect(paused.every((url) => url.includes('page=1&'))).toBe(true);
+  });
+
+  it('steps back from an emptied last page to the last page with rows', async () => {
+    const urls: string[] = [];
+    stubRoutes([
+      on(listRoute, (call) => {
+        urls.push(call.url);
+        const page = Number(call.query.get('page'));
+        // 41 rows: page 3 of 20 had one, and it was just deleted.
+        return page === 3
+          ? { items: [], total: 40, page: 3, pageSize: 20 }
+          : { items: rows, total: 40, page, pageSize: 20 };
+      }),
+    ]);
+    let state!: { snapshot: Record<string, string> };
+    renderAdmin(<Harness initial={{ page: '3' }} onState={(next) => (state = next)} />);
+
+    await waitFor(() => expect(state.snapshot['page']).toBe('2'));
+    expect(await screen.findByText('组件 1')).toBeInTheDocument();
   });
 });

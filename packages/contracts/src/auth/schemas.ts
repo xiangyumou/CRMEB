@@ -22,6 +22,11 @@ export const adminLoginBody = z.object({
   password: z.string().min(1).max(128),
   /** Present once the slider captcha is switched on; ignored while it is off. */
   captchaToken: z.string().max(4096).optional(),
+  /**
+   * 「记住登录状态」: the session survives seven idle days and a closed
+   * browser. Without it, eight idle hours or closing the browser end it.
+   */
+  remember: z.boolean().optional(),
 });
 export type AdminLoginBody = z.infer<typeof adminLoginBody>;
 

@@ -18,7 +18,8 @@ import {
 } from 'antd';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
-import { useAssetSource } from './asset-source-context';
+import { ApiError } from '../../api/errors';
+import { useAssetAccess, useAssetSource } from './asset-source-context';
 import type { AssetCategory, AssetItem } from './types';
 
 const PAGE_SIZE = 24;
@@ -97,6 +98,7 @@ export function AssetPicker({
   accept = 'image/*',
 }: AssetPickerProps) {
   const source = useAssetSource();
+  const access = useAssetAccess();
   const { message } = App.useApp();
 
   const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
@@ -111,14 +113,14 @@ export function AssetPicker({
   const categories = useQuery({
     queryKey: ['kit.assets.categories'],
     queryFn: () => source.listCategories(),
-    enabled: open,
+    enabled: open && access.categories,
     staleTime: 5 * 60_000,
   });
 
   const list = useQuery({
     queryKey: ['kit.assets.list', categoryId ?? null, page, keyword],
     queryFn: () => source.listAssets({ categoryId, page, pageSize: PAGE_SIZE, keyword }),
-    enabled: open,
+    enabled: open && access.list,
   });
 
   const treeData = useMemo(() => toTreeData(categories.data ?? []), [categories.data]);
@@ -199,7 +201,7 @@ export function AssetPicker({
     >
       <Row gutter={16} style={{ minHeight: 420 }}>
         <Col xs={24} md={6} style={{ borderRight: '1px solid var(--ant-color-border-secondary)' }}>
-          <Spin spinning={categories.isPending}>
+          <Spin spinning={access.categories && categories.isPending}>
             <Tree
               treeData={treeData as never}
               defaultExpandAll
@@ -227,22 +229,25 @@ export function AssetPicker({
             <Button icon={<ReloadOutlined />} onClick={() => void list.refetch()}>
               刷新
             </Button>
-            <UploadArea
-              accept={accept}
-              uploading={uploading}
-              onUpload={async (files) => {
-                setUploading(true);
-                try {
-                  for (const file of files) await source.upload(file, categoryId);
-                  await list.refetch();
-                  void message.success(`已上传 ${files.length} 个文件`);
-                } catch (error) {
-                  void message.error(error instanceof Error ? error.message : '上传失败');
-                } finally {
-                  setUploading(false);
-                }
-              }}
-            />
+            {access.upload ? (
+              <UploadArea
+                accept={accept}
+                uploading={uploading}
+                onUpload={async (files) => {
+                  setUploading(true);
+                  try {
+                    for (const file of files) await source.upload(file, categoryId);
+                    await list.refetch();
+                    void message.success(`已上传 ${files.length} 个文件`);
+                  } catch (error) {
+                    // A server refusal is written for the operator; anything else is not.
+                    void message.error(ApiError.is(error) ? error.message : '上传失败，请重试');
+                  } finally {
+                    setUploading(false);
+                  }
+                }}
+              />
+            ) : null}
           </div>
 
           <Spin spinning={list.isFetching}>

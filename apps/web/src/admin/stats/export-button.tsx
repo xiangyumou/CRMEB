@@ -6,6 +6,7 @@ import { useState } from 'react';
 import type { StatsExportResult } from '@shop/contracts/stats/schemas';
 
 import { callRoute } from '@/admin/api/call-route';
+import { presentApiError } from '@/admin/api/error-presenter';
 import type { AnyRouteDef } from '@/admin/api/contracts';
 import { Can } from '@/admin/session/can';
 
@@ -20,7 +21,9 @@ import { Can } from '@/admin/session/can';
  *
  * The two exports behave differently on purpose and the button says which
  * happened: a ranking truncates (`truncated`), a time series refuses with
- * `STATS_EXPORT_TOO_LARGE` and the global error toast shows it.
+ * `STATS_EXPORT_TOO_LARGE`. The call is made here rather than through a query
+ * hook, so the failure is handed to the presenter here too — before, it was
+ * an unhandled rejection and the button simply stopped spinning.
  */
 export function StatsExportButton({
   route,
@@ -52,6 +55,8 @@ export function StatsExportButton({
       } else {
         message.success(`已导出 ${result.rowCount} 行`);
       }
+    } catch (error) {
+      presentApiError(error);
     } finally {
       setBusy(false);
     }

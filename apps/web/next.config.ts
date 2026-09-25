@@ -23,19 +23,36 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@shop/contracts', '@shop/storefront-blocks', '@shop/admin-ops'],
   // OAuth discovery for MCP clients (RFC 9728 / RFC 8414) lives at fixed
   // `/.well-known/` URLs; the handlers live under `/oauth/`.
+  //
+  // `fallback` runs only when no page or route matched: an API URL nothing
+  // serves gets the JSON error envelope (`app/api-not-found`), not the HTML
+  // 404 page.
   async rewrites() {
-    return [
-      {
-        source: '/.well-known/oauth-protected-resource/:path*',
-        destination: '/oauth/metadata/resource',
-      },
-      { source: '/.well-known/oauth-protected-resource', destination: '/oauth/metadata/resource' },
-      {
-        source: '/.well-known/oauth-authorization-server/:path*',
-        destination: '/oauth/metadata/server',
-      },
-      { source: '/.well-known/oauth-authorization-server', destination: '/oauth/metadata/server' },
-    ];
+    return {
+      beforeFiles: [],
+      afterFiles: [
+        {
+          source: '/.well-known/oauth-protected-resource/:path*',
+          destination: '/oauth/metadata/resource',
+        },
+        {
+          source: '/.well-known/oauth-protected-resource',
+          destination: '/oauth/metadata/resource',
+        },
+        {
+          source: '/.well-known/oauth-authorization-server/:path*',
+          destination: '/oauth/metadata/server',
+        },
+        {
+          source: '/.well-known/oauth-authorization-server',
+          destination: '/oauth/metadata/server',
+        },
+      ],
+      fallback: [
+        { source: '/api/v1/:path*', destination: '/api-not-found' },
+        { source: '/admin-api/:path*', destination: '/api-not-found' },
+      ],
+    };
   },
   reactStrictMode: true,
   poweredByHeader: false,

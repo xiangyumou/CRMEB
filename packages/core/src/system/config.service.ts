@@ -238,6 +238,20 @@ async function groupStatus(ctx: Ctx, def: ConfigGroupDef): Promise<ConfigGroupSt
  * A group that narrows its permission (say `payment:config:read`) is written
  * with the matching `:write` atom, which its own domain declares.
  */
+/**
+ * Groups guarded by the payment configuration atom hold the merchant keys and
+ * say where the money goes. Like admin and role management they are changed
+ * from the console only, never with an API token (the `consoleOnly` rule of
+ * the routes, applied per group because one route saves every group).
+ */
+const CONSOLE_ONLY_GROUP_ATOMS: ReadonlySet<string> = new Set(['payment:config:write']);
+
+function refuseTokenForConsoleGroup(ctx: Ctx, writePermission: string): void {
+  if (ctx.actor.apiTokenId !== undefined && CONSOLE_ONLY_GROUP_ATOMS.has(writePermission)) {
+    throw new DomainError('AUTH_TOKEN_CONSOLE_ONLY');
+  }
+}
+
 function writePermissionFor(readPermission: string): string {
   return readPermission.endsWith(':read')
     ? `${readPermission.slice(0, -':read'.length)}:write`
@@ -274,6 +288,7 @@ export async function configSave(
   if (!hasPermission(ctx.actor, writePermission)) {
     throw new DomainError('FORBIDDEN', { details: { permission: writePermission } });
   }
+  refuseTokenForConsoleGroup(ctx, writePermission);
 
   // The keys the form shows, not every key of the schema. A schema key with no
   // `ui` entry is written by a job or `ctx.config.set` — `wechat.apiBaseUrl` /
@@ -377,6 +392,7 @@ export async function configTest(
   if (!hasPermission(ctx.actor, writePermission)) {
     throw new DomainError('FORBIDDEN', { details: { permission: writePermission } });
   }
+  refuseTokenForConsoleGroup(ctx, writePermission);
   const hook = getConfigTest(def.group);
   if (!hook) throw new DomainError('SYSTEM_CONFIG_TEST_UNSUPPORTED');
 

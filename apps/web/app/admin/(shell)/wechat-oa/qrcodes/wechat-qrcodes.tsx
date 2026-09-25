@@ -55,7 +55,7 @@ export function WechatQrcodesPage() {
   const [viewing, setViewing] = useState<WechatQrcode | null>(null);
 
   const categories = useRouteQuery(wechatOaQrcodeCategoryList, {
-    query: { page: 1, pageSize: 200 },
+    query: { page: 1, pageSize: 100 },
   });
   const categoryOptions: SelectOption[] = (categories.data?.items ?? []).map((item) => ({
     value: item.id,
@@ -166,7 +166,7 @@ export function WechatQrcodesPage() {
                 <ConfirmButton
                   route={wechatOaQrcodeDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该渠道码？"
+                  title={`删除渠道码「${row.name}」？`}
                   description="已经印出去的海报还会被扫到，但扫码将不再归因到任何渠道。"
                   invalidate={[wechatOaQrcodeList]}
                   successMessage="已删除"

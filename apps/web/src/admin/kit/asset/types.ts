@@ -35,6 +35,18 @@ export interface AssetListResult {
  * `createStubAssetSource()` from `@/test/asset-source`.
  */
 export interface AssetSource {
+  /**
+   * The atoms each call needs, when the source is backed by permissioned
+   * routes. The picker leaves out what the signed-in admin may not do rather
+   * than letting it end in a 403 toast. Absent means "no check".
+   */
+  permissions?:
+    | {
+        list?: string | undefined;
+        upload?: string | undefined;
+        categories?: string | undefined;
+      }
+    | undefined;
   listCategories(): Promise<AssetCategory[]>;
   listAssets(query: AssetListQuery): Promise<AssetListResult>;
   /** Resolves with the stored asset. Throw to surface an upload failure. */

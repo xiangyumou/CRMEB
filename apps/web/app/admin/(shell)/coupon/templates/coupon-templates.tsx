@@ -178,7 +178,7 @@ export function CouponTemplatesPage() {
                 <ConfirmButton
                   route={couponAdminDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该优惠券？"
+                  title={`删除优惠券「${row.name}」？`}
                   description="已领取的优惠券不受影响，仍可正常使用。"
                   invalidate={[couponAdminList]}
                   successMessage="已删除"

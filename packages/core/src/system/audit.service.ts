@@ -12,7 +12,7 @@ import * as repo from './system.repo';
  * admin sign-in writes one per outcome, with
  * the body already redacted by `redactPayload`. A service that wants to name
  * what it touched calls `ctx.audit('coupon:42')` and the same writer picks it
- * up.
+ * up; on a read (an export) that call is what asks for a row at all.
  *
  * There is also no delete route. An operation log an operator can edit is not
  * an operation log; old rows leave through the retention job instead.

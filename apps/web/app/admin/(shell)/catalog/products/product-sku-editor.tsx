@@ -166,6 +166,8 @@ export interface SkuMatrixEditorProps {
   specMode: boolean;
   kind: ProductKind;
   disabled?: boolean | undefined;
+  /** `false` for a role the server hides 成本价 from: no column rather than an empty one. */
+  showCost?: boolean | undefined;
 }
 
 export function SkuMatrixEditor({
@@ -175,6 +177,7 @@ export function SkuMatrixEditor({
   specMode,
   kind,
   disabled = false,
+  showCost = true,
 }: SkuMatrixEditorProps) {
   const rows = value ?? EMPTY_SKUS;
   const axes = specs.map((spec) => spec.name).filter(Boolean);
@@ -237,6 +240,7 @@ export function SkuMatrixEditor({
           row={row}
           disabled={disabled}
           cardStock={cardStock}
+          showCost={showCost}
           onChange={(changes) =>
             onChange?.([{ ...row, ...changes, specValues: {}, isDefault: true }])
           }
@@ -337,19 +341,23 @@ export function SkuMatrixEditor({
               />
             ),
           },
-          {
-            title: '成本价',
-            key: 'cost',
-            width: 120,
-            render: (_value: unknown, row: ProductSkuInput, index: number) => (
-              <MoneyInput
-                size="small"
-                value={row.cost}
-                disabled={disabled}
-                onChange={(next) => patch(index, { cost: next })}
-              />
-            ),
-          },
+          ...(showCost
+            ? [
+                {
+                  title: '成本价',
+                  key: 'cost',
+                  width: 120,
+                  render: (_value: unknown, row: ProductSkuInput, index: number) => (
+                    <MoneyInput
+                      size="small"
+                      value={row.cost}
+                      disabled={disabled}
+                      onChange={(next) => patch(index, { cost: next })}
+                    />
+                  ),
+                },
+              ]
+            : []),
           {
             title: '库存',
             key: 'stock',
@@ -373,7 +381,10 @@ export function SkuMatrixEditor({
               <Input
                 size="small"
                 value={row.skuCode ?? ''}
-                disabled={disabled}
+                // A saved SKU keeps its code (orders and exports refer to it);
+                // only a new combination takes one.
+                disabled={disabled || isSavedSku(row)}
+                title={isSavedSku(row) ? SAVED_CODE_HINT : undefined}
                 placeholder="留空自动生成"
                 aria-label={`规格编码 ${index + 1}`}
                 onChange={(event) => patch(index, { skuCode: event.target.value || undefined })}
@@ -470,11 +481,13 @@ function SingleSkuFields({
   onChange,
   disabled,
   cardStock,
+  showCost,
 }: {
   row: ProductSkuInput;
   onChange: (changes: Partial<ProductSkuInput>) => void;
   disabled: boolean;
   cardStock: boolean;
+  showCost: boolean;
 }) {
   return (
     <Space wrap size={12}>
@@ -494,14 +507,16 @@ function SingleSkuFields({
           onChange={(next) => onChange({ originalPrice: next })}
         />
       </Field>
-      <Field label="成本价">
-        <MoneyInput
-          value={row.cost}
-          disabled={disabled}
-          style={{ width: 120 }}
-          onChange={(next) => onChange({ cost: next })}
-        />
-      </Field>
+      {showCost ? (
+        <Field label="成本价">
+          <MoneyInput
+            value={row.cost}
+            disabled={disabled}
+            style={{ width: 120 }}
+            onChange={(next) => onChange({ cost: next })}
+          />
+        </Field>
+      ) : null}
       <Field label="库存">
         <InputNumber
           min={0}
@@ -514,7 +529,8 @@ function SingleSkuFields({
       <Field label="规格编码">
         <Input
           value={row.skuCode ?? ''}
-          disabled={disabled}
+          disabled={disabled || isSavedSku(row)}
+          title={isSavedSku(row) ? SAVED_CODE_HINT : undefined}
           style={{ width: 160 }}
           placeholder="留空自动生成"
           aria-label="规格编码"
@@ -674,4 +690,15 @@ export function ParamEditor({ value, onChange, templates, disabled = false }: Pa
       </Space>
     </Space>
   );
+}
+
+const SAVED_CODE_HINT = '已保存的规格编码不能修改';
+
+/**
+ * A row that came from the server: `formValuesOf` gives it the stock the
+ * operator is looking at. The server matches rows by spec combination and
+ * never rewrites a saved SKU's code, so an editable box would be ignored.
+ */
+function isSavedSku(row: ProductSkuInput): boolean {
+  return row.expectedStock !== undefined;
 }

@@ -8,7 +8,7 @@ import { resetApiConfig } from '@/admin/api/config';
 import { on, stubRoutes } from '@/test/api';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
-import { SettingsGroupPage } from './settings-group';
+import { SettingsGroupPage, groupWritePermission } from './settings-group';
 
 /**
  * One settings group, as the role that opens it. Reading is
@@ -67,6 +67,22 @@ describe('配置分组', () => {
     expect(screen.queryByRole('button', { name: zhName('保存') })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /发送测试短信/ })).not.toBeInTheDocument();
     expect(screen.getByText('你的身份只能查看这些配置，不能在这里修改')).toBeInTheDocument();
+  });
+
+  it('keeps a group that narrows its atom read-only for a role without that group’s write atom', async () => {
+    const payment: ConfigGroupValues = {
+      ...sms,
+      descriptor: { ...sms.descriptor, group: 'payment', permission: 'payment:config:read' },
+    };
+    stubRoutes([on(systemConfigGet, payment)]);
+    renderAdmin(<SettingsGroupPage group="payment" />, {
+      identity: { ...writer, permissions: [...writer.permissions, 'payment:config:read'] },
+    });
+
+    // system:config:write alone does not save 支付设置: the server wants payment:config:write.
+    expect(await screen.findByLabelText('短信签名')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: zhName('保存') })).not.toBeInTheDocument();
+    expect(groupWritePermission('payment:config:read')).toBe('payment:config:write');
   });
 
   it('leaves out the WeChat card, and its query, without payment:config:write', async () => {

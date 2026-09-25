@@ -99,7 +99,7 @@ export function ExpressCompaniesPage() {
                 <ConfirmButton
                   route={expressCompanyDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该快递公司？"
+                  title={`删除快递公司「${row.name}」？`}
                   description="已产生运单的快递公司无法删除，改用停用。"
                   invalidate={[expressCompanyAdminList]}
                   successMessage="已删除"

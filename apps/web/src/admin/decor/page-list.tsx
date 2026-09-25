@@ -26,6 +26,7 @@ import {
   instantColumn,
   statusOptions,
   textColumn,
+  useDetailHref,
   useFormModal,
 } from '../kit';
 import { Can } from '../session';
@@ -72,11 +73,12 @@ function DesignationsCard() {
   const designations = useRouteQuery(decorDesignations);
   const home = designations.data?.home ?? null;
   const userCenter = designations.data?.user_center ?? null;
+  const detailHref = useDetailHref();
   const entry = (label: string, row: DecorDocumentSummary | null, empty: string) => (
     <Space size={6} wrap>
       <Typography.Text type="secondary">{label}</Typography.Text>
       {row ? (
-        <Link href={`/admin/decor/${row.id}`}>{row.name}</Link>
+        <Link href={detailHref(`/admin/decor/${row.id}`)}>{row.name}</Link>
       ) : (
         <Typography.Text type="warning">{empty}</Typography.Text>
       )}
@@ -111,6 +113,8 @@ function DesignationsCard() {
 export function DecorDocumentList() {
   const [creating, setCreating] = useState(false);
   const rename = useFormModal<DecorDocumentSummary>();
+  // 返回列表 in the editor comes back to these filters and this page.
+  const detailHref = useDetailHref();
   const designations = useRouteQuery(decorDesignations);
 
   const designateAction = (row: DecorDocumentSummary) => {
@@ -171,7 +175,7 @@ export function DecorDocumentList() {
             ...textColumn<DecorDocumentSummary>({ title: '名称', dataIndex: 'name' }),
             render: (_value: unknown, row: DecorDocumentSummary) => (
               <Space size={4} wrap>
-                <Link href={`/admin/decor/${row.id}`}>{row.name}</Link>
+                <Link href={detailHref(`/admin/decor/${row.id}`)}>{row.name}</Link>
                 {row.designation ? (
                   <StatusTag value={row.designation} map={DESIGNATION_LABELS} />
                 ) : null}
@@ -194,7 +198,7 @@ export function DecorDocumentList() {
             width: 300,
             render: (row) => (
               <>
-                <Link href={`/admin/decor/${row.id}`}>
+                <Link href={detailHref(`/admin/decor/${row.id}`)}>
                   <Button type="link" size="small">
                     装修
                   </Button>

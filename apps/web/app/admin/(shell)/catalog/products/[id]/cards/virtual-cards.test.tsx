@@ -92,6 +92,26 @@ describe('卡密库存', () => {
     expect(screen.queryByRole('button', { name: zhName('导入卡密') })).not.toBeInTheDocument();
   });
 
+  it('asks before voiding a batch, saying how many cards go', async () => {
+    const calls = stubApi();
+    renderAdmin(<VirtualCardsPage productId="9" />, { identity: cardAdmin });
+    await screen.findByText('8800-1234-5678');
+
+    const checkboxes = screen.getAllByRole('checkbox');
+    await userEvent.click(checkboxes[checkboxes.length - 1]!);
+    await userEvent.click(await screen.findByRole('button', { name: zhName('批量作废') }));
+
+    const ask = await screen.findByText('作废选中的 1 条未发放卡密？');
+    expect(calls.some((call) => call.url.includes('/void'))).toBe(false);
+    const popup = ask.closest('.ant-popover') as HTMLElement;
+    await userEvent.click(within(popup).getByRole('button', { name: zhName('作废') }));
+
+    await waitFor(() => {
+      const voided = calls.find((call) => call.method === 'POST' && call.url.includes('void'));
+      expect(voided?.body).toEqual({ cardIds: ['7001'] });
+    });
+  });
+
   it('imports a pasted batch against the chosen SKU', async () => {
     const calls = stubApi();
     renderAdmin(<VirtualCardsPage productId="9" />, { identity: cardAdmin });

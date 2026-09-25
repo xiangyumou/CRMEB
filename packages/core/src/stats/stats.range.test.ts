@@ -9,6 +9,7 @@ import {
   resolveRange,
   shanghaiDayLabel,
   shanghaiDayStart,
+  statsExportFilename,
 } from './stats.range';
 
 /**
@@ -37,6 +38,21 @@ describe('shanghai days', () => {
     expect(bucketStartOf(at, 'hour').toISOString()).toBe('2026-02-03T01:00:00.000Z');
     expect(bucketStartOf(at, 'day').toISOString()).toBe('2026-02-02T16:00:00.000Z');
     expect(bucketStartOf(at, 'month').toISOString()).toBe('2026-01-31T16:00:00.000Z');
+  });
+});
+
+describe('statsExportFilename', () => {
+  it('names an export in Chinese by the Shanghai days it covers, like the order export', () => {
+    const range = {
+      from: new Date('2026-02-01T00:00:00+08:00'),
+      to: new Date('2026-02-04T00:00:00+08:00'),
+    };
+    expect(statsExportFilename('交易统计', range)).toBe('交易统计-2026-02-01至2026-02-03.csv');
+    const oneDay = {
+      from: new Date('2026-02-03T00:00:00+08:00'),
+      to: new Date('2026-02-04T00:00:00+08:00'),
+    };
+    expect(statsExportFilename('商品统计', oneDay)).toBe('商品统计-2026-02-03.csv');
   });
 });
 

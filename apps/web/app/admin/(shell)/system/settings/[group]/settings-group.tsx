@@ -45,9 +45,10 @@ export function SettingsGroupPage({ group }: { group: string }) {
   // Set by the settings search: which field to scroll to.
   const focusKey = useSearchParams().get('field') ?? undefined;
   // Reading a group is `system:config:read`; saving and 测试 are both
-  // `system:config:write`. A reader gets the form read-only, with no 保存 or
+  // `system:config:write` *and* the group's own write atom (支付 is
+  // `payment:config:write`). A reader gets the form read-only, with no 保存 or
   // 测试 to press into a 403.
-  const mayWrite = useCan()('system:config:write');
+  const can = useCan();
   const { data, isPending, error } = useRouteQuery(systemConfigGet, input, {
     presentError: false,
   });
@@ -73,6 +74,8 @@ export function SettingsGroupPage({ group }: { group: string }) {
     );
   }
 
+  const mayWrite =
+    can('system:config:write') && can(groupWritePermission(data.descriptor.permission));
   const writable = mayWrite && data.descriptor.fields.length > 0;
 
   return (
@@ -166,4 +169,14 @@ function toKitField(field: {
     ...(field.readOnly === undefined ? {} : { readOnly: field.readOnly }),
     ...(field.unit === undefined ? {} : { unit: field.unit }),
   };
+}
+
+/**
+ * The atom that writes a group, as the server derives it
+ * (`config.service.ts::writePermissionFor`): `x:read` → `x:write`.
+ */
+export function groupWritePermission(readPermission: string): string {
+  return readPermission.endsWith(':read')
+    ? `${readPermission.slice(0, -':read'.length)}:write`
+    : readPermission;
 }

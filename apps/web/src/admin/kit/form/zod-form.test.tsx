@@ -94,6 +94,86 @@ describe('<ZodForm> validation', () => {
   });
 });
 
+describe('<ZodForm> empty and cleared fields', () => {
+  const clearable = z.object({
+    name: z.string().min(1).max(10),
+    kind: z.enum(['a', 'b']),
+    limit: z.number().int().min(1).optional(),
+    birthday: z.string().nullable().optional(),
+    note: z.string().optional(),
+  });
+  const clearableFields: FieldSpec[] = [
+    { kind: 'text', name: 'name', label: '名称' },
+    {
+      kind: 'select',
+      name: 'kind',
+      label: '类型',
+      options: [
+        { label: '甲', value: 'a' },
+        { label: '乙', value: 'b' },
+      ],
+    },
+    { kind: 'number', name: 'limit', label: '每人限领' },
+    { kind: 'text', name: 'birthday', label: '生日' },
+    { kind: 'text', name: 'note', label: '备注' },
+  ];
+
+  function renderClearable(initialValues: Record<string, unknown>) {
+    const onSubmit = vi.fn();
+    renderAdmin(
+      <ZodForm
+        schema={clearable as never}
+        fields={clearableFields}
+        onSubmit={onSubmit}
+        initialValues={initialValues as never}
+      />,
+    );
+    return { onSubmit };
+  }
+
+  it('asks for an empty required field by its label, never with a zod type error', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderClearable({});
+
+    await user.click(submit());
+
+    expect(await screen.findByText('请填写名称')).toBeInTheDocument();
+    expect(screen.getByText('请选择类型')).toBeInTheDocument();
+    expect(screen.queryByText(/期望|undefined/)).not.toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('says how long a text may be in words', async () => {
+    const user = userEvent.setup();
+    renderClearable({ name: '', kind: 'a' });
+
+    await user.type(screen.getByLabelText('名称'), '一二三四五六七八九十十一');
+    await user.click(submit());
+
+    expect(await screen.findByText('最多 10 个字')).toBeInTheDocument();
+  });
+
+  it('lets an optional number, a nullable value and a text be cleared, and trims text', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderClearable({
+      name: '  张三 ',
+      kind: 'a',
+      limit: 5,
+      birthday: '1990-01-01',
+      note: '备注',
+    });
+
+    await user.clear(screen.getByLabelText('每人限领'));
+    await user.clear(screen.getByLabelText('生日'));
+    await user.clear(screen.getByLabelText('备注'));
+    await user.click(submit());
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    // Optional → absent; nullable → null, the explicit clear; text trimmed.
+    expect(onSubmit.mock.calls[0]?.[0]).toEqual({ name: '张三', kind: 'a', birthday: null });
+  });
+});
+
 describe('<ZodForm> server errors', () => {
   it('maps a 422 detail onto the matching field', async () => {
     setup({

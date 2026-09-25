@@ -2,6 +2,7 @@
 
 import { createContext, use, useMemo, type ReactNode } from 'react';
 
+import { useOptionalSession } from '../../session/session-provider';
 import type { AssetSource } from './types';
 
 const AssetSourceContext = createContext<AssetSource | null>(null);
@@ -30,4 +31,27 @@ export function AssetSourceProvider({
 }) {
   const value = useMemo(() => source, [source]);
   return <AssetSourceContext value={value}>{children}</AssetSourceContext>;
+}
+
+/** What the signed-in admin may do with the material library. */
+export interface AssetAccess {
+  list: boolean;
+  upload: boolean;
+  categories: boolean;
+}
+
+/**
+ * Checks the source's `permissions` against the session. Outside a session
+ * (the kit demo, a stub source) everything is allowed.
+ */
+export function useAssetAccess(): AssetAccess {
+  const source = useAssetSource();
+  const session = useOptionalSession();
+  const may = (atom: string | undefined): boolean =>
+    atom === undefined || session === null || session.can(atom);
+  return {
+    list: may(source.permissions?.list),
+    upload: may(source.permissions?.upload),
+    categories: may(source.permissions?.categories),
+  };
 }

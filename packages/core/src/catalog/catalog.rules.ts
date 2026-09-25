@@ -279,9 +279,7 @@ export function normaliseKeyword(raw: string): string {
   return raw.trim().replace(/\s+/g, ' ').slice(0, 64);
 }
 
-export function likePattern(keyword: string): string {
-  return `%${keyword.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
-}
+export { containsPattern as likePattern } from '../kernel/like';
 
 // ---------------------------------------------------------------------------
 // SKU codes

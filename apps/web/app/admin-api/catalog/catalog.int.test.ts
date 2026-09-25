@@ -306,7 +306,7 @@ describe('/admin-api/catalog/products', () => {
     expect(response.status).toBe(200);
 
     const body = await response.json();
-    expect(body.filename).toBe('products-2026-06-01.csv');
+    expect(body.filename).toBe('商品-2026-06-01.csv');
     expect(body.rows).toHaveLength(1);
     expect(body.truncated).toBe(false);
   });

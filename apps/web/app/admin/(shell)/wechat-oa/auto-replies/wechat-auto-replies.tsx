@@ -167,7 +167,9 @@ export function WechatAutoRepliesPage() {
                 <ConfirmButton
                   route={wechatOaReplyDelete}
                   input={{ params: { id: row.id } }}
-                  title="确认删除该自动回复？"
+                  title={
+                    row.keyword ? `删除关键词「${row.keyword}」的自动回复？` : '删除该自动回复？'
+                  }
                   invalidate={[wechatOaReplyList]}
                   successMessage="已删除"
                   permission="wechat-oa:reply:write"

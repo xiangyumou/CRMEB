@@ -13,6 +13,7 @@ import type {
 
 import { useRouteQuery } from '@/admin/api/hooks';
 import { DescriptionsCard } from '@/admin/kit/descriptions-card';
+import { formatInstant } from '@/admin/kit/instant';
 import { idColumn, instantColumn, textColumn } from '@/admin/kit/table/columns';
 import { CrudTable } from '@/admin/kit/table/crud-table';
 
@@ -60,7 +61,7 @@ function Body({ qrcode }: { qrcode: WechatQrcode }) {
           { label: '新增关注', value: data?.followCount ?? qrcode.followCount },
           {
             label: '有效期',
-            value: qrcode.expiresAt ? qrcode.expiresAt.slice(0, 10) : '永久',
+            value: qrcode.expiresAt ? formatInstant(qrcode.expiresAt, 'date') : '永久',
           },
           {
             label: '二维码',

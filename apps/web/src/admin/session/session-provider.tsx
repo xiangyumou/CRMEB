@@ -5,6 +5,7 @@ import { Button, Result, Spin } from 'antd';
 import { useRouter } from 'next/navigation';
 import { createContext, use, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 
+import { isSessionExpiry, loginUrl } from '../api/config';
 import { adminLogout, adminMe, type AdminIdentity } from '../api/contracts';
 import { useRouteMutation, useRouteQuery } from '../api/hooks';
 import { hasPermission, type PermissionInput } from './permissions';
@@ -37,8 +38,8 @@ export function useCan(): (required: PermissionInput) => boolean {
   return useSession().can;
 }
 
-export function loginHref(nextUrl?: string): string {
-  return nextUrl ? `/admin/login?next=${encodeURIComponent(nextUrl)}` : '/admin/login';
+export function loginHref(nextUrl?: string, options: { expired?: boolean } = {}): string {
+  return loginUrl(nextUrl, options);
 }
 
 /**
@@ -59,6 +60,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   });
 
   const unauthenticated = me.isError && me.error.status === 401;
+  const expired = me.isError && isSessionExpiry(me.error);
 
   useEffect(() => {
     if (!unauthenticated) return;
@@ -66,8 +68,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       typeof window === 'undefined'
         ? undefined
         : `${window.location.pathname}${window.location.search}`;
-    router.replace(loginHref(here));
-  }, [unauthenticated, router]);
+    router.replace(loginHref(here, { expired }));
+  }, [unauthenticated, expired, router]);
 
   const logoutMutation = useRouteMutation(adminLogout, {
     onSuccess() {

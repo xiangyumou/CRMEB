@@ -89,7 +89,7 @@ export function WechatMenusPage() {
                     <ConfirmButton
                       route={wechatOaMenuDelete}
                       input={{ params: { id: row.id } }}
-                      title="确认删除该菜单？"
+                      title={`删除菜单「${row.name}」？`}
                       description="微信上已经生效的菜单不会因此消失。"
                       invalidate={[wechatOaMenuList]}
                       successMessage="已删除"

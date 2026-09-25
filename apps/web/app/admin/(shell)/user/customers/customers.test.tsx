@@ -17,7 +17,7 @@ import type { AdminUserDetail, AdminUserListItem } from '@shop/contracts/user/sc
 
 import { resetApiConfig } from '@/admin/api/config';
 import { on, stubRoutes, type StubCall } from '@/test/api';
-import { renderAdmin, testIdentity } from '@/test/render';
+import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { CustomersPage } from './customers';
 
@@ -63,7 +63,7 @@ const detail: AdminUserDetail = {
   updatedAt: '2026-09-20T08:31:00+08:00',
 };
 
-function stubApi(): StubCall[] {
+function stubApi(current: AdminUserDetail = detail): StubCall[] {
   return stubRoutes([
     on(userGroupList, {
       items: [
@@ -87,10 +87,10 @@ function stubApi(): StubCall[] {
       ],
       total: 1,
       page: 1,
-      pageSize: 200,
+      pageSize: 100,
     }),
     on(userAdminList, { items: [row], total: 1, page: 1, pageSize: 20 }),
-    on(userAdminDetail, detail),
+    on(userAdminDetail, current),
     on(userAdminUpdate, detail),
     on(userAdminCreate, { ...detail, registerSource: 'admin' }),
     on(userAdminSetStatus, { ...detail, status: 'disabled' }),
@@ -176,12 +176,17 @@ describe('用户列表', () => {
     expect(screen.queryByRole('button', { name: '新增用户' })).not.toBeInTheDocument();
   });
 
-  it('disables through the status sub-resource, not the edit form', async () => {
+  it('disables through the status sub-resource after asking, not the edit form', async () => {
     const calls = stubApi();
     renderAdmin(<CustomersPage />, { identity: allPermissions });
     await screen.findByText('小明');
 
-    await userEvent.click(screen.getByRole('button', { name: '禁用' }));
+    await userEvent.click(screen.getByRole('button', { name: zhName('禁用') }));
+    // Asks first, naming the customer; nothing is sent until confirmed.
+    const ask = await screen.findByText(/禁用用户「小明」？/);
+    expect(calls.some((call) => call.url.includes('/status'))).toBe(false);
+    const popup = ask.closest('.ant-popover') as HTMLElement;
+    await userEvent.click(within(popup).getByRole('button', { name: zhName('禁用') }));
 
     await waitFor(() => {
       const toggle = calls.find((call) => call.url.includes('/admin-api/users/1001/status'));
@@ -240,6 +245,65 @@ describe('用户列表', () => {
         realName: '王小明',
         adminRemark: '老客户，走加急',
       });
+    });
+  });
+
+  it('clears 真实姓名 and 管理员备注 by sending null, the clear the service applies', async () => {
+    const calls = stubApi();
+    renderAdmin(<CustomersPage />, { identity: allPermissions });
+    await screen.findByText('小明');
+
+    await userEvent.click(screen.getByRole('button', { name: '编辑' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByDisplayValue('王小明');
+
+    await userEvent.clear(within(dialog).getByLabelText('真实姓名'));
+    await userEvent.clear(within(dialog).getByDisplayValue('老客户，走加急'));
+    await userEvent.click(within(dialog).getByRole('button', { name: '保 存' }));
+
+    await waitFor(() => {
+      const save = calls.find((call) => call.method === 'PUT');
+      expect(save?.body).toMatchObject({ realName: null, adminRemark: null });
+    });
+  });
+
+  it('clears 生日 by sending null', async () => {
+    const calls = stubApi({ ...detail, birthday: '1990-05-01T00:00:00+08:00' });
+    renderAdmin(<CustomersPage />, { identity: allPermissions });
+    await screen.findByText('小明');
+
+    await userEvent.click(screen.getByRole('button', { name: '编辑' }));
+    const dialog = await screen.findByRole('dialog');
+    const picker = (await within(dialog).findByDisplayValue('1990-05-01')).closest('.ant-picker');
+    await userEvent.hover(picker as HTMLElement);
+    await userEvent.click(picker!.querySelector('.ant-picker-clear') as HTMLElement);
+    await userEvent.click(within(dialog).getByRole('button', { name: '保 存' }));
+
+    await waitFor(() => {
+      const save = calls.find((call) => call.method === 'PUT');
+      expect(save?.body).toMatchObject({ birthday: null });
+    });
+  });
+
+  it('新增用户 saves when 昵称 and 密码 were typed and then emptied', async () => {
+    const calls = stubApi();
+    renderAdmin(<CustomersPage />, { identity: allPermissions });
+    await screen.findByText('小明');
+
+    await userEvent.click(screen.getByRole('button', { name: '新增用户' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('手机号'), '13900139000');
+    for (const label of ['昵称', '登录密码']) {
+      await userEvent.type(within(dialog).getByLabelText(label), 'x');
+      await userEvent.clear(within(dialog).getByLabelText(label));
+    }
+    await userEvent.click(within(dialog).getByRole('button', { name: '新 增' }));
+
+    await waitFor(() => {
+      const create = calls.find(
+        (call) => call.method === 'POST' && call.url.endsWith('/admin-api/users'),
+      );
+      expect(create?.body).toEqual({ phone: '13900139000', groupIds: [], labelIds: [] });
     });
   });
 

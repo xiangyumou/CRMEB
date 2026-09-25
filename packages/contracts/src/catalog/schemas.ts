@@ -64,10 +64,10 @@ export const productCustomFormField = z.object({
     .min(1)
     .max(32)
     .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, '字段标识只能是字母、数字和下划线'),
-  label: z.string().min(1).max(32),
+  label: z.string().trim().min(1).max(32),
   type: productCustomFormFieldType,
   required: z.boolean(),
-  options: z.array(z.string().min(1).max(64)).max(50).optional(),
+  options: z.array(z.string().trim().min(1).max(64)).max(50).optional(),
   placeholder: z.string().max(64).optional(),
 });
 export type ProductCustomFormField = z.infer<typeof productCustomFormField>;
@@ -129,7 +129,7 @@ export const productCategoryForm = z
   .object({
     /** `null` / omitted makes a root category. */
     parentId: id.nullable().default(null),
-    name: z.string().min(1).max(100),
+    name: z.string().trim().min(1).max(100),
     iconUrl: z.string().max(512).optional(),
     bannerUrl: z.string().max(512).optional(),
     sortOrder: z.number().int().min(0).max(9999).default(0),
@@ -140,7 +140,7 @@ export type ProductCategoryForm = z.infer<typeof productCategoryForm>;
 
 export const productCategoryListQuery = pageQuery
   .extend({
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     /** Direct children of this category only. */
     parentId: id.optional(),
     isVisible: z.stringbool().optional(),
@@ -168,14 +168,14 @@ export type ProductLabelCategory = z.infer<typeof productLabelCategory>;
 
 export const productLabelCategoryForm = z
   .object({
-    name: z.string().min(1).max(64),
+    name: z.string().trim().min(1).max(64),
     sortOrder: z.number().int().min(0).max(9999).default(0),
   })
   .strict();
 export type ProductLabelCategoryForm = z.infer<typeof productLabelCategoryForm>;
 
 export const productLabelCategoryListQuery = pageQuery
-  .extend({ keyword: z.string().max(64).optional() })
+  .extend({ keyword: z.string().trim().max(64).optional() })
   .extend(sortQuery(['id', 'sortOrder', 'name']).shape);
 
 export const pagedProductLabelCategories = paged(productLabelCategory);
@@ -215,7 +215,7 @@ export type ProductCardLabel = z.infer<typeof productCardLabel>;
 export const productLabelForm = z
   .object({
     categoryId: id.nullable().default(null),
-    name: z.string().min(1).max(64),
+    name: z.string().trim().min(1).max(64),
     style: productLabelStyle.default('text'),
     fontColor: z.string().max(32).optional(),
     backgroundColor: z.string().max(32).optional(),
@@ -237,7 +237,7 @@ export type ProductLabelForm = z.infer<typeof productLabelForm>;
 
 export const productLabelListQuery = pageQuery
   .extend({
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     categoryId: id.optional(),
     isEnabled: z.stringbool().optional(),
   })
@@ -264,7 +264,7 @@ export type ProductParamTemplate = z.infer<typeof productParamTemplate>;
 
 export const productParamTemplateForm = z
   .object({
-    name: z.string().min(1).max(64),
+    name: z.string().trim().min(1).max(64),
     suggestedValues: z.string().max(2000).optional(),
     isEnabled: z.boolean().default(true),
     sortOrder: z.number().int().min(0).max(9999).default(0),
@@ -274,7 +274,7 @@ export type ProductParamTemplateForm = z.infer<typeof productParamTemplateForm>;
 
 export const productParamTemplateListQuery = pageQuery
   .extend({
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     isEnabled: z.stringbool().optional(),
   })
   .extend(sortQuery(['id', 'sortOrder', 'name']).shape);
@@ -285,8 +285,8 @@ export const productParamTemplateEnabledBody = z.object({ isEnabled: z.boolean()
 
 /** One parameter as it appears on a product. */
 export const productParam = z.object({
-  name: z.string().min(1).max(64),
-  value: z.string().min(1).max(255),
+  name: z.string().trim().min(1).max(64),
+  value: z.string().trim().min(1).max(255),
   templateId: id.nullable().default(null),
   sortOrder: z.number().int().min(0).max(9999).default(0),
 });
@@ -309,7 +309,7 @@ export type ProductProtection = z.infer<typeof productProtection>;
 
 export const productProtectionForm = z
   .object({
-    title: z.string().min(1).max(64),
+    title: z.string().trim().min(1).max(64),
     content: z.string().max(2000).optional(),
     iconUrl: z.string().max(512).optional(),
     isEnabled: z.boolean().default(true),
@@ -320,7 +320,7 @@ export type ProductProtectionForm = z.infer<typeof productProtectionForm>;
 
 export const productProtectionListQuery = pageQuery
   .extend({
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     isEnabled: z.stringbool().optional(),
   })
   .extend(sortQuery(['id', 'sortOrder', 'title']).shape);
@@ -334,12 +334,12 @@ export const productProtectionEnabledBody = z.object({ isEnabled: z.boolean() })
 // ---------------------------------------------------------------------------
 
 export const productSpecValueInput = z.object({
-  value: z.string().min(1).max(64),
+  value: z.string().trim().min(1).max(64),
   imageUrl: z.string().max(512).optional(),
 });
 
 export const productSpecInput = z.object({
-  name: z.string().min(1).max(64),
+  name: z.string().trim().min(1).max(64),
   values: z.array(productSpecValueInput).min(1).max(50),
 });
 export type ProductSpecInput = z.infer<typeof productSpecInput>;
@@ -392,7 +392,7 @@ export type ProductSku = z.infer<typeof productSku>;
  */
 export const productSkuInput = z.object({
   specValues: z.record(z.string(), z.string()),
-  skuCode: z.string().max(32).optional(),
+  skuCode: z.string().trim().max(32).optional(),
   imageUrl: z.string().max(512).optional(),
   price: money,
   originalPrice: money.optional(),
@@ -405,7 +405,7 @@ export const productSkuInput = z.object({
    * otherwise `CATALOG_SKU_STOCK_CHANGED`. Without it, `stock` is set as sent.
    */
   expectedStock: z.number().int().min(0).optional(),
-  barCode: z.string().max(50).optional(),
+  barCode: z.string().trim().max(50).optional(),
   weight: weight.optional(),
   volume: volume.optional(),
   isDefault: z.boolean().default(false),
@@ -501,18 +501,18 @@ export type AdminProductDetail = z.infer<typeof adminProductDetail>;
  */
 export const adminProductForm = z
   .object({
-    name: z.string().min(1).max(128),
-    subtitle: z.string().max(255).optional(),
-    keyword: z.string().max(255).optional(),
-    spu: z.string().max(32).optional(),
-    barCode: z.string().max(32).optional(),
+    name: z.string().trim().min(1).max(128),
+    subtitle: z.string().trim().max(255).optional(),
+    keyword: z.string().trim().max(255).optional(),
+    spu: z.string().trim().max(32).optional(),
+    barCode: z.string().trim().max(32).optional(),
     kind: productKind.default('physical'),
     status: productStatus.default('draft'),
     imageUrl: z.string().min(1).max(512),
     cardImageUrl: z.string().max(512).optional(),
     sliderImages: z.array(z.string().max(512)).max(10).default([]),
     videoUrl: z.string().max(512).optional(),
-    unitName: z.string().max(32).optional(),
+    unitName: z.string().trim().max(32).optional(),
     originalPrice: money.optional(),
     displaySalesBoost: z.number().int().min(0).max(1_000_000).default(0),
     /** `false` means one implicit SKU; `true` means the spec matrix below. */
@@ -576,6 +576,13 @@ export const adminProductForm = z
         path: ['purchaseLimitQuantity'],
         message: '请填写限购数量',
       });
+    } else if (value.minPurchaseQuantity > value.purchaseLimitQuantity) {
+      // 起购 3、限购 2 is a product nobody can buy.
+      ctx.addIssue({
+        code: 'custom',
+        path: ['minPurchaseQuantity'],
+        message: '起购数量不能大于限购数量',
+      });
     }
 
     if (value.specMode) {
@@ -621,8 +628,13 @@ export const adminProductForm = z
 
     // A card-key product's stock is the card pool, not a number an operator
     // types: kept apart, the two drift and the shop sells cards that do not
-    // exist.
-    if (value.kind === 'virtual_card' && value.skus.some((sku) => sku.stock > 0)) {
+    // exist. The editor echoes the pool it was shown (`stock` equal to
+    // `expectedStock`), which is not typing a number, and the server derives
+    // the stock from the pool either way.
+    if (
+      value.kind === 'virtual_card' &&
+      value.skus.some((sku) => sku.stock > 0 && sku.stock !== sku.expectedStock)
+    ) {
       ctx.addIssue({
         code: 'custom',
         path: ['skus'],
@@ -656,7 +668,7 @@ export type AdminProductTab = z.infer<typeof adminProductTab>;
 export const adminProductListQuery = pageQuery
   .extend({
     tab: adminProductTab.default('all'),
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     categoryId: id.optional(),
     labelId: id.optional(),
     /**
@@ -695,7 +707,7 @@ export const stockWarningItem = z.object({
 export type StockWarningItem = z.infer<typeof stockWarningItem>;
 
 export const stockWarningListQuery = pageQuery.extend({
-  keyword: z.string().max(64).optional(),
+  keyword: z.string().trim().max(64).optional(),
   categoryId: id.optional(),
   /** Overrides the configured threshold for this call only. */
   threshold: z.coerce.number().int().min(0).max(1_000_000).optional(),
@@ -713,7 +725,7 @@ export const pagedStockWarnings = paged(stockWarningItem);
  */
 export const productExportQuery = z.object({
   tab: adminProductTab.default('all'),
-  keyword: z.string().max(64).optional(),
+  keyword: z.string().trim().max(64).optional(),
   categoryId: id.optional(),
   kind: productKind.optional(),
   /** Hard ceiling; the server refuses more and asks for a narrower filter. */
@@ -756,7 +768,7 @@ export const virtualCardImportBody = z.object({
   cards: z
     .array(
       z.object({
-        cardNo: z.string().min(1).max(255),
+        cardNo: z.string().trim().min(1).max(255),
         cardSecret: z.string().max(255).optional(),
       }),
     )
@@ -846,7 +858,7 @@ export type SubmittedReview = z.infer<typeof submittedReview>;
 
 export const adminReviewListQuery = pageQuery
   .extend({
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     productId: id.optional(),
     status: z.union([productReviewStatus, z.array(productReviewStatus)]).optional(),
     /** 好评 4–5 / 中评 3 / 差评 1–2. */
@@ -864,7 +876,7 @@ export const adminReviewForm = z
   .object({
     productId: id,
     skuId: id.optional(),
-    authorNickname: z.string().min(1).max(64),
+    authorNickname: z.string().trim().min(1).max(64),
     authorAvatarUrl: z.string().max(512).optional(),
     productScore: z.number().int().min(1).max(5),
     serviceScore: z.number().int().min(1).max(5),
@@ -877,7 +889,7 @@ export const adminReviewForm = z
 export type AdminReviewForm = z.infer<typeof adminReviewForm>;
 
 export const reviewReplyBody = z.object({
-  content: z.string().min(1).max(500),
+  content: z.string().trim().min(1).max(500),
 });
 
 export const reviewStatusBody = z.object({
@@ -1017,7 +1029,7 @@ export const productSkuMatrix = z.object({
 
 export const storefrontProductListQuery = pageQuery
   .extend({
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     categoryId: id.optional(),
     labelId: id.optional(),
     /**
