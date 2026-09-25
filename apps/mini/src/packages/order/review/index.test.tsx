@@ -93,7 +93,7 @@ describe('评价商品', () => {
               status: 409,
               body: { code: 'CATALOG_REVIEW_ALREADY_WRITTEN', message: '已经评价过了' },
             }
-          : { status: 503, body: { code: 'INTERNAL', message: '服务暂时不可用' } };
+          : { status: 500, body: { code: 'INTERNAL', message: '服务器开小差了，请稍后再试' } };
       },
     });
     await renderPage(<ReviewPage />);
@@ -103,7 +103,7 @@ describe('评价商品', () => {
     await waitFor(() =>
       expect(taroFake.calls).toContainEqual({
         api: 'showToast',
-        args: expect.objectContaining({ title: '服务暂时不可用' }),
+        args: expect.objectContaining({ title: '服务器开小差了，请稍后再试' }),
       }),
     );
     // 商品乙 is still there to try again.

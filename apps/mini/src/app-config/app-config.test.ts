@@ -40,7 +40,7 @@ describe('app config', () => {
   it('keeps the stored copy when the network fails, and ignores a copy from an older build', async () => {
     taroFake.storage.set(APP_CONFIG_KEY, JSON.stringify(config));
     serveApi({
-      'GET /api/v1/app/config': () => ({ status: 503, body: { code: 'X', message: 'down' } }),
+      'GET /api/v1/app/config': () => ({ status: 502, body: '<html>502 Bad Gateway</html>' }),
     });
     await loadAppConfig();
     expect(useAppConfigStore.getState()).toMatchObject({ source: 'cache' });
@@ -48,7 +48,7 @@ describe('app config', () => {
     useAppConfigStore.setState({ config: null, source: 'none' });
     taroFake.storage.set(APP_CONFIG_KEY, JSON.stringify({ version: 'old' }));
     const seen = serveApi({
-      'GET /api/v1/app/config': () => ({ status: 503, body: { code: 'X', message: 'down' } }),
+      'GET /api/v1/app/config': () => ({ status: 502, body: '<html>502 Bad Gateway</html>' }),
     });
     await loadAppConfig();
     expect(seen[0]?.headers['If-None-Match']).toBeUndefined();

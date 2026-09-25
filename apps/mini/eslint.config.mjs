@@ -41,6 +41,37 @@ const REACT_19_ONLY = {
   message: '小程序运行的是 React 18（Taro 4.2），没有这个 API',
 };
 
+const SERVE_API =
+  '用 serveApi（src/test/fake-api.ts）答复请求：它按契约检查请求和答复（AGENTS.md 20）';
+
+/** Ways a test could answer a request without serveApi. (esquery regexes cannot hold a `/`.) */
+const RAW_REQUEST_MOCKS = [
+  {
+    selector: "NewExpression[callee.name='Function']",
+    message: 'new Function 被静态守卫禁止',
+  },
+  {
+    selector:
+      "AssignmentExpression > MemberExpression.left[object.name='taroFake'][property.name=/^(onRequest|request)$/]",
+    message: SERVE_API,
+  },
+  {
+    selector:
+      "CallExpression[callee.object.name='vi'][callee.property.name='stubGlobal'][arguments.0.value=/^(fetch|XMLHttpRequest)$/]",
+    message: SERVE_API,
+  },
+  {
+    selector:
+      "CallExpression[callee.object.name='vi'][callee.property.name='spyOn'][arguments.1.value=/^(request|uploadFile)$/]",
+    message: SERVE_API,
+  },
+  {
+    selector:
+      "CallExpression[callee.object.name='vi'][callee.property.name=/^(mock|doMock)$/][arguments.0.value=/^(@shop.api-client|@tarojs.taro$|@.data.api$)/]",
+    message: `${SERVE_API}；@tarojs/taro 已经换成 src/test/taro-fake`,
+  },
+];
+
 /** `@shop/contracts` modules with no zod import, allowed at runtime. */
 const CONTRACTS_RUNTIME = [
   '@shop/contracts/decor/link-route',
@@ -132,5 +163,14 @@ export default [
     // Tests may reach the fake runtime directly.
     files: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'src/test/**'],
     rules: { 'no-console': 'off', '@typescript-eslint/no-explicit-any': 'off' },
+  },
+  {
+    // A test answers requests through serveApi (src/test/fake-api.ts), which holds each stub and
+    // each request to the contracts: a hand-rolled answer passes on a page that breaks against
+    // the real server (AGENTS.md 20). The H5 emulation's tests talk to its own `/__e2e/`
+    // endpoints over fetch, which no contract describes.
+    files: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    ignores: ['src/test/**', 'src/platform/h5-*.test.ts', 'src/platform/h5-*.test.tsx'],
+    rules: { 'no-restricted-syntax': ['error', ...RAW_REQUEST_MOCKS] },
   },
 ];

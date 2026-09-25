@@ -346,6 +346,8 @@ describe('确认订单 — when the server says no', () => {
               status: 409,
               body: { code: 'SHIPPING_NOT_DELIVERABLE', message: '部分商品不支持配送到所选地区' },
             },
+      // The address sheet's region picker.
+      'GET /api/v1/cities': () => ({ body: cityTreeFixture }),
       'GET /api/v1/addresses': () => ({
         body: {
           items: [

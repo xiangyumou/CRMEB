@@ -13,7 +13,8 @@
  * const client = createApiClient({ ..., validateResponse: contractValidator() });
  * ```
  */
-import type { AnyRouteDef } from '@shop/contracts/conventions';
+import { commonErrors, errorBody, type AnyRouteDef } from '@shop/contracts/conventions';
+import { errorRegistry } from '@shop/contracts/errors';
 import { allRoutes } from '@shop/contracts/routes';
 import type { ResponseValidator } from './client';
 import { ApiError, CLIENT_ERROR_CODES } from './errors';
@@ -50,4 +51,33 @@ export function contractValidator(): ResponseValidator {
       });
     }
   };
+}
+
+/** Codes `handle()` may answer on any route, whatever the route lists in `errors`. */
+const ALWAYS_POSSIBLE: ReadonlySet<string> = new Set(Object.keys(commonErrors));
+
+/**
+ * Why `status` + `body` is an error the route `id` never answers, or `null` when it may: the
+ * body must be the error envelope, its code one the route declares (or one any route may
+ * give), and the status the one that code is registered under. For test stubs: a test of a
+ * failure the server never sends proves nothing (AGENTS.md 20).
+ */
+export function errorReplyProblem(
+  id: RouteId | string,
+  status: number,
+  body: unknown,
+): string | null {
+  const route = contractOf(id);
+  const parsed = errorBody.safeParse(body);
+  if (!parsed.success)
+    return `${id}: a ${status} answer is not an error envelope { code, message }`;
+  const { code } = parsed.data;
+  if (!ALWAYS_POSSIBLE.has(code) && !(route.errors ?? []).includes(code)) {
+    return `${id} does not declare ${code} in its errors; the server never answers it there`;
+  }
+  const registered = errorRegistry[code];
+  if (registered !== undefined && registered.status !== status) {
+    return `${code} is a ${registered.status}, but the stub for ${id} answered ${status}`;
+  }
+  return null;
 }

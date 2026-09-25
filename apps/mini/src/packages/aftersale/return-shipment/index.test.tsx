@@ -23,15 +23,12 @@ const companies = {
   ],
 };
 
-/** The last `?keyword=` the picker sent (the fake answers like the server: name or code). */
-let keyword = '';
-
 function serve(refund = approved) {
-  keyword = '';
   const seen = serveApi({
     'GET /api/v1/refunds/601': () => ({ body: refund }),
-    'GET /api/v1/express-companies': () => {
-      const words = keyword.toLowerCase();
+    // Answers like the server: the keyword matches a name or a code.
+    'GET /api/v1/express-companies': (_body, { query }) => {
+      const words = (query['keyword'] ?? '').toLowerCase();
       return {
         body: {
           items: companies.items.filter(
@@ -44,14 +41,6 @@ function serve(refund = approved) {
       body: { ...refund, returnStage: 'shipped_back', returnTrackingNo: 'SF123' },
     }),
   });
-  // The handler sees no query string; read it off the request as it is recorded.
-  const onRequest = taroFake.onRequest;
-  taroFake.onRequest = (option) => {
-    const search = option.url.split('?')[1] ?? '';
-    if (option.url.includes('/express-companies'))
-      keyword = new URLSearchParams(search).get('keyword') ?? '';
-    return onRequest(option);
-  };
   return seen;
 }
 

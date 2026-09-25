@@ -33,12 +33,16 @@ function userCenter(signedIn: boolean) {
   };
 }
 
+/** The tab bar's badge reads it once the shopper is signed in. */
+const EMPTY_CART_COUNT = { items: 0, quantity: 0, availableCount: 0, unavailableCount: 0 };
+
 describe('我的', () => {
   it('draws the decorated 个人中心 with the shopper, and the unread messages', async () => {
     signIn();
     serveApi({
       'GET /api/v1/pages/user-center': () => ({ body: userCenter(true) }),
       'GET /api/v1/my-messages/unread-count': () => ({ body: { unread: 2 } }),
+      'GET /api/v1/cart/count': () => ({ body: EMPTY_CART_COUNT }),
     });
     await renderPage(<Me />);
 
@@ -65,6 +69,7 @@ describe('我的', () => {
     const seen = serveApi({
       'GET /api/v1/pages/user-center': () => ({ body: userCenter(signedIn) }),
       'GET /api/v1/my-messages/unread-count': () => ({ body: { unread: 0 } }),
+      'GET /api/v1/cart/count': () => ({ body: EMPTY_CART_COUNT }),
     });
     await renderPage(<Me />);
 
@@ -82,6 +87,7 @@ describe('我的', () => {
     const seen = serveApi({
       'GET /api/v1/pages/user-center': () => ({ body: userCenter(true) }),
       'GET /api/v1/my-messages/unread-count': () => ({ body: { unread: 0 } }),
+      'GET /api/v1/cart/count': () => ({ body: EMPTY_CART_COUNT }),
     });
     // The app's own freshness window: a read younger than 30 s is not stale.
     const client = new QueryClient({
