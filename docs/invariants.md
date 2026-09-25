@@ -2024,6 +2024,14 @@ No date is cut out of a UTC instant — `toISOString().slice/split` unless shift
 - `guards/src/checks/literals.test.ts::instants cut as dates > GUARD-003 — finds an instant field sliced as text`
 - `guards/src/checks/literals.test.ts::instants cut as dates > GUARD-003 — in UI code, reports every bare toISOString()`
 
+### GUARD-004
+
+No response carries a credential or cross-app identifier (a password or its hash, `session_key`, `openid` / `unionid`, an ID-card number, a 卡密) as text unless it is masked or staff-only and listed with the reason; a phone number, real name, e-mail or invoice bank account leaves a non-admin route only as the shopper's own record or the shop's own.
+
+- `guards/src/checks/personal-data.test.ts::personal data in responses > GUARD-004 — fails a credential in any response, admin included`
+- `guards/src/checks/personal-data.test.ts::personal data in responses > GUARD-004 — fails somebody else’s phone on a storefront route`
+- `guards/src/checks/personal-data.test.ts::personal-data over the tree > GUARD-004 — no response carries a credential or another person’s data unexplained`
+
 ## Storefront share codes (小程序码)
 
 ### SHARE-001

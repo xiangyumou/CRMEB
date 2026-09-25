@@ -36,7 +36,7 @@ function secretFields(): SecretField[] {
 }
 
 /** Every `(path, zod type)` pair reachable in a schema, depth-limited by the cycle set. */
-function walkSchema(
+export function walkSchema(
   schema: z.ZodType,
   visit: (propertyPath: string[], node: z.ZodType) => void,
 ): void {

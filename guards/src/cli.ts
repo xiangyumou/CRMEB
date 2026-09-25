@@ -22,6 +22,7 @@ import { migrations } from './checks/migrations';
 import { miniCheck } from './checks/mini';
 import { miniStyles } from './checks/mini-styles';
 import { permissions } from './checks/permissions';
+import { personalData } from './checks/personal-data';
 import { pipeline } from './checks/pipeline';
 import { retiredFeatures } from './checks/retired';
 import { routeHygiene } from './checks/route-hygiene';
@@ -41,6 +42,7 @@ const CHECKS: readonly Check[] = [
   retiredFeatures,
   bannedConstructs,
   secretsNeverLeak,
+  personalData,
   txPool,
   counters,
   literals,
