@@ -83,12 +83,6 @@ export const notificationTemplateShells: NewNotificationTemplate[] = [
     audience: 'user',
     variables: ['orderNo', 'amount'],
   },
-  {
-    code: 'order_unpaid_reminder',
-    name: '未付款提醒',
-    audience: 'user',
-    variables: ['orderNo', 'amount'],
-  },
   { code: 'groupbuy_created', name: '开团成功提醒', audience: 'user', variables: ['orderNo'] },
   { code: 'groupbuy_joined', name: '参团成功提醒', audience: 'user', variables: ['orderNo'] },
   {

@@ -481,7 +481,8 @@ describe('login throttling', () => {
         { ip: '203.0.113.9' },
       ),
     ).resolves.toBeDefined();
-    expect(await harness.redis.get(`user:login:fail:${PHONE}:203.0.113.1`)).toBe('3');
+    // The counters count attempts (the refused one included), not only failures.
+    expect(await harness.redis.get(`user:login:fail:${PHONE}:203.0.113.1`)).toBe('4');
   });
 
   it('USER-013 — guesses from many addresses park the account at ten times the limit', async () => {
@@ -528,8 +529,9 @@ describe('login throttling', () => {
       { account: PHONE, password: 'crmeb654321' },
       { ip: '203.0.113.1' },
     );
-    // A guesser's progress against the account is not wiped by the owner.
-    expect(await harness.redis.get(`user:login:fail:${PHONE}`)).toBe('1');
+    // A guesser's progress against the account is not wiped by the owner: both
+    // attempts stay on the account's ceiling (it counts attempts, not failures).
+    expect(await harness.redis.get(`user:login:fail:${PHONE}`)).toBe('2');
     expect(await harness.redis.get(`user:login:fail:${PHONE}:203.0.113.1`)).toBeNull();
   });
 });
