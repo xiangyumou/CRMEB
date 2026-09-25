@@ -236,7 +236,7 @@ async function makeOrder(args: {
     quantity,
     unitPrice: amount,
     totalAmount: amount,
-    snapshot: { name: '坚果礼盒' } as never,
+    snapshot: { name: '坚果礼盒', productKind: 'physical' } as never,
   });
   return { orderId: order!.id, orderNo };
 }
@@ -792,7 +792,6 @@ describe('paying', () => {
           courierName: '王五',
           courierPhone: '13900000000',
         },
-        operatorAdminId: 1,
       });
 
     await expect(ship()).rejects.toMatchObject({ code: 'ORDER_GROUPBUY_NOT_READY' });

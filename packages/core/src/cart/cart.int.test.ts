@@ -222,7 +222,7 @@ describe('listing the cart', () => {
     });
     await harness.ctx.db
       .update(orders)
-      .set({ status: 'paid' })
+      .set({ status: 'paid', paidAt: harness.clock.now(), paidAmount: bought.payableAmount })
       .where(eq(orders.id, Number(bought.id)));
 
     await cart.addItem(as(userId), { skuId: String(limited.skuId), quantity: 1 });
