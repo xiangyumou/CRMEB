@@ -2326,9 +2326,12 @@ The 省市区 tree is immutable seed data served with a fingerprint and a weak E
 
 ### CMS-001
 
-Stored article HTML is sanitised on write against an allow-list: no `script`, no `on*` handler, no `javascript:` / `data:text/html` URL, and no `url(`/`expression(` style.
+Stored article HTML and product descriptions are sanitised on write against one allow-list (`packages/core/src/kernel/sanitize-html.ts`): no `script`, no `on*` handler, no `javascript:` / `data:text/html` URL, and no `url(`/`expression(` style. Sanitising is idempotent — the editor saves back what it loaded, so entities are not escaped twice and a link's `rel` is not appended again.
 
 - `packages/core/src/cms/cms.int.test.ts::文章 > sanitises the body on write, so the stored html is already safe`
+- `packages/core/src/catalog/catalog.int.test.ts::products > CMS-001 — sanitises the description on save, and a re-save changes nothing`
+- `packages/core/src/cms/cms.sanitize.test.ts::sanitizeHtml > CMS-001 — a second pass changes nothing (the editor saves back what it loaded): <html>`
+- `packages/core/src/cms/cms.sanitize.test.ts::sanitizeHtml > CMS-001 — judges an attribute by what the browser decodes, not by its spelling`
 
 ### CMS-002
 

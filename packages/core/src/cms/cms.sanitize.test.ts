@@ -79,4 +79,35 @@ describe('sanitizeHtml', () => {
   it('leaves an empty body empty', () => {
     expect(sanitizeHtml('')).toBe('');
   });
+
+  it.each([
+    '<p>A &amp; B &lt;b&gt; 价格&nbsp;¥9 &ldquo;引号&rdquo; &#39;</p>',
+    '<img src="/uploads/a.png?w=1&amp;h=2" alt="&quot;海报&quot;" />',
+    '<a href="https://example.test" target="_blank" rel="noopener noreferrer">外链</a>',
+    '<p>5 &lt; 6 &amp; 7 &gt; 3</p>',
+  ])(
+    'CMS-001 — a second pass changes nothing (the editor saves back what it loaded): %s',
+    (html) => {
+      const once = sanitizeHtml(html);
+      expect(sanitizeHtml(once)).toBe(once);
+      expect(once).not.toContain('&amp;amp;');
+      expect(once.match(/rel=/g) ?? []).toHaveLength(html.includes('rel=') ? 1 : 0);
+    },
+  );
+
+  it('CMS-001 — judges an attribute by what the browser decodes, not by its spelling', () => {
+    // `&amp;` in a URL is `&`, written back once.
+    expect(sanitizeHtml('<img src="/a.png?x=1&amp;y=2" />')).toBe(
+      '<img src="/a.png?x=1&amp;y=2" />',
+    );
+    // A named reference the sanitiser does not decode stays literal text, so it
+    // can never become the `:` of a `javascript:` the check did not see.
+    expect(sanitizeHtml('<a href="javascript&colon;alert(1)">x</a>')).toBe(
+      '<a href="javascript&amp;colon;alert(1)">x</a>',
+    );
+    // No code point, no 500.
+    expect(sanitizeHtml('<img src="/a.png" alt="&#99999999;" />')).toBe(
+      '<img src="/a.png" alt="" />',
+    );
+  });
 });

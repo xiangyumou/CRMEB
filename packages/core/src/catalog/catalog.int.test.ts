@@ -231,6 +231,26 @@ describe('categories', () => {
 // ---------------------------------------------------------------------------
 
 describe('products', () => {
+  it('CMS-001 — sanitises the description on save, and a re-save changes nothing', async () => {
+    const product = await makeProduct(asAdmin(), {
+      descriptionHtml:
+        '<p onclick="alert(1)">面料 &amp; 洗涤</p><script>alert(1)</script>' +
+        '<img src="/uploads/a.png" onerror="alert(1)" /><a href="javascript:alert(1)">链接</a>',
+    });
+    const stored = (await service.adminProductDetail(asAdmin(), { id: product.id }))
+      .descriptionHtml;
+    expect(stored).toBe('<p>面料 &amp; 洗涤</p><img src="/uploads/a.png" /><a>链接</a>');
+
+    await service.adminProductUpdate(
+      asAdmin(),
+      { id: product.id },
+      productForm({ name: product.name, descriptionHtml: stored }),
+    );
+    expect((await service.adminProductDetail(asAdmin(), { id: product.id })).descriptionHtml).toBe(
+      stored,
+    );
+  });
+
   it('rolls the denormalised price and stock up from the visible SKUs', async () => {
     const product = await makeProduct(asAdmin(), {
       specMode: true,

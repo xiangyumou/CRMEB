@@ -25,6 +25,7 @@ import { randomBytes } from 'node:crypto';
 import { hasPermission } from '../auth/rbac';
 import { DomainError } from '../kernel/errors';
 import { shopDay } from '../kernel/shop-time';
+import { sanitizeHtml } from '../kernel/sanitize-html';
 import { requireAdminId, type Ctx } from '../kernel/context';
 import { catalogConfig } from './catalog.config';
 import { catalogPermissions } from './permissions';
@@ -1033,7 +1034,13 @@ async function writeProductChildren(
   await repo.replaceProtectionLinks(tx, productId, body.protectionIds.map(Number));
   await repo.replaceRecommendations(tx, productId, body.recommendedProductIds.map(Number));
   await repo.replaceGiftCoupons(tx, productId, body.giftCouponIds.map(Number));
-  await repo.upsertDescription(tx, { productId, contentHtml: body.descriptionHtml, now });
+  // Sanitised on write, like an article body: the column is served to every
+  // shopper, so what it holds must already be safe (kernel/sanitize-html.ts).
+  await repo.upsertDescription(tx, {
+    productId,
+    contentHtml: sanitizeHtml(body.descriptionHtml),
+    now,
+  });
   await repo.replaceParams(
     tx,
     productId,
