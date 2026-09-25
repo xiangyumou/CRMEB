@@ -677,6 +677,13 @@ Submitting an order checks that its activity is still open before it compares th
 
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > ORDER-013 — an activity that closed after the preview answers 活动未开放, not 价格有变动`
 
+### ORDER-014
+
+退款中 means an after-sales request on the order is still open (`applied`, `approved`, `processing`, `unknown` or `failed`), read from `refunds` rather than the `orders.refund_status` roll-up that stays `partially_refunded` after its request closed. The console's 退款中 tab and counter and the shopper's 退款/售后 tab and badge all use it, and neither 删除 nor the shopper's 删除订单 files away an order in that state.
+
+- `packages/core/src/order/order.console.int.test.ts::ORDER-014 — 退款中 means an after-sales request still open > lists and counts an open request, and not an order whose request closed after a partial refund`
+- `packages/core/src/order/order.console.int.test.ts::ORDER-014 — 退款中 means an after-sales request still open > neither 删除 nor the shopper’s 删除订单 files away an order whose request is still open`
+
 ### COUPON-007
 
 The last coupon cannot be claimed twice: one concurrent claim wins, the other is refused, `remain_count` never goes negative and exactly one user holds it.

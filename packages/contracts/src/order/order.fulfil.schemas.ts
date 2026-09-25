@@ -419,6 +419,12 @@ export const adminOrderListQuery = pageQuery
       .union([orderFulfillmentStatus, z.array(orderFulfillmentStatus)])
       .optional(),
     refundStatus: z.union([orderRefundStatus, z.array(orderRefundStatus)]).optional(),
+    /**
+     * `true` keeps only orders with an after-sales request still open (退款中).
+     * Not a `refundStatus` value: that roll-up stays `partially_refunded` after
+     * the request that caused it has closed.
+     */
+    refunding: z.stringbool().optional(),
     kind: orderKind.optional(),
     platform: clientPlatform.optional(),
     /** Order number, receiver name, receiver phone or a product name in the order. */

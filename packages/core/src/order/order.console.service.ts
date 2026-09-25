@@ -191,6 +191,7 @@ export function filterOf(query: AdminOrderListQuery): fulfilRepo.AdminOrderFilte
     status: asArray(query.status),
     fulfillmentStatus: asArray(query.fulfillmentStatus),
     refundStatus: asArray(query.refundStatus),
+    refunding: query.refunding,
     kind: query.kind,
     platform: query.platform === undefined ? undefined : PLATFORM_TO_DB[query.platform],
     keyword: query.keyword,
@@ -588,13 +589,16 @@ export async function adminConfirmReceipt(
   return adminDetail(ctx, params);
 }
 
+export const OPEN_REFUND_BLOCKS_DELETE = '订单还有售后在处理，处理完后才能删除';
+
 /**
  * 删除订单 — a soft delete, and only of a finished order.
  *
  * Removing a `paid` order from every list would leave its stock, its coupon and
  * its money committed with nobody looking at them. So the WHERE says
  * `cancelled | completed | refunded`, and an order in flight cannot be made to
- * disappear.
+ * disappear. Nor can a 已完成 order whose after-sales request is still open:
+ * the refund would go on with the order gone from every list.
  */
 export async function adminDelete(ctx: Ctx, params: { id: string }): Promise<{ deleted: boolean }> {
   const adminId = requireAdminId(ctx);
@@ -604,8 +608,15 @@ export async function adminDelete(ctx: Ctx, params: { id: string }): Promise<{ d
     const order = await repo.findOrder(tx, orderId);
     if (!order) throw new DomainError('ORDER_NOT_FOUND');
     const deleted = await fulfilRepo.softDeleteOrder(tx, { orderId, at: ctx.clock.now() });
-    if (!deleted.won)
+    if (!deleted.won) {
+      if (order.deletedAt === null && (await repo.orderHasOpenRefund(tx, orderId))) {
+        throw new DomainError('ORDER_NOT_DELETABLE', {
+          message: OPEN_REFUND_BLOCKS_DELETE,
+          details: { status: order.status, openRefund: true },
+        });
+      }
       throw new DomainError('ORDER_NOT_DELETABLE', { details: { status: order.status } });
+    }
     await repo.insertStatusLog(tx, {
       orderId,
       changeType: 'deleted_by_admin',

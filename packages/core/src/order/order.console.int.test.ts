@@ -4,6 +4,7 @@ import { cartItems } from '@shop/db/schema/cart';
 import { productSkus, products } from '@shop/db/schema/catalog';
 import { orderItems, orderStatusLogs, orders } from '@shop/db/schema/order';
 import { expressCompanies } from '@shop/db/schema/reference';
+import { refunds } from '@shop/db/schema/refund';
 import { admins } from '@shop/db/schema/auth';
 import { effects as effectsTable } from '@shop/db/schema/system';
 import { userAddresses, users } from '@shop/db/schema/user';
@@ -650,6 +651,107 @@ describe('删除订单', () => {
     });
     expect(result).toEqual({ deleted: 1, skippedIds: [String(live.orderId)] });
     expect((await orderRow(live.orderId)).deletedAt).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 退款中
+// ---------------------------------------------------------------------------
+
+/** A 已完成 order, as confirm-receipt and the completion sweep would leave it. */
+async function complete(placed: Placed): Promise<void> {
+  await pay(placed);
+  await harness.ctx.db
+    .update(orders)
+    .set({ status: 'completed', fulfillmentStatus: 'fulfilled' })
+    .where(eq(orders.id, placed.orderId));
+}
+
+async function fileRefund(
+  placed: Placed,
+  status: 'applied' | 'failed' | 'cancelled',
+  { refunded = '0.00' }: { refunded?: string } = {},
+): Promise<void> {
+  sequence += 1;
+  await harness.ctx.db.insert(refunds).values({
+    refundNo: `RF-${sequence}`,
+    outRefundNo: `ORF-${sequence}`,
+    orderId: placed.orderId,
+    userId: placed.userId,
+    kind: 'refund_only',
+    status,
+    quantity: 1,
+    amount: '10.00',
+    cancelledAt: status === 'cancelled' ? new Date() : null,
+    failedAt: status === 'failed' ? new Date() : null,
+  });
+  if (refunded !== '0.00') {
+    await harness.ctx.db
+      .update(orders)
+      .set({ refundStatus: 'partially_refunded', refundedAmount: refunded })
+      .where(eq(orders.id, placed.orderId));
+  }
+}
+
+describe('ORDER-014 — 退款中 means an after-sales request still open', () => {
+  it('lists and counts an open request, and not an order whose request closed after a partial refund', async () => {
+    const adminId = await makeAdmin();
+    const open = await placeOrder();
+    await complete(open);
+    await fileRefund(open, 'applied');
+    // Money went back once and the request is closed: `partially_refunded` for good.
+    const settled = await placeOrder();
+    await complete(settled);
+    await fileRefund(settled, 'cancelled', { refunded: '10.00' });
+    // A failed refund still holds its lines until the merchant retries or closes it.
+    const failed = await placeOrder();
+    await complete(failed);
+    await fileRefund(failed, 'failed');
+
+    const listed = await order.orderConsole.adminList(
+      asAdmin(adminId),
+      listQuery({ refunding: true }),
+    );
+    expect(listed.items.map((row) => row.id).sort()).toEqual(
+      [String(open.orderId), String(failed.orderId)].sort(),
+    );
+
+    const stats = await order.orderConsole.adminStatistics(asAdmin(adminId), {});
+    expect(stats.refunding).toBe(2);
+
+    // The shopper's 退款/售后 badge and tab say the same.
+    expect((await order.counts(as(open.userId))).refunding).toBe(1);
+    expect((await order.counts(as(settled.userId))).refunding).toBe(0);
+    const tab = await order.list(as(settled.userId), {
+      tab: 'refunding',
+      page: 1,
+      pageSize: 20,
+      sortOrder: 'desc',
+    });
+    expect(tab.total).toBe(0);
+  });
+
+  it('neither 删除 nor the shopper’s 删除订单 files away an order whose request is still open', async () => {
+    const adminId = await makeAdmin();
+    const open = await placeOrder();
+    await complete(open);
+    await fileRefund(open, 'applied');
+
+    await expect(
+      order.orderConsole.adminDelete(asAdmin(adminId), { id: String(open.orderId) }),
+    ).rejects.toMatchObject({
+      code: 'ORDER_NOT_DELETABLE',
+      message: '订单还有售后在处理，处理完后才能删除',
+    });
+    expect(
+      await order.orderConsole.adminDeleteMany(asAdmin(adminId), { ids: [String(open.orderId)] }),
+    ).toEqual({ deleted: 0, skippedIds: [String(open.orderId)] });
+    await expect(order.hide(as(open.userId), { id: String(open.orderId) })).rejects.toMatchObject({
+      code: 'ORDER_NOT_DELETABLE',
+    });
+    const row = await orderRow(open.orderId);
+    expect(row.deletedAt).toBeNull();
+    expect(row.hiddenByUserAt).toBeNull();
   });
 });
 

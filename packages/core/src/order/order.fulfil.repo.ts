@@ -27,6 +27,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { allOf, conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
+import { hasOpenRefund } from './order.repo';
 import type { OrderStatus } from './ports';
 
 /**
@@ -425,6 +426,7 @@ export interface AdminOrderFilter {
   status?: readonly OrderStatus[] | undefined;
   fulfillmentStatus?: readonly FulfillmentStatus[] | undefined;
   refundStatus?: readonly ('none' | 'requested' | 'partially_refunded' | 'refunded')[] | undefined;
+  refunding?: boolean | undefined;
   kind?: 'normal' | 'groupbuy' | 'presale' | undefined;
   platform?: 'h5' | 'wechat_oa' | 'wechat_mini' | undefined;
   keyword?: string | undefined;
@@ -449,6 +451,11 @@ function adminWhere(filter: AdminOrderFilter): SQL | undefined {
     filter.refundStatus?.length
       ? inArray(orders.refundStatus, [...filter.refundStatus])
       : undefined,
+    filter.refunding === undefined
+      ? undefined
+      : filter.refunding
+        ? hasOpenRefund()
+        : sql`not ${hasOpenRefund()}`,
     filter.kind ? eq(orders.kind, filter.kind) : undefined,
     filter.platform ? eq(orders.platform, filter.platform) : undefined,
     filter.userId === undefined ? undefined : eq(orders.userId, filter.userId),
@@ -630,7 +637,7 @@ export async function workQueueCounts(db: DbOrTx): Promise<WorkQueueCounts> {
       .select({
         pendingShipment: sql<number>`count(*) filter (where ${orders.status} = 'paid')::int`,
         pendingReceipt: sql<number>`count(*) filter (where ${orders.status} = 'shipped')::int`,
-        refunding: sql<number>`count(*) filter (where ${orders.refundStatus} in ('requested','partially_refunded'))::int`,
+        refunding: sql<number>`count(*) filter (where ${hasOpenRefund()})::int`,
       })
       .from(orders)
       .where(isNull(orders.deletedAt)),
@@ -717,7 +724,7 @@ export async function updateReceiver(
   });
 }
 
-/** Only a finished order can be filed away, and only once. */
+/** Only a finished order with no after-sales still open can be filed away, and only once. */
 export async function softDeleteOrder(
   tx: Tx,
   args: { orderId: number; at: Date },
@@ -727,6 +734,7 @@ export async function softDeleteOrder(
       eq(orders.id, args.orderId),
       inArray(orders.status, ['cancelled', 'completed', 'refunded']),
       isNull(orders.deletedAt),
+      sql`not ${hasOpenRefund()}`,
     ),
     set: { deletedAt: args.at, updatedAt: sql`now()` },
   });
