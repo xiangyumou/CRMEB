@@ -9,6 +9,7 @@ import {
   NOTIFICATION_SCOPE,
 } from './notification.service';
 import { formatShopTime } from './notification.render';
+import { settledRefundNote } from './notification.registry';
 
 /**
  * Where notifications hook into the rest of the system.
@@ -102,6 +103,7 @@ export function installNotificationHooks(): void {
         refundNo: event.refundNo ?? '',
         orderNo: event.orderNo,
         amount: event.refundedAmount.toString(),
+        refundNote: settledRefundNote(event.refundedAmount.toString()),
       },
     });
   });

@@ -14,7 +14,7 @@ import { recordEffect } from '../effects';
 import { requireAdminId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { toId, toIdOrNull } from '../kernel/ids';
-import { notify } from '../notification';
+import { approvedRefundNote, notify } from '../notification';
 import { refundPermissions } from './permissions';
 import { returnAddress, type ReturnAddress } from './refund.config';
 import * as repo from './refund.repo';
@@ -174,7 +174,10 @@ async function approveAs(
     // Last, so that an approval the unit bound rolls back — the units went out
     // of the door first and the request is now a return — never tells the buyer
     // their refund was agreed.
-    await notifyReview(tx, ctx, row, 'refund_approved', { amount: row.amount });
+    await notifyReview(tx, ctx, row, 'refund_approved', {
+      amount: row.amount,
+      refundNote: approvedRefundNote(row.amount),
+    });
   });
 
   return detail(ctx, id);

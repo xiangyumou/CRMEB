@@ -1,4 +1,5 @@
 import type { NotificationChannel } from '@shop/contracts/notification/schemas';
+import { Money } from '../kernel/money';
 import {
   storefrontRouteDef,
   storefrontRouteKey,
@@ -133,6 +134,23 @@ export function resetNotificationRegistry(): void {
 // ---------------------------------------------------------------------------
 
 /**
+ * How 退款申请通过 and 退款到账 speak of the money. A refund may be worth ¥0 —
+ * an order a coupon paid for in full gives back units, the coupon and the seat
+ * — and 「¥0.00 已原路退回」 tells the buyer to look for money that is not coming.
+ */
+export function approvedRefundNote(amount: string): string {
+  return isZeroAmount(amount) ? '没有需要退回的款项' : `的 ¥${amount} 将原路退回`;
+}
+
+export function settledRefundNote(amount: string): string {
+  return isZeroAmount(amount) ? '已处理完成，没有需要退回的款项' : `的 ¥${amount} 已原路退回`;
+}
+
+function isZeroAmount(amount: string): boolean {
+  return amount.trim() === '' || Money.parse(amount).isZero();
+}
+
+/**
  * What every order sender fills. The admin form lists these as the variables
  * an operator may use, so a name here that no sender supplies is a promise the
  * message breaks: `nickname` was listed for months and rendered blank.
@@ -261,11 +279,11 @@ export function registerBuiltInNotificationEvents(): void {
       name: '退款申请通过',
       description: '客服同意退款后发送',
       audience: 'user',
-      variables: ['refundId', 'refundNo', 'orderNo', 'amount'],
+      variables: ['refundId', 'refundNo', 'orderNo', 'amount', 'refundNote'],
       channels: [...USER_CHANNELS],
       defaults: {
         title: '退款申请已通过',
-        body: '退款单 {{refundNo}} 已通过审核，退款将原路返回。',
+        body: '退款单 {{refundNo}} 已通过审核，订单 {{orderNo}} {{refundNote}}。',
       },
       route: REFUND_ROUTE,
     },
@@ -284,9 +302,9 @@ export function registerBuiltInNotificationEvents(): void {
       name: '退款到账提醒',
       description: '退款成功打回原支付渠道后发送',
       audience: 'user',
-      variables: ['refundId', 'refundNo', 'orderNo', 'amount'],
+      variables: ['refundId', 'refundNo', 'orderNo', 'amount', 'refundNote'],
       channels: [...USER_CHANNELS],
-      defaults: { title: '退款已到账', body: '退款单 {{refundNo}} 的 ¥{{amount}} 已原路退回。' },
+      defaults: { title: '退款已完成', body: '退款单 {{refundNo}} {{refundNote}}。' },
       route: REFUND_ROUTE,
     },
     {

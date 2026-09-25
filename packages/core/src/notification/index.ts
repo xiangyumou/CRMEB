@@ -33,6 +33,8 @@ export {
 } from './notification.service';
 
 export {
+  approvedRefundNote,
+  settledRefundNote,
   registerNotificationEvents,
   findNotificationEvent,
   allNotificationEvents,

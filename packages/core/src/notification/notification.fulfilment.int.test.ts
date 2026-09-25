@@ -421,7 +421,11 @@ describe('NOTIF-007 — the order hooks carry what their wording names', () => {
       }),
     );
     const settled = await notificationPayload('refund_settled:refund:77');
-    expect(settled?.data).toMatchObject({ refundNo: 'RF202606010001', amount: '60.00' });
+    expect(settled?.data).toMatchObject({
+      refundNo: 'RF202606010001',
+      amount: '60.00',
+      refundNote: '的 ¥60.00 已原路退回',
+    });
     expect(blankIn('refund_settled', settled!.data)).toEqual([]);
   });
 

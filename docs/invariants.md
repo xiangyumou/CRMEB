@@ -1416,6 +1416,13 @@ A mini-program subscribe-message value is fitted to the type its key names befor
 - `packages/core/src/notification/notification.render.test.ts::NOTIF-010 — a subscribe-message value fits its field type > keeps only digits, letters and ASCII symbols in a character_string, at most 32`
 - `packages/core/src/notification/notification.render.test.ts::NOTIF-010 — a subscribe-message value fits its field type > cuts a phrase to 5, a name to 10 characters (20 in ASCII), a symbol to 5`
 
+### NOTIF-011
+
+A refund worth ¥0 (an order a coupon paid for in full) is not announced as money on its way back: 退款申请通过 and 退款完成 carry a `refundNote` that names the amount and 原路退回 for a paid refund, and says there is nothing to return for ¥0.
+
+- `packages/core/src/notification/notification.registry.test.ts::NOTIF-011 — a ¥0 refund is not announced as money on its way back > says 原路退回 with the amount for a paid refund`
+- `packages/core/src/notification/notification.registry.test.ts::NOTIF-011 — a ¥0 refund is not announced as money on its way back > says there is nothing to return for a refund worth ¥0`
+
 ### USER-010
 
 An SMS verification code is spent exactly once: two concurrent verifications of one code produce one sign-in and one refusal, and a wrong code burns an attempt.

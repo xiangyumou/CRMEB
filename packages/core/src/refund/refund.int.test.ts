@@ -385,7 +385,7 @@ describe('after-sales notifications', () => {
     expect(approved?.payload).toMatchObject({
       event: 'refund_approved',
       userId: order.userId,
-      data: { refundId: id, amount: '50.00' },
+      data: { refundId: id, amount: '50.00', refundNote: '的 ¥50.00 将原路退回' },
     });
     expect((approved?.payload as { data: { orderNo: string } }).data.orderNo).toMatch(/^RO\d+$/);
   });
