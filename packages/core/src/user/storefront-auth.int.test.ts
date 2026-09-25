@@ -452,52 +452,28 @@ describe('passwordLogin', () => {
 });
 
 describe('login throttling', () => {
-  it('counts the account window and the account+IP window separately', async () => {
-    // INVARIANT USER-013. One shared reverse proxy means an IP-only bucket
-    // throttles the whole shop; an account-only bucket lets a botnet spread
-    // the guesses across machines.
+  it('USER-013 — five wrong passwords park that address, not the shopper’s account', async () => {
+    // One shared reverse proxy means an IP-only bucket throttles the whole
+    // shop; an account-only bucket at the same small limit let anybody lock a
+    // shopper out of their own account with a handful of wrong passwords.
     await registerCustomer();
     await harness.ctx.config.set(storefrontAuthConfig, { loginMaxAttempts: 3 });
-
     const wrong = { account: PHONE, password: 'wrong-one-1' };
+
     for (let i = 0; i < 3; i += 1) {
       await expect(
         auth.passwordLogin(asAnonymous(), wrong, { ip: '203.0.113.1' }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' });
     }
-
-    // The account window is spent, so moving to a fresh address does not help…
+    // That address is parked, even with the right password…
     await expect(
-      auth.passwordLogin(asAnonymous(), wrong, { ip: '203.0.113.2' }),
+      auth.passwordLogin(
+        asAnonymous(),
+        { account: PHONE, password: 'crmeb654321' },
+        { ip: '203.0.113.1' },
+      ),
     ).rejects.toMatchObject({ code: 'AUTH_TOO_MANY_ATTEMPTS' });
-    // …and neither does the right password, which is the point of a lockout.
-    await expect(
-      auth.passwordLogin(asAnonymous(), { account: PHONE, password: 'crmeb654321' }),
-    ).rejects.toMatchObject({ code: 'AUTH_TOO_MANY_ATTEMPTS' });
-
-    // Two distinct keys, and the account one is checked first — so the second
-    // address never even gets a counter.
-    expect(await harness.redis.get(`user:login:fail:${PHONE}`)).not.toBeNull();
-    expect(await harness.redis.get(`user:login:fail:${PHONE}:203.0.113.1`)).toBe('3');
-    expect(await harness.redis.get(`user:login:fail:${PHONE}:203.0.113.2`)).toBeNull();
-  });
-
-  it('parks one address without parking the account', async () => {
-    // The other half of the pair: a single machine burns through its own
-    // window first, and a shopper on a different connection is unaffected.
-    await registerCustomer();
-    await harness.ctx.config.set(storefrontAuthConfig, { loginMaxAttempts: 6 });
-    const wrong = { account: PHONE, password: 'wrong-one-1' };
-
-    for (let i = 0; i < 6; i += 1) {
-      await auth.passwordLogin(asAnonymous(), wrong, { ip: '203.0.113.1' }).catch(() => undefined);
-    }
-    // The account counter is at 6 as well, so raise the account budget to
-    // isolate the address counter and prove it is the one refusing.
-    await harness.redis.del(`user:login:fail:${PHONE}`);
-    await expect(
-      auth.passwordLogin(asAnonymous(), wrong, { ip: '203.0.113.1' }),
-    ).rejects.toMatchObject({ code: 'AUTH_TOO_MANY_ATTEMPTS' });
+    // …the shopper, on their own connection, is not.
     await expect(
       auth.passwordLogin(
         asAnonymous(),
@@ -505,6 +481,27 @@ describe('login throttling', () => {
         { ip: '203.0.113.9' },
       ),
     ).resolves.toBeDefined();
+    expect(await harness.redis.get(`user:login:fail:${PHONE}:203.0.113.1`)).toBe('3');
+  });
+
+  it('USER-013 — guesses from many addresses park the account at ten times the limit', async () => {
+    await registerCustomer();
+    await harness.ctx.config.set(storefrontAuthConfig, { loginMaxAttempts: 3 });
+    const wrong = { account: PHONE, password: 'wrong-one-1' };
+
+    // 30 guesses, two per address: no address is parked, the account ceiling is spent.
+    for (let i = 0; i < 30; i += 1) {
+      await expect(
+        auth.passwordLogin(asAnonymous(), wrong, { ip: `198.51.100.${Math.floor(i / 2)}` }),
+      ).rejects.toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' });
+    }
+    await expect(
+      auth.passwordLogin(
+        asAnonymous(),
+        { account: PHONE, password: 'crmeb654321' },
+        { ip: '203.0.113.9' },
+      ),
+    ).rejects.toMatchObject({ code: 'AUTH_TOO_MANY_ATTEMPTS' });
   });
 
   it('uses the configured window, defaulting to 900 seconds', async () => {
@@ -517,7 +514,7 @@ describe('login throttling', () => {
     expect(ttl).toBeLessThanOrEqual(900_000);
   });
 
-  it('clears both counters on a successful login', async () => {
+  it('USER-013 — a successful login clears the caller’s counter, not the account’s', async () => {
     await registerCustomer();
     await auth
       .passwordLogin(
@@ -531,7 +528,8 @@ describe('login throttling', () => {
       { account: PHONE, password: 'crmeb654321' },
       { ip: '203.0.113.1' },
     );
-    expect(await harness.redis.get(`user:login:fail:${PHONE}`)).toBeNull();
+    // A guesser's progress against the account is not wiped by the owner.
+    expect(await harness.redis.get(`user:login:fail:${PHONE}`)).toBe('1');
     expect(await harness.redis.get(`user:login:fail:${PHONE}:203.0.113.1`)).toBeNull();
   });
 });

@@ -185,20 +185,33 @@ export async function sendSmsCode(
 // ---------------------------------------------------------------------------
 
 /**
- * Two throttle counters, not one.
+ * Two throttle counters with two budgets: the caller's, and the account's.
  *
  * Everything reaches this app through one reverse proxy, so an IP-only bucket
  * would throttle the whole shop the moment one customer fat-fingers a password.
- * And an account-only bucket lets a botnet walk the password list of every
- * account in parallel at 4 tries each. Counting `account` and `account+ip`
- * separately catches both: a distributed attack trips the account window, a
- * single machine trips its own.
+ * An account-only bucket at the same small limit let anybody lock a shopper out
+ * of their own account with five wrong passwords. So `account+ip` gets
+ * `loginMaxAttempts` — one machine guessing is parked quickly — and the account
+ * alone gets ten times that: only guesses from many addresses at once, a
+ * distributed attack rather than a nuisance, park the account. Without an
+ * address (a dev server, a test) there is only the account, at the small
+ * limit. The admin sign-in works the same way (`AdminAuthService`).
  */
-function throttleKeys(account: string, ip: string | null | undefined): string[] {
-  const subject = account.trim().toLowerCase();
-  const keys = [`user:login:fail:${subject}`];
-  if (ip) keys.push(`user:login:fail:${subject}:${ip}`);
-  return keys;
+const ACCOUNT_CEILING_FACTOR = 10;
+
+function throttleKeys(
+  account: string,
+  ip: string | null | undefined,
+  maxAttempts: number,
+): { caller: string; account: { key: string; limit: number } | null; callerLimit: number } {
+  const subject = `user:login:fail:${account.trim().toLowerCase()}`;
+  return ip
+    ? {
+        caller: `${subject}:${ip}`,
+        callerLimit: maxAttempts,
+        account: { key: subject, limit: maxAttempts * ACCOUNT_CEILING_FACTOR },
+      }
+    : { caller: subject, callerLimit: maxAttempts, account: null };
 }
 
 /**
@@ -213,26 +226,36 @@ export async function passwordLogin(
   meta: RequestMeta = {},
 ): Promise<StorefrontSession> {
   const config = await settings(ctx);
-  const keys = throttleKeys(body.account, meta.ip);
+  const keys = throttleKeys(body.account, meta.ip, config.loginMaxAttempts);
+  const windowMs = config.loginWindowSec * 1000;
 
-  let worstRemaining = Number.MAX_SAFE_INTEGER;
-  for (const key of keys) {
-    const throttle = await fixedWindow(ctx.redis, {
-      key,
-      limit: config.loginMaxAttempts,
-      windowMs: config.loginWindowSec * 1000,
+  const throttle = await fixedWindow(ctx.redis, {
+    key: keys.caller,
+    limit: keys.callerLimit,
+    windowMs,
+    nowMs: ctx.clock.nowMs(),
+  });
+  if (!throttle.allowed) {
+    throw new DomainError('AUTH_TOO_MANY_ATTEMPTS', {
+      details: { retryAfterMs: throttle.retryAfterMs },
+    });
+  }
+  if (keys.account) {
+    const ceiling = await fixedWindow(ctx.redis, {
+      key: keys.account.key,
+      limit: keys.account.limit,
+      windowMs,
       nowMs: ctx.clock.nowMs(),
     });
-    if (!throttle.allowed) {
+    if (!ceiling.allowed) {
       throw new DomainError('AUTH_TOO_MANY_ATTEMPTS', {
-        details: { retryAfterMs: throttle.retryAfterMs },
+        details: { retryAfterMs: ceiling.retryAfterMs },
       });
     }
-    worstRemaining = Math.min(worstRemaining, throttle.remaining);
   }
 
   const verifier = getCaptchaVerifier();
-  const failedSoFar = config.loginMaxAttempts - worstRemaining - 1;
+  const failedSoFar = keys.callerLimit - throttle.remaining - 1;
   if (verifier && captchaRequired({ failedAttempts: failedSoFar })) {
     if (!body.captchaToken) throw new DomainError('AUTH_CAPTCHA_REQUIRED');
     const passed = await verifier.verify(body.captchaToken, {
@@ -274,7 +297,9 @@ export async function passwordLogin(
     if (result.won) ctx.logger.info({ userId: user.id }, '已将遗留 MD5 密码升级为 bcrypt');
   }
 
-  for (const key of keys) await resetFixedWindow(ctx.redis, key);
+  // The caller's counter only: a guesser's progress against the account is not
+  // wiped by the owner signing in.
+  await resetFixedWindow(ctx.redis, keys.caller);
   if (body.bindToken) await linkPendingToAccount(ctx, user.id, body.bindToken);
   return issueSession(ctx, user, meta);
 }

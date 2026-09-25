@@ -95,7 +95,13 @@ export const storefrontAuthConfig = defineConfigGroup({
     },
     codePerIpPerDay: { label: '每 IP 每天上限', type: 'number', section: '短信验证码', order: 13 },
 
-    loginMaxAttempts: { label: '登录失败次数上限', type: 'number', section: '登录保护', order: 20 },
+    loginMaxAttempts: {
+      label: '登录失败次数上限',
+      type: 'number',
+      section: '登录保护',
+      order: 20,
+      help: '同一网络连续输错达到此次数后，该网络暂停密码登录；同一账号在所有网络累计输错达到 10 倍时，暂停该账号的密码登录',
+    },
     loginWindowSec: {
       label: '统计窗口',
       type: 'number',

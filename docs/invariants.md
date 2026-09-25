@@ -1379,9 +1379,11 @@ A disabled account's already-issued token stops resolving immediately, not at ex
 
 ### USER-013
 
-Login throttling counts an account+IP window and an account-only window separately, both over 900 s.
+Login throttling counts an account+IP window and an account-only window separately, both over 900 s. The caller's window allows `loginMaxAttempts`; the account's allows ten times that, so wrong passwords from one address park that address and never the shopper, and only guesses from many addresses park the account. A successful login clears the caller's window only.
 
-- `packages/core/src/user/storefront-auth.int.test.ts::login throttling > counts the account window and the account+IP window separately`
+- `packages/core/src/user/storefront-auth.int.test.ts::login throttling > USER-013 — five wrong passwords park that address, not the shopper’s account`
+- `packages/core/src/user/storefront-auth.int.test.ts::login throttling > USER-013 — guesses from many addresses park the account at ten times the limit`
+- `packages/core/src/user/storefront-auth.int.test.ts::login throttling > USER-013 — a successful login clears the caller’s counter, not the account’s`
 
 ### USER-014
 
