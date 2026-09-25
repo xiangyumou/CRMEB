@@ -49,15 +49,19 @@ export default function Home() {
   // A claim made on another page marks it stale: its 优惠券 block says 已领取 once back here.
   useRefetchOnShow(routeKey('decor.pageHome'), { when: 'invalidated' });
   usePullToRefresh(() => home.refetch());
+  // The page's own title, unless it is the generic 「首页」 every new page starts with: a friend
+  // sent a card titled 首页 learns nothing, so the shop's name stands in.
+  const ownTitle = root?.title?.trim() && root.title.trim() !== '首页' ? root.title.trim() : null;
+  const shopName = config?.name?.trim() || null;
   useShare(
     { route: 'home', params: {} },
     {
-      title: root?.shareTitle || root?.title || config?.share.title,
+      title: root?.shareTitle || ownTitle || config?.share.title || shopName || undefined,
       imageUrl: assetUrl(root?.shareImage) ?? undefined,
     },
   );
 
-  const title = root?.title ?? config?.name ?? '首页';
+  const title = ownTitle ?? shopName ?? '首页';
   return (
     <PageShell title={title}>
       {ownSearch ? (

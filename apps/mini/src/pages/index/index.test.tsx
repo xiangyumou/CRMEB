@@ -148,6 +148,21 @@ describe('首页', () => {
     });
   });
 
+  it('titles and shares a page still called 「首页」 by the shop’s name', async () => {
+    const page = resolvedPageFixture();
+    serveApi({
+      ...visits,
+      'GET /api/v1/pages/home': () => ({
+        body: { ...page, root: { props: { ...page.root.props, title: '首页', shareTitle: '' } } },
+      }),
+    });
+
+    await renderPage(<Home />);
+    await screen.findByText('柔雾丝绒礼盒');
+    // No share title of its own: the shop's configured one (appConfigFixture), not 「首页」.
+    expect(taroFake.shareHandlers.message?.()).toMatchObject({ title: '好物一站购齐' });
+  });
+
   it('is fetched again on show after a claim elsewhere marked it stale, not merely as it ages', async () => {
     let served = 0;
     serveApi({
