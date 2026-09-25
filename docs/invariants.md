@@ -1364,6 +1364,13 @@ A message says what its sender carried: every placeholder of an event's default 
 - `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > says 商家配送 and the courier for a parcel the shop delivers itself`
 - `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > says the goods were handed over for an automatic virtual delivery`
 - `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > does not announce a parcel cancelled before the dispatcher reached it`
+
+### NOTIF-008
+
+Every admin notification links to a console page that exists. A record without a page of its own (退款单, 异常支付) is opened in its list page's drawer through `?detail=<id>`, and closing the drawer drops the parameter. Links already delivered to the old addresses are redirected.
+
+- `apps/web/src/server/notification-links.test.ts::NOTIF-008 — every admin notification links to a page that exists > resolves each link to a console page`
+- `apps/web/src/admin/kit/table/url-detail.test.tsx::NOTIF-008 — a ?detail= link opens that record on the list page > opens the drawer on the id in the link`
 - `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > names the order in 确认收货`
 - `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the order hooks carry what their wording names > gives 支付成功 its payment time and 退款到账 its refund number`
 - `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the order hooks carry what their wording names > leaves no placeholder of the order events’ default wording blank`

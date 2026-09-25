@@ -1,7 +1,6 @@
 'use client';
 
 import { Alert, Button, Descriptions, Drawer, Space, Table, Tag, Timeline, Typography } from 'antd';
-import { useState } from 'react';
 import {
   refundAdminApprove,
   refundAdminDetail,
@@ -36,6 +35,7 @@ import {
   textColumn,
 } from '@/admin/kit/table/columns';
 import { CrudTable } from '@/admin/kit/table/crud-table';
+import { useUrlDetailId } from '@/admin/kit/table/url-state';
 import { Can } from '@/admin/session/can';
 
 import { REFUND_KIND, REFUND_RETURN_STAGE, REFUND_STATUS, optionsOf } from '../trade-enums';
@@ -79,7 +79,8 @@ import { REFUND_KIND, REFUND_RETURN_STAGE, REFUND_STATUS, optionsOf } from '../t
 const REFRESHES = [refundAdminList, refundAdminDetail] as const;
 
 export function RefundRequestsPage() {
-  const [detailId, setDetailId] = useState<string | null>(null);
+  // `?detail=<id>` is what the admin notification links to (NOTIF-008).
+  const [detailId, setDetailId] = useUrlDetailId();
   const approveModal = useFormModal<AdminRefundListItem>();
   const rejectModal = useFormModal<AdminRefundListItem>();
   const remarkModal = useFormModal<AdminRefundListItem>();

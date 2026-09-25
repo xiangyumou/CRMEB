@@ -27,6 +27,22 @@ const nextConfig: NextConfig = {
   // `fallback` runs only when no page or route matched: an API URL nothing
   // serves gets the JSON error envelope (`app/api-not-found`), not the HTML
   // 404 page.
+  // Admin notifications delivered before NOTIF-008 link to pages that never
+  // existed; the inbox still holds them, so send them where the record is.
+  async redirects() {
+    return [
+      {
+        source: '/admin/refunds/:id',
+        destination: '/admin/trade/refunds?detail=:id',
+        permanent: false,
+      },
+      {
+        source: '/admin/payment-exceptions/:id',
+        destination: '/admin/trade/payment-exceptions?detail=:id',
+        permanent: false,
+      },
+    ];
+  },
   async rewrites() {
     return {
       beforeFiles: [],

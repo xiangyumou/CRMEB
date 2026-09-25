@@ -24,7 +24,7 @@ export function registerRefundNotificationEvents(): void {
       variables: ['refundId', 'refundNo', 'amount', 'reason'],
       channels: ['inApp'],
       defaults: { title: '退款异常待核对', body: '退款单 {{refundNo}}：{{reason}}。' },
-      link: '/admin/refunds/{{refundId}}',
+      link: '/admin/trade/refunds?detail={{refundId}}',
     },
   ]);
 }

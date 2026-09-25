@@ -349,7 +349,7 @@ export function registerBuiltInNotificationEvents(): void {
       variables: ['refundId', 'refundNo', 'orderNo', 'amount', 'reason'],
       channels: [...ADMIN_CHANNELS],
       defaults: { title: '新的退款申请', body: '退款单 {{refundNo}} 待处理，金额 ¥{{amount}}。' },
-      link: '/admin/refunds/{{refundId}}',
+      link: '/admin/trade/refunds?detail={{refundId}}',
     },
     {
       code: 'admin_low_stock',
@@ -374,7 +374,7 @@ export function registerBuiltInNotificationEvents(): void {
       variables: ['exceptionId', 'outTradeNo', 'amount', 'reason'],
       channels: [...ADMIN_CHANNELS],
       defaults: { title: '支付异常待处理', body: '{{outTradeNo}}：{{reason}}。' },
-      link: '/admin/payment-exceptions/{{exceptionId}}',
+      link: '/admin/trade/payment-exceptions?detail={{exceptionId}}',
     },
   ]);
 }

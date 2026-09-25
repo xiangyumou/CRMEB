@@ -1,7 +1,6 @@
 'use client';
 
 import { Alert, Button, Drawer, Space, Typography } from 'antd';
-import { useState } from 'react';
 import {
   paymentAdminExceptionDetail,
   paymentAdminExceptionIgnore,
@@ -32,6 +31,7 @@ import {
   textColumn,
 } from '@/admin/kit/table/columns';
 import { CrudTable } from '@/admin/kit/table/crud-table';
+import { useUrlDetailId } from '@/admin/kit/table/url-state';
 import { Can } from '@/admin/session/can';
 
 import { PAYMENT_EXCEPTION_REASON, PAYMENT_EXCEPTION_STATUS, optionsOf } from '../trade-enums';
@@ -64,7 +64,8 @@ import { PAYMENT_EXCEPTION_REASON, PAYMENT_EXCEPTION_STATUS, optionsOf } from '.
  * by hand is how a shop refunds more than it was paid.
  */
 export function PaymentExceptionsPage() {
-  const [detailId, setDetailId] = useState<string | null>(null);
+  // `?detail=<id>` is what the admin notification links to (NOTIF-008).
+  const [detailId, setDetailId] = useUrlDetailId();
   const ignoreModal = useFormModal<PaymentExceptionListItem>();
   const refundModal = useFormModal<PaymentExceptionListItem>();
 

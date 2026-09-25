@@ -43,6 +43,42 @@ export function useNextUrlState(): TableUrlState {
   return useMemo(() => ({ read, write }), [read, write]);
 }
 
+/**
+ * The record a list page's detail drawer shows, seeded from `?detail=<id>` so
+ * a link — a notification, a dashboard tile — opens that one record rather
+ * than a page that does not exist. Closing the drawer drops the parameter, so
+ * a refresh does not open it again.
+ */
+export function useUrlDetailId(key = 'detail'): [string | null, (id: string | null) => void] {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const fromUrl = searchParams.get(key);
+  const [id, setId] = useState<string | null>(fromUrl);
+
+  // A second link followed while the page is open changes only the URL, so
+  // follow it (adjusted during render, not in an effect).
+  const [seenUrl, setSeenUrl] = useState(fromUrl);
+  if (fromUrl !== seenUrl) {
+    setSeenUrl(fromUrl);
+    if (fromUrl) setId(fromUrl);
+  }
+
+  const set = useCallback(
+    (next: string | null) => {
+      setId(next);
+      if (next !== null || !searchParams.has(key)) return;
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete(key);
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [key, router, pathname, searchParams],
+  );
+
+  return [id, set];
+}
+
 export interface MemoryUrlState extends TableUrlState {
   /** Current key/value pairs. Assert on this in tests. */
   snapshot: Record<string, string>;

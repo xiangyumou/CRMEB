@@ -74,7 +74,7 @@ beforeEach(() => {
     on(notificationAdminInboxList, () => ({
       items: inbox.map((item) => ({
         ...item,
-        data: { link: '/admin/refunds/1' },
+        data: { link: '/admin/trade/refunds?detail=1' },
         readAt: null,
       })),
       total: inbox.length,
@@ -99,7 +99,7 @@ describe('useNotificationStream', () => {
       id: '11',
       type: 'admin_refund_applied',
       body: '退款单 RF1 待处理',
-      link: '/admin/refunds/1',
+      link: '/admin/trade/refunds?detail=1',
     });
     // Three unread on the server, one of them listed.
     expect(result.current.unreadCount).toBe(3);
