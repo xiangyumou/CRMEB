@@ -309,7 +309,10 @@ describe('a refund the shop opens by itself', () => {
       returnStage: 'not_required',
       isAutomatic: true,
       reason: GROUPBUY_REASON,
-      explanation: '拼团 9 未成团',
+      // The note names internal ids: staff remark, not the shopper's
+      // explanation (REFUND-019).
+      explanation: null,
+      adminRemark: '拼团 9 未成团',
       quantity: 2,
       amount: '100.00',
       includesFreight: false,

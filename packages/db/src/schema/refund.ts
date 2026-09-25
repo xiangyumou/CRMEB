@@ -159,7 +159,9 @@ export const refunds = pgTable(
       .on(t.orderId)
       .where(sql`status in ('applied','approved','processing','unknown')`),
     check('refunds_quantity_positive', sql`${t.quantity} >= 1`),
-    check('refunds_amount_positive', sql`${t.amount} > 0`),
+    // Zero is a refund of an order a coupon paid for in full: it gives back
+    // units, the coupon and the seat, and settles without the gateway.
+    check('refunds_amount_non_negative', sql`${t.amount} >= 0`),
     check(
       'refunds_refunded_within_amount',
       sql`${t.refundedAmount} >= 0 and ${t.refundedAmount} <= ${t.amount}`,
@@ -188,9 +190,9 @@ export type NewRefund = typeof refunds.$inferInsert;
  * ## The "one open refund per order item" invariant
  *
  * `isOpen` mirrors the parent refund's status: TRUE while the refund is in
- * `applied | approved | processing | unknown`, FALSE once it reaches
- * `succeeded | failed | rejected | cancelled`. The service flips it in the
- * same statement that changes `refunds.status`.
+ * `applied | approved | processing | unknown | failed` (a failed refund can
+ * still be retried), FALSE once it reaches `succeeded | rejected | cancelled`.
+ * The service flips it in the same statement that changes `refunds.status`.
  *
  * `refund_items_open_uq` is a partial unique index on `order_item_id WHERE
  * is_open`, so **an order item can be inside at most one in-flight refund**.

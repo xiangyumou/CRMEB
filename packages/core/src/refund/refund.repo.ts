@@ -10,6 +10,7 @@ import { expressCompanies } from '@shop/db/schema/reference';
 import { users } from '@shop/db/schema/user';
 import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { allOf, conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
+import { IN_FLIGHT_STATUSES } from './refund.rules';
 
 /**
  * The only file in the refund domain that touches Drizzle tables.
@@ -34,8 +35,11 @@ export type RefundRow = typeof refunds.$inferSelect;
 export type RefundItemRow = typeof refundItems.$inferSelect;
 export type RefundLogRow = typeof refundLogs.$inferSelect;
 
-/** The statuses in which a refund is still in flight. Mirrors `refunds_open_idx`. */
-export const OPEN_REFUND_STATUSES = ['applied', 'approved', 'processing', 'unknown'] as const;
+/**
+ * The statuses in which a refund is still in flight — `failed` included, since
+ * the merchant can retry it (REFUND-017). See `IN_FLIGHT_STATUSES`.
+ */
+export const OPEN_REFUND_STATUSES = IN_FLIGHT_STATUSES;
 export type OpenRefundStatus = (typeof OPEN_REFUND_STATUSES)[number];
 
 /** PostgreSQL's unique-violation SQLSTATE. */
@@ -179,6 +183,46 @@ export async function openRefundTotal(db: DbOrTx, orderId: number): Promise<stri
 }
 
 /**
+ * Whether the order's freight is already in a refund that gave it back or
+ * still may. Freight goes back once: a second full request after a first one
+ * was carried with it must not carry it again.
+ */
+export async function freightClaimed(db: DbOrTx, orderId: number): Promise<boolean> {
+  const rows = await db
+    .select({ id: refunds.id })
+    .from(refunds)
+    .where(
+      and(
+        eq(refunds.orderId, orderId),
+        eq(refunds.includesFreight, true),
+        inArray(refunds.status, [...OPEN_REFUND_STATUSES, 'succeeded']),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
+/**
+ * The order's units, and how many of them a settled refund covers — the
+ * roll-up of an order that collected nothing is measured in units (REFUND-016).
+ */
+export async function orderUnits(
+  db: DbOrTx,
+  orderId: number,
+): Promise<{ ordered: number; settled: number }> {
+  const [ordered] = await db
+    .select({ total: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int` })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, orderId));
+  const [settled] = await db
+    .select({ total: sql<number>`coalesce(sum(${refundItems.quantity}), 0)::int` })
+    .from(refundItems)
+    .innerJoin(refunds, eq(refunds.id, refundItems.refundId))
+    .where(and(eq(refunds.orderId, orderId), eq(refunds.status, 'succeeded')));
+  return { ordered: ordered?.total ?? 0, settled: settled?.total ?? 0 };
+}
+
+/**
  * Adds to the order's running refunded total, guarded by the ceiling.
  *
  * The `WHERE` carries the invariant, so two concurrent settlements cannot both
@@ -236,16 +280,20 @@ export async function markOrderRefunded(
  * writers at two different moments and an increment cannot be replayed safely:
  *
  *  - a **`refund_only`** takes its units out of fulfilment the moment it is
- *    approved. The warehouse must not ship goods an operator has already agreed
- *    to refund, and fulfilment's dispatch bound reads exactly this column
- *    (`shipped + q <= quantity - refunded_quantity`);
+ *    approved, and keeps them while it is in flight — `failed` included, since
+ *    the merchant can still retry it. The warehouse must not ship goods an
+ *    operator has already agreed to refund, and fulfilment's dispatch bound
+ *    reads exactly this column (`shipped + q <= quantity - refunded_quantity`);
  *  - a **`return_and_refund`** counts only once the money is actually back —
  *    those units were shipped, and they are already out of fulfilment.
  *
  * Deriving the number instead of accumulating it makes every write idempotent
  * (settling a refund that was counted at approval changes nothing) and makes
- * release automatic: a `refund_only` that fails at the gateway drops out of the
- * set and the units come back to the warehouse with no compensating update.
+ * release automatic: a `refund_only` that is withdrawn, rejected or closed
+ * drops out of the set and the units come back to the warehouse with no
+ * compensating update.
+ *
+ * `countsUnits` in `refund.rules.ts` is the same table in TypeScript.
  */
 const countedUnits = (orderItemId: number) => sql<number>`(
   select coalesce(sum(${refundItems.quantity}), 0)::int
@@ -254,7 +302,7 @@ const countedUnits = (orderItemId: number) => sql<number>`(
    where ${refundItems.orderItemId} = ${orderItemId}
      and (${refunds.status} = 'succeeded'
           or (${refunds.kind} = 'refund_only'
-              and ${refunds.status} in ('approved', 'processing', 'unknown')))
+              and ${refunds.status} in ('approved', 'processing', 'unknown', 'failed')))
 )`;
 
 /**
@@ -270,17 +318,27 @@ const countedUnits = (orderItemId: number) => sql<number>`(
  *
  * Goods that came back are a different path: they were shipped, so the ceiling
  * is the line's whole quantity.
+ *
+ * `retry` is for a request that is sent again: it may keep what it already
+ * counts, and grow only into units that have not shipped. A failed 仅退款
+ * written before failed requests kept their units lost them at the failure,
+ * and the warehouse may have shipped them since; paying it again then would
+ * hand over goods and money (REFUND-015).
  */
+export type UnitBound = 'unshipped' | 'whole-line' | 'retry';
+
 export async function recomputeItemRefundedQuantity(
   tx: DbOrTx,
   orderItemId: number,
-  bound: 'unshipped' | 'whole-line',
+  bound: UnitBound,
 ): Promise<ConditionalUpdateResult> {
   const counted = countedUnits(orderItemId);
   const ceiling =
     bound === 'unshipped'
       ? sql`${orderItems.quantity} - ${orderItems.shippedQuantity}`
-      : sql`${orderItems.quantity}`;
+      : bound === 'retry'
+        ? sql`greatest(${orderItems.quantity} - ${orderItems.shippedQuantity}, ${orderItems.refundedQuantity})`
+        : sql`${orderItems.quantity}`;
   return conditionalUpdate(tx, orderItems, {
     where: and(eq(orderItems.id, orderItemId), sql`${counted} <= ${ceiling}`),
     set: { refundedQuantity: counted },
@@ -436,13 +494,37 @@ export interface TransitionPatch {
 }
 
 /**
+ * How a transition re-derives its lines' `refunded_quantity`.
+ *
+ * - `whole-line` (the default): anything but taking unshipped units — a
+ *   withdrawal, a rejection, a settlement. Lowering a count cannot cross
+ *   fulfilment's bound, so it always lands.
+ * - `approval`: a 仅退款 taking its units. A line that has not shipped is bound
+ *   by `quantity - shipped_quantity` inside the statement, so an approval
+ *   racing a dispatch has exactly one winner; a line that already shipped is a
+ *   money-only refund of goods the buyer keeps, bound by the whole line.
+ * - `retry`: sending a failed request again (see `UnitBound`).
+ */
+export type TransitionUnits = 'whole-line' | 'approval' | 'retry';
+
+export interface TransitionResult extends ConditionalUpdateResult {
+  /** Order lines whose units could not be taken. Empty unless the bound refused. */
+  refusedLines: number[];
+}
+
+/**
  * The only way a refund changes status.
  *
  * One conditional `UPDATE` guarded by the statuses it may come from, and — in
- * the same transaction step — the `is_open` flip on its lines. Doing both here
- * is what keeps `refund_items_open_uq` honest: a refund that reaches a terminal
- * status always frees its lines, and one that stays in flight always holds
- * them, with no window in between.
+ * the same transaction step — the `is_open` flip on its lines and the
+ * re-derivation of their `refunded_quantity`. Doing all three here is what
+ * keeps `refund_items_open_uq` and the units honest: a refund that leaves the
+ * in-flight set always frees its lines and hands its units back, one that
+ * stays always holds them, and no caller can move a status and forget the
+ * units (REFUND-015 — a withdrawn approved 仅退款 once kept its units frozen).
+ *
+ * A caller that gets `refusedLines` back must refuse the whole move: throwing
+ * rolls the status back with it.
  */
 export async function transitionRefund(
   tx: Tx,
@@ -450,16 +532,31 @@ export async function transitionRefund(
   from: readonly RefundRow['status'][],
   to: RefundRow['status'],
   patch: TransitionPatch = {},
-): Promise<ConditionalUpdateResult> {
+  units: TransitionUnits = 'whole-line',
+): Promise<TransitionResult> {
   const result = await conditionalUpdate(tx, refunds, {
     where: and(eq(refunds.id, id), inArray(refunds.status, [...from])),
     set: { status: to, ...patch },
   });
-  if (!result.won) return result;
+  if (!result.won) return { ...result, refusedLines: [] };
 
   const open = isOpenFor(to);
   await tx.update(refundItems).set({ isOpen: open }).where(eq(refundItems.refundId, id));
-  return result;
+
+  const lines = await tx
+    .select({ orderItemId: refundItems.orderItemId, shipped: orderItems.shippedQuantity })
+    .from(refundItems)
+    .innerJoin(orderItems, eq(orderItems.id, refundItems.orderItemId))
+    .where(eq(refundItems.refundId, id))
+    .orderBy(asc(refundItems.orderItemId));
+  const refusedLines: number[] = [];
+  for (const line of lines) {
+    const bound: UnitBound =
+      units === 'approval' ? (line.shipped === 0 ? 'unshipped' : 'whole-line') : units;
+    const derived = await recomputeItemRefundedQuantity(tx, line.orderItemId, bound);
+    if (!derived.won) refusedLines.push(line.orderItemId);
+  }
+  return { ...result, refusedLines };
 }
 
 export async function setReturnShipment(
@@ -518,7 +615,8 @@ export async function hideRefund(
     where: and(
       eq(refunds.id, id),
       eq(refunds.userId, userId),
-      inArray(refunds.status, ['rejected', 'succeeded', 'failed', 'cancelled']),
+      // Not `failed`: the merchant can still retry it (REFUND-017).
+      inArray(refunds.status, ['rejected', 'succeeded', 'cancelled']),
     ),
     set: { deletedAt: at },
   });
@@ -575,7 +673,7 @@ const STATE_STATUSES: Record<
 > = {
   open: [...OPEN_REFUND_STATUSES],
   succeeded: ['succeeded'],
-  closed: ['rejected', 'failed', 'cancelled'],
+  closed: ['rejected', 'cancelled'],
 };
 
 export async function listMyRefunds(

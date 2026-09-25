@@ -171,6 +171,11 @@ export const refundListItem = z.object({
   includesFreight: z.boolean(),
   reason: z.string().nullable(),
   rejectReason: z.string().nullable(),
+  /**
+   * Opened by the shop itself (a failed group buy, an expired presale), not by
+   * the shopper — who therefore cannot withdraw it.
+   */
+  isAutomatic: z.boolean(),
   items: z.array(refundItem),
   createdAt: instant,
   succeededAt: instant.nullable(),
@@ -215,7 +220,6 @@ export const adminRefundListItem = refundListItem.extend({
   outRefundNo: z.string(),
   gatewayRefundId: z.string().nullable(),
   paymentAttemptId: id.nullable(),
-  isAutomatic: z.boolean(),
   adminRemark: z.string().nullable(),
   lastError: z.string().nullable(),
   reviewedByAdminId: id.nullable(),
@@ -343,6 +347,7 @@ export const refundExample: RefundListItem = {
   includesFreight: false,
   reason: '商品破损',
   rejectReason: null,
+  isAutomatic: false,
   items: [refundItemExample],
   createdAt: '2026-02-26T13:00:00+08:00',
   succeededAt: null,
@@ -369,7 +374,6 @@ export const adminRefundExample: AdminRefundListItem = {
   outRefundNo: 'R2602261300000601C4D2',
   gatewayRefundId: null,
   paymentAttemptId: '5001',
-  isAutomatic: false,
   adminRemark: null,
   lastError: null,
   reviewedByAdminId: null,
