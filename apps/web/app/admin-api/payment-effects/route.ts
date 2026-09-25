@@ -5,8 +5,8 @@ import { handle } from '../../../src/server';
 /**
  * `/admin-api/payment-effects` — 需人工处理.
  *
- * The parked rows of the effects ledger, scoped to payment, refund and order.
- * The table is platform-owned, so one domain does not claim the whole resource.
+ * The parked rows of the effects ledger, scoped to `paymentEffectScopes`
+ * (everything but the notification send log).
  */
 export const GET = handle(paymentAdminEffectList, (ctx, { query }) =>
   payment.adminListEffects(ctx, query),

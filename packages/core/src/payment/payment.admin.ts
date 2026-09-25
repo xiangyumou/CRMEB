@@ -12,6 +12,7 @@ import type {
   PaymentExceptionListItem,
   PaymentExceptionListQuery,
 } from '@shop/contracts/payment/schemas';
+import { paymentEffectScopes } from '@shop/contracts/payment/schemas';
 import type { PageQuery } from '@shop/contracts/conventions';
 import { requirePermission } from '../auth/rbac';
 import { requireAdminId, type Ctx } from '../kernel/context';
@@ -282,8 +283,11 @@ function toFlowItem(row: repo.FlowListRow): CapitalFlowListItem {
 // the "needs a human" console
 // ---------------------------------------------------------------------------
 
-/** The scopes this console may show. Deliberately not "all of them". */
-const EFFECT_SCOPES = ['payment', 'refund', 'order'] as const;
+/**
+ * The scopes this console may show: every one whose parked effect is work left
+ * undone (`paymentEffectScopes`), not the notification send log.
+ */
+const EFFECT_SCOPES = paymentEffectScopes;
 
 export async function adminListEffects(
   ctx: Ctx,

@@ -319,12 +319,26 @@ export type CapitalFlowSummary = z.infer<typeof capitalFlowSummary>;
 // ---------------------------------------------------------------------------
 
 /**
- * One row of the "需人工处理" console.
- *
- * Scoped to the payment and refund ledger entries: the generic effects table is
- * platform-owned, and this route filters it to `scope in ('payment','refund',
- * 'order')` so one domain's console cannot become everybody's.
+ * The effect scopes the "需人工处理" console lists: every ledger scope whose
+ * parked row means something did not happen — money, refunds, orders, the
+ * WeChat 发货信息录入 (`shipment`), group-buy and presale settlement, content
+ * security checks and WeChat's pushes. `notification` is left out on purpose:
+ * it has its own send log, and a subscribe message nobody could deliver is not
+ * an operator's to retry.
  */
+export const paymentEffectScopes = [
+  'payment',
+  'refund',
+  'order',
+  'shipment',
+  'groupbuy',
+  'presale',
+  'content-security',
+  'wechat-mini-push',
+] as const;
+export type PaymentEffectScope = (typeof paymentEffectScopes)[number];
+
+/** One row of the "需人工处理" console (scopes: `paymentEffectScopes`). */
 export const paymentEffectListItem = z.object({
   id,
   scope: z.string(),
@@ -341,7 +355,7 @@ export type PaymentEffectListItem = z.infer<typeof paymentEffectListItem>;
 
 export const paymentEffectListQuery = pageQuery.extend({
   status: z.enum(['pending', 'done', 'unknown']).default('unknown'),
-  scope: z.enum(['payment', 'refund', 'order']).optional(),
+  scope: z.enum(paymentEffectScopes).optional(),
   eventType: z.string().max(64).optional(),
 });
 export type PaymentEffectListQuery = z.infer<typeof paymentEffectListQuery>;
