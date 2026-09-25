@@ -2032,6 +2032,14 @@ No response carries a credential or cross-app identifier (a password or its hash
 - `guards/src/checks/personal-data.test.ts::personal data in responses > GUARD-004 — fails somebody else’s phone on a storefront route`
 - `guards/src/checks/personal-data.test.ts::personal-data over the tree > GUARD-004 — no response carries a credential or another person’s data unexplained`
 
+### GUARD-005
+
+From every admin page, following what it renders symbol by symbol: every write route a control calls sits under a `<Can>` / `can()` / `permission=` for its own atom, and every read (a picker's options, a statistics panel) is required by the page's menu entry, gated, or granted with a held write atom by `PERMISSION_REQUIREMENTS`. A role set up correctly never meets a control that answers 没有权限 (AGENTS rule 11).
+
+- `guards/src/checks/admin-permissions.test.ts::admin permission gates > GUARD-005 — fails a delete button no <Can> gates`
+- `guards/src/checks/admin-permissions.test.ts::admin permission gates > GUARD-005 — fails a picker whose read the page neither requires nor gates`
+- `guards/src/checks/admin-permissions.test.ts::admin-permissions over the tree > GUARD-005 — every admin control and picker read is gated or granted with its screen`
+
 ## Storefront share codes (小程序码)
 
 ### SHARE-001

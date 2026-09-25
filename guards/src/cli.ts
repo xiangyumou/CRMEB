@@ -10,6 +10,7 @@
  *   pnpm --filter @shop/guards guards --quiet          only the summary and the failures
  */
 import { adminClient } from './checks/admin-client';
+import { adminPermissions } from './checks/admin-permissions';
 import { apiCompat } from './checks/api-compat';
 import { bannedConstructs } from './checks/banned';
 import { contractsAndRoutes } from './checks/contracts';
@@ -36,6 +37,7 @@ const CHECKS: readonly Check[] = [
   routeHygiene,
   permissions,
   adminClient,
+  adminPermissions,
   fixtures,
   miniCheck,
   miniStyles,
