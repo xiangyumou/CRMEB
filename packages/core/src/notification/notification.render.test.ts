@@ -4,7 +4,9 @@ import {
   formatShopTime,
   placeholdersIn,
   render,
+  fitSubscribeField,
   renderFields,
+  renderSubscribeFields,
   renderRoute,
   toTemplateData,
   WECHAT_FIELD_LIMIT,
@@ -174,5 +176,44 @@ describe('renderRoute', () => {
         },
       ]),
     ).toThrow(/用 route 而不是 link/);
+  });
+});
+
+describe('NOTIF-010 — a subscribe-message value fits its field type', () => {
+  it('cuts a thing to 20 characters with an ellipsis', () => {
+    const long = '超长的商品名称'.repeat(5);
+    const fitted = fitSubscribeField('thing3', long);
+    expect([...fitted]).toHaveLength(20);
+    expect(fitted.endsWith('…')).toBe(true);
+    expect(fitSubscribeField('thing3', '短名称')).toBe('短名称');
+  });
+
+  it('keeps only digits, letters and ASCII symbols in a character_string, at most 32', () => {
+    expect(fitSubscribeField('character_string2', '单号 SF-123 456')).toBe('SF-123456');
+    expect(fitSubscribeField('character_string2', 'A'.repeat(40))).toHaveLength(32);
+  });
+
+  it('cuts a phrase to 5, a name to 10 characters (20 in ASCII), a symbol to 5', () => {
+    expect(fitSubscribeField('phrase1', '待付款请尽快处理')).toBe('待付款请尽');
+    expect(fitSubscribeField('name4', '一二三四五六七八九十十一')).toBe('一二三四五六七八九十');
+    expect(fitSubscribeField('name4', 'a'.repeat(25))).toHaveLength(20);
+    expect(fitSubscribeField('symbol7', '!!!!!!!')).toBe('!!!!!');
+  });
+
+  it('leaves the formatted types alone: amount, time, date', () => {
+    expect(fitSubscribeField('amount5', '¥12345.60')).toBe('¥12345.60');
+    expect(fitSubscribeField('time6', '2026-09-25 14:30')).toBe('2026-09-25 14:30');
+    expect(fitSubscribeField('date2', '2026年9月25日')).toBe('2026年9月25日');
+  });
+
+  it('drops a field that fits to nothing rather than sending it empty', () => {
+    expect(
+      renderSubscribeFields(
+        { character_string1: '{{name}}', thing2: '{{name}}' },
+        { name: '张三' },
+      ),
+    ).toEqual({
+      thing2: { value: '张三' },
+    });
   });
 });

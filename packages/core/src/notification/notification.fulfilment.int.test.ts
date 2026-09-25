@@ -382,6 +382,23 @@ describe('NOTIF-007 — the fulfilment messages carry what their wording names',
     const [message] = await inbox(placed.userId, 'order_received');
     expect(message?.content).toBe(`订单 ${placed.orderNo} 已确认收货，感谢您的购买。`);
   });
+
+  it('NOTIF-009 — tells the admins 用户已确认收货, with the order number and amount', async () => {
+    const placed = await paidOrder([await makeProduct()]);
+    const company = await makeExpressCompany();
+    await order.adminShip(
+      asAdmin(await makeAdmin()),
+      { id: String(placed.orderId) },
+      { deliveryMode: 'express', expressCompanyId: String(company), trackingNo: 'SF9', lines: [] },
+    );
+    await order.confirmReceipt(as(placed.userId), { id: String(placed.orderId) });
+    await drain();
+
+    const payload = await notificationPayload(`admin_order_received:order:${placed.orderId}`);
+    expect(payload?.data).toMatchObject({ orderNo: placed.orderNo });
+    expect(payload?.data['amount']).not.toBe('');
+    expect(blankIn('admin_order_received', payload!.data)).toEqual([]);
+  });
 });
 
 describe('NOTIF-007 — the order hooks carry what their wording names', () => {
@@ -427,6 +444,7 @@ describe('NOTIF-007 — the order hooks carry what their wording names', () => {
     expect(sent.map((payload) => payload.event).sort()).toEqual([
       'admin_order_created',
       'admin_order_paid',
+      'admin_order_received',
       'order_created',
       'order_paid',
       'order_received',

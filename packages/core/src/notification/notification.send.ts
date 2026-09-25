@@ -7,7 +7,13 @@ import { notificationConfig } from './notification.config';
 import { resolveSmsPort } from './notification.ports';
 import type { NotificationChannels } from './notification.repo';
 import type { NotificationEvent } from './notification.registry';
-import { render, renderFields, renderRoute, toTemplateData } from './notification.render';
+import {
+  render,
+  renderFields,
+  renderRoute,
+  renderSubscribeFields,
+  toTemplateData,
+} from './notification.render';
 
 /**
  * The outbound half of a fan-out: one function per channel, each returning an
@@ -110,7 +116,8 @@ export async function sendWechatMini(ctx: Ctx, input: SendContext): Promise<Chan
   if (openid === null) return { kind: 'skipped', reason: 'user has no mini openid' };
 
   const { miniProgramState } = await ctx.config.get(notificationConfig);
-  const fields = renderFields(config.fields, input.data);
+  // Fitted to each field's type: one over-long `thing` fails the whole message.
+  const fields = renderSubscribeFields(config.fields, input.data);
   if (Object.keys(fields).length === 0) return { kind: 'skipped', reason: 'no rendered fields' };
 
   const page = subscribePage(input);

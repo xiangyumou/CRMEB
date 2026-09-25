@@ -34,3 +34,19 @@ describe('NOTIF-007 — an event’s wording names only the variables it declare
     expect(undeclared).toEqual([]);
   });
 });
+
+describe('NOTIF-009 — an event offers only the variables its senders fill', () => {
+  it('lists no nickname, no amount where the hook carries none, and no event nothing sends', () => {
+    const events = new Map(allNotificationEvents().map((event) => [event.code, event]));
+    expect(
+      [...events.values()]
+        .filter((event) => event.variables.includes('nickname'))
+        .map((e) => e.code),
+    ).toEqual([]);
+    expect(events.get('order_cancelled')?.variables).toEqual(['orderId', 'orderNo', 'reason']);
+    expect(events.get('order_completed')?.variables).toEqual(['orderId', 'orderNo']);
+    expect(events.has('order_unpaid_reminder')).toBe(false);
+    // 用户确认收货提醒 is sent now, from the fulfilment notifier.
+    expect(events.get('admin_order_received')?.variables).toEqual(['orderId', 'orderNo', 'amount']);
+  });
+});

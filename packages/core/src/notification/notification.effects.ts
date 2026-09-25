@@ -111,8 +111,13 @@ export function installNotificationHooks(): void {
       const event = FULFILMENT_EVENTS[notice.kind];
       if (event === undefined) return;
       const { shipment } = notice;
-      await ctx.withTx((tx) =>
-        notify(tx, ctx, {
+      const data = {
+        orderId: notice.orderId,
+        orderNo: notice.order?.orderNo ?? '',
+        amount: notice.order?.paidAmount ?? '',
+      };
+      await ctx.withTx(async (tx) => {
+        await notify(tx, ctx, {
           event,
           // A dispatch is keyed on its parcel, not the order: an order shipped
           // in parts is told about each parcel and each tracking number, and
@@ -122,14 +127,17 @@ export function installNotificationHooks(): void {
               ? { scope: 'order', id: notice.orderId }
               : { scope: 'shipment', id: shipment.id },
           userId: notice.userId,
-          data: {
-            orderId: notice.orderId,
-            orderNo: notice.order?.orderNo ?? '',
-            amount: notice.order?.paidAmount ?? '',
-            ...(shipment === null ? {} : deliveryVariables(shipment)),
-          },
-        }),
-      );
+          data: { ...data, ...(shipment === null ? {} : deliveryVariables(shipment)) },
+        });
+        // 用户确认收货提醒 was offered in 消息管理 and never sent (NOTIF-009).
+        if (notice.kind === 'order.received') {
+          await notify(tx, ctx, {
+            event: 'admin_order_received',
+            subject: { scope: 'order', id: notice.orderId },
+            data,
+          });
+        }
+      });
     },
   });
 }

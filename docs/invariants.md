@@ -1376,6 +1376,21 @@ Every admin notification links to a console page that exists. A record without a
 - `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the order hooks carry what their wording names > leaves no placeholder of the order events’ default wording blank`
 - `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — an old ledger row > is told in full when it carries nothing but the order id`
 
+### NOTIF-009
+
+An event offers the operator only the variables its senders fill, and every event offered is sent: no `nickname` anywhere, no `amount` on 订单取消/订单完成 (their hooks carry none), no 未付款提醒 (nothing sends it), and 用户确认收货提醒 is sent to the admins when a buyer confirms receipt.
+
+- `packages/core/src/notification/notification.registry.test.ts::NOTIF-009 — an event offers only the variables its senders fill > lists no nickname, no amount where the hook carries none, and no event nothing sends`
+- `packages/core/src/notification/notification.fulfilment.int.test.ts::NOTIF-007 — the fulfilment messages carry what their wording names > NOTIF-009 — tells the admins 用户已确认收货, with the order number and amount`
+
+### NOTIF-010
+
+A mini-program subscribe-message value is fitted to the type its key names before it is sent — `thing` 20 characters, `character_string` 32 of digits, letters and ASCII symbols, `phrase` 5, `name` 10 (20 in ASCII) — and the formatted types (`amount`, `time`, `date`) are left as rendered, so one long product name does not fail the whole message with 47003.
+
+- `packages/core/src/notification/notification.render.test.ts::NOTIF-010 — a subscribe-message value fits its field type > cuts a thing to 20 characters with an ellipsis`
+- `packages/core/src/notification/notification.render.test.ts::NOTIF-010 — a subscribe-message value fits its field type > keeps only digits, letters and ASCII symbols in a character_string, at most 32`
+- `packages/core/src/notification/notification.render.test.ts::NOTIF-010 — a subscribe-message value fits its field type > cuts a phrase to 5, a name to 10 characters (20 in ASCII), a symbol to 5`
+
 ### USER-010
 
 An SMS verification code is spent exactly once: two concurrent verifications of one code produce one sign-in and one refusal, and a wrong code burns an attempt.

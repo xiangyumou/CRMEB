@@ -323,14 +323,14 @@ export function decodeScene(key: StorefrontRouteKey, scene: string): StorefrontR
 
 **实现（H2，NOTIF-006）：** 事件新增 `route: { route, params }` 模板，先代入变量、再用 `storefrontRoute` 校验；校验不通过时不给目的地，而不是给一个错的。`link` **没有删除**，与 `route` 并存：公众号模板消息打开的是线上旧 uni-app 的 H5 页面，拼团、预售的旧路径今天可用，删掉会影响现有用户。切换到新商城时再删 `link`。
 
-| 事件 `code`                                                                                                                                            | 路由                                              |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
-| `order_created`、`order_paid`、`order_shipped`、`order_received`、`order_completed`、`order_cancelled`、`order_price_changed`、`order_unpaid_reminder` | `order { id: '{{orderId}}' }`                     |
-| `refund_applied`、`refund_approved`、`refund_rejected`、`refund_settled`                                                                               | `refund { id: '{{refundId}}' }`                   |
-| `groupbuy_created`、`groupbuy_joined`、`groupbuy_succeeded`                                                                                            | `groupbuyTeam { id: '{{groupId}}' }`              |
-| `presale_paid`                                                                                                                                         | `order { id: '{{orderId}}' }`                     |
-| `groupbuy_failed`、`presale_sold_out`（两者都带 `refundId`，是系统自动退款）                                                                           | `refund { id: '{{refundId}}' }`                   |
-| `admin_*`（包括 `admin_payment_notify_mismatch`、`admin_refund_exception`）                                                                            | 不变（后台路径 `/admin/...`，不属于商城路由目录） |
+| 事件 `code`                                                                                                                   | 路由                                              |
+| ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `order_created`、`order_paid`、`order_shipped`、`order_received`、`order_completed`、`order_cancelled`、`order_price_changed` | `order { id: '{{orderId}}' }`                     |
+| `refund_applied`、`refund_approved`、`refund_rejected`、`refund_settled`                                                      | `refund { id: '{{refundId}}' }`                   |
+| `groupbuy_created`、`groupbuy_joined`、`groupbuy_succeeded`                                                                   | `groupbuyTeam { id: '{{groupId}}' }`              |
+| `presale_paid`                                                                                                                | `order { id: '{{orderId}}' }`                     |
+| `groupbuy_failed`、`presale_sold_out`（两者都带 `refundId`，是系统自动退款）                                                  | `refund { id: '{{refundId}}' }`                   |
+| `admin_*`（包括 `admin_payment_notify_mismatch`、`admin_refund_exception`）                                                   | 不变（后台路径 `/admin/...`，不属于商城路由目录） |
 
 **顺带解决的两处问题：**
 

@@ -132,7 +132,14 @@ export function resetNotificationRegistry(): void {
 // the built-in events
 // ---------------------------------------------------------------------------
 
-const ORDER_VARS = ['orderId', 'orderNo', 'amount', 'nickname'] as const;
+/**
+ * What every order sender fills. The admin form lists these as the variables
+ * an operator may use, so a name here that no sender supplies is a promise the
+ * message breaks: `nickname` was listed for months and rendered blank.
+ */
+const ORDER_VARS = ['orderId', 'orderNo', 'amount'] as const;
+/** 取消 and 完成 are announced from hooks that carry no amount. */
+const ORDER_ID_VARS = ['orderId', 'orderNo'] as const;
 
 /** The mini-program pages customer events open (docs/mini/pages.md §3.4). */
 export const ORDER_ROUTE: NotificationRouteTemplate = {
@@ -211,7 +218,7 @@ export function registerBuiltInNotificationEvents(): void {
       name: '订单完成提醒',
       description: '订单结束后发送',
       audience: 'user',
-      variables: [...ORDER_VARS],
+      variables: [...ORDER_ID_VARS],
       channels: [...USER_CHANNELS],
       defaults: { title: '订单已完成', body: '订单 {{orderNo}} 已完成，期待再次为您服务。' },
       route: ORDER_ROUTE,
@@ -221,7 +228,7 @@ export function registerBuiltInNotificationEvents(): void {
       name: '订单取消提醒',
       description: '订单被取消（买家取消、超时未付款、后台取消）后发送',
       audience: 'user',
-      variables: [...ORDER_VARS, 'reason'],
+      variables: [...ORDER_ID_VARS, 'reason'],
       channels: [...USER_CHANNELS],
       defaults: { title: '订单已取消', body: '订单 {{orderNo}} 已取消。' },
       route: ORDER_ROUTE,
@@ -237,16 +244,6 @@ export function registerBuiltInNotificationEvents(): void {
         title: '订单金额已修改',
         body: '订单 {{orderNo}} 的金额由 ¥{{oldAmount}} 改为 ¥{{amount}}，请重新支付。',
       },
-      route: ORDER_ROUTE,
-    },
-    {
-      code: 'order_unpaid_reminder',
-      name: '未付款提醒',
-      description: '订单即将超时未付款时提醒买家',
-      audience: 'user',
-      variables: [...ORDER_VARS, 'expiresAt'],
-      channels: [...USER_CHANNELS],
-      defaults: { title: '订单待付款', body: '订单 {{orderNo}} 还未付款，请尽快完成支付。' },
       route: ORDER_ROUTE,
     },
     {

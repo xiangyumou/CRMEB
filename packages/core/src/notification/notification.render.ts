@@ -71,6 +71,67 @@ export function renderFields(
 }
 
 /**
+ * A mini-program subscribe message types each field by its key's letters
+ * (`thing3` is a `thing`, `character_string2` a `character_string`), and a
+ * value its type does not accept fails the **whole** message with `47003`.
+ * So each value is fitted to its type before it is sent:
+ *
+ * - `thing` — up to 20 characters, cut with `…`;
+ * - `character_string` — up to 32 digits, letters and ASCII symbols; anything
+ *   else (a Chinese character, a space) is dropped rather than rejected;
+ * - `number`, `letter` — up to 32; `symbol` — up to 5;
+ * - `phrase` — up to 5 characters;
+ * - `name` — up to 10 characters, or 20 when it is all ASCII;
+ * - `phone_number` — up to 17; `car_number` — up to 8.
+ *
+ * `amount`, `time` and `date` are formats, not lengths: cutting one would only
+ * turn a valid value into an invalid one, so they are left as rendered.
+ */
+const SUBSCRIBE_LIMITS: Readonly<Record<string, number>> = {
+  thing: 20,
+  character_string: 32,
+  number: 32,
+  letter: 32,
+  symbol: 5,
+  phrase: 5,
+  phone_number: 17,
+  car_number: 8,
+};
+
+export function subscribeFieldType(key: string): string {
+  return key.replace(/\d+$/, '');
+}
+
+export function fitSubscribeField(key: string, value: string): string {
+  const type = subscribeFieldType(key);
+  // Characters, not UTF-16 units: an emoji is one character to WeChat.
+  let chars = [...value];
+  if (type === 'character_string') chars = chars.filter((char) => /^[\x21-\x7e]$/.test(char));
+  if (type === 'thing') {
+    return chars.length <= 20 ? chars.join('') : `${chars.slice(0, 19).join('')}…`;
+  }
+  if (type === 'name') {
+    const limit = chars.every((char) => char.charCodeAt(0) < 0x80) ? 20 : 10;
+    return chars.slice(0, limit).join('');
+  }
+  const limit = SUBSCRIBE_LIMITS[type];
+  return limit === undefined ? value : chars.slice(0, limit).join('');
+}
+
+/** `renderFields` for a subscribe message: each value fitted to its field's type. */
+export function renderSubscribeFields(
+  fields: Readonly<Record<string, string>> | undefined,
+  data: Readonly<Record<string, string>>,
+): Record<string, { value: string }> {
+  const out: Record<string, { value: string }> = {};
+  for (const [key, { value }] of Object.entries(renderFields(fields, data))) {
+    const fitted = fitSubscribeField(key, value);
+    if (fitted !== '') out[key] = { value: fitted };
+  }
+  return out;
+}
+
+/**
  * Everything in the payload flattened to strings, because a template is text.
  *
  * `null` and `undefined` become the empty string (so the placeholder
