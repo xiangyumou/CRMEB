@@ -494,6 +494,25 @@ describe('the group-buy price through the real checkout', () => {
     expect(ordinary.groupbuyTeam).toBeNull();
   });
 
+  it('RISK-D-013 — 取消拼团 closes the leader’s unpaid order with the team', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await shopper();
+    const opened = await checkout.create(leader.ctx, {
+      ...buyNow(fixture, { activityId: String(fixture.activityId) }),
+      idempotencyKey: `withdraw-${fixture.activityId}`,
+    });
+    const team = await repo.findMemberByOrder(harness.ctx.db, Number(opened.id));
+
+    const view = await service.withdraw(leader.ctx, { id: String(team!.groupId) });
+    expect(view.status).toBe('cancelled');
+
+    const after = await checkout.detail(leader.ctx, { id: opened.id });
+    expect(after.status).toBe('cancelled');
+    expect(after.groupbuyTeam).toMatchObject({ status: 'cancelled' });
+    // The activity stock the unpaid order held is back.
+    expect((await readActivityCounters(fixture)).activity).toEqual({ stock: 10, sales: 0 });
+  });
+
   it('charges freight by the activity’s 运费模板, not the product’s 包邮', async () => {
     const fixture = await makeActivity();
     // ¥6 for the first piece, anywhere.

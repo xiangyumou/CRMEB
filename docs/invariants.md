@@ -1450,6 +1450,12 @@ An activity SKU that orders still depend on is never removed by an edit of its �
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the admin surface > editing while orders move the stock > RISK-D-012 — refuses to remove a SKU an unpaid order is still buying`
 - `packages/core/src/presale/presale.int.test.ts::the admin surface > editing while orders move the stock > RISK-D-012 — refuses to remove a SKU orders point at, instead of a foreign-key 500`
 
+### RISK-D-013
+
+取消拼团 (a leader withdrawing a team nobody has paid into) closes the team's unpaid orders with it — the leader's own and any joiner's — through the order domain's cancel, which closes the WeChat payment and gives the activity stock and coupon back, so nobody can pay for a team that no longer exists.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > RISK-D-013 — 取消拼团 closes the leader’s unpaid order with the team`
+
 ## Storefront end to end
 
 ### SMOKE-002
