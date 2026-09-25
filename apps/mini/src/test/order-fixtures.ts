@@ -200,6 +200,7 @@ export function refundListItem(overrides: Partial<RefundListItem> = {}): RefundL
     includesFreight: false,
     reason: '不想要了',
     rejectReason: null,
+    isAutomatic: false,
     items: [
       {
         orderItemId: '7001',

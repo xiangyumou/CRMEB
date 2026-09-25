@@ -13,7 +13,7 @@ import './refund-card.scss';
 
 /** The buttons a request offers, left to right; the last is the primary one where there is one. */
 export function refundActions(
-  refund: Pick<RefundListItem, 'status' | 'kind' | 'returnStage'>,
+  refund: Pick<RefundListItem, 'status' | 'kind' | 'returnStage' | 'isAutomatic'>,
 ): Array<{ key: RefundActionKey; label: string; primary: boolean }> {
   const out: Array<{ key: RefundActionKey; label: string; primary: boolean }> = [];
   if (canHide(refund)) out.push({ key: 'hide', label: '删除记录', primary: false });
