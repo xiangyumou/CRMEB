@@ -142,6 +142,16 @@ const TOKEN_ERRCODES = new Set([40001, 40014, 42001]);
 
 /** The token is refreshed this long before WeChat says it expires. */
 const REFRESH_MARGIN_MS = 5 * 60_000;
+
+/**
+ * How long one call to `api.weixin.qq.com` may take, body included.
+ *
+ * These calls run on the effects dispatcher, one at a time, under a 60-second
+ * lease: a request that never answers would stall every effect behind it and
+ * then run twice when the lease lapsed. A timeout fails like any transport
+ * failure — thrown, and retried by the ledger.
+ */
+export const WECHAT_API_TIMEOUT_MS = 10_000;
 /** How long one process may hold the cross-process refresh lock. */
 const LOCK_TTL_MS = 10_000;
 /** How long a loser waits for the winner's token before refreshing anyway. */
@@ -196,6 +206,7 @@ export function createWechatClient(ctx: Ctx): WechatCoreClient {
 
     const response = await fetch(url, {
       method: req.method,
+      signal: AbortSignal.timeout(WECHAT_API_TIMEOUT_MS),
       // A form sets its own `multipart/form-data; boundary=…` content type.
       headers: {
         accept: 'application/json',
@@ -240,6 +251,7 @@ export function createWechatClient(ctx: Ctx): WechatCoreClient {
 
     const response = await fetch(url, {
       method: req.method,
+      signal: AbortSignal.timeout(WECHAT_API_TIMEOUT_MS),
       headers: {
         accept: '*/*',
         ...(req.body === undefined ? {} : { 'content-type': 'application/json; charset=utf-8' }),
@@ -598,6 +610,7 @@ export async function probeWechatCredentials(args: {
 }): Promise<{ ok: true; expiresIn: number } | { ok: false; errcode: number; errmsg: string }> {
   const response = await fetch(new URL('/cgi-bin/stable_token', args.apiBaseUrl), {
     method: 'POST',
+    signal: AbortSignal.timeout(WECHAT_API_TIMEOUT_MS),
     headers: { accept: 'application/json', 'content-type': 'application/json; charset=utf-8' },
     body: JSON.stringify({
       grant_type: 'client_credential',
