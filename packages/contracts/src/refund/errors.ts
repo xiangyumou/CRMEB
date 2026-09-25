@@ -16,6 +16,8 @@ import { defineErrors } from '../_conventions/errors';
  *    (REFUND-005).
  *  - `REFUND_STATE_UNKNOWN` — the gateway's answer was lost. The frozen
  *    `out_refund_no` is queryable; it is never re-sent under a new number.
+ *    The operator reads it on 复核, so it says what happens next (the system
+ *    keeps asking, and where to look if it never settles) rather than 「人工核对」.
  */
 export const refundErrors = defineErrors({
   /** The order does not exist, is soft-deleted, or belongs to somebody else. */
@@ -74,7 +76,11 @@ export const refundErrors = defineErrors({
   /** The gateway refused the refund with a business code. `details` carries it. */
   REFUND_GATEWAY_REFUSED: { status: 502, message: '退款网关拒绝了本次请求，请稍后重试' },
   /** The gateway's answer was lost. Nothing is restored; the frozen number is queried later. */
-  REFUND_STATE_UNKNOWN: { status: 409, message: '退款结果未知，请人工核对后处理' },
+  REFUND_STATE_UNKNOWN: {
+    status: 409,
+    message:
+      '微信支付暂未返回确定的退款结果，系统会继续查询；如长时间未更新，请到微信支付商户平台核对',
+  },
 });
 
 export type RefundErrorCode = keyof typeof refundErrors;
