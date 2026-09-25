@@ -523,6 +523,16 @@ describe('the operator', () => {
       issuedAt: null,
       voided: true,
     });
+    const voidLogs = (await logsOf(placed.orderId)).filter(
+      (entry) => entry.changeType === 'invoice_voided',
+    );
+    expect(voidLogs).toEqual([
+      expect.objectContaining({
+        message: '作废发票 FP-20260601-0005',
+        operatorKind: 'admin',
+        operatorAdminId: adminId,
+      }),
+    ]);
     await expect(
       order.orderInvoices.adminVoid(asAdmin(adminId), { id: invoiceId }),
     ).rejects.toMatchObject({ code: 'ORDER_INVOICE_NOT_ACTIONABLE' });

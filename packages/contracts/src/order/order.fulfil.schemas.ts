@@ -268,6 +268,7 @@ export const orderChangeType = z.enum([
   'invoice_requested',
   'invoice_issued',
   'invoice_rejected',
+  'invoice_voided',
   'groupbuy_joined',
   'groupbuy_succeeded',
   'groupbuy_failed',

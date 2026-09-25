@@ -125,6 +125,7 @@ export const CHANGE_TYPE: Record<OrderChangeType, string> = {
   invoice_requested: '申请开票',
   invoice_issued: '开票',
   invoice_rejected: '驳回开票',
+  invoice_voided: '作废发票',
   groupbuy_joined: '参与拼团',
   groupbuy_succeeded: '拼团成功',
   groupbuy_failed: '拼团失败',

@@ -429,7 +429,7 @@ export async function adminReject(
  * `issued` row one — which frees the order to ask again for what is left.
  */
 export async function adminVoid(ctx: Ctx, params: { id: string }): Promise<OrderInvoice> {
-  requireAdminId(ctx);
+  const adminId = requireAdminId(ctx);
   const invoiceId = fromId(params.id);
 
   await ctx.withTx(async (tx) => {
@@ -445,8 +445,14 @@ export async function adminVoid(ctx: Ctx, params: { id: string }): Promise<Order
     if (!moved.won) {
       throw new DomainError('ORDER_INVOICE_NOT_ACTIONABLE', { details: { status: row.status } });
     }
-    // Who voided it is the route's audit entry: the order timeline has no
-    // 作废 change type yet (adding one is a migration).
+
+    await repo.insertStatusLog(tx, {
+      orderId: row.orderId,
+      changeType: 'invoice_voided',
+      message: `作废发票 ${row.invoiceNumber ?? ''}`.trim().slice(0, 512),
+      operatorKind: 'admin',
+      operatorAdminId: adminId,
+    });
   });
 
   return readInvoice(ctx, invoiceId);
