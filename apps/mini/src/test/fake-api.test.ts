@@ -120,6 +120,12 @@ describe('serveApi (AGENTS 20)', () => {
 
     expect((await post(reply(409, 'CART_OUT_OF_STOCK'))).mismatches).toEqual([]);
     expect((await post(reply(401, 'UNAUTHENTICATED'))).mismatches).toEqual([]);
+    // handle() answers a foreign-key violation with these on any route.
+    expect((await post(reply(409, 'REFERENCE_MISSING'))).mismatches).toEqual([]);
+    expect((await post(reply(409, 'REFERENCE_IN_USE'))).mismatches).toEqual([]);
+    expect((await post(reply(500, 'REFERENCE_IN_USE'))).mismatches).toEqual([
+      'POST /api/v1/cart/items: REFERENCE_IN_USE is a 409, but the stub for cart.addItem answered 500',
+    ]);
     expect((await post(reply(409, 'ORDER_OUT_OF_STOCK'))).mismatches).toEqual([
       'POST /api/v1/cart/items: cart.addItem does not declare ORDER_OUT_OF_STOCK in its errors; the server never answers it there',
     ]);
