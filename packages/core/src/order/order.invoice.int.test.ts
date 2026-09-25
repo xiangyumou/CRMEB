@@ -192,6 +192,28 @@ const logsOf = async (orderId: number) =>
 // ---------------------------------------------------------------------------
 
 describe('申请开票', () => {
+  it('INVOICE-004 — 订单详情 offers 申请开票 until a request is open, and again once it is cancelled', async () => {
+    const placed = await paidOrder();
+    const buyer = as(placed.userId);
+    const before = await order.detail(buyer, { id: String(placed.orderId) });
+    expect(before.invoiceRequestable).toBe(true);
+    expect(before.invoiceAmount).toBe('60.00');
+
+    const invoice = await order.orderInvoices.request(
+      buyer,
+      { id: String(placed.orderId) },
+      header,
+    );
+    expect((await order.detail(buyer, { id: String(placed.orderId) })).invoiceRequestable).toBe(
+      false,
+    );
+
+    await order.orderInvoices.cancel(buyer, { id: invoice.id });
+    expect((await order.detail(buyer, { id: String(placed.orderId) })).invoiceRequestable).toBe(
+      true,
+    );
+  });
+
   it('freezes what the buyer paid and what they typed', async () => {
     const placed = await paidOrder();
     const invoice = await order.orderInvoices.request(

@@ -432,6 +432,12 @@ export interface OrderKindHandler {
    */
   detailLinks?(db: DbOrTx, orderId: number): Promise<OrderKindDetailLinks>;
   /**
+   * Read-only, batched: where each of these orders stands in its kind's own state (the 拼团
+   * team and the order's seat in it), for 我的订单 and 订单详情. Optional; an order the kind
+   * has nothing for is simply absent from the map.
+   */
+  orderStates?(db: DbOrTx, orderIds: readonly number[]): Promise<Map<number, OrderKindState>>;
+  /**
    * Read-only, for 确认订单: what this kind promises before the order exists (the presale
    * ship time). Optional — a kind without it adds nothing. `selections` are the checkout
    * body's `kindMeta`, unvalidated: answer nothing for an activity it cannot find rather
@@ -463,6 +469,19 @@ export interface OrderKindPreviewTerms {
 export interface OrderKindDetailLinks {
   /** The `groupbuy_groups.id` the order holds its membership in. */
   groupbuyTeamId?: number | null;
+}
+
+/** What `OrderKindHandler.orderStates` answers per order; every key is optional. */
+export interface OrderKindState {
+  /** 拼团: the team the order holds its seat in, and that seat's role. */
+  groupbuyTeam?: {
+    id: number;
+    status: 'forming' | 'succeeded' | 'failed' | 'cancelled';
+    role: 'leader' | 'member';
+    seatsTotal: number;
+    seatsTaken: number;
+    expiresAt: Date;
+  };
 }
 
 /**

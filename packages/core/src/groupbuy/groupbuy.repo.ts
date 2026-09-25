@@ -924,6 +924,20 @@ export function isUniqueViolation(error: unknown): boolean {
   return (error as { code?: string } | null)?.code === '23505';
 }
 
+/** Each order's seat and its team, for 我的订单 (one read for a page of orders). */
+export async function listTeamsByOrders(
+  db: DbOrTx,
+  orderIds: readonly number[],
+): Promise<{ orderId: number; role: GroupbuyMember['role']; group: GroupbuyGroup }[]> {
+  if (orderIds.length === 0) return [];
+  const rows = await db
+    .select({ orderId: groupbuyMembers.orderId, role: groupbuyMembers.role, group: groupbuyGroups })
+    .from(groupbuyMembers)
+    .innerJoin(groupbuyGroups, eq(groupbuyGroups.id, groupbuyMembers.groupId))
+    .where(inArray(groupbuyMembers.orderId, [...orderIds]));
+  return rows;
+}
+
 export async function findMemberByOrder(
   db: DbOrTx,
   orderId: number,
@@ -1171,9 +1185,9 @@ export async function listMyGroups(
 export async function findMyOpenGroup(
   db: DbOrTx,
   args: { activityId: number; userId: number; now: Date },
-): Promise<number | null> {
+): Promise<{ id: number; role: GroupbuyMember['role'] } | null> {
   const [row] = await db
-    .select({ id: groupbuyGroups.id })
+    .select({ id: groupbuyGroups.id, role: groupbuyMembers.role })
     .from(groupbuyGroups)
     .innerJoin(groupbuyMembers, eq(groupbuyMembers.groupId, groupbuyGroups.id))
     .where(
@@ -1187,7 +1201,7 @@ export async function findMyOpenGroup(
     )
     .orderBy(desc(groupbuyGroups.id))
     .limit(1);
-  return row?.id ?? null;
+  return row ?? null;
 }
 
 /** Identity is frozen onto the member row, so a later rename cannot rewrite history. */

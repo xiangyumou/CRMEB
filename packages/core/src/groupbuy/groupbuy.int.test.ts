@@ -453,6 +453,19 @@ describe('the group-buy price through the real checkout', () => {
     const team = await repo.findMemberByOrder(harness.ctx.db, Number(opened.id));
     // 开团: the team exists with the unpaid order, so the link is there from the start.
     expect(opened.groupbuyTeamId).toBe(String(team!.groupId));
+    // 拼团中, and the leader's own seat — the list says the same as the detail.
+    expect(opened.groupbuyTeam).toMatchObject({
+      id: String(team!.groupId),
+      status: 'forming',
+      role: 'leader',
+    });
+    const listed = await checkout.list(leader.ctx, {
+      tab: 'all',
+      page: 1,
+      pageSize: 20,
+      sortOrder: 'desc',
+    });
+    expect(listed.items.find((o) => o.id === opened.id)?.groupbuyTeam?.status).toBe('forming');
     await pay(Number(opened.id));
 
     const joiner = await shopper();
@@ -465,6 +478,7 @@ describe('the group-buy price through the real checkout', () => {
     });
     const read = await checkout.detail(joiner.ctx, { id: joined.id });
     expect(read.groupbuyTeamId).toBe(String(team!.groupId));
+    expect(read.groupbuyTeam).toMatchObject({ id: String(team!.groupId), role: 'member' });
 
     // A cancelled join keeps the link: the team page shows how it went on without them.
     await cancel(Number(joined.id));
@@ -477,6 +491,7 @@ describe('the group-buy price through the real checkout', () => {
       idempotencyKey: `plain-${fixture.activityId}`,
     });
     expect(ordinary.groupbuyTeamId).toBeNull();
+    expect(ordinary.groupbuyTeam).toBeNull();
   });
 
   it('charges freight by the activity’s 运费模板, not the product’s 包邮', async () => {

@@ -892,6 +892,15 @@ An invoice can only be asked for on an order that was paid for and not refunded,
 - `packages/core/src/order/order.invoice.int.test.ts::申请开票 > refuses an order whose money went back`
 - `packages/core/src/order/order.invoice.int.test.ts::what the buyer can see > tells a stranger the invoice does not exist`
 
+### INVOICE-004
+
+订单详情 offers 申请开票 (`invoiceRequestable`) exactly when the request would be accepted: paid, not refunded in full, something left to invoice (paid less refunded, `invoiceAmount`), and no request already 待开票 or 已开票.
+
+- `packages/core/src/order/order.invoice.rules.test.ts::INVOICE-004 — 订单详情 offers 申请开票 exactly when the request would be accepted > does not offer it while a request is 待开票 or 已开票`
+- `packages/core/src/order/order.invoice.rules.test.ts::INVOICE-004 — 订单详情 offers 申请开票 exactly when the request would be accepted > does not offer it once the order is refunded in full`
+- `packages/core/src/order/order.invoice.rules.test.ts::INVOICE-004 — 订单详情 offers 申请开票 exactly when the request would be accepted > makes it out for what was paid less what came back`
+- `packages/core/src/order/order.invoice.int.test.ts::申请开票 > INVOICE-004 — 订单详情 offers 申请开票 until a request is open, and again once it is cancelled`
+
 ## 小程序发货信息管理 (WeChat mini-program shipping)
 
 ### WXSHIP-001

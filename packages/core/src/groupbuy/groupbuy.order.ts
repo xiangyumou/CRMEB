@@ -256,6 +256,26 @@ export const groupbuyKindHandler: OrderKindHandler = {
     return { groupbuyTeamId: member?.groupId ?? null };
   },
 
+  /** 拼团中 / 拼团成功 / 拼团失败 on 我的订单: the team of each order's seat. */
+  async orderStates(db, orderIds) {
+    const rows = await repo.listTeamsByOrders(db, orderIds);
+    return new Map(
+      rows.map((row) => [
+        row.orderId,
+        {
+          groupbuyTeam: {
+            id: row.group.id,
+            status: row.group.status,
+            role: row.role,
+            seatsTotal: row.group.seatsTotal,
+            seatsTaken: row.group.seatsTaken,
+            expiresAt: row.group.expiresAt,
+          },
+        },
+      ]),
+    );
+  },
+
   /**
    * The activity's own 运费模板, which charges the order in place of the
    * product's freight setting; `null` (the form's 留空) follows the product.

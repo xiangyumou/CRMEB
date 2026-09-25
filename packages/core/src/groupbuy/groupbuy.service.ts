@@ -491,7 +491,7 @@ export async function detail(ctx: Ctx, input: { id: string }): Promise<GroupbuyD
   // "开团", so the page needs to know. `null` for an anonymous visitor: "cannot
   // join" and "we do not know you" are different answers.
   const userId = ctx.actor.kind === 'user' ? ctx.actor.id : null;
-  const myOpenGroupId =
+  const myOpenGroup =
     userId === null ? null : await repo.findMyOpenGroup(ctx.db, { activityId: id, userId, now });
 
   await repo.bumpViews(ctx.db, id);
@@ -513,7 +513,8 @@ export async function detail(ctx: Ctx, input: { id: string }): Promise<GroupbuyD
         originalPrice: sku.skuOriginalPrice ?? sku.skuPrice,
         stock: sku.stock,
       })),
-    myOpenGroupId: toIdOrNull(myOpenGroupId),
+    myOpenGroupId: toIdOrNull(myOpenGroup?.id ?? null),
+    myOpenGroupRole: myOpenGroup?.role ?? null,
   };
 }
 
