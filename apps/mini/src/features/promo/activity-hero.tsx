@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Swiper, SwiperItem, Text, View } from '@tarojs/components';
 import { RichText as RichTextBlock, type RichTextProps } from '@shop/storefront-blocks';
 import { assetUrl } from '@/lib/asset-url';
+import { strikePrice } from '@/lib/money';
 import { previewImages } from '@/platform';
 import { Card } from '@/ui/card';
 import { Countdown } from '@/ui/countdown';
@@ -53,6 +54,7 @@ export function ActivityHero({
   overlay,
 }: ActivityHeroProps) {
   const [slide, setSlide] = useState(0);
+  const strike = strikePrice(price, originalPrice);
   const sources = sliderImages.length > 0 ? sliderImages : [imageUrl];
   const urls = sources.map((src) => assetUrl(src)).filter((src): src is string => !!src);
 
@@ -92,7 +94,7 @@ export function ActivityHero({
         <View className="activity-hero__price">
           <Tag tone="primary">{badge}</Tag>
           <Price value={price} size="lg" />
-          {originalPrice ? <Price value={originalPrice} size="sm" strike /> : null}
+          {strike ? <Price value={strike} size="sm" strike /> : null}
         </View>
         {deadline ? (
           <View className="activity-hero__deadline">

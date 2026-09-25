@@ -95,7 +95,7 @@ function ArticleRow({ article }: { article: Article }) {
         <Text className="article-row__title">{article.title}</Text>
         {article.summary ? <Text className="article-row__summary">{article.summary}</Text> : null}
         <Text className="article-row__meta">
-          {[date, `${article.views} 阅读`].filter(Boolean).join(' · ')}
+          {[date, article.views > 0 ? `${article.views} 阅读` : null].filter(Boolean).join(' · ')}
         </Text>
       </View>
       {article.coverImageUrl ? (

@@ -8,6 +8,8 @@
  * No avatar or nickname, no slogan, no "share to unlock".
  */
 
+import { strikePrice } from '@/lib/money';
+
 export const POSTER_WIDTH = 600;
 const PAD = 32;
 const INNER = POSTER_WIDTH - PAD * 2;
@@ -153,8 +155,8 @@ export function posterLayout(
   ops.push({ op: 'text', text: '¥', x: PAD, y, font: YUAN, color: colors.price });
   const priceX = PAD + yuanWidth + 4;
   ops.push({ op: 'text', text: content.price, x: priceX, y, font: PRICE, color: colors.price });
-  const original = content.originalPrice;
-  if (original && Number(original) > Number(content.price)) {
+  const original = strikePrice(content.price, content.originalPrice);
+  if (original) {
     const text = `¥${original}`;
     const x = priceX + measure(content.price, PRICE) + 16;
     const width = measure(text, STRIKE);

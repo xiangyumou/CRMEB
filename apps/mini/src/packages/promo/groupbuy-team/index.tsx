@@ -17,6 +17,7 @@ import { PosterSheet } from '@/features/share/poster-sheet';
 import { ShareSheet } from '@/features/share/share-sheet';
 import { assetUrl } from '@/lib/asset-url';
 import { cx } from '@/lib/cx';
+import { strikePrice } from '@/lib/money';
 import { serverNow } from '@/lib/server-clock';
 import { leaveFor, navigate, usePullToRefresh, useRouteParams, useShare } from '@/platform';
 import { requireLogin } from '@/session/session';
@@ -179,6 +180,7 @@ function Team({ view, onStale }: { view: TeamView; onStale: () => void }) {
   };
 
   const seatsTaken = view.seatsTotal - view.seatsLeft;
+  const strike = strikePrice(view.price, activity.data?.originalPrice);
   const badge = `${view.seatsTotal} 人团${view.seatsLeft > 0 ? ` · 还差 ${view.seatsLeft} 人成团` : ''}`;
 
   return (
@@ -199,9 +201,7 @@ function Team({ view, onStale }: { view: TeamView; onStale: () => void }) {
               <Text className="groupbuy-team__meta">{view.seatsTotal} 人团</Text>
               <View className="groupbuy-team__price">
                 <Price value={view.price} />
-                {activity.data?.originalPrice ? (
-                  <Price value={activity.data.originalPrice} size="sm" strike />
-                ) : null}
+                {strike ? <Price value={strike} size="sm" strike /> : null}
               </View>
             </View>
             <Icon name="chevron-right" className="groupbuy-team__chevron" />

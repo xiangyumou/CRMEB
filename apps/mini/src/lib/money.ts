@@ -11,3 +11,12 @@ export function fromCents(cents: number): string {
   const abs = Math.abs(Math.round(cents));
   return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
 }
+
+/**
+ * The 划线价 worth striking through next to `price`: `original` only when it is above what is
+ * charged. A 划线价 at or below the price (a product edited down to its old price, an activity
+ * priced at the catalogue price) is no saving and is not shown.
+ */
+export function strikePrice(price: string, original: string | null | undefined): string | null {
+  return original && toCents(original) > toCents(price) ? original : null;
+}

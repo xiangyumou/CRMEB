@@ -40,6 +40,7 @@ import { Sheet } from '@/ui/sheet';
 import { ProductCardSkeleton, Skeleton } from '@/ui/skeleton';
 import './index.scss';
 import { errorMessage } from '@/lib/error-message';
+import { strikePrice } from '@/lib/money';
 
 type Product = ResponseOf<'catalog.productDetail'>;
 
@@ -140,6 +141,7 @@ function Detail({ product }: { product: Product }) {
   const images = product.sliderImages.length > 0 ? product.sliderImages : [product.imageUrl];
   const urls = images.map((src) => assetUrl(src)).filter((src): src is string => !!src);
   const soldOut = product.stock <= 0 || product.skus.every((sku) => sku.stock <= 0);
+  const strike = strikePrice(product.price, product.originalPrice);
   const canCart = product.canAddToCart && !soldOut;
   const isFavorite = favorited ?? product.favorited === true;
   const matrix = { specs: product.specs, skus: product.skus };
@@ -247,8 +249,10 @@ function Detail({ product }: { product: Product }) {
       <View className="product__summary">
         <View className="product__price-row">
           <Price value={product.price} size="lg" />
-          {product.originalPrice ? <Price value={product.originalPrice} size="sm" strike /> : null}
-          <Text className="product__sales">已售 {formatSales(product.salesDisplay)}</Text>
+          {strike ? <Price value={strike} size="sm" strike /> : null}
+          {product.salesDisplay > 0 ? (
+            <Text className="product__sales">已售 {formatSales(product.salesDisplay)}</Text>
+          ) : null}
         </View>
         <View className="product__title-row">
           <Text className="product__name" id="product-name" userSelect>

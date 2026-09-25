@@ -83,7 +83,9 @@ export function ProductCards({
               {yuan}
               <Text className={styles.minor}>{fen}</Text>
             </Text>
-            {showMarketPrice && product.marketPrice ? (
+            {showMarketPrice &&
+            product.marketPrice &&
+            Number(product.marketPrice) > Number(product.price) ? (
               <Text className={styles.market}>¥{product.marketPrice}</Text>
             ) : null}
           </View>

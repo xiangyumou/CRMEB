@@ -188,6 +188,17 @@ describe('ProductGrid', () => {
     expect(screen.queryByText('¥199.00')).toBeNull();
   });
 
+  it('strikes no market price at or below the price', () => {
+    const [first] = fixtureProducts;
+    render(
+      <ProductGrid
+        props={fixtureProductGrid}
+        data={{ products: [{ ...first!, marketPrice: '129.90' }] }}
+      />,
+    );
+    expect(screen.queryByText('¥129.90')).toBeNull();
+  });
+
   it('says so when the source resolved to nothing', () => {
     render(<ProductGrid props={fixtureProductGrid} data={{ products: [] }} />);
     expect(screen.getByText('暂无商品')).toBeTruthy();

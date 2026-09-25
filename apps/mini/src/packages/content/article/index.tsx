@@ -5,6 +5,7 @@ import { extractLinks } from '@/features/content/links';
 import { RichContent } from '@/features/content/rich-content';
 import { assetUrl } from '@/lib/asset-url';
 import { formatDate } from '@/lib/format';
+import { strikePrice } from '@/lib/money';
 import { navigate, openExternalLink, useRouteParams, useShare } from '@/platform';
 import { Cell, CellGroup } from '@/ui/cell';
 import { Empty } from '@/ui/empty';
@@ -52,7 +53,8 @@ function ArticleBody({ article }: { article: Article }) {
     article.categoryTitle,
     article.author,
     article.publishedAt ? formatDate(article.publishedAt) : null,
-    `${article.views} 阅读`,
+    // 「0 阅读」 says nobody cares; say nothing until someone has read it.
+    article.views > 0 ? `${article.views} 阅读` : null,
   ].filter(Boolean);
   return (
     <View className="article">
@@ -82,6 +84,7 @@ function ArticleBody({ article }: { article: Article }) {
 }
 
 function LinkedProduct({ product }: { product: NonNullable<Article['product']> }) {
+  const strike = strikePrice(product.price, product.originalPrice);
   return (
     <Pressable
       label={product.name}
@@ -96,7 +99,7 @@ function LinkedProduct({ product }: { product: NonNullable<Article['product']> }
         <Text className="article-product__name">{product.name}</Text>
         <View className="article-product__prices">
           <Price value={product.price} size="sm" />
-          {product.originalPrice ? <Price value={product.originalPrice} size="sm" strike /> : null}
+          {strike ? <Price value={strike} size="sm" strike /> : null}
         </View>
       </View>
       <Icon name="chevron-right" className="article-product__arrow" />

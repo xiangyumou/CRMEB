@@ -44,6 +44,12 @@ describe('ProductCard', () => {
     );
   });
 
+  it('strikes no 划线价 at or below the price, and says nothing of 已售 0', () => {
+    render(<ProductCard product={{ ...product, originalPrice: '59.90', salesDisplay: 0 }} />);
+    expect(screen.queryByRole('text', { name: /原价/ })).toBeNull();
+    expect(screen.queryByText(/已售/)).toBeNull();
+  });
+
   it('adds to the cart without opening the product', () => {
     const onAddToCart = vi.fn();
     const onClick = vi.fn();

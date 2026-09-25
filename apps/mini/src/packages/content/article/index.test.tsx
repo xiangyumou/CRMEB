@@ -31,6 +31,21 @@ describe('资讯详情', () => {
     );
   });
 
+  it('says nothing of 0 阅读, and strikes no 划线价 at the price', async () => {
+    serveApi({
+      'GET /api/v1/articles/61': () => ({
+        body: {
+          ...articleFixture,
+          views: 0,
+          product: { ...articleFixture.product!, originalPrice: '19.90' },
+        },
+      }),
+    });
+    await renderPage(<ArticlePage />);
+    expect(await screen.findByText('护理知识 · 小编 · 2026.09.20')).toBeTruthy();
+    expect(screen.queryByRole('text', { name: /原价/ })).toBeNull();
+  });
+
   it('opens 阅读原文 in the web-view and copies a link WeChat would refuse', async () => {
     await renderPage(<ArticlePage />);
     fireEvent.click(await screen.findByRole('link', { name: '阅读原文' }));

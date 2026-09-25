@@ -2,6 +2,7 @@ import type { ProductCard as ProductCardDto } from '@shop/contracts/catalog/sche
 import { Image as TaroImage, Text, View } from '@tarojs/components';
 import { assetUrl } from '@/lib/asset-url';
 import { cx } from '@/lib/cx';
+import { strikePrice } from '@/lib/money';
 import { navigate } from '@/platform';
 import { Icon } from './icon';
 import { Image } from './image';
@@ -66,7 +67,7 @@ export function ProductCard({
 }: ProductCardProps) {
   const soldOut = product.stock <= 0;
   const price = activityPrice ?? product.price;
-  const strike = activityPrice ? product.price : product.originalPrice;
+  const strike = strikePrice(price, activityPrice ? product.price : product.originalPrice);
   const showCart =
     Boolean(onAddToCart) && product.canAddToCart && !soldOut && !unavailable && layout !== 'mini';
   const open = onClick ?? (() => navigate({ route: 'product', params: { id: product.id } }));
