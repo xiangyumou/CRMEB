@@ -23,6 +23,7 @@ import {
   sql,
   type SQL,
 } from 'drizzle-orm';
+import { containsPattern } from '../kernel/like';
 import { allOf, conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
 
 /**
@@ -82,7 +83,10 @@ function adminFilters(args: AdminListArgs): SQL | undefined {
   return allOf(
     ADMIN_ALIVE,
     args.keyword
-      ? or(ilike(admins.account, `%${args.keyword}%`), ilike(admins.name, `%${args.keyword}%`))
+      ? or(
+          ilike(admins.account, containsPattern(args.keyword)),
+          ilike(admins.name, containsPattern(args.keyword)),
+        )
       : undefined,
     args.enabled === undefined ? undefined : eq(admins.status, args.enabled ? 1 : 0),
     args.roleId === undefined
@@ -302,7 +306,7 @@ export async function listRoles(
   args: RoleListArgs,
 ): Promise<{ rows: RoleRow[]; total: number }> {
   const where = allOf(
-    args.keyword ? ilike(roles.name, `%${args.keyword}%`) : undefined,
+    args.keyword ? ilike(roles.name, containsPattern(args.keyword)) : undefined,
     args.enabled === undefined ? undefined : eq(roles.status, args.enabled ? 1 : 0),
   );
   const column =
@@ -531,9 +535,9 @@ export async function listAuditLogs(
     args.to ? lte(auditLogs.createdAt, args.to) : undefined,
     args.keyword
       ? or(
-          ilike(auditLogs.routeId, `%${args.keyword}%`),
-          ilike(auditLogs.path, `%${args.keyword}%`),
-          ilike(auditLogs.target, `%${args.keyword}%`),
+          ilike(auditLogs.routeId, containsPattern(args.keyword)),
+          ilike(auditLogs.path, containsPattern(args.keyword)),
+          ilike(auditLogs.target, containsPattern(args.keyword)),
         )
       : undefined,
   );
