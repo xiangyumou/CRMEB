@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import {
   catalogAdminProductDelete,
+  catalogAdminProductDetail,
   catalogAdminProductExport,
   catalogAdminProductList,
   catalogAdminProductRestore,
@@ -97,12 +98,12 @@ export function ProductListPage() {
   };
 
   const setStatus = useRouteMutation(catalogAdminProductSetStatus, {
-    invalidate: [catalogAdminProductList],
+    invalidate: [catalogAdminProductList, catalogAdminProductDetail],
     successMessage: '已更新上架状态',
   });
 
   const restore = useRouteMutation(catalogAdminProductRestore, {
-    invalidate: [catalogAdminProductList],
+    invalidate: [catalogAdminProductList, catalogAdminProductDetail],
     successMessage: '已恢复，商品处于下架状态',
   });
 

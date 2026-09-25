@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -195,6 +196,78 @@ describe('商品编辑器', () => {
       expect(body.fixedFreight).toBeUndefined();
       // The select round-trips the id it was loaded with.
       expect(body.shippingTemplateId).toBe('3');
+    });
+  });
+
+  it('opens on a fresh read, not a detail cached before a 下架 in the list', async () => {
+    let current: AdminProductDetail = detail;
+    const calls = stubRoutes([
+      on(catalogAdminCategoryTree, { items: [] }),
+      on(shippingTemplateOptionList, { items: [] }),
+      on(catalogAdminLabelList, { items: [], total: 0, page: 1, pageSize: 100 }),
+      on(catalogAdminProtectionList, { items: [], total: 0, page: 1, pageSize: 100 }),
+      on(catalogAdminParamTemplateList, { items: [], total: 0, page: 1, pageSize: 100 }),
+      on(catalogAdminProductDetail, () => current),
+      on(catalogAdminProductUpdate, () => current),
+    ]);
+    // The admin's own cache settings: a detail read seconds ago counts as fresh.
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 30_000 }, mutations: { retry: false } },
+    });
+
+    const first = renderAdmin(withStubAssets(<ProductEditorPage productId="1" />), {
+      identity: editor,
+      queryClient,
+    });
+    await waitFor(() => expect(screen.getByLabelText('商品名称')).toHaveValue('简约白 T 恤'));
+    first.unmount();
+
+    // Taken off the shelf from the list meanwhile.
+    current = { ...detail, status: 'off_shelf' };
+    renderAdmin(withStubAssets(<ProductEditorPage productId="1" />), {
+      identity: editor,
+      queryClient,
+    });
+    await waitFor(() => expect(screen.getByLabelText('商品名称')).toHaveValue('简约白 T 恤'));
+    await userEvent.click(screen.getByRole('button', { name: zhName('保存') }));
+
+    await waitFor(() => {
+      const save = calls.find((call) => call.method === 'PUT');
+      expect((save?.body as Record<string, unknown>).status).toBe('off_shelf');
+    });
+  });
+
+  it('saves a 卡密 product showing its pool, and keeps saved SKU codes read-only', async () => {
+    const card: AdminProductDetail = {
+      ...detail,
+      kind: 'virtual_card',
+      freightMode: 'free',
+      shippingTemplateId: null,
+      specMode: false,
+      specs: [],
+      skus: [{ ...detail.skus[0]!, specValues: {}, specText: '', stock: 3 }],
+    };
+    const calls = stubRoutes([
+      on(catalogAdminCategoryTree, { items: [] }),
+      on(shippingTemplateOptionList, { items: [] }),
+      on(catalogAdminLabelList, { items: [], total: 0, page: 1, pageSize: 100 }),
+      on(catalogAdminProtectionList, { items: [], total: 0, page: 1, pageSize: 100 }),
+      on(catalogAdminParamTemplateList, { items: [], total: 0, page: 1, pageSize: 100 }),
+      on(catalogAdminProductDetail, card),
+      on(catalogAdminProductUpdate, card),
+    ]);
+    renderAdmin(withStubAssets(<ProductEditorPage productId="1" />), { identity: editor });
+
+    await waitFor(() => expect(screen.getByLabelText('商品名称')).toHaveValue('简约白 T 恤'));
+    expect(screen.getByLabelText('规格编码')).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: zhName('保存') }));
+
+    await waitFor(() => {
+      const save = calls.find((call) => call.method === 'PUT');
+      expect((save?.body as { skus: unknown[] }).skus[0]).toMatchObject({
+        stock: 3,
+        expectedStock: 3,
+      });
     });
   });
 

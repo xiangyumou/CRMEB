@@ -373,7 +373,10 @@ export function SkuMatrixEditor({
               <Input
                 size="small"
                 value={row.skuCode ?? ''}
-                disabled={disabled}
+                // A saved SKU keeps its code (orders and exports refer to it);
+                // only a new combination takes one.
+                disabled={disabled || isSavedSku(row)}
+                title={isSavedSku(row) ? SAVED_CODE_HINT : undefined}
                 placeholder="留空自动生成"
                 aria-label={`规格编码 ${index + 1}`}
                 onChange={(event) => patch(index, { skuCode: event.target.value || undefined })}
@@ -514,7 +517,8 @@ function SingleSkuFields({
       <Field label="规格编码">
         <Input
           value={row.skuCode ?? ''}
-          disabled={disabled}
+          disabled={disabled || isSavedSku(row)}
+          title={isSavedSku(row) ? SAVED_CODE_HINT : undefined}
           style={{ width: 160 }}
           placeholder="留空自动生成"
           aria-label="规格编码"
@@ -674,4 +678,15 @@ export function ParamEditor({ value, onChange, templates, disabled = false }: Pa
       </Space>
     </Space>
   );
+}
+
+const SAVED_CODE_HINT = '已保存的规格编码不能修改';
+
+/**
+ * A row that came from the server: `formValuesOf` gives it the stock the
+ * operator is looking at. The server matches rows by spec combination and
+ * never rewrites a saved SKU's code, so an editable box would be ignored.
+ */
+function isSavedSku(row: ProductSkuInput): boolean {
+  return row.expectedStock !== undefined;
 }

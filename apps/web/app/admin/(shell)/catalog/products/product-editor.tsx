@@ -64,10 +64,13 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
   // to press into a 403 — and without the option lists it has no right to.
   const mayWrite = useCan()('catalog:product:write');
 
+  // Always a fresh read: the form takes its values once, at mount, and a
+  // cached detail from before a 下架 in the list would put the product back on
+  // the shelf on the next 保存.
   const detail = useRouteQuery(
     catalogAdminProductDetail,
     { params: { id: productId ?? '' } },
-    { enabled: productId !== undefined },
+    { enabled: productId !== undefined, refetchOnMount: 'always' },
   );
 
   // The three taxonomies the form offers as options: the first 100 enabled,
@@ -180,7 +183,7 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
     [labels.data, protections.data, shippingTemplates.data, templates, specs, specMode, kind],
   );
 
-  if (productId !== undefined && detail.isPending) {
+  if (productId !== undefined && (detail.isPending || !detail.isFetchedAfterMount)) {
     return (
       <PageContainer title="编辑商品">
         <Skeleton active paragraph={{ rows: 8 }} />

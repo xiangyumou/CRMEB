@@ -621,8 +621,13 @@ export const adminProductForm = z
 
     // A card-key product's stock is the card pool, not a number an operator
     // types: kept apart, the two drift and the shop sells cards that do not
-    // exist.
-    if (value.kind === 'virtual_card' && value.skus.some((sku) => sku.stock > 0)) {
+    // exist. The editor echoes the pool it was shown (`stock` equal to
+    // `expectedStock`), which is not typing a number, and the server derives
+    // the stock from the pool either way.
+    if (
+      value.kind === 'virtual_card' &&
+      value.skus.some((sku) => sku.stock > 0 && sku.stock !== sku.expectedStock)
+    ) {
       ctx.addIssue({
         code: 'custom',
         path: ['skus'],

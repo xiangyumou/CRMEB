@@ -1217,6 +1217,68 @@ describe('virtual cards', () => {
     expect(second).toMatchObject({ imported: 1, skippedCardNos: ['A2'], stock: 3 });
   });
 
+  it('saves a card product the editor echoes its pool for, and derives the stock from the pool', async () => {
+    const { product, skuId } = await makeCardProduct();
+    await service.adminVirtualCardImport(
+      asAdmin(),
+      { id: product.id },
+      { skuId: String(skuId), cards: [{ cardNo: 'A1' }, { cardNo: 'A2' }] },
+    );
+
+    const edited = await service.adminProductUpdate(
+      asAdmin(),
+      { id: product.id },
+      productForm({
+        name: '改名后的充值卡',
+        kind: 'virtual_card',
+        freightMode: 'free',
+        categoryIds: product.categoryIds,
+        skus: [
+          {
+            specValues: {},
+            price: '30.00',
+            stock: 2,
+            expectedStock: 2,
+            isDefault: true,
+            isVisible: true,
+            sortOrder: 0,
+          },
+        ],
+      }),
+    );
+    expect(edited).toMatchObject({ name: '改名后的充值卡', stock: 2 });
+  });
+
+  it('turns a typed stock into the (empty) pool when a product becomes a card product', async () => {
+    const product = await makeProduct(asAdmin());
+    expect(product.stock).toBe(10);
+
+    const edited = await service.adminProductUpdate(
+      asAdmin(),
+      { id: product.id },
+      productForm({
+        name: product.name,
+        kind: 'virtual_card',
+        freightMode: 'free',
+        categoryIds: product.categoryIds,
+        skus: [
+          {
+            specValues: {},
+            price: '99.00',
+            stock: 10,
+            expectedStock: 10,
+            isDefault: true,
+            isVisible: true,
+            sortOrder: 0,
+          },
+        ],
+      }),
+    );
+    // No cards imported yet: nothing to sell.
+    expect(edited.stock).toBe(0);
+    expect(edited.skus[0]!.stock).toBe(0);
+  });
+
   it('refuses an import against a product that is not a card product', async () => {
     const product = await makeProduct(asAdmin());
     const skuId = await firstSkuId(harness, product.id);

@@ -1135,6 +1135,13 @@ async function reconcileSkus(
     }
   }
 
+  // The pool is the stock of every card SKU, kept or new — including SKUs of
+  // a product that just became a card product, whose old typed stock would
+  // otherwise sell cards that do not exist.
+  if (body.kind === 'virtual_card') {
+    for (const skuId of keptIds) await repo.syncCardStock(tx, skuId);
+  }
+
   const dropped = existing.filter((sku) => !keptIds.has(sku.id));
   try {
     await repo.deleteSkus(
