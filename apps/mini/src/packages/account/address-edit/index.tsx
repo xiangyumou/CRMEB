@@ -73,6 +73,9 @@ function AddressForm({ id, initial }: { id?: string; initial: AddressDraft | nul
   const [focus, setFocus] = useState<keyof AddressErrors | null>(null);
   const blurred = () => setFocus(null);
   const tree = useCityTree();
+  // The default stays the default until another address takes over (USER-020): its switch
+  // cannot be turned off here, and says so, rather than seeming to save a change it never makes.
+  const keepsDefault = id !== undefined && initial?.isDefault === true;
   const create = useRouteMutation('user.addressCreate', { invalidate: ADDRESS_READS });
   const update = useRouteMutation('user.addressUpdate', { invalidate: ADDRESS_READS });
 
@@ -177,10 +180,12 @@ function AddressForm({ id, initial }: { id?: string; initial: AddressDraft | nul
       <CellGroup>
         <Cell
           title="设为默认地址"
+          description={keepsDefault ? '这是默认地址；要换默认，请把其他地址设为默认' : undefined}
           value={
             <Switch
               label="设为默认地址"
-              checked={draft.isDefault}
+              checked={keepsDefault || draft.isDefault}
+              disabled={keepsDefault}
               onChange={(checked) => change('isDefault', checked)}
             />
           }

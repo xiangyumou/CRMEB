@@ -46,6 +46,16 @@ describe('新增 / 编辑发票抬头', () => {
     expect(taroFake.calls.map((c) => c.api)).toContain('navigateBack');
   });
 
+  it('shows the default title’s switch as fixed, and a non-default one as free', async () => {
+    taroFake.routerParams = { id: '7001' };
+    serveApi({ 'GET /api/v1/invoice-titles/7001': () => ({ body: invoiceTitleFixture }) });
+    await renderPage(<InvoiceTitleEditPage />);
+    const toggle = await screen.findByRole('switch', { name: '设为默认抬头' });
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    expect(toggle.getAttribute('aria-disabled')).toBe('true');
+    expect(screen.getByText('这是默认抬头；要换默认，请把其他抬头设为默认')).toBeTruthy();
+  });
+
   it('asks for a 税号 before sending a company title', async () => {
     const seen = serveApi({});
     await renderPage(<InvoiceTitleEditPage />);

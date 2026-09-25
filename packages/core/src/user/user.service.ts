@@ -240,13 +240,24 @@ export async function addressUpdate(
  * not this row, so nothing breaks — but a customer who deletes an address and
  * then asks "where did you send it" deserves an answer, and `deleted_at` keeps
  * one.
+ *
+ * Deleting the default makes the most recently added of the rest the default
+ * (USER-020): checkout preselects the default, and a book of addresses with
+ * none marked would leave 确认订单 asking for an address the shopper has.
  */
 export async function addressDelete(ctx: Ctx, params: { id: string }): Promise<void> {
   const userId = requireUserId(ctx);
   const id = fromId(params.id);
   await ctx.withTx(async (tx) => {
-    const result = await repo.softDeleteAddress(tx, { id, userId, now: ctx.clock.now() });
+    const now = ctx.clock.now();
+    await repo.lockAddressBook(tx, userId);
+    const current = await repo.findAddress(tx, { id, userId });
+    const result = await repo.softDeleteAddress(tx, { id, userId, now });
     if (!result.won) throw new DomainError('USER_ADDRESS_NOT_FOUND');
+    if (!current?.isDefault) return;
+    // Default first, then newest: with the default gone, the newest of the rest.
+    const [next] = await repo.listAddresses(tx, { userId, limit: 1, offset: 0 });
+    if (next && !next.isDefault) await repo.setDefaultAddress(tx, { id: next.id, userId, now });
   });
 }
 

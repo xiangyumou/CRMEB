@@ -625,6 +625,16 @@ export async function updateAddress(
   });
 }
 
+/**
+ * Serialises one customer's address-book writes that pick a default (deleting the default
+ * promotes the next), so two at once cannot both promote and trip `user_addresses_default_uq`.
+ */
+export async function lockAddressBook(tx: Tx, userId: number): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`user-addresses:${userId}`}, 0))`,
+  );
+}
+
 export async function softDeleteAddress(
   tx: Tx,
   args: { id: number; userId: number; now: Date },

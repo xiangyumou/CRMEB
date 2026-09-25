@@ -1296,6 +1296,13 @@ A shopper's avatar is a picture we hold: `PUT /profile` takes an `avatarUrl` onl
 - `apps/web/app/api/v1/user.int.test.ts::/api/v1/profile > USER-019 — takes the avatar our upload returned and refuses one on another server`
 - `packages/core/src/storage/storage.int.test.ts::image variants > CAT-018 — a thumbnail of a live image counts as ours, a thumbnail of anything else does not`
 
+### USER-020
+
+A shopper with addresses always has a default one: deleting the default makes the most recently added of the rest the default, so 确认订单 never asks for an address the shopper has saved; deleting any other address leaves the default alone. The default cannot be switched off by editing it (another address is made the default instead). Invoice titles differ on purpose: deleting the default title leaves none (which company is invoiced next is not guessed).
+
+- `packages/core/src/user/user.int.test.ts::addresses > USER-020: deleting the default makes the newest of the rest the default`
+- `packages/core/src/user/user.int.test.ts::addresses > USER-020: deleting another address leaves the default where it is`
+
 ## Coupons
 
 ### COUPON-001

@@ -48,6 +48,20 @@ describe('新增 / 编辑地址', () => {
     await waitFor(() => expect(taroFake.calls.some((c) => c.api === 'navigateBack')).toBe(true));
   });
 
+  it('shows the default’s switch as fixed, not as one that turns off', async () => {
+    taroFake.routerParams = { id: '31' };
+    serveApi({
+      'GET /api/v1/addresses/31': () => ({ body: addressFixture }),
+      'GET /api/v1/cities': () => ({ body: cityTreeFixture }),
+    });
+    await renderPage(<AddressEditPage />);
+    await screen.findByDisplayValue('李四');
+    const toggle = screen.getByRole('switch', { name: '设为默认地址' });
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    expect(toggle.getAttribute('aria-disabled')).toBe('true');
+    expect(screen.getByText('这是默认地址；要换默认，请把其他地址设为默认')).toBeTruthy();
+  });
+
   it('makes 确认订单’s price stale: it prices against the default address underneath', async () => {
     taroFake.routerParams = { id: '31' };
     serveApi({

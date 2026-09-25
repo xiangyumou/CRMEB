@@ -370,6 +370,35 @@ describe('addresses', () => {
     expect(replacement.isDefault).toBe(true);
   });
 
+  it('USER-020: deleting the default makes the newest of the rest the default', async () => {
+    const user = await makeUser();
+    const oldest = await service.addressCreate(asUser(user.id), addressForm());
+    const newest = await service.addressCreate(
+      asUser(user.id),
+      addressForm({ receiverName: '李四', isDefault: false }),
+    );
+    const chosen = await service.addressCreate(
+      asUser(user.id),
+      addressForm({ receiverName: '王五', isDefault: true }),
+    );
+    // `chosen` is newer still, but it is the one going away.
+    await service.addressDelete(asUser(user.id), { id: chosen.id });
+
+    const { address } = await service.defaultAddress(asUser(user.id));
+    expect(address?.id).not.toBe(oldest.id);
+    expect(address?.id).toBe(newest.id);
+    const list = await service.addressList(asUser(user.id), { page: 1, pageSize: 20 });
+    expect(list.items.filter((a) => a.isDefault)).toHaveLength(1);
+  });
+
+  it('USER-020: deleting another address leaves the default where it is', async () => {
+    const user = await makeUser();
+    const home = await service.addressCreate(asUser(user.id), addressForm());
+    const office = await service.addressCreate(asUser(user.id), addressForm({ isDefault: false }));
+    await service.addressDelete(asUser(user.id), { id: office.id });
+    expect((await service.defaultAddress(asUser(user.id))).address?.id).toBe(home.id);
+  });
+
   it('enforces the configured limit', async () => {
     const user = await makeUser();
     await harness.ctx.config.set(storefrontAuthConfig, { addressLimit: 2 });

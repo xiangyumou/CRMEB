@@ -59,6 +59,8 @@ function ExistingTitle({ id }: { id: string }) {
 
 function TitleForm({ id, initial }: { id?: string; initial: InvoiceDraft }) {
   const [draft, setDraft] = useState(initial);
+  // The server keeps an edited default the default: its switch cannot be turned off here.
+  const keepsDefault = id !== undefined && initial.isDefault;
   const [errors, setErrors] = useState<InvoiceErrors>({});
   const [focus, setFocus] = useState<InvoiceField | null>(null);
   const create = useRouteMutation('user.invoiceTitleCreate', { invalidate: INVALIDATE });
@@ -206,10 +208,12 @@ function TitleForm({ id, initial }: { id?: string; initial: InvoiceDraft }) {
       <CellGroup>
         <Cell
           title="设为默认抬头"
+          description={keepsDefault ? '这是默认抬头；要换默认，请把其他抬头设为默认' : undefined}
           value={
             <Switch
               label="设为默认抬头"
-              checked={draft.isDefault}
+              checked={keepsDefault || draft.isDefault}
+              disabled={keepsDefault}
               onChange={(checked) => change('isDefault', checked)}
             />
           }
