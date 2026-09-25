@@ -1122,6 +1122,58 @@ A shopper's after-sale evidence photos must each be a live image our own storage
 - `packages/core/src/refund/refund.int.test.ts::REFUND-014 — evidence photos come from our own storage > refuses a link to somebody else’s server, and opens no request`
 - `packages/core/src/storage/storage.int.test.ts::image variants > CAT-018 — a thumbnail of a live image counts as ours, a thumbnail of anything else does not`
 
+### REFUND-015
+
+`order_items.refunded_quantity` is always the units the line's refunds count — every succeeded refund, plus a 仅退款 from approval until it is closed (`approved`, `processing`, `unknown`, `failed`) — and it is re-derived inside `transitionRefund`, the one place a refund's status changes. So a shopper withdrawing an approved 仅退款, or the merchant rejecting or closing one, hands its units back to the warehouse in the same transaction. 复核 of a refused refund may keep what it counts but grows only into unshipped units: one whose units shipped meanwhile is refused with `REFUND_LINE_ALREADY_SHIPPED`, never paid.
+
+- `packages/core/src/refund/refund.rules.test.ts::REFUND-015 — the units a request holds follow its status > counts a 仅退款 from approval until it is closed, and a return only once paid`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-015 — a shopper withdrawing an approved 仅退款 hands its units back to the warehouse`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-015 — 复核 refuses a refund whose units shipped since it failed`
+
+### REFUND-016
+
+An order a coupon paid for in full (`paid = 0`) can still be refunded: the request is worth ¥0, settles without the gateway and without a capital-flow row, and releases the units, the coupon and the group-buy seat like any full refund. A failed group buy on such an order settles the same way. The order's roll-up is decided by units when no money was collected.
+
+- `packages/core/src/refund/refund.rules.test.ts::REFUND-016 — an order a coupon paid for in full has a way out > rolls up by units when no money was collected`
+- `packages/core/src/refund/refund.system.int.test.ts::REFUND-016 — a failed group buy on a ¥0 order settles without the gateway and releases stock`
+- `packages/core/src/refund/refund.system.int.test.ts::REFUND-016 — a shopper can ask for a ¥0 order back, and the approval settles it`
+
+### REFUND-017
+
+A refund WeChat refused (`failed`) is still in flight while the merchant can send it again: it holds its lines (`refund_items.is_open`), counts against the ceiling, keeps its units, shows the shopper 处理中 and cannot be hidden. It leaves that state only by 复核 succeeding, the merchant closing it (拒绝) or the shopper withdrawing it. A refund the shop opened by itself (a failed group buy, an expired presale) cannot be withdrawn by the shopper.
+
+- `packages/core/src/refund/refund.rules.test.ts::REFUND-017 — a refused refund is still in flight > holds its lines while the merchant can send it again`
+- `packages/core/src/refund/refund.rules.test.ts::REFUND-017 — a refused refund is still in flight > lets the shopper withdraw it until money can have moved, but never a refund the shop opened`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-017 — keeps its lines and units, so the same units cannot be asked for twice`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-017 — 复核 pays it under the same number`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-017 — the shopper may withdraw it, and the merchant may close it`
+- `packages/core/src/refund/refund.concurrency.int.test.ts::REFUND-017 — keeps the units out of the warehouse while a refused refund can be retried, and hands them back when the merchant closes it`
+- `apps/mini/src/packages/aftersale/shared/refund.test.ts::REFUND-017 — shows a failed refund as in progress, keeps it, and lets the shopper withdraw it`
+- `apps/web/app/admin/(shell)/trade/refunds/refund-requests.test.tsx::REFUND-017 — offers 关闭 on a refund WeChat refused, through the reject route`
+
+### REFUND-018
+
+The freight goes back with the request that takes the rest of an order nothing of which has shipped, once. A line inside another in-flight request counts as taken, so the shopper's second request on an unshipped order carries the freight; the apply screen's `freightRefundable` and the server decide from the same facts, and a request that leaves a takeable unit behind, or comes after the freight was claimed, is refused.
+
+- `packages/core/src/refund/refund.rules.test.ts::REFUND-018 — the freight goes with the rest of an unshipped order > counts a line inside another open request as taken`
+- `packages/core/src/refund/refund.system.int.test.ts::REFUND-018 — gives the freight back with the second request while the first holds the other line`
+- `packages/core/src/refund/refund.system.int.test.ts::REFUND-018 — refuses the freight on a request that leaves a takeable line behind`
+
+### REFUND-019
+
+What the shopper reads on a refund's timeline is what a person wrote (the shopper, 商家同意/拒绝) or a fixed line per status. Gateway answers, source tags, merchant numbers and a system refund's internal note stay in staff fields (`last_error`, the internal remark, the operator notification).
+
+- `packages/core/src/refund/refund.rules.test.ts::REFUND-019 — the shopper reads fixed lines, never what the gateway said > replaces a system row with the fixed line for its status`
+- `packages/core/src/refund/refund.rules.test.ts::REFUND-019 — the shopper reads fixed lines, never what the gateway said > leaves out a system row that did not move the status, such as a merchant-number mismatch`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-019 — shows a refused refund as 退款未完成 and keeps the gateway text for staff`
+
+### REFUND-020
+
+A fully refunded order takes back the gift coupons it earned that nobody has spent, and returns each one to its template's supply; a spent one stays spent, and a partial refund takes nothing back.
+
+- `packages/core/src/refund/refund.int.test.ts::REFUND-020 — revokes the unused gifts and returns them to the supply, leaving other coupons alone`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-020 — a partial refund leaves the gifts where they are`
+
 ## Registration and notifications
 
 ### USER-001
@@ -1503,7 +1555,7 @@ The shop has no 砍价, 秒杀, 抽奖, 直播, 分销, 积分, 签到, 付费�
 
 ### SEQ-001
 
-A fixed-seed sequence of real operations (create payment, gateway payment, cancel, refund, duplicate notification, close task) interleaved over three orders keeps every invariant after every step: a cancelled order keeps no collectible gateway payment, a paid attempt carries its trade number, money taken at the gateway is recorded locally, completed refunds never exceed the payment, and each stock layer keeps every unit in stock or sold. Four seeds run in the suite, and a failure prints the seed and the full event log for an exact replay.
+A fixed-seed sequence of real operations (create payment, gateway payment, cancel, refund — apply, approve, send, a refused send, withdraw, reject, 复核 — duplicate notification, close task) interleaved over three orders keeps every invariant after every step: a cancelled order keeps no collectible gateway payment, a paid attempt carries its trade number, money taken at the gateway is recorded locally, completed refunds never exceed the payment, each stock layer keeps every unit in stock or sold, `refunded_quantity` equals the units the line's refunds count, and a unit is never both shipped and taken by a refund approved before shipping. Four seeds run in the suite, and a failure prints the seed and the full event log for an exact replay.
 
 - `packages/core/src/order/order.sequence.int.test.ts::SEQ-001 — a fixed-seed interleaving of real operations > holds every invariant after every step, seed <seed>`
 
