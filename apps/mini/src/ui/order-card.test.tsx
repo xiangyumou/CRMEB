@@ -1,5 +1,5 @@
 import type { StorefrontOrderListItem } from '@shop/contracts/order/schemas';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { taroFake } from '@/test/taro-fake/taro';
 import { orderActions, orderStatusText } from './order-actions';
@@ -137,6 +137,52 @@ describe('OrderCard', () => {
     expect(screen.getByRole('button', { name: '立即付款' }).className).toContain(
       'shop-btn--loading',
     );
+  });
+
+  it('says 支付已超时 and offers no 立即付款 once the time to pay is gone', () => {
+    render(
+      <OrderCard
+        order={{
+          ...order,
+          status: 'pending_payment',
+          paidAmount: null,
+          payExpiresAt: '2020-01-01T00:00:00+08:00',
+        }}
+        onAction={() => undefined}
+      />,
+    );
+    expect(screen.getByText('支付已超时')).toBeTruthy();
+    expect(screen.queryByRole('timer')).toBeNull();
+    expect(screen.queryByRole('button', { name: '立即付款' })).toBeNull();
+    expect(screen.getByRole('button', { name: '取消订单' })).toBeTruthy();
+  });
+
+  it('reads the list again when the countdown runs out on screen', () => {
+    vi.useFakeTimers({ now: Date.parse('2026-09-25T10:00:00+08:00') });
+    try {
+      const onExpire = vi.fn();
+      render(
+        <OrderCard
+          order={{
+            ...order,
+            status: 'pending_payment',
+            paidAmount: null,
+            payExpiresAt: '2026-09-25T10:00:02+08:00',
+          }}
+          onAction={() => undefined}
+          onExpire={onExpire}
+        />,
+      );
+      expect(screen.getByRole('button', { name: '立即付款' })).toBeTruthy();
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(onExpire).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('支付已超时')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: '立即付款' })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('prints an activity line at the price paid, not the catalogue price', () => {

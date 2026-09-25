@@ -90,6 +90,25 @@ describe('拼团商品', () => {
     expect(navigatedTo().at(-1)).toBe('/packages/promo/groupbuy-team/index?id=501');
   });
 
+  it('shows the team the shopper just opened when they come back from paying', async () => {
+    let mine: string | null = null;
+    serveApi({
+      'GET /api/v1/groupbuy/activities/1': () => ({ body: activity({ myOpenGroupId: mine }) }),
+      'GET /api/v1/groupbuy/activities/1/groups': () => ({
+        body: { items: [], total: 0, page: 1, pageSize: 5 },
+      }),
+    });
+    const { client } = await renderPage(<GroupbuyDetailPage />);
+    expect(await screen.findByRole('button', { name: '发起拼团' })).toBeTruthy();
+    expect(screen.queryByText('你发起的团正在拼')).toBeNull();
+    // 确认订单 → 收银台 → 支付结果 mark it stale; the page is shown again.
+    mine = '777';
+    taroFake.hidePage();
+    await client.invalidateQueries({ queryKey: ['groupbuy.detail'], refetchType: 'none' });
+    taroFake.showPage();
+    expect(await screen.findByText('你发起的团正在拼')).toBeTruthy();
+  });
+
   it('opens a team: picks a SKU and hands checkout a group-buy draft', async () => {
     serve(activity());
     await renderPage(<GroupbuyDetailPage />);

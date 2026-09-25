@@ -1,7 +1,9 @@
 import type { OrderItem, StorefrontOrderListItem } from '@shop/contracts/order/schemas';
+import { useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { cx } from '@/lib/cx';
 import { orderPrices } from '@/lib/order-price';
+import { serverNow } from '@/lib/server-clock';
 import { formatSpec } from '@/lib/spec';
 import { navigate } from '@/platform';
 import { Button } from './button';
@@ -65,6 +67,11 @@ export interface OrderCardProps {
   onClick?: (() => void) | undefined;
   /** Which action is in flight (its button spins). */
   busy?: OrderActionKey | undefined;
+  /**
+   * An unpaid order's time to pay ran out while shown: the list reads it again (the server
+   * closes it). Until then the card says 「支付已超时」 and offers no 立即付款.
+   */
+  onExpire?: (() => void) | undefined;
   className?: string | undefined;
 }
 
@@ -74,8 +81,12 @@ const KIND_TAG = { groupbuy: '拼团', presale: '预售' } as const;
  * An order in 我的订单 (design.md §4.4): status, up to three lines then 「共 N 件」, the amount
  * paid, and the buttons `orderActions` gives it. An unpaid order counts down to its expiry.
  */
-export function OrderCard({ order, onAction, onClick, busy, className }: OrderCardProps) {
-  const actions = orderActions(order);
+export function OrderCard({ order, onAction, onClick, busy, onExpire, className }: OrderCardProps) {
+  // The deadline the countdown reached here; one already past when drawn counts too.
+  const [endedAt, setEndedAt] = useState<string | null>(null);
+  const expiry = order.status === 'pending_payment' ? order.payExpiresAt : null;
+  const expired = expiry !== null && (endedAt === expiry || Date.parse(expiry) <= serverNow());
+  const actions = orderActions(order).filter((action) => !(expired && action.key === 'pay'));
   const open = onClick ?? (() => void navigate({ route: 'order', params: { id: order.id } }));
   const shown = order.items.slice(0, MAX_ROWS);
   const { unitPrices } = orderPrices(order);
@@ -119,10 +130,20 @@ export function OrderCard({ order, onAction, onClick, busy, className }: OrderCa
       </Pressable>
       {actions.length > 0 ? (
         <View className="shop-order__actions">
-          {order.status === 'pending_payment' && order.payExpiresAt ? (
+          {expiry && expired ? (
+            <View className="shop-order__expiry">
+              <Text className="shop-order__expiry-label">支付已超时</Text>
+            </View>
+          ) : expiry ? (
             <View className="shop-order__expiry">
               <Text className="shop-order__expiry-label">剩余</Text>
-              <Countdown endsAt={order.payExpiresAt} />
+              <Countdown
+                endsAt={expiry}
+                onEnd={() => {
+                  setEndedAt(expiry);
+                  onExpire?.();
+                }}
+              />
             </View>
           ) : null}
           {actions.map((action) => (

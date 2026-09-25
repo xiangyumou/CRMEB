@@ -136,7 +136,19 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
   const create = useRouteMutation('order.create', {
     // The coupon now sits on the order: out of the wallet's 可使用, and no longer usable in the
     // cart's hint or on another 确认订单.
-    invalidate: ['cart.list', 'cart.count', 'order.list', 'order.counts', ...COUPON_READS],
+    // A 拼团 or 预售 order changes its activity page too: the shopper's own open team (查看我的团
+    // instead of 发起拼团), the team's seats, the units left.
+    invalidate: [
+      'cart.list',
+      'cart.count',
+      'order.list',
+      'order.counts',
+      'groupbuy.detail',
+      'groupbuy.groupDetail',
+      'groupbuy.myGroups',
+      'presale.detail',
+      ...COUPON_READS,
+    ],
   });
 
   // 导入微信地址, as 我的地址 does it: the city tree turns WeChat's names into the ids freight is

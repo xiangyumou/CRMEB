@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { isApiError, type ResponseOf } from '@shop/api-client';
-import { useRouteQuery } from '@shop/api-client/react';
+import { routeKey, useRouteQuery } from '@shop/api-client/react';
+import { useRefetchOnShow } from '@/data/use-refetch-on-show';
 import {
   ActivityDescription,
   ActivityHero,
@@ -46,6 +47,8 @@ type Activity = ResponseOf<'groupbuy.detail'>;
 export default function GroupbuyDetailPage() {
   const { id = '' } = useRouteParams('groupbuy');
   const detail = useRouteQuery('groupbuy.detail', { params: { id } }, { enabled: id !== '' });
+  // Back from 确认订单 / 收银台 / an order: whether the shopper now leads a team here.
+  useRefetchOnShow(routeKey('groupbuy.detail'));
   const activity = detail.data;
   useShare(id ? { route: 'groupbuy', params: { id } } : null, {
     title: activity

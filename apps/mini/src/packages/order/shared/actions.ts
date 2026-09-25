@@ -17,13 +17,16 @@ export const ORDER_READS: readonly RouteId[] = [
 
 /**
  * A cancelled unpaid order puts its coupon back in the wallet (and back in the cart's hint and
- * 确认订单's list), and a cancelled 拼团 order gives its seat back.
+ * 确认订单's list), and a cancelled 拼团 order gives its seat back (and the activity page its
+ * 发起拼团, the stock its units).
  */
 const CANCEL_READS: readonly RouteId[] = [
   ...ORDER_READS,
   ...COUPON_READS,
+  'groupbuy.detail',
   'groupbuy.groupDetail',
   'groupbuy.myGroups',
+  'presale.detail',
 ];
 
 export interface OrderRef {

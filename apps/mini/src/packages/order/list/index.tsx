@@ -83,6 +83,7 @@ function OrderList({ tab }: { tab: ShownTab }) {
             order={order}
             onAction={(key) => actions.run(key, order)}
             busy={actions.busy?.orderId === order.id ? actions.busy.key : undefined}
+            onExpire={() => void list.refetch()}
           />
         )}
         skeleton={

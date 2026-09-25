@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { View } from '@tarojs/components';
 import { isApiError, type ResponseOf } from '@shop/api-client';
-import { useRouteQuery } from '@shop/api-client/react';
+import { routeKey, useRouteQuery } from '@shop/api-client/react';
+import { useRefetchOnShow } from '@/data/use-refetch-on-show';
 import {
   ActivityDescription,
   ActivityHero,
@@ -43,6 +44,7 @@ type Activity = ResponseOf<'presale.detail'>;
 export default function PresaleDetailPage() {
   const { id = '' } = useRouteParams('presale');
   const detail = useRouteQuery('presale.detail', { params: { id } }, { enabled: id !== '' });
+  useRefetchOnShow(routeKey('presale.detail'));
   const activity = detail.data;
   useShare(id ? { route: 'presale', params: { id } } : null, {
     title: activity ? `预售 ¥${activity.price} ${activity.title}` : undefined,
