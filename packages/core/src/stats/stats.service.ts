@@ -21,7 +21,7 @@ import { toId } from '../kernel/ids';
 import { cached } from './stats.cache';
 import { statsConfig } from './stats.config';
 import * as repo from './stats.repo';
-import { rangeKey, resolveRange, shanghaiDayLabel, type ResolvedRange } from './stats.range';
+import { rangeKey, resolveRange, statsExportFilename, type ResolvedRange } from './stats.range';
 
 /**
  * The four statistics pages, the ranking, the two exports and the figures the
@@ -645,12 +645,6 @@ function csv(header: string[], rows: Array<Array<string | number>>): string {
   return [header.join(','), ...rows.map((row) => row.map(cell).join(','))].join('\n') + '\n';
 }
 
-function exportFilename(prefix: string, range: ResolvedRange): string {
-  const last = new Date(range.to.getTime() - 1);
-  const compact = (at: Date): string => shanghaiDayLabel(at).replaceAll('-', '');
-  return `${prefix}-${compact(range.from)}-${compact(last)}.csv`;
-}
-
 /**
  * 交易统计导出 — one row per bucket.
  *
@@ -691,7 +685,7 @@ export async function tradeExport(ctx: Ctx, input: StatsRangeQuery): Promise<Sta
   ]);
 
   return {
-    filename: exportFilename('trade', range),
+    filename: statsExportFilename('交易统计', range),
     contentType: 'text/csv',
     rowCount: rows.length,
     truncated: false,
@@ -722,7 +716,7 @@ export async function productExport(
   ]);
 
   return {
-    filename: exportFilename('products', range),
+    filename: statsExportFilename('商品统计', range),
     contentType: 'text/csv',
     rowCount: rows.length,
     truncated: matched > rows.length,

@@ -215,3 +215,14 @@ export function truncUnit(bucket: StatsBucket): 'hour' | 'day' | 'month' {
 export function rangeKey(range: { from: Date; to: Date }): string {
   return `${shanghaiDayLabel(range.from)}..${shanghaiDayLabel(range.to)}`.replaceAll('-', '');
 }
+
+/**
+ * What a statistics export is saved as, named like the order and product
+ * exports: `交易统计-2026-02-01至2026-02-03.csv`, one Shanghai day alone when
+ * the window is a single day.
+ */
+export function statsExportFilename(title: string, range: { from: Date; to: Date }): string {
+  const first = shanghaiDayLabel(range.from);
+  const last = shanghaiDayLabel(new Date(range.to.getTime() - 1));
+  return `${title}-${first === last ? first : `${first}至${last}`}.csv`;
+}
