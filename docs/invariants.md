@@ -2128,6 +2128,13 @@ The mini-program's splash (`app/config.splashAd.link`) is a `LinkTarget`: the st
 - `packages/contracts/src/system/theme.test.ts::SYS-021 — deriveTheme keeps text readable > falls back: no accent is the primary colour, no price is the primary text colour`
 - `packages/contracts/src/system/theme.test.ts::zod-free > imports nothing at runtime, so the mini-program may ship it`
 
+### SYS-022
+
+A role given an editor's write atom is given the reads its pickers need, as ordinary rows, when the role is saved (`permission-requirements.ts`); migrations 0013 and 0015 applied the same table to the roles that already existed, and together are that table pair for pair. 0015 also gave every role that handles 待处理任务 the new 失败的后台任务 atom. Neither touches a role that holds none of the listed atoms.
+
+- `packages/core/src/system/system.int.test.ts::migration 0013 — editors get what their editor reads > is the requirements table, pair for pair, together with 0015`
+- `packages/core/src/system/system.int.test.ts::migration 0015 — 管理员 and 用户 editors, and 失败的后台任务 > SYS-022 — completes the two editors, gives effect handlers the failed-jobs page, and nothing else`
+
 ### SYSC-001
 
 Six concurrent disables of one account report exactly one session revocation, and the sessions are gone once.

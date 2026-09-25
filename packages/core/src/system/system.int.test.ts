@@ -1163,12 +1163,17 @@ describe('migration 0013 — editors get what their editor reads', () => {
   const MIGRATION = fileURLToPath(
     new URL('../../../db/migrations/0013_editor_permission_requirements.sql', import.meta.url),
   );
+  const LATER = fileURLToPath(
+    new URL('../../../db/migrations/0015_admin_user_permission_requirements.sql', import.meta.url),
+  );
   const sql = () => readFileSync(MIGRATION, 'utf8');
   const runMigration = () => harness.db.handle.pool.query(sql());
 
-  it('is the requirements table, pair for pair', () => {
-    const pairs = [...sql().matchAll(/\('([a-z:-]+)', '([a-z:-]+)'\)/g)].map(
-      ([, atom, needs]) => `${atom} -> ${needs}`,
+  it('is the requirements table, pair for pair, together with 0015', () => {
+    const pairs = [sql(), readFileSync(LATER, 'utf8')].flatMap((text) =>
+      [...text.matchAll(/\('([a-z:-]+)', '([a-z:-]+)'\)/g)].map(
+        ([, atom, needs]) => `${atom} -> ${needs}`,
+      ),
     );
     const table = Object.entries(PERMISSION_REQUIREMENTS).flatMap(([atom, needs]) =>
       needs.map((need) => `${atom} -> ${need}`),
@@ -1201,6 +1206,48 @@ describe('migration 0013 — editors get what their editor reads', () => {
         .sort();
     expect(await granted(editor!.id)).toEqual(withRequirements(['catalog:product:write']));
     expect(await granted(support!.id)).toEqual(['order:order:read']);
+  });
+});
+
+describe('migration 0015 — 管理员 and 用户 editors, and 失败的后台任务', () => {
+  const MIGRATION = fileURLToPath(
+    new URL('../../../db/migrations/0015_admin_user_permission_requirements.sql', import.meta.url),
+  );
+  const runMigration = () => harness.db.handle.pool.query(readFileSync(MIGRATION, 'utf8'));
+
+  it('SYS-022 — completes the two editors, gives effect handlers the failed-jobs page, and nothing else', async () => {
+    const [accounts, service, finance, viewer] = await harness.ctx.db
+      .insert(roles)
+      .values([{ name: '账号管理' }, { name: '客服主管' }, { name: '财务' }, { name: '只读' }])
+      .returning({ id: roles.id });
+    await harness.ctx.db.insert(rolePermissions).values([
+      { roleId: accounts!.id, permission: 'system:admin:write' },
+      { roleId: service!.id, permission: 'user:customer:write' },
+      { roleId: service!.id, permission: 'user:group:read' },
+      { roleId: finance!.id, permission: 'payment:effect:handle' },
+      { roleId: viewer!.id, permission: 'order:order:read' },
+    ]);
+
+    await runMigration();
+    await runMigration();
+
+    const granted = async (roleId: number) =>
+      (
+        await harness.ctx.db
+          .select()
+          .from(rolePermissions)
+          .where(eq(rolePermissions.roleId, roleId))
+      )
+        .map((row) => row.permission)
+        .sort();
+    expect(await granted(accounts!.id)).toEqual(['system:admin:write', 'system:role:read']);
+    expect(await granted(service!.id)).toEqual([
+      'user:customer:write',
+      'user:group:read',
+      'user:label:read',
+    ]);
+    expect(await granted(finance!.id)).toEqual(['payment:effect:handle', 'system:job:handle']);
+    expect(await granted(viewer!.id)).toEqual(['order:order:read']);
   });
 });
 

@@ -10,9 +10,9 @@
  *
  * Only reads (and 素材 upload, which is how an editor puts a picture in) are
  * listed, and none of them requires anything in turn, so one pass is the whole
- * closure. Migration 0013 applied this table to the roles that existed then; a
- * change here is a change to the next migration too, and the test that reads
- * 0013 back says so.
+ * closure. Migrations 0013 and 0015 applied this table to the roles that
+ * existed then; a change here is a change to the next migration too, and the
+ * test that reads them back says so.
  */
 
 const STORAGE_FOR_EDITORS = [
@@ -44,6 +44,10 @@ export const PERMISSION_REQUIREMENTS: Readonly<Record<string, readonly string[]>
     'catalog:product:read',
     ...STORAGE_FOR_EDITORS,
   ],
+  // 新建/编辑管理员 picks the admin's 身份.
+  'system:admin:write': ['system:role:read'],
+  // 编辑用户 sets 分组 and 标签.
+  'user:customer:write': ['user:group:read', 'user:label:read'],
   // The page editor's pickers: a block can link to any of these.
   'decor:page:write': [
     'decor:page:read',
