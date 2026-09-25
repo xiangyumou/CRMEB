@@ -46,19 +46,16 @@ export function DashboardPage() {
   const urlState = useMemoryUrlState();
   const range = useStatsRange(urlState);
 
-  const header = useRouteQuery(systemDashboardHeader, undefined, {
-    enabled: can('system:dashboard:read'),
-  });
-  const trade = useRouteQuery(
-    statsTrade,
-    { query: range.query },
-    { enabled: can('stats:trade:read') },
-  );
-  const orders = useRouteQuery(
-    statsOrders,
-    { query: range.query },
-    { enabled: can('stats:order:read') },
-  );
+  const canHeader = can('system:dashboard:read');
+  const canTrade = can('stats:trade:read');
+  const canOrders = can('stats:order:read');
+
+  // A disabled query stays `isPending` for ever, so "loading" is asked only
+  // of the queries this admin may run: a role without 订单统计 must not
+  // watch the 经营概览 skeleton spin waiting for it.
+  const header = useRouteQuery(systemDashboardHeader, undefined, { enabled: canHeader });
+  const trade = useRouteQuery(statsTrade, { query: range.query }, { enabled: canTrade });
+  const orders = useRouteQuery(statsOrders, { query: range.query }, { enabled: canOrders });
 
   return (
     <PageContainer
@@ -76,27 +73,27 @@ export function DashboardPage() {
           />
         ) : null}
 
-        <HeaderTiles tiles={header.data?.tiles} loading={header.isPending} />
+        {canHeader ? <HeaderTiles tiles={header.data?.tiles} loading={header.isPending} /> : null}
 
-        {can('stats:trade:read') || can('stats:order:read') ? (
+        {canTrade || canOrders ? (
           <div>
             <Typography.Title level={5} style={{ marginTop: 0 }}>
               经营概览（{rangeLabel(range.value)}）
             </Typography.Title>
             <MetricCards
               metrics={overviewMetrics(trade.data?.metrics, orders.data?.metrics)}
-              loading={trade.isPending || orders.isPending}
+              loading={(canTrade && trade.isPending) || (canOrders && orders.isPending)}
             />
           </div>
         ) : null}
 
         <Row gutter={[16, 16]}>
-          {can('stats:trade:read') ? (
+          {canTrade ? (
             <Col xs={24} xl={12}>
               <StatsChart chart={trade.data?.chart} loading={trade.isPending} title="交易趋势" />
             </Col>
           ) : null}
-          {can('stats:order:read') ? (
+          {canOrders ? (
             <Col xs={24} xl={12}>
               <StatsChart chart={orders.data?.chart} loading={orders.isPending} title="订单趋势" />
             </Col>

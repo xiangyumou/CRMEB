@@ -89,6 +89,16 @@ describe('工作台', () => {
     expect(calls.some((call) => call.url.includes('/stats/products/ranking'))).toBe(false);
   });
 
+  it('leaves out the tiles a role may not read instead of a skeleton that never resolves', async () => {
+    stubApi();
+    const { container } = renderAdmin(<DashboardPage />, {
+      identity: identityWith(['stats:trade:read']),
+    });
+
+    expect(await screen.findByText('营业额')).toBeInTheDocument();
+    expect(container.querySelector('.ant-skeleton')).toBeNull();
+  });
+
   it('shows what is missing instead of going down when a contributor fails', async () => {
     stubApi({ ...dashboardHeaderExample, degraded: ['storage'] });
     renderAdmin(<DashboardPage />, { identity: identityWith(ALL) });
