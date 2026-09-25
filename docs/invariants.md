@@ -1158,6 +1158,7 @@ The freight goes back with the request that takes the rest of an order nothing o
 - `packages/core/src/refund/refund.rules.test.ts::REFUND-018 — the freight goes with the rest of an unshipped order > counts a line inside another open request as taken`
 - `packages/core/src/refund/refund.system.int.test.ts::REFUND-018 — gives the freight back with the second request while the first holds the other line`
 - `packages/core/src/refund/refund.system.int.test.ts::REFUND-018 — refuses the freight on a request that leaves a takeable line behind`
+- `apps/mini/src/packages/aftersale/apply/index.test.tsx::REFUND-018 — sends the freight with the rest of an unshipped order when the other line is already in after-sales`
 
 ### REFUND-019
 
