@@ -283,6 +283,21 @@ describe('商品编辑器', () => {
     expect(screen.getByText('你的身份只能查看商品，不能在这里修改')).toBeInTheDocument();
     // Nor does it ask for the option lists it holds no atom for.
     expect(calls.some((call) => call.url.includes('/admin-api/catalog/labels'))).toBe(false);
+    // The server blanks 成本价 for this role: no column, rather than empty boxes.
+    expect(screen.queryByText('成本价')).not.toBeInTheDocument();
+  });
+
+  it('shows 成本价 to a look-only role that may export, which the server does tell it', async () => {
+    stubApi();
+    renderAdmin(withStubAssets(<ProductEditorPage productId="1" />), {
+      identity: {
+        ...testIdentity,
+        permissions: ['catalog:product:read', 'catalog:product:export'],
+      },
+    });
+
+    await waitFor(() => expect(screen.getByLabelText('商品名称')).toHaveValue('简约白 T 恤'));
+    expect(screen.getAllByText('成本价').length).toBeGreaterThan(0);
   });
 
   /**

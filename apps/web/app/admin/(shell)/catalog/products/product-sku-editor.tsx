@@ -166,6 +166,8 @@ export interface SkuMatrixEditorProps {
   specMode: boolean;
   kind: ProductKind;
   disabled?: boolean | undefined;
+  /** `false` for a role the server hides 成本价 from: no column rather than an empty one. */
+  showCost?: boolean | undefined;
 }
 
 export function SkuMatrixEditor({
@@ -175,6 +177,7 @@ export function SkuMatrixEditor({
   specMode,
   kind,
   disabled = false,
+  showCost = true,
 }: SkuMatrixEditorProps) {
   const rows = value ?? EMPTY_SKUS;
   const axes = specs.map((spec) => spec.name).filter(Boolean);
@@ -237,6 +240,7 @@ export function SkuMatrixEditor({
           row={row}
           disabled={disabled}
           cardStock={cardStock}
+          showCost={showCost}
           onChange={(changes) =>
             onChange?.([{ ...row, ...changes, specValues: {}, isDefault: true }])
           }
@@ -337,19 +341,23 @@ export function SkuMatrixEditor({
               />
             ),
           },
-          {
-            title: '成本价',
-            key: 'cost',
-            width: 120,
-            render: (_value: unknown, row: ProductSkuInput, index: number) => (
-              <MoneyInput
-                size="small"
-                value={row.cost}
-                disabled={disabled}
-                onChange={(next) => patch(index, { cost: next })}
-              />
-            ),
-          },
+          ...(showCost
+            ? [
+                {
+                  title: '成本价',
+                  key: 'cost',
+                  width: 120,
+                  render: (_value: unknown, row: ProductSkuInput, index: number) => (
+                    <MoneyInput
+                      size="small"
+                      value={row.cost}
+                      disabled={disabled}
+                      onChange={(next) => patch(index, { cost: next })}
+                    />
+                  ),
+                },
+              ]
+            : []),
           {
             title: '库存',
             key: 'stock',
@@ -473,11 +481,13 @@ function SingleSkuFields({
   onChange,
   disabled,
   cardStock,
+  showCost,
 }: {
   row: ProductSkuInput;
   onChange: (changes: Partial<ProductSkuInput>) => void;
   disabled: boolean;
   cardStock: boolean;
+  showCost: boolean;
 }) {
   return (
     <Space wrap size={12}>
@@ -497,14 +507,16 @@ function SingleSkuFields({
           onChange={(next) => onChange({ originalPrice: next })}
         />
       </Field>
-      <Field label="成本价">
-        <MoneyInput
-          value={row.cost}
-          disabled={disabled}
-          style={{ width: 120 }}
-          onChange={(next) => onChange({ cost: next })}
-        />
-      </Field>
+      {showCost ? (
+        <Field label="成本价">
+          <MoneyInput
+            value={row.cost}
+            disabled={disabled}
+            style={{ width: 120 }}
+            onChange={(next) => onChange({ cost: next })}
+          />
+        </Field>
+      ) : null}
       <Field label="库存">
         <InputNumber
           min={0}

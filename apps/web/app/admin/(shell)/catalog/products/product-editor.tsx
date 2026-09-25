@@ -64,7 +64,11 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
   const [form] = Form.useForm();
   // A role that may only look at products sees the form read-only, with no 保存
   // to press into a 403 — and without the option lists it has no right to.
-  const mayWrite = useCan()('catalog:product:write');
+  const can = useCan();
+  const mayWrite = can('catalog:product:write');
+  // The server blanks 成本价 for a role that may neither edit nor export; an
+  // empty box would read as "no cost recorded", so the column goes instead.
+  const showCost = mayWrite || can('catalog:product:export');
 
   // Always a fresh read: the form takes its values once, at mount, and a
   // cached detail from before a 下架 in the list would put the product back on
@@ -179,10 +183,20 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
         specs,
         specMode,
         kind,
+        showCost,
       }),
     // `labelOptions`/`protectionOptions` are rebuilt every render; their data is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [labels.data, protections.data, shippingTemplates.data, templates, specs, specMode, kind],
+    [
+      labels.data,
+      protections.data,
+      shippingTemplates.data,
+      templates,
+      specs,
+      specMode,
+      kind,
+      showCost,
+    ],
   );
 
   if (productId !== undefined && (detail.isPending || !detail.isFetchedAfterMount)) {
@@ -282,6 +296,7 @@ function buildFields({
   specs,
   specMode,
   kind,
+  showCost,
 }: {
   labelOptions: SelectOption[];
   protectionOptions: SelectOption[];
@@ -290,6 +305,7 @@ function buildFields({
   specs: readonly ProductSpecInput[];
   specMode: boolean;
   kind: ProductKind;
+  showCost: boolean;
 }): FieldSpec<Extract<keyof AdminProductForm, string>>[] {
   return [
     { kind: 'text', name: 'name', label: '商品名称', span: 12, maxLength: 128 },
@@ -423,6 +439,7 @@ function buildFields({
           specs={specs}
           specMode={specMode}
           kind={kind}
+          showCost={showCost}
           disabled={disabled}
         />
       ),
