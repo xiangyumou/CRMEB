@@ -61,6 +61,7 @@ describe('system sider entries', () => {
       'system.admins',
       'system.roles',
       'system.auditLogs',
+      'system.failedJobs',
     ]);
   });
 

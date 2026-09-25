@@ -62,6 +62,33 @@ describe('工作台', () => {
     expect(calls.some((call) => call.url.includes('/admin-api/dashboard/header'))).toBe(true);
   });
 
+  it('OPS-020 — shows 「异常待处理」 in the danger colour while there is work, linking to it', async () => {
+    stubApi({
+      ...dashboardHeaderExample,
+      tiles: [
+        {
+          key: 'system.attention',
+          label: '异常待处理',
+          value: 3,
+          format: 'count',
+          href: '/admin/trade/effects',
+          deltaFromYesterday: null,
+          attention: true,
+        },
+        ...dashboardHeaderExample.tiles,
+      ],
+    });
+    renderAdmin(<DashboardPage />, { identity: identityWith(ALL) });
+
+    const figure = await screen.findByText('3');
+    expect(figure.closest('.ant-typography-danger')).not.toBeNull();
+    expect(screen.getByText('点击查看并处理')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /异常待处理/ })).toHaveAttribute(
+      'href',
+      '/admin/trade/effects',
+    );
+  });
+
   it('shows the last 30 days: net revenue, refund rate and a sales ranking', async () => {
     const calls = stubApi();
     renderAdmin(<DashboardPage />, { identity: identityWith(ALL) });

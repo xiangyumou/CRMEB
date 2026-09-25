@@ -730,6 +730,11 @@ export const dashboardTile = z.object({
   href: z.string().nullable(),
   /** Comparison against the same figure yesterday; null when not meaningful. */
   deltaFromYesterday: z.number().nullable(),
+  /**
+   * The figure is work waiting for a person (「异常待处理」): the page shows a
+   * non-zero value in the warning colour. Absent means an ordinary figure.
+   */
+  attention: z.boolean().optional(),
 });
 export type DashboardTile = z.infer<typeof dashboardTile>;
 
@@ -770,4 +775,46 @@ export const dashboardHeaderExample: DashboardHeader = {
   ],
   degraded: [],
   generatedAt: '2026-09-22T09:00:00+08:00',
+};
+
+// ---------------------------------------------------------------------------
+// failed background jobs
+// ---------------------------------------------------------------------------
+
+/**
+ * A background job that used up its retries (`failed_jobs`). `jobName` is the
+ * worker's job id (`order.autoCancel`); the screen shows it as words. `error` is
+ * the last failure as the worker saw it — staff-only detail, never shown to a
+ * shopper.
+ */
+export const failedJobItem = z.object({
+  id,
+  jobName: z.string(),
+  error: z.string(),
+  attempts: z.number().int().min(0),
+  createdAt: instant,
+  resolvedAt: instant.nullable(),
+});
+export type FailedJobItem = z.infer<typeof failedJobItem>;
+
+export const failedJobListQuery = pageQuery.extend({
+  /** `open`: still waiting for a person (the default); `resolved`: marked 已处理. */
+  status: z.enum(['open', 'resolved']).default('open'),
+});
+export type FailedJobListQuery = z.infer<typeof failedJobListQuery>;
+
+export const pagedFailedJobs = paged(failedJobItem);
+
+export const failedJobParams = z.object({ id });
+
+/** `resolved: false` — somebody marked it first; nothing changed. */
+export const failedJobResolveResult = z.object({ resolved: z.boolean() });
+
+export const failedJobItemExample: FailedJobItem = {
+  id: '12',
+  jobName: 'order.sweepExpiredOrders',
+  error: 'connect ETIMEDOUT',
+  attempts: 3,
+  createdAt: '2026-09-25T04:00:12+08:00',
+  resolvedAt: null,
 };

@@ -49,6 +49,9 @@ export const systemErrors = defineErrors({
   /** The current password did not match. Deliberately distinct from a 401. */
   SYSTEM_PASSWORD_MISMATCH: { status: 422, message: '当前密码不正确' },
 
+  /** No failed background job with that id. */
+  SYSTEM_FAILED_JOB_NOT_FOUND: { status: 404, message: '该任务记录不存在' },
+
   /** No config group is registered under that name. */
   SYSTEM_CONFIG_GROUP_NOT_FOUND: { status: 404, message: '配置分组不存在' },
   /**

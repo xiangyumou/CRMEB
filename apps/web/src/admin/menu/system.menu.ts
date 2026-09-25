@@ -1,7 +1,8 @@
 import { defineMenu } from './types';
 
 /**
- * 设置 — admins, roles, the audit log and the generic settings screens.
+ * 设置 — admins, roles, the audit log, failed background jobs and the generic
+ * settings screens.
  *
  * Last in the sider on purpose (`order: 900`): it is the menu an operator opens
  * once a week, not once an hour. 个人资料 is reachable from the avatar menu and
@@ -53,6 +54,13 @@ export default defineMenu({
       path: '/admin/system/audit-logs',
       permission: 'system:audit:read',
       order: 40,
+    },
+    {
+      key: 'system.failedJobs',
+      label: '失败的后台任务',
+      path: '/admin/system/failed-jobs',
+      permission: 'system:job:handle',
+      order: 42,
     },
     {
       key: 'system.apiTokens',

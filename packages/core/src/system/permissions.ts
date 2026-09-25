@@ -25,6 +25,7 @@ export const systemPermissions = definePermissions(
     'config:read': '查看系统设置',
     'config:write': '修改系统设置',
     'dashboard:read': '查看后台首页统计',
+    'job:handle': '查看并处理失败的后台任务',
   },
   { section: '系统' },
 );

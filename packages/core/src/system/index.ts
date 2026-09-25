@@ -10,6 +10,7 @@
  * | `GET/POST/PUT/DELETE /admin-api/roles…` | `roleList` / `roleDetail` / `roleCreate` / `roleUpdate` / `roleSetStatus` / `roleDelete` |
  * | `GET /admin-api/permissions` | `permissionTreeRoute` |
  * | `GET /admin-api/audit-logs` | `auditLogList` |
+ * | `GET /admin-api/failed-jobs`, `POST …/:id/resolve` | `failedJobList` / `failedJobResolve` |
  * | `GET /admin-api/system/config-groups` | `configGroupList` |
  * | `GET/PUT /admin-api/system/config/:group` | `configGet` / `configSave` |
  * | `POST /admin-api/system/config/:group/test` | `configTest` |
@@ -76,6 +77,7 @@ export {
 } from './config.service';
 export { agreementGet } from './agreement.service';
 export { auditLogList, pruneAuditLogs } from './audit.service';
+export { failedJobList, failedJobResolve } from './failed-jobs.service';
 
 export {
   countTile,

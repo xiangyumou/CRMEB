@@ -1,6 +1,6 @@
 import type { DbOrTx } from '@shop/db';
 import { failedJobs } from '@shop/db/schema/system';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 
 /**
  * The only file that touches `failed_jobs`.
@@ -45,4 +45,49 @@ export async function resolveFailedJob(db: DbOrTx, id: number, now: Date): Promi
     .set({ resolvedAt: now })
     .where(and(eq(failedJobs.id, id), isNull(failedJobs.resolvedAt)));
   return (result as { rowCount?: number | null }).rowCount ?? 0;
+}
+
+/** One page of the 失败的后台任务 screen, newest first. */
+export async function pageFailedJobs(
+  db: DbOrTx,
+  input: { resolved: boolean; limit: number; offset: number },
+) {
+  const where = input.resolved ? isNotNull(failedJobs.resolvedAt) : isNull(failedJobs.resolvedAt);
+  const rows = await db
+    .select({
+      id: failedJobs.id,
+      jobName: failedJobs.jobName,
+      error: failedJobs.error,
+      attempts: failedJobs.attempts,
+      createdAt: failedJobs.createdAt,
+      resolvedAt: failedJobs.resolvedAt,
+    })
+    .from(failedJobs)
+    .where(where)
+    .orderBy(desc(failedJobs.id))
+    .limit(input.limit)
+    .offset(input.offset);
+  const [count] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(failedJobs)
+    .where(where);
+  return { rows, total: count?.total ?? 0 };
+}
+
+export async function failedJobExists(db: DbOrTx, id: number): Promise<boolean> {
+  const rows = await db
+    .select({ id: failedJobs.id })
+    .from(failedJobs)
+    .where(eq(failedJobs.id, id))
+    .limit(1);
+  return rows.length > 0;
+}
+
+/** Failed jobs nobody has marked 已处理: the other half of 「异常待处理」. */
+export async function countUnresolvedFailedJobs(db: DbOrTx): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(failedJobs)
+    .where(isNull(failedJobs.resolvedAt));
+  return row?.n ?? 0;
 }

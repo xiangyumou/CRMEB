@@ -173,13 +173,30 @@ function HeaderTiles({ tiles, loading }: { tiles: DashboardTile[] | undefined; l
 }
 
 function TileBody({ tile }: { tile: DashboardTile }) {
+  // 「异常待处理」 and its like: work waiting for a person reads in the danger
+  // colour while it is not zero, so it is seen before the sales figures.
+  const alarming = tile.attention === true && tile.value > 0;
+  const figure =
+    tile.format === 'bytes' ? formatBytes(tile.value) : formatFigure(tile.value, tile.format);
   const body = (
     <>
       <Typography.Text type="secondary">{tile.label}</Typography.Text>
       <div style={{ fontSize: 24, lineHeight: '32px', fontVariantNumeric: 'tabular-nums' }}>
-        {tile.format === 'bytes' ? formatBytes(tile.value) : formatFigure(tile.value, tile.format)}
+        {alarming ? (
+          <Typography.Text type="danger" style={{ fontSize: 'inherit' }}>
+            {figure}
+          </Typography.Text>
+        ) : (
+          figure
+        )}
       </div>
-      <TileDelta tile={tile} />
+      {tile.attention ? (
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          {alarming ? '点击查看并处理' : '暂无'}
+        </Typography.Text>
+      ) : (
+        <TileDelta tile={tile} />
+      )}
     </>
   );
   return tile.href ? (

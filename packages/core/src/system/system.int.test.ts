@@ -4,7 +4,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { and, eq } from 'drizzle-orm';
 import { admins, rolePermissions, roles } from '@shop/db/schema/auth';
 import { notificationTemplates, type NotificationChannels } from '@shop/db/schema/notification';
-import { configValues } from '@shop/db/schema/system';
+import { configValues, effects as effectsTable } from '@shop/db/schema/system';
+import { recordFailedJob } from '../kernel/failed-jobs.repo';
+import { failedJobList, failedJobResolve } from './failed-jobs.service';
 import { createTestCtx, type TestCtx } from '@shop/testing';
 import { createAdminSessionStore } from '../auth/admin-session.store';
 import { hashPassword } from '../auth/password';
@@ -990,6 +992,81 @@ describe('agreements and the dashboard', () => {
     expect(byKey.get('system.admins')).toBe(1);
     expect(byKey.get('storage.files')).toBe(0);
     expect(header.degraded).toEqual([]);
+  });
+
+  async function seedTrouble() {
+    const now = harness.ctx.clock.now();
+    await recordFailedJob(harness.ctx.db, {
+      queue: 'shop',
+      jobName: 'order.sweepExpiredOrders',
+      jobId: '1',
+      payload: {},
+      error: 'connect ETIMEDOUT',
+      attempts: 3,
+      now,
+    });
+    await harness.ctx.db.insert(effectsTable).values([
+      // Parked in a scope the 待处理任务 console shows: counted.
+      {
+        scope: 'refund',
+        scopeId: '5',
+        eventType: 'refund.execute',
+        payload: {},
+        status: 'unknown',
+      },
+      // Parked notification: it has its own send log, not counted here.
+      { scope: 'notification', scopeId: 'x:1', eventType: 'send', payload: {}, status: 'unknown' },
+      // Delivered: not trouble.
+      { scope: 'refund', scopeId: '6', eventType: 'refund.execute', payload: {}, status: 'done' },
+    ]);
+  }
+
+  it('OPS-020 — 「异常待处理」 counts parked effects and failed jobs, first on the page', async () => {
+    await seedTrouble();
+    const header = await dashboardHeader(as(superId));
+    expect(header.tiles[0]).toMatchObject({
+      key: 'system.attention',
+      label: '异常待处理',
+      value: 2,
+      href: '/admin/trade/effects',
+      attention: true,
+    });
+  });
+
+  it('OPS-020 — 「异常待处理」 counts only what the admin may open, and links there', async () => {
+    await seedTrouble();
+    const jobsOnly = await dashboardHeader(
+      as(superId, { isSuper: false, permissions: ['system:dashboard:read', 'system:job:handle'] }),
+    );
+    expect(jobsOnly.tiles.find((t) => t.key === 'system.attention')).toMatchObject({
+      value: 1,
+      href: '/admin/system/failed-jobs',
+    });
+
+    const neither = await dashboardHeader(
+      as(superId, { isSuper: false, permissions: ['system:dashboard:read'] }),
+    );
+    expect(neither.tiles.map((t) => t.key)).not.toContain('system.attention');
+  });
+
+  it('OPS-020 — a failed job leaves 「异常待处理」 once marked 已处理, and only once', async () => {
+    await seedTrouble();
+    const open = await failedJobList(as(superId), { page: 1, pageSize: 20, status: 'open' });
+    expect(open.items).toHaveLength(1);
+    const id = open.items[0]!.id;
+
+    expect(await failedJobResolve(as(superId), id)).toEqual({ resolved: true });
+    expect(await failedJobResolve(as(superId), id)).toEqual({ resolved: false });
+    expect(await code(failedJobResolve(as(superId), '999999'))).toBe('SYSTEM_FAILED_JOB_NOT_FOUND');
+
+    const resolved = await failedJobList(as(superId), {
+      page: 1,
+      pageSize: 20,
+      status: 'resolved',
+    });
+    expect(resolved.items.map((item) => item.id)).toEqual([id]);
+    const header = await dashboardHeader(as(superId));
+    expect(header.tiles.find((t) => t.key === 'system.attention')?.value).toBe(1);
   });
 });
 

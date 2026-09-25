@@ -1858,6 +1858,38 @@ Every service the production topology starts — `postgres`, `redis`, `web`, `wo
 
 - `deploy/rehearsal/drill.sh::static/healthcheck-per-service`
 
+### OPS-017
+
+Readiness measures the worker by the jobs it finishes, not by its process being up. The worker writes `worker:heartbeat:job` when a job completes (throttled to one write per five seconds), and `/api/v1/readyz` fails `worker` unless that key is at most three minutes old (`JOB_HEARTBEAT_MAX_AGE_MS`) as well as the loop's `worker:heartbeat` being fresh. The loop beat is a timer and keeps ticking while BullMQ's consumer is stuck.
+
+- `apps/worker/src/job-heartbeat.test.ts::OPS-017 — the job heartbeat is written when a job completes > writes at most once per interval, however many jobs complete`
+- `apps/web/src/server/health.int.test.ts::GET /api/v1/readyz > OPS-017 — is 503 when the process beats but no job has completed for minutes`
+- `apps/web/src/server/health.int.test.ts::GET /api/v1/readyz > OPS-017 — is 503 when no job has ever completed`
+
+### OPS-018
+
+Failed runs are bounded in Redis. Every repeatable schedule keeps at most 200 failed runs for at most a day (`removeOnFail`), and on-demand jobs at most 1000 for a week: Redis runs `noeviction`, so a sweep failing through an outage must not fill it until sessions cannot be written. A job that exhausts its retries is recorded in `failed_jobs` either way.
+
+- `apps/worker/src/main.int.test.ts::syncRepeatables > OPS-018 — bounds the failed runs a schedule keeps in Redis`
+
+### OPS-019
+
+The effects ledger is pruned nightly (`system.pruneEffects`): `done` rows older than 90 days are deleted in bounded batches. Parked (`unknown`) and `pending` rows are work and are never pruned; `shipment` rows are kept for good because the WeChat 发货信息录入 code reads them back as a record.
+
+- `packages/core/src/effects/effects.int.test.ts::OPS-019 — pruneEffects keeps work and records, drops delivered history > deletes only done rows past the window, never parked, pending or shipment rows`
+- `packages/core/src/effects/effects.int.test.ts::OPS-019 — pruneEffects keeps work and records, drops delivered history > keeps a done row inside the window, and deletes at most the limit per run`
+
+### OPS-020
+
+Work that stopped and waits for a person is on the admin home page. The first tile, 「异常待处理」, is the number of effects parked in the scopes the 待处理任务 console shows plus the background jobs that failed every retry and nobody marked 已处理 (系统 › 失败的后台任务). Each half is counted only for an admin who may open its screen, the tile links to the screen with work in it, and a non-zero value shows in the danger colour.
+
+- `packages/core/src/effects/effects.int.test.ts::OPS-019 — pruneEffects keeps work and records, drops delivered history > OPS-020 — counts parked rows in the named scopes only`
+- `packages/core/src/system/system.int.test.ts::agreements and the dashboard > OPS-020 — 「异常待处理」 counts parked effects and failed jobs, first on the page`
+- `packages/core/src/system/system.int.test.ts::agreements and the dashboard > OPS-020 — 「异常待处理」 counts only what the admin may open, and links there`
+- `packages/core/src/system/system.int.test.ts::agreements and the dashboard > OPS-020 — a failed job leaves 「异常待处理」 once marked 已处理, and only once`
+- `apps/web/app/admin/(shell)/dashboard.test.tsx::工作台 > OPS-020 — shows 「异常待处理」 in the danger colour while there is work, linking to it`
+- `apps/web/app/admin/(shell)/system/failed-jobs/failed-jobs.test.tsx::失败的后台任务 > OPS-020 — says so when somebody else marked the row first`
+
 ## Route integrity
 
 ### ROUTE-001
