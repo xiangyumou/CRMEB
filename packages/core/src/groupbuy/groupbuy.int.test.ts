@@ -2024,7 +2024,7 @@ describe('shopper notifications', () => {
       expect(row.variables).toContain('orderNo');
     }
     expect(page.items.find((row) => row.code === 'groupbuy_failed')?.channels.inApp?.body).toBe(
-      '「{{activityTitle}}」{{reason}}，订单 {{orderNo}} 的 ¥{{amount}} 将原路退回。',
+      '「{{activityTitle}}」{{reason}}，订单 {{orderNo}} {{refundNote}}。',
     );
   });
 });

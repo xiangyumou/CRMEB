@@ -5,7 +5,7 @@ import { formatShopTime, notify } from '../notification';
 import { autoDeliver } from '../order';
 import { refundSystemInitiated } from '../refund';
 import { settleGroup } from './groupbuy.jobs';
-import { GROUPBUY_EVENTS } from './groupbuy.notifications';
+import { GROUPBUY_EVENTS, refundNoteOf } from './groupbuy.notifications';
 import * as repo from './groupbuy.repo';
 
 /**
@@ -261,6 +261,7 @@ async function notifyFailed(
       groupId: notice.groupId,
       activityTitle: notice.activityTitle,
       amount: notice.paidAmount ?? '',
+      refundNote: refundNoteOf(notice.paidAmount),
       reason: FAILURE_REASONS[args.reason] ?? FAILURE_REASONS['group_failed'],
       refundId: args.refundId,
     },
