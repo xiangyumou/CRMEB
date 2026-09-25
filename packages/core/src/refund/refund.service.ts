@@ -8,7 +8,7 @@ import type {
   RefundableItemsResult,
 } from '@shop/contracts/refund/schemas';
 import type { Tx } from '@shop/db';
-import { release as releaseCoupon } from '../coupon';
+import { release as releaseCoupon, revokeOrderGifts } from '../coupon';
 import { recordEffect } from '../effects';
 import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
@@ -30,12 +30,14 @@ import {
 import { REFUND_EXCEPTION_EVENT } from './refund.notifications';
 import * as repo from './refund.repo';
 import {
+  buyerMayWithdraw,
+  coversEverything,
   freightRefundable,
   lineRefundAmount,
-  normalise,
   orderRefundStatus,
   refundableLine,
   remainingCeiling,
+  shopperLogMessage,
 } from './refund.rules';
 
 /**
@@ -109,10 +111,11 @@ export async function applicableItems(
     throw new DomainError('REFUND_ORDER_NOT_REFUNDABLE');
   }
 
-  const [items, openIds, openTotal] = await Promise.all([
+  const [items, openIds, openTotal, freightTaken] = await Promise.all([
     repo.listOrderItems(ctx.db, orderId),
     repo.listOpenItemIds(ctx.db, orderId),
     repo.openRefundTotal(ctx.db, orderId),
+    repo.freightClaimed(ctx.db, orderId),
   ]);
   const open = new Set(openIds);
 
@@ -156,7 +159,12 @@ export async function applicableItems(
     refundedAmount: order.refundedAmount,
     refundableAmount: ceiling.toString(),
     freightAmount: order.freightAmount,
-    freightRefundable: freightRefundable(order.fulfillmentStatus),
+    // The same three conditions `apply` checks, so the apply screen's
+    // `includesFreight` and the server agree (REFUND-018).
+    freightRefundable:
+      freightRefundable(order.fulfillmentStatus) &&
+      Money.parse(order.paidAmount).isPositive() &&
+      !freightTaken,
     items: lines,
   };
 }
@@ -194,6 +202,9 @@ export async function apply(ctx: Ctx, body: RefundApplyBody): Promise<RefundDeta
     const items = new Map(
       (await repo.listOrderItems(tx, orderId)).map((item) => [item.id, item] as const),
     );
+    // A coupon paid for all of it: every line is worth nothing, and the request
+    // gives back units, the coupon and the seat rather than money (REFUND-016).
+    const zeroPaid = !Money.parse(order.paidAmount).isPositive();
     // Two entries for one line are one claim on that line; summing first is what
     // stops `[{id: 7001, qty: 1}, {id: 7001, qty: 1}]` refunding two units of a
     // one-unit line through two separate remaining-quantity checks.
@@ -216,18 +227,20 @@ export async function apply(ctx: Ctx, body: RefundApplyBody): Promise<RefundDeta
           details: { orderItemId: toId(orderItemId), remaining },
         });
       }
-      const lineAmount = lineRefundAmount(
-        {
-          orderItemId: item.id,
-          quantity: item.quantity,
-          refundedQuantity: item.refundedQuantity,
-          shippedQuantity: item.shippedQuantity,
-          totalAmount: item.totalAmount,
-          refundedAmount: item.refundedAmount,
-          isOpen: false,
-        },
-        units,
-      );
+      const lineAmount = zeroPaid
+        ? Money.ZERO
+        : lineRefundAmount(
+            {
+              orderItemId: item.id,
+              quantity: item.quantity,
+              refundedQuantity: item.refundedQuantity,
+              shippedQuantity: item.shippedQuantity,
+              totalAmount: item.totalAmount,
+              refundedAmount: item.refundedAmount,
+              isOpen: false,
+            },
+            units,
+          );
       amount = amount.add(lineAmount);
       quantity += units;
       lines.push({
@@ -238,10 +251,16 @@ export async function apply(ctx: Ctx, body: RefundApplyBody): Promise<RefundDeta
       });
     }
 
-    const freight = body.includeFreight ? refundableFreight(order, items, asked) : null;
+    const freight =
+      body.includeFreight && !zeroPaid
+        ? refundableFreight(order, items, asked, {
+            held: new Set(await repo.listOpenItemIds(tx, orderId)),
+            claimed: await repo.freightClaimed(tx, orderId),
+          })
+        : null;
     if (freight !== null) amount = amount.add(Money.parse(freight));
 
-    if (!amount.isPositive()) throw new DomainError('REFUND_AMOUNT_ZERO');
+    if (!amount.isPositive() && !zeroPaid) throw new DomainError('REFUND_AMOUNT_ZERO');
 
     // The ceiling counts what other open requests have already spoken for, so
     // two requests on two different lines cannot together exceed what was paid.
@@ -288,11 +307,7 @@ export async function apply(ctx: Ctx, body: RefundApplyBody): Promise<RefundDeta
       throw error;
     }
 
-    await repo.setOrderRefundStatus(
-      tx,
-      orderId,
-      orderRefundStatus(Money.parse(order.refundedAmount), Money.parse(order.paidAmount), true),
-    );
+    await refreshOrderRefundStatus(tx, orderId);
     await repo.insertLog(tx, {
       refundId: refund.id,
       fromStatus: null,
@@ -333,26 +348,38 @@ export async function apply(ctx: Ctx, body: RefundApplyBody): Promise<RefundDeta
 /**
  * Whether freight goes into this request, and how much.
  *
- * Two conditions: nothing has shipped, and the request covers **every**
- * remaining unrefunded unit of the order. A partial refund never carries
- * freight, because the shop still has to post the parcel the rest of the order
- * is in.
+ * Three conditions: nothing has shipped, no other request has taken the
+ * freight already, and the request covers every remaining unrefunded unit of
+ * the order that nobody else holds — a line inside another in-flight request
+ * counts as taken, as it does on the apply screen (REFUND-018). A partial
+ * refund never carries freight, because the shop still has to post the parcel
+ * the rest of the order is in.
  */
 function refundableFreight(
   order: repo.OrderRefundRow,
   items: ReadonlyMap<number, repo.OrderItemRow>,
   asked: ReadonlyMap<number, number>,
+  others: { held: ReadonlySet<number>; claimed: boolean },
 ): string | null {
   if (!freightRefundable(order.fulfillmentStatus)) {
     throw new DomainError('REFUND_FREIGHT_NOT_REFUNDABLE');
   }
-  for (const item of items.values()) {
-    const remaining = item.quantity - item.refundedQuantity;
-    if (remaining > 0 && (asked.get(item.id) ?? 0) < remaining) {
-      throw new DomainError('REFUND_FREIGHT_NOT_REFUNDABLE', {
-        details: { reason: 'partial-refund' },
-      });
-    }
+  if (others.claimed) {
+    throw new DomainError('REFUND_FREIGHT_NOT_REFUNDABLE', {
+      details: { reason: 'already-claimed' },
+    });
+  }
+  const everything = coversEverything(
+    [...items.values()].map((item) => ({
+      remaining: item.quantity - item.refundedQuantity,
+      asked: asked.get(item.id) ?? 0,
+      held: others.held.has(item.id),
+    })),
+  );
+  if (!everything) {
+    throw new DomainError('REFUND_FREIGHT_NOT_REFUNDABLE', {
+      details: { reason: 'partial-refund' },
+    });
   }
   const freight = Money.parse(order.freightAmount);
   return freight.isPositive() ? freight.toString() : null;
@@ -365,11 +392,17 @@ function refundableFreight(
 /**
  * The buyer withdraws.
  *
- * Only from `applied` or `approved`, and the conditional update is the whole
- * guard: an operator approving-and-executing at the same moment either gets
- * there first (and this answers `REFUND_NOT_ACTIONABLE`) or arrives to find the
- * row already `cancelled` and refuses to execute. Money never leaves on a
- * withdrawn request, and a withdrawal never lands on money already gone.
+ * Only from `applied`, `approved` or `failed` (`buyerMayWithdraw`), and the
+ * conditional update is the whole guard: an operator approving-and-executing
+ * — or retrying a failed one — at the same moment either gets there first (and
+ * this answers `REFUND_NOT_ACTIONABLE`) or arrives to find the row already
+ * `cancelled` and refuses to execute. Money never leaves on a withdrawn
+ * request, and a withdrawal never lands on money already gone.
+ *
+ * A refund the shop opened by itself is not the buyer's to withdraw: its order
+ * cannot ship (the group buy failed), so withdrawing it would strand the money.
+ * The units an approved 仅退款 took come back to fulfilment in the same step
+ * (`transitionRefund`, REFUND-015).
  */
 export async function cancel(ctx: Ctx, input: { id: string }): Promise<RefundDetail> {
   const userId = requireUserId(ctx);
@@ -378,9 +411,16 @@ export async function cancel(ctx: Ctx, input: { id: string }): Promise<RefundDet
   await ctx.withTx(async (tx) => {
     const row = await repo.lockRefund(tx, id);
     if (!row || row.userId !== userId) throw new DomainError('REFUND_NOT_FOUND');
-    const { won } = await repo.transitionRefund(tx, id, ['applied', 'approved'], 'cancelled', {
-      cancelledAt: ctx.clock.now(),
-    });
+    if (!buyerMayWithdraw(row)) {
+      throw new DomainError('REFUND_NOT_ACTIONABLE', { details: { status: row.status } });
+    }
+    const { won } = await repo.transitionRefund(
+      tx,
+      id,
+      ['applied', 'approved', 'failed'],
+      'cancelled',
+      { cancelledAt: ctx.clock.now() },
+    );
     if (!won) throw new DomainError('REFUND_NOT_ACTIONABLE', { details: { status: row.status } });
 
     await repo.insertLog(tx, {
@@ -502,6 +542,24 @@ export async function executeRefund(ctx: Ctx, refundId: number): Promise<Execute
         details: { status: row.status, returnStage: row.returnStage },
       });
     }
+    // Nothing to send: an order a coupon paid for in full. WeChat cannot
+    // refund 0 and there is no payment to refund through, so the request
+    // settles here and gives back what it can — units, the coupon, the seat
+    // (REFUND-016).
+    if (Money.parse(row.amount).isZero()) {
+      const { won, refusedLines } = await repo.transitionRefund(
+        tx,
+        refundId,
+        ['approved', 'processing', 'unknown', 'failed'],
+        'processing',
+        { lastError: null },
+        'retry',
+      );
+      if (!won) throw new DomainError('REFUND_NOT_ACTIONABLE', { details: { status: row.status } });
+      refuseShippedLines(refusedLines);
+      await settleRefundSucceeded(tx, ctx, refundId, { gatewayRefundId: null, source: 'zero' });
+      return null;
+    }
 
     // Frozen on the first submit and never rewritten, so a later config change
     // or a second payment attempt cannot redirect a refund already in flight.
@@ -515,14 +573,16 @@ export async function executeRefund(ctx: Ctx, refundId: number): Promise<Execute
       });
     }
 
-    const { won } = await repo.transitionRefund(
+    const { won, refusedLines } = await repo.transitionRefund(
       tx,
       refundId,
       ['approved', 'processing', 'unknown', 'failed'],
       'processing',
       { requestContext: context, lastError: null },
+      'retry',
     );
     if (!won) throw new DomainError('REFUND_NOT_ACTIONABLE', { details: { status: row.status } });
+    refuseShippedLines(refusedLines);
     return { ...row, requestContext: context };
   });
 
@@ -578,11 +638,13 @@ export async function executeRefund(ctx: Ctx, refundId: number): Promise<Execute
         lastError: messageOf(error),
       });
       if (won) {
+        // The gateway's words go to `last_error`, which only staff read; the
+        // log is the shopper's timeline too (REFUND-019).
         await repo.insertLog(tx, {
           refundId,
           fromStatus: 'processing',
           toStatus: 'unknown',
-          message: `退款结果未知：${messageOf(error)}`,
+          message: '退款结果待确认',
         });
       }
     });
@@ -591,6 +653,20 @@ export async function executeRefund(ctx: Ctx, refundId: number): Promise<Execute
       ? { status: 'failed', message: messageOf(error) }
       : { status: 'unknown', message: messageOf(error) };
   }
+}
+
+/**
+ * A retry that would have to take units the warehouse has shipped since the
+ * request failed is refused rather than paid: paying it would hand over the
+ * goods and the money (REFUND-015). The request is now a return, or a
+ * merchant's decision to close.
+ */
+function refuseShippedLines(refusedLines: readonly number[]): void {
+  const [first] = refusedLines;
+  if (first === undefined) return;
+  throw new DomainError('REFUND_LINE_ALREADY_SHIPPED', {
+    details: { orderItemId: toId(first) },
+  });
 }
 
 /** The payment facts this refund is sent with, read from the paid attempt. */
@@ -619,8 +695,9 @@ async function freezeContext(
  * This is the only function that raises an order's refunded total, and it does
  * everything in one transaction: the refund reaches `succeeded`, its lines stop
  * being open, the order and its lines take the amount, the ledger gets its row,
- * the roll-up is recomputed, a full refund releases the coupon and ends the
- * order, and `onOrderRefunded` fires for stock.
+ * the roll-up is recomputed, a full refund releases the coupon, takes back the
+ * unused gift coupons the order earned (REFUND-020) and ends the order, and
+ * `onOrderRefunded` fires for stock.
  *
  * Every step is conditional or idempotent, because a refund notification and a
  * query result can arrive at the same instant and both land here. Returns
@@ -640,7 +717,10 @@ export async function settleRefundSucceeded(
   const order = await repo.lockOrder(tx, row.orderId);
   if (!order) throw new DomainError('REFUND_ORDER_NOT_FOUND');
 
-  const { won } = await repo.transitionRefund(
+  // The whole line is the ceiling for the units: a `refund_only` already took
+  // its units at approval and this re-derivation changes nothing, and a return
+  // is by definition made of units that were shipped.
+  const { won, refusedLines } = await repo.transitionRefund(
     tx,
     refundId,
     ['approved', 'processing', 'unknown'],
@@ -653,6 +733,15 @@ export async function settleRefundSucceeded(
     },
   );
   if (!won) return false;
+  for (const orderItemId of refusedLines) {
+    // The database CHECK would refuse anything truly impossible; this is the
+    // readable version, and it must not be silent — the money is already
+    // back, so somebody has to look at the line.
+    ctx.logger.error(
+      { refundId: toId(refundId), orderItemId: toId(orderItemId) },
+      'refunded quantity could not be re-derived for a settled refund line',
+    );
+  }
 
   const amount = Money.parse(row.amount);
   const raised = await repo.addOrderRefundedAmount(tx, row.orderId, row.amount);
@@ -667,42 +756,31 @@ export async function settleRefundSucceeded(
 
   const lines = await repo.listRefundItems(tx, refundId);
   for (const item of lines) {
-    // The whole line is the ceiling here: a `refund_only` already took its
-    // units at approval and this re-derivation changes nothing, and a return
-    // is by definition made of units that were shipped.
-    const counted = await repo.recomputeItemRefundedQuantity(tx, item.orderItemId, 'whole-line');
-    if (!counted.won) {
-      // The database CHECK would refuse anything truly impossible; this is the
-      // readable version, and it must not be silent — the money is already
-      // back, so somebody has to look at the line.
-      ctx.logger.error(
-        { refundId: toId(refundId), orderItemId: toId(item.orderItemId) },
-        'refunded quantity could not be re-derived for a settled refund line',
-      );
-    }
     await repo.addItemRefundedAmount(tx, item.orderItemId, item.amount);
   }
   await restock(tx, ctx, { orderId: row.orderId, refundId, lines });
 
-  await recordCapitalFlow(tx, {
-    kind: 'order_refund',
-    reference: row.outRefundNo,
-    direction: 'out',
-    amount: row.amount,
-    orderId: row.orderId,
-    userId: row.userId,
-    mchId: row.requestContext?.mchId ?? null,
-    transactionId: facts.gatewayRefundId ?? row.requestContext?.transactionId ?? null,
-    note: `售后退款 ${row.refundNo}`,
-    occurredAt: now,
-  });
+  // A zero refund moved no money, so the ledger has nothing to record (and
+  // `capital_flows_amount_positive` would refuse the row).
+  if (amount.isPositive()) {
+    await recordCapitalFlow(tx, {
+      kind: 'order_refund',
+      reference: row.outRefundNo,
+      direction: 'out',
+      amount: row.amount,
+      orderId: row.orderId,
+      userId: row.userId,
+      mchId: row.requestContext?.mchId ?? null,
+      transactionId: facts.gatewayRefundId ?? row.requestContext?.transactionId ?? null,
+      note: `售后退款 ${row.refundNo}`,
+      occurredAt: now,
+    });
+  }
 
-  const paid = order.paidAmount === null ? Money.ZERO : Money.parse(order.paidAmount);
-  const refundedTotal = Money.parse(order.refundedAmount).add(amount);
-  const stillOpen = Money.parse(
-    normalise(await repo.openRefundTotal(tx, row.orderId)),
-  ).isPositive();
-  const rollup = orderRefundStatus(refundedTotal, paid, stillOpen);
+  const rollup = await currentRollup(tx, row.orderId, {
+    paidAmount: order.paidAmount,
+    refundedAmount: Money.parse(order.refundedAmount).add(amount),
+  });
   await repo.setOrderRefundStatus(tx, row.orderId, rollup);
 
   const full = rollup === 'refunded';
@@ -713,13 +791,17 @@ export async function settleRefundSucceeded(
     if (order.userCouponId !== null) {
       await releaseCoupon(tx, ctx, { userCouponId: order.userCouponId, orderId: row.orderId });
     }
+    // …and takes back the gift coupons it earned and nobody has spent yet
+    // (REFUND-020). A spent one stays spent: its own order stands.
+    await revokeOrderGifts(tx, ctx, { orderId: row.orderId });
   }
 
+  ctx.logger.info({ refundId: toId(refundId), source: facts.source }, 'refund settled');
   await repo.insertLog(tx, {
     refundId,
     fromStatus: row.status,
     toStatus: 'succeeded',
-    message: `退款成功（${facts.source}）`,
+    message: amount.isPositive() ? '退款成功，款项已原路退回' : '售后已完成',
   });
 
   await onOrderRefunded.dispatch(tx, ctx, {
@@ -804,21 +886,17 @@ async function failRefund(tx: Tx, ctx: Ctx, refundId: number, error: string): Pr
     { failedAt: ctx.clock.now(), lastError: error.slice(0, 500) },
   );
   if (!won) return;
+  // The reason is on `last_error` for staff; the shopper's timeline says the
+  // merchant is on it (REFUND-019).
   await repo.insertLog(tx, {
     refundId,
     fromStatus: row.status,
     toStatus: 'failed',
-    message: `退款失败：${error.slice(0, 200)}`,
+    message: '退款未完成，商家处理中',
   });
-  // A failed 仅退款 gives its units back to the warehouse: they were taken out
-  // of fulfilment at approval, and the gateway has just said the money is not
-  // going anywhere. Re-deriving does it — the refund has dropped out of the set
-  // the column is computed from.
-  if (row.kind === 'refund_only') {
-    for (const line of await repo.listRefundItems(tx, refundId)) {
-      await repo.recomputeItemRefundedQuantity(tx, line.orderItemId, 'whole-line');
-    }
-  }
+  // A failed request stays in flight: it keeps its lines and a 仅退款 keeps
+  // its units out of fulfilment, because the merchant can retry it under the
+  // same number (REFUND-017). They come back when it is withdrawn or closed.
   await refreshOrderRefundStatus(tx, row.orderId);
 }
 
@@ -826,16 +904,32 @@ async function failRefund(tx: Tx, ctx: Ctx, refundId: number, error: string): Pr
 export async function refreshOrderRefundStatus(tx: Tx, orderId: number): Promise<void> {
   const order = await repo.findOrder(tx, orderId);
   if (!order) return;
-  const stillOpen = Money.parse(normalise(await repo.openRefundTotal(tx, orderId))).isPositive();
   await repo.setOrderRefundStatus(
     tx,
     orderId,
-    orderRefundStatus(
-      Money.parse(order.refundedAmount),
-      order.paidAmount === null ? Money.ZERO : Money.parse(order.paidAmount),
-      stillOpen,
-    ),
+    await currentRollup(tx, orderId, {
+      paidAmount: order.paidAmount,
+      refundedAmount: Money.parse(order.refundedAmount),
+    }),
   );
+}
+
+/**
+ * The roll-up from the order's money, what is still in flight, and — for an
+ * order that collected nothing — its settled units (REFUND-016).
+ */
+async function currentRollup(
+  tx: Tx,
+  orderId: number,
+  money: { paidAmount: string | null; refundedAmount: Money },
+): Promise<ReturnType<typeof orderRefundStatus>> {
+  const paid = money.paidAmount === null ? Money.ZERO : Money.parse(money.paidAmount);
+  const stillOpen = (await repo.listOpenItemIds(tx, orderId)).length > 0;
+  const units =
+    money.paidAmount !== null && !paid.isPositive()
+      ? await repo.orderUnits(tx, orderId)
+      : undefined;
+  return orderRefundStatus(money.refundedAmount, paid, stillOpen, units);
 }
 
 function messageOf(error: unknown): string {
@@ -854,6 +948,9 @@ export async function reconcileRefund(ctx: Ctx, refundId: number): Promise<Execu
   const row = await repo.findRefund(ctx.db, refundId);
   if (!row) throw new DomainError('REFUND_NOT_FOUND');
   if (row.status === 'succeeded') return { status: 'succeeded', message: '已退款' };
+  // The gateway never saw a zero refund, so asking it would read as "no such
+  // refund" and fail a request that only has to settle (REFUND-016).
+  if (Money.parse(row.amount).isZero()) return executeRefund(ctx, refundId);
 
   const client = await payClient(ctx);
   if (!client.configured) throw new DomainError('PAYMENT_NOT_CONFIGURED');
@@ -1132,11 +1229,13 @@ async function raiseRefundException(
   if (row.lastError === message) return;
 
   await repo.setLastError(tx, row.id, message);
+  // The discrepancy — which may name a merchant number — is on `last_error`
+  // and in the operator's notification; the log line is fixed (REFUND-019).
   await repo.insertLog(tx, {
     refundId: row.id,
     fromStatus: row.status,
     toStatus: row.status,
-    message: `退款异常，待人工核对：${message}`,
+    message: '退款异常，待商家核对',
   });
   await notify(tx, ctx, {
     event: REFUND_EXCEPTION_EVENT,
@@ -1176,8 +1275,23 @@ export async function detail(ctx: Ctx, refundId: number): Promise<RefundDetail> 
       items.get(row.id) ?? [],
     ),
     ...returnDetail(row, company),
-    logs: logs.map(toLogEntry),
+    logs: shopperLogs(logs, row),
   };
+}
+
+/**
+ * The shopper's timeline: their own and the operator's words as written, the
+ * system's as fixed lines, staff-only rows left out (REFUND-019).
+ */
+export function shopperLogs(
+  logs: readonly repo.RefundLogRow[],
+  refund: { amount: string; reason: string | null },
+): RefundDetail['logs'] {
+  return logs.flatMap((log) => {
+    const message = shopperLogMessage(log, refund);
+    if (message === null) return [];
+    return [{ toStatus: log.toStatus, message, createdAt: log.createdAt.toISOString() }];
+  });
 }
 
 type ReturnDetailFields = Pick<
@@ -1242,6 +1356,7 @@ export function toListItem(
     includesFreight: row.includesFreight,
     reason: row.reason,
     rejectReason: row.rejectReason,
+    isAutomatic: row.isAutomatic,
     items: items.map(toRefundItem),
     createdAt: row.createdAt.toISOString(),
     succeededAt: row.succeededAt === null ? null : row.succeededAt.toISOString(),

@@ -35,7 +35,7 @@ import {
 } from '../order/ports';
 import { groupbuyConfig } from './groupbuy.config';
 import { clearAutoRefundPort, registerAutoRefundPort } from './groupbuy.effects';
-import { settleExpiredGroups, settleGroup } from './groupbuy.jobs';
+import { closeEndedActivities, settleExpiredGroups, settleGroup } from './groupbuy.jobs';
 import { groupbuyKindHandler } from './groupbuy.order';
 import * as repo from './groupbuy.repo';
 import * as service from './groupbuy.service';
@@ -453,6 +453,19 @@ describe('the group-buy price through the real checkout', () => {
     const team = await repo.findMemberByOrder(harness.ctx.db, Number(opened.id));
     // 开团: the team exists with the unpaid order, so the link is there from the start.
     expect(opened.groupbuyTeamId).toBe(String(team!.groupId));
+    // 拼团中, and the leader's own seat — the list says the same as the detail.
+    expect(opened.groupbuyTeam).toMatchObject({
+      id: String(team!.groupId),
+      status: 'forming',
+      role: 'leader',
+    });
+    const listed = await checkout.list(leader.ctx, {
+      tab: 'all',
+      page: 1,
+      pageSize: 20,
+      sortOrder: 'desc',
+    });
+    expect(listed.items.find((o) => o.id === opened.id)?.groupbuyTeam?.status).toBe('forming');
     await pay(Number(opened.id));
 
     const joiner = await shopper();
@@ -465,6 +478,7 @@ describe('the group-buy price through the real checkout', () => {
     });
     const read = await checkout.detail(joiner.ctx, { id: joined.id });
     expect(read.groupbuyTeamId).toBe(String(team!.groupId));
+    expect(read.groupbuyTeam).toMatchObject({ id: String(team!.groupId), role: 'member' });
 
     // A cancelled join keeps the link: the team page shows how it went on without them.
     await cancel(Number(joined.id));
@@ -477,6 +491,48 @@ describe('the group-buy price through the real checkout', () => {
       idempotencyKey: `plain-${fixture.activityId}`,
     });
     expect(ordinary.groupbuyTeamId).toBeNull();
+    expect(ordinary.groupbuyTeam).toBeNull();
+  });
+
+  it('RISK-D-013 — 取消拼团 closes the leader’s unpaid order with the team', async () => {
+    const fixture = await makeActivity({ stock: 10 });
+    const leader = await shopper();
+    const opened = await checkout.create(leader.ctx, {
+      ...buyNow(fixture, { activityId: String(fixture.activityId) }),
+      idempotencyKey: `withdraw-${fixture.activityId}`,
+    });
+    const team = await repo.findMemberByOrder(harness.ctx.db, Number(opened.id));
+
+    const view = await service.withdraw(leader.ctx, { id: String(team!.groupId) });
+    expect(view.status).toBe('cancelled');
+
+    const after = await checkout.detail(leader.ctx, { id: opened.id });
+    expect(after.status).toBe('cancelled');
+    expect(after.groupbuyTeam).toMatchObject({ status: 'cancelled' });
+    // The activity stock the unpaid order held is back.
+    expect((await readActivityCounters(fixture)).activity).toEqual({ stock: 10, sales: 0 });
+  });
+
+  it('ORDER-013 — an activity that closed after the preview answers 活动未开放, not 价格有变动', async () => {
+    const fixture = await makeActivity();
+    const { ctx } = await shopper();
+    const meta = { activityId: String(fixture.activityId) };
+    const preview = await checkout.preview(ctx, buyNow(fixture, meta));
+    expect(preview.payableAmount).toBe('59.00');
+
+    // The activity closes between the preview and the submit.
+    await harness.ctx.db
+      .update(groupbuyActivities)
+      .set({ status: 'ended' })
+      .where(eq(groupbuyActivities.id, fixture.activityId));
+
+    await expect(
+      checkout.create(ctx, {
+        ...buyNow(fixture, meta),
+        idempotencyKey: `ended-${fixture.activityId}`,
+        expectedPayableAmount: preview.payableAmount,
+      }),
+    ).rejects.toMatchObject({ code: 'GROUPBUY_ACTIVITY_NOT_OPEN' });
   });
 
   it('charges freight by the activity’s 运费模板, not the product’s 包邮', async () => {
@@ -719,7 +775,45 @@ describe('paying', () => {
     expect(group).toMatchObject({ status: 'succeeded', seatsTaken: 2 });
     expect(group.succeededAt).not.toBeNull();
   });
+
+  it('RISK-D-011 — a paid order does not ship while its team is forming, and ships once it succeeded', async () => {
+    const fixture = await makeActivity({ seatsRequired: 2, stock: 10 });
+    const leader = await makeUser();
+    const joiner = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    const admin = asAdmin(['order:shipment:write']);
+    const ship = () =>
+      checkout.shipOrder(admin, {
+        orderId: opened.orderId,
+        body: {
+          deliveryMode: 'merchant_delivery',
+          lines: [],
+          courierName: '王五',
+          courierPhone: '13900000000',
+        },
+        operatorAdminId: 1,
+      });
+
+    await expect(ship()).rejects.toMatchObject({ code: 'ORDER_GROUPBUY_NOT_READY' });
+    const listed = await checkout.orderConsole.adminList(admin, adminListQuery());
+    expect(listed.items[0]?.groupbuyTeamStatus).toBe('forming');
+
+    const joined = await placeOrder({ userId: joiner, fixture, groupId: opened.groupId });
+    await pay(joined.orderId);
+    expect(await readGroup(opened.groupId)).toMatchObject({ status: 'succeeded' });
+    await expect(ship()).resolves.toMatchObject({ deliveryMode: 'merchant_delivery' });
+  });
 });
+
+function adminListQuery() {
+  return {
+    page: 1,
+    pageSize: 20,
+    sortOrder: 'desc' as const,
+    deleted: false,
+  } as Parameters<typeof checkout.orderConsole.adminList>[1];
+}
 
 describe('cancelling an unpaid order', () => {
   it('gives the activity stock back and leaves no seat behind', async () => {
@@ -846,6 +940,30 @@ describe('refunding a paid order', () => {
 });
 
 describe('the expiry sweep', () => {
+  it('RISK-D-014 — ends a campaign whose 结束时间 has passed, and leaves a running one alone', async () => {
+    // NOW is 2026-06-01.
+    const over = await makeActivity({ endAt: new Date('2026-05-31T16:00:00.000Z') });
+    const running = await makeActivity();
+    const paused = await makeActivity({
+      status: 'paused',
+      endAt: new Date('2026-05-31T16:00:00.000Z'),
+    });
+
+    expect(await closeEndedActivities(harness.ctx)).toEqual({ scanned: 1, closed: 1 });
+    const statusOf = async (activityId: number) =>
+      (
+        await harness.ctx.db
+          .select({ status: groupbuyActivities.status })
+          .from(groupbuyActivities)
+          .where(eq(groupbuyActivities.id, activityId))
+      )[0]?.status;
+    expect(await statusOf(over.activityId)).toBe('ended');
+    expect(await statusOf(running.activityId)).toBe('active');
+    expect(await statusOf(paused.activityId)).toBe('paused');
+    // A second pass finds nothing left to do.
+    expect(await closeEndedActivities(harness.ctx)).toEqual({ scanned: 0, closed: 0 });
+  });
+
   it('fails an under-filled team and asks for one refund per paid member', async () => {
     const fixture = await makeActivity({ seatsRequired: 3, ttlSeconds: 3_600, stock: 10 });
     const leader = await makeUser();
@@ -1433,6 +1551,7 @@ describe('the admin surface', () => {
       fixture: ActivityFixture,
       stock: { activity: number; sku: number; expected: number },
       status: 'active' | 'ended' = 'active',
+      sku: 'kept' | 'removed' | 'switched-off' = 'kept',
     ) {
       const admin = asAdmin(['groupbuy:activity:read', 'groupbuy:activity:write']);
       const before = await service.adminActivityDetail(admin, { id: String(fixture.activityId) });
@@ -1453,18 +1572,42 @@ describe('the admin surface', () => {
           startAt: before.startAt,
           endAt: before.endAt,
           sortOrder: 0,
-          skus: [
-            {
-              skuId: String(fixture.skuId),
-              price: '59.00',
-              stock: stock.sku,
-              expectedStock: stock.expected,
-              isEnabled: true,
-            },
-          ],
+          skus:
+            sku === 'removed'
+              ? []
+              : [
+                  {
+                    skuId: String(fixture.skuId),
+                    price: '59.00',
+                    stock: stock.sku,
+                    expectedStock: stock.expected,
+                    isEnabled: sku === 'kept',
+                  },
+                ],
         },
       );
     }
+
+    it('RISK-D-012 — refuses to remove a SKU that has sold, and lets it be switched off instead', async () => {
+      const fixture = await soldOneSinceTheFormOpened();
+      await expect(
+        edit(fixture, { activity: 10, sku: 10, expected: 10 }, 'active', 'removed'),
+      ).rejects.toMatchObject({
+        code: 'GROUPBUY_ACTIVITY_SKU_IN_USE',
+        details: { skuIds: [String(fixture.skuId)] },
+      });
+      // Switched off, it keeps its 已售 — the counters are the order history.
+      await edit(fixture, { activity: 10, sku: 10, expected: 10 }, 'active', 'switched-off');
+      expect((await readActivityCounters(fixture)).sku).toEqual({ stock: 9, sales: 1 });
+    });
+
+    it('RISK-D-012 — refuses to remove a SKU an unpaid order is still buying', async () => {
+      const fixture = await makeActivity({ stock: 10 });
+      await placeOrder({ userId: await makeUser(), fixture });
+      await expect(
+        edit(fixture, { activity: 10, sku: 10, expected: 9 }, 'active', 'removed'),
+      ).rejects.toMatchObject({ code: 'GROUPBUY_ACTIVITY_SKU_IN_USE' });
+    });
 
     it('keeps the live stock when the operator only fixed the title', async () => {
       const fixture = await soldOneSinceTheFormOpened();
@@ -1881,7 +2024,7 @@ describe('shopper notifications', () => {
       expect(row.variables).toContain('orderNo');
     }
     expect(page.items.find((row) => row.code === 'groupbuy_failed')?.channels.inApp?.body).toBe(
-      '「{{activityTitle}}」{{reason}}，订单 {{orderNo}} 的 ¥{{amount}} 将原路退回。',
+      '「{{activityTitle}}」{{reason}}，订单 {{orderNo}} {{refundNote}}。',
     );
   });
 });

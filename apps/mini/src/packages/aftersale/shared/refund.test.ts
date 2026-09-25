@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { refundableItem, refundListItem } from '@/test/order-fixtures';
-import { awaitsReturn, fromCents, lineEstimate, refundStatusText, toCents } from './refund';
+import {
+  awaitsReturn,
+  canCancel,
+  canHide,
+  fromCents,
+  lineEstimate,
+  refundStatusText,
+  toCents,
+} from './refund';
 
 describe('refund helpers', () => {
   it('turns money strings into cents and back', () => {
@@ -25,5 +33,19 @@ describe('refund helpers', () => {
     expect(awaitsReturn({ ...r, returnStage: 'awaiting_shipment' })).toBe(true);
     expect(awaitsReturn({ ...r, returnStage: 'shipped_back' })).toBe(false);
     expect(refundStatusText(refundListItem({ status: 'succeeded' }))).toBe('退款成功');
+  });
+
+  it('REFUND-017 — shows a failed refund as in progress, keeps it, and lets the shopper withdraw it', () => {
+    const failed = refundListItem({ status: 'failed' });
+    expect(refundStatusText(failed)).toBe('退款处理中');
+    expect(canHide(failed)).toBe(false);
+    expect(canCancel(failed)).toBe(true);
+    expect(canHide(refundListItem({ status: 'rejected' }))).toBe(true);
+  });
+
+  it('never offers 撤销申请 on a refund the shop opened itself', () => {
+    expect(canCancel(refundListItem({ status: 'approved', isAutomatic: true }))).toBe(false);
+    expect(canCancel(refundListItem({ status: 'approved' }))).toBe(true);
+    expect(canCancel(refundListItem({ status: 'processing' }))).toBe(false);
   });
 });

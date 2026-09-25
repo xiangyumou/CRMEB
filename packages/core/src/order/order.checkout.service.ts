@@ -544,15 +544,6 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
       }
       assertCustomFormComplete(draft, body.customForm);
 
-      if (body.expectedPayableAmount !== undefined) {
-        const expected = Money.parse(body.expectedPayableAmount);
-        if (!expected.eq(draft.payableAmount)) {
-          throw new DomainError('ORDER_PRICE_CHANGED', {
-            details: { expected: expected.toString(), actual: draft.payableAmount.toString() },
-          });
-        }
-      }
-
       // Group-buy and presale attach here rather than forking this service.
       const handler = getOrderKindHandler(body.kind);
       if (body.kind !== 'normal' && !handler) {
@@ -576,6 +567,18 @@ export async function create(ctx: Ctx, body: CheckoutCreateBody): Promise<OrderD
             adjustments: draft.discount.applied,
           })
         : {};
+
+      // After the kind handler, never before it: an activity that has ended
+      // drops its price from the draft, and the shopper must hear 「活动已结束」
+      // rather than a 「价格有变动」 that sends them back to pay full price.
+      if (body.expectedPayableAmount !== undefined) {
+        const expected = Money.parse(body.expectedPayableAmount);
+        if (!expected.eq(draft.payableAmount)) {
+          throw new DomainError('ORDER_PRICE_CHANGED', {
+            details: { expected: expected.toString(), actual: draft.payableAmount.toString() },
+          });
+        }
+      }
 
       const address = draft.address;
       const order = await repo.insertOrder(tx, {

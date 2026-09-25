@@ -342,6 +342,7 @@ export const orderAdminShip = defineRoute({
     'ORDER_SHIP_QUANTITY_EXCEEDED',
     'ORDER_SHIP_LINE_INVALID',
     'ORDER_VIRTUAL_AUTO_DELIVERED',
+    'ORDER_GROUPBUY_NOT_READY',
     'ORDER_EXPRESS_COMPANY_NOT_FOUND',
   ],
   examples: [

@@ -104,6 +104,8 @@ export const orderFulfilErrors = defineErrors({
   ORDER_SHIP_LINE_INVALID: { status: 422, message: '发货商品不属于该订单' },
   /** Card keys and coupon goods are delivered by the system when the order is paid. */
   ORDER_VIRTUAL_AUTO_DELIVERED: { status: 409, message: '卡密/优惠券商品由系统自动发货' },
+  /** A 拼团 order whose team has not succeeded (RISK-D-011); it ships once the team is full. */
+  ORDER_GROUPBUY_NOT_READY: { status: 409, message: '拼团尚未成功，成团后才能发货' },
   /** The shop ran out of unclaimed keys for a `virtual_card` product. `details: { orderItemIds }`. */
   ORDER_VIRTUAL_CARD_EXHAUSTED: { status: 409, message: '卡密库存不足，请补充后重试' },
   ORDER_SHIPMENT_NOT_FOUND: { status: 404, message: '发货单不存在' },

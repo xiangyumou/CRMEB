@@ -24,6 +24,7 @@ import { randomBytes } from 'node:crypto';
 
 import { hasPermission } from '../auth/rbac';
 import { DomainError } from '../kernel/errors';
+import { shopDay } from '../kernel/shop-time';
 import { requireAdminId, type Ctx } from '../kernel/context';
 import { catalogConfig } from './catalog.config';
 import { catalogPermissions } from './permissions';
@@ -620,9 +621,10 @@ export async function adminProductExport(
     }
   }
 
-  const stamp = ctx.clock.now().toISOString().slice(0, 10);
+  // The shop's day, in Chinese, as staff file it.
+  const stamp = shopDay(ctx.clock.now());
   return {
-    filename: `products-${stamp}.csv`,
+    filename: `商品-${stamp}.csv`,
     columns: EXPORT_COLUMNS.map((c) => ({ key: c.key, title: c.title })),
     rows: out,
     total,

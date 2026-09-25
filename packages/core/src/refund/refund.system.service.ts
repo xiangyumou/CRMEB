@@ -6,12 +6,8 @@ import { generateOrderNo, toId } from '../kernel/ids';
 import { Money } from '../kernel/money';
 import { findPaidPaymentAttempt } from '../payment';
 import * as repo from './refund.repo';
-import {
-  freightRefundable,
-  lineRefundAmount,
-  orderRefundStatus,
-  remainingCeiling,
-} from './refund.rules';
+import { freightRefundable, lineRefundAmount, remainingCeiling } from './refund.rules';
+import { refreshOrderRefundStatus } from './refund.service';
 import { findSucceededRefund, listAutomaticRefunds } from './refund.system.repo';
 
 /**
@@ -72,7 +68,11 @@ const SYSTEM_REASONS: Record<SystemRefundReason, string> = {
 export interface SystemRefundInput {
   orderId: number;
   reason: SystemRefundReason;
-  /** Added to the refund's explanation and its timeline entry. */
+  /**
+   * Staff detail (which team, which campaign), kept as the refund's internal
+   * remark. Not the explanation and not the timeline: those are what the
+   * shopper reads, and the note names internal ids (REFUND-019).
+   */
   note?: string | undefined;
 }
 
@@ -115,6 +115,10 @@ export async function refundSystemInitiated(
     });
   }
 
+  // An order a coupon paid for in full still owes the shopper everything but
+  // money: the refund is worth 0 and settles without the gateway (REFUND-016).
+  const zeroPaid = !Money.parse(order.paidAmount).isPositive();
+
   const already = (await listAutomaticRefunds(tx, orderId)).find(
     (row) => row.reason === reasonText && row.status !== 'cancelled' && row.status !== 'rejected',
   );
@@ -136,18 +140,20 @@ export async function refundSystemInitiated(
       everythingCovered = false;
       continue;
     }
-    const lineAmount = lineRefundAmount(
-      {
-        orderItemId: item.id,
-        quantity: item.quantity,
-        refundedQuantity: item.refundedQuantity,
-        shippedQuantity: item.shippedQuantity,
-        totalAmount: item.totalAmount,
-        refundedAmount: item.refundedAmount,
-        isOpen: false,
-      },
-      remaining,
-    );
+    const lineAmount = zeroPaid
+      ? Money.ZERO
+      : lineRefundAmount(
+          {
+            orderItemId: item.id,
+            quantity: item.quantity,
+            refundedQuantity: item.refundedQuantity,
+            shippedQuantity: item.shippedQuantity,
+            totalAmount: item.totalAmount,
+            refundedAmount: item.refundedAmount,
+            isOpen: false,
+          },
+          remaining,
+        );
     amount = amount.add(lineAmount);
     quantity += remaining;
     lines.push({
@@ -171,7 +177,10 @@ export async function refundSystemInitiated(
   // nothing has shipped, and only when this refund covers every remaining unit.
   const freight = Money.parse(order.freightAmount);
   let includesFreight =
-    everythingCovered && freightRefundable(order.fulfillmentStatus) && freight.isPositive();
+    !zeroPaid &&
+    everythingCovered &&
+    freightRefundable(order.fulfillmentStatus) &&
+    freight.isPositive();
   if (includesFreight) amount = amount.add(freight);
 
   const ceiling = remainingCeiling({
@@ -179,7 +188,7 @@ export async function refundSystemInitiated(
     refundedAmount: order.refundedAmount,
     openAmount: await repo.openRefundTotal(tx, orderId),
   });
-  if (!ceiling.isPositive()) {
+  if (!ceiling.isPositive() && !zeroPaid) {
     const settled = await findSucceededRefund(tx, orderId);
     if (settled) return { refundId: settled.id, created: false };
     throw new DomainError('REFUND_EXCEEDS_PAID', {
@@ -234,7 +243,7 @@ export async function refundSystemInitiated(
     amount: amount.toString(),
     includesFreight,
     reason: reasonText,
-    explanation: input.note ?? null,
+    explanation: null,
     images: [],
     isAutomatic: true,
   });
@@ -257,34 +266,37 @@ export async function refundSystemInitiated(
   // Straight to `approved`: there is no review step, and `executeRefund` only
   // claims a row that is already past one. `reviewed_by_admin_id` stays null,
   // which is the truthful record — no admin decided this.
-  const { won } = await repo.transitionRefund(tx, refund.id, ['applied'], 'approved', {
-    reviewedAt: now,
-  });
-  if (!won) throw new DomainError('REFUND_NOT_ACTIONABLE', { details: { status: refund.status } });
-
+  //
   // The same step `adminApprove` takes for a 仅退款: raise `refunded_quantity`
   // now so the warehouse cannot ship goods the shop has just decided to refund.
+  // Every line here is unshipped, so the approval bound is the unshipped one.
   // Losing means the units went out the door first, and rolling back is right —
   // the effect retries, finds a shipped line, and the order falls to a person.
-  for (const line of lines) {
-    const bound = await repo.recomputeItemRefundedQuantity(tx, line.orderItemId, 'unshipped');
-    if (!bound.won) {
-      throw new DomainError('REFUND_LINE_ALREADY_SHIPPED', {
-        details: { orderItemId: toId(line.orderItemId) },
-      });
-    }
+  const { won, refusedLines } = await repo.transitionRefund(
+    tx,
+    refund.id,
+    ['applied'],
+    'approved',
+    {
+      reviewedAt: now,
+      ...(input.note === undefined ? {} : { adminRemark: input.note.slice(0, 255) }),
+    },
+    'approval',
+  );
+  if (!won) throw new DomainError('REFUND_NOT_ACTIONABLE', { details: { status: refund.status } });
+  const [shipped] = refusedLines;
+  if (shipped !== undefined) {
+    throw new DomainError('REFUND_LINE_ALREADY_SHIPPED', {
+      details: { orderItemId: toId(shipped) },
+    });
   }
 
-  await repo.setOrderRefundStatus(
-    tx,
-    orderId,
-    orderRefundStatus(Money.parse(order.refundedAmount), Money.parse(order.paidAmount), true),
-  );
+  await refreshOrderRefundStatus(tx, orderId);
   await repo.insertLog(tx, {
     refundId: refund.id,
     fromStatus: null,
     toStatus: 'approved',
-    message: (input.note === undefined ? reasonText : `${reasonText}：${input.note}`).slice(0, 500),
+    message: reasonText,
   });
 
   // Post-commit, like every gateway call in this codebase. One row per refund

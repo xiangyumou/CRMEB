@@ -124,6 +124,45 @@ function ipv4ToInt(address: string): number | null {
   return value >>> 0;
 }
 
+/**
+ * The 16 bytes of an IPv6 address, or `null`. Takes every spelling `isIP`
+ * accepts — `::` compression, a dotted IPv4 tail (`::ffff:1.2.3.4`) — and
+ * refuses a zone id (`fe80::1%eth0`) rather than guess what it names.
+ */
+function ipv6ToBytes(address: string): number[] | null {
+  if (address.includes('%')) return null;
+  let text = address;
+  const tail: number[] = [];
+  const dotted = /(\d+\.\d+\.\d+\.\d+)$/.exec(text);
+  if (dotted?.[1]) {
+    const v4 = ipv4ToInt(dotted[1]);
+    if (v4 === null) return null;
+    tail.push(v4 >>> 24, (v4 >>> 16) & 0xff, (v4 >>> 8) & 0xff, v4 & 0xff);
+    text = text.slice(0, -dotted[1].length);
+    // `::1.2.3.4` leaves `::`; `::ffff:1.2.3.4` leaves `::ffff:`.
+    if (text.endsWith(':') && !text.endsWith('::')) text = text.slice(0, -1);
+  }
+  const halves = text.split('::');
+  if (halves.length > 2) return null;
+  const groupsOf = (part: string | undefined): number[] | null => {
+    if (part === undefined || part === '') return [];
+    const out: number[] = [];
+    for (const group of part.split(':')) {
+      if (!/^[0-9a-f]{1,4}$/.test(group)) return null;
+      const value = parseInt(group, 16);
+      out.push(value >>> 8, value & 0xff);
+    }
+    return out;
+  };
+  const head = groupsOf(halves[0]);
+  const rest = groupsOf(halves[1]);
+  if (head === null || rest === null) return null;
+  const known = head.length + rest.length + tail.length;
+  if (halves.length === 1) return known === 16 ? [...head, ...tail] : null;
+  if (known > 14) return null;
+  return [...head, ...new Array<number>(16 - known).fill(0), ...rest, ...tail];
+}
+
 /** CIDR blocks that must never be reachable from a user-supplied URL. */
 const BLOCKED_V4: ReadonlyArray<readonly [string, number, string]> = [
   ['0.0.0.0', 8, 'unspecified'],
@@ -158,18 +197,30 @@ export function classifyAddress(address: string): AddressVerdict {
   }
 
   if (family === 6) {
-    const normalised = address.toLowerCase().replace(/^\[|\]$/g, '');
-    // IPv4-mapped (`::ffff:169.254.169.254`) is the classic bypass: judge the
-    // embedded v4 address, not the v6 spelling.
-    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(normalised);
-    if (mapped?.[1]) return classifyAddress(mapped[1]);
-    if (normalised === '::') return { blocked: true, reason: 'unspecified' };
-    if (normalised === '::1') return { blocked: true, reason: 'loopback' };
-    if (normalised.startsWith('fe80:')) return { blocked: true, reason: 'link-local' };
-    if (/^f[cd]/.test(normalised)) return { blocked: true, reason: 'unique local' };
-    if (normalised.startsWith('ff')) return { blocked: true, reason: 'multicast' };
-    if (normalised.startsWith('64:ff9b:')) return { blocked: true, reason: 'NAT64' };
-    if (normalised.startsWith('2002:')) return { blocked: true, reason: '6to4' };
+    const bytes = ipv6ToBytes(address.toLowerCase().replace(/^\[|\]$/g, ''));
+    if (bytes === null) return { blocked: true, reason: 'unparseable address' };
+    const zeroUpTo = (end: number) => bytes.slice(0, end).every((byte) => byte === 0);
+    const embeddedV4 = () => bytes.slice(12).join('.');
+
+    if (zeroUpTo(16)) return { blocked: true, reason: 'unspecified' };
+    if (zeroUpTo(15) && bytes[15] === 1) return { blocked: true, reason: 'loopback' };
+    // IPv4-mapped (`::ffff:169.254.169.254`) is the classic bypass, and `new
+    // URL` rewrites it to hex (`[::ffff:7f00:1]`) before we ever see it — so the
+    // judgement is on the bytes, never on a spelling. The deprecated
+    // IPv4-compatible `::a.b.c.d` (`::/96`) embeds one the same way.
+    if (zeroUpTo(10) && bytes[10] === 0xff && bytes[11] === 0xff) {
+      return classifyAddress(embeddedV4());
+    }
+    if (zeroUpTo(12)) return classifyAddress(embeddedV4());
+    const [b0 = 0, b1 = 0, b2 = 0, b3 = 0] = bytes;
+    if (b0 === 0xfe && (b1 & 0xc0) === 0x80) return { blocked: true, reason: 'link-local' };
+    if (b0 === 0xfe && (b1 & 0xc0) === 0xc0) return { blocked: true, reason: 'site-local' };
+    if ((b0 & 0xfe) === 0xfc) return { blocked: true, reason: 'unique local' };
+    if (b0 === 0xff) return { blocked: true, reason: 'multicast' };
+    if (b0 === 0x00 && b1 === 0x64 && b2 === 0xff && b3 === 0x9b) {
+      return { blocked: true, reason: 'NAT64' };
+    }
+    if (b0 === 0x20 && b1 === 0x02) return { blocked: true, reason: '6to4' };
     return { blocked: false };
   }
 

@@ -358,6 +358,11 @@ export const groupbuyDetail = groupbuyCard.extend({
   skus: z.array(groupbuyStorefrontSku),
   /** `null` for an anonymous visitor: "cannot join" and "we do not know you" differ. */
   myOpenGroupId: id.nullable(),
+  /**
+   * The caller's seat in `myOpenGroupId`: `leader` for a team they opened (你发起的团), `member`
+   * for one they joined. `null` exactly when `myOpenGroupId` is.
+   */
+  myOpenGroupRole: groupbuyMemberRole.nullable(),
 });
 export type GroupbuyDetail = z.infer<typeof groupbuyDetail>;
 
@@ -606,6 +611,7 @@ export const groupbuyDetailExample: GroupbuyDetail = {
     },
   ],
   myOpenGroupId: null,
+  myOpenGroupRole: null,
 };
 
 export const groupbuyOpenGroupExample: GroupbuyOpenGroup = {

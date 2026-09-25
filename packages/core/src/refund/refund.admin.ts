@@ -143,13 +143,23 @@ async function approveAs(
         ? { returnAddress: address }
         : {};
 
-    const { won } = await repo.transitionRefund(tx, id, ['applied'], 'approved', {
-      reviewedByAdminId: adminId,
-      reviewedAt: ctx.clock.now(),
-      ...freeze,
-      ...(input.remark === undefined ? {} : { adminRemark: input.remark }),
-    });
+    // A 仅退款 takes its units out of fulfilment in the same step
+    // (`transitionRefund` with the approval bound; see `refusedShipped`).
+    const { won, refusedLines } = await repo.transitionRefund(
+      tx,
+      id,
+      ['applied'],
+      'approved',
+      {
+        reviewedByAdminId: adminId,
+        reviewedAt: ctx.clock.now(),
+        ...freeze,
+        ...(input.remark === undefined ? {} : { adminRemark: input.remark }),
+      },
+      'approval',
+    );
     if (!won) throw new DomainError('REFUND_NOT_ACTIONABLE', { details: { status: row.status } });
+    refusedShipped(refusedLines);
 
     await repo.insertLog(tx, {
       refundId: id,
@@ -159,12 +169,9 @@ async function approveAs(
       operatorAdminId: adminId,
     });
 
-    if (row.kind === 'refund_only') {
-      await reserveUnits(tx, id, row.orderId);
-      await queueExecution(tx, ctx, id);
-    }
+    if (row.kind === 'refund_only') await queueExecution(tx, ctx, id);
 
-    // Last, so that an approval `reserveUnits` rolls back — the units went out
+    // Last, so that an approval the unit bound rolls back — the units went out
     // of the door first and the request is now a return — never tells the buyer
     // their refund was agreed.
     await notifyReview(tx, ctx, row, 'refund_approved', { amount: row.amount });
@@ -209,7 +216,7 @@ async function notifyReview(
  * The warehouse must not ship goods an operator has just agreed to refund, and
  * fulfilment's dispatch guard reads `quantity - refunded_quantity`, so the only
  * way to stop it is to raise that column now rather than when the money lands.
- * The statement carries the mirror of fulfilment's own bound
+ * `transitionRefund`'s approval bound carries the mirror of fulfilment's own
  * (`refunded + q <= quantity - shipped_quantity`) for a line that has not
  * shipped, so an approval racing a dispatch of the same units has exactly one
  * winner whichever commits first. A line that already shipped is a money-only
@@ -220,32 +227,10 @@ async function notifyReview(
  * and the operator is told, which is right: the request is now a return, not a
  * refund.
  */
-async function reserveUnits(tx: Tx, refundId: number, orderId: number): Promise<void> {
-  const lines = await repo.listRefundItems(tx, refundId);
-  const items = new Map(
-    (await repo.listOrderItems(tx, orderId)).map((item) => [item.id, item] as const),
-  );
-  for (const line of lines) {
-    const item = items.get(line.orderItemId);
-    const bound = item !== undefined && item.shippedQuantity === 0 ? 'unshipped' : 'whole-line';
-    const { won } = await repo.recomputeItemRefundedQuantity(tx, line.orderItemId, bound);
-    if (!won) {
-      throw new DomainError('REFUND_LINE_ALREADY_SHIPPED', {
-        details: { orderItemId: toId(line.orderItemId) },
-      });
-    }
-  }
-}
-
-/**
- * The other direction: a refund that no longer counts drops out of the derived
- * total. Lowering a count cannot cross fulfilment's bound, so the whole line is
- * the ceiling and the update always lands.
- */
-async function releaseUnits(tx: Tx, refundId: number): Promise<void> {
-  for (const line of await repo.listRefundItems(tx, refundId)) {
-    await repo.recomputeItemRefundedQuantity(tx, line.orderItemId, 'whole-line');
-  }
+function refusedShipped(refusedLines: readonly number[]): void {
+  const [first] = refusedLines;
+  if (first === undefined) return;
+  throw new DomainError('REFUND_LINE_ALREADY_SHIPPED', { details: { orderItemId: toId(first) } });
 }
 
 /**
@@ -286,25 +271,34 @@ async function rejectAs(
     // `refunds_rejected_needs_reason` makes the reason a database rule; the
     // contract makes it a required field. Both, because a rejection nobody can
     // explain later is the complaint that reaches the shop owner.
-    const { won } = await repo.transitionRefund(tx, id, ['applied', 'approved'], 'rejected', {
-      reviewedByAdminId: adminId,
-      reviewedAt: ctx.clock.now(),
-      rejectReason: input.rejectReason,
-    });
+    //
+    // From `failed` too: that is how a merchant closes a refund the gateway
+    // keeps refusing (settled by hand, say), which frees its lines for a new
+    // request (REFUND-017). An approved or failed 仅退款 hands its units back to
+    // fulfilment in the same step (`transitionRefund`, REFUND-015).
+    const { won } = await repo.transitionRefund(
+      tx,
+      id,
+      ['applied', 'approved', 'failed'],
+      'rejected',
+      {
+        reviewedByAdminId: adminId,
+        reviewedAt: ctx.clock.now(),
+        rejectReason: input.rejectReason,
+      },
+    );
     if (!won) throw new DomainError('REFUND_NOT_ACTIONABLE', { details: { status: row.status } });
 
     await repo.insertLog(tx, {
       refundId: id,
       fromStatus: row.status,
       toStatus: 'rejected',
-      message: `商家拒绝：${input.rejectReason}`,
+      message:
+        row.status === 'failed'
+          ? `商家关闭售后：${input.rejectReason}`
+          : `商家拒绝：${input.rejectReason}`,
       operatorAdminId: adminId,
     });
-    // An approved 仅退款 had taken its units out of fulfilment (`reserveUnits`);
-    // the count is derived from open refunds, so re-deriving it hands them back.
-    if (row.status === 'approved' && row.kind === 'refund_only') {
-      await releaseUnits(tx, id);
-    }
     await refreshOrderRefundStatus(tx, row.orderId);
 
     // The reason travels with it: a rejection the buyer cannot explain later is
@@ -453,7 +447,6 @@ function toAdminItem(
     outRefundNo: row.outRefundNo,
     gatewayRefundId: row.gatewayRefundId,
     paymentAttemptId: toIdOrNull(row.paymentAttemptId),
-    isAutomatic: row.isAutomatic,
     adminRemark: row.adminRemark,
     lastError: row.lastError,
     reviewedByAdminId: toIdOrNull(row.reviewedByAdminId),

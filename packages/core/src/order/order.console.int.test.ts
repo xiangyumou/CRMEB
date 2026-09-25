@@ -4,6 +4,7 @@ import { cartItems } from '@shop/db/schema/cart';
 import { productSkus, products } from '@shop/db/schema/catalog';
 import { orderItems, orderStatusLogs, orders } from '@shop/db/schema/order';
 import { expressCompanies } from '@shop/db/schema/reference';
+import { refunds } from '@shop/db/schema/refund';
 import { admins } from '@shop/db/schema/auth';
 import { effects as effectsTable } from '@shop/db/schema/system';
 import { userAddresses, users } from '@shop/db/schema/user';
@@ -261,6 +262,22 @@ describe('the list', () => {
     );
     expect(found.total).toBe(1);
     expect(found.items[0]!.orderNo).toBe(row.orderNo);
+  });
+
+  it('masks the buyer’s account phone in the list and shows it whole in the detail', async () => {
+    const adminId = await makeAdmin();
+    const placed = await placeOrder();
+    await harness.ctx.db
+      .update(users)
+      .set({ phone: '13912345678' })
+      .where(eq(users.id, placed.userId));
+
+    const listed = await order.orderConsole.adminList(asAdmin(adminId), listQuery());
+    expect(listed.items[0]!.user.phone).toBe('139****5678');
+    const detail = await order.orderConsole.adminDetail(asAdmin(adminId), {
+      id: String(placed.orderId),
+    });
+    expect(detail.user.phone).toBe('13912345678');
   });
 
   it('hides a deleted order unless the operator asks for the deleted ones', async () => {
@@ -638,6 +655,107 @@ describe('删除订单', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 退款中
+// ---------------------------------------------------------------------------
+
+/** A 已完成 order, as confirm-receipt and the completion sweep would leave it. */
+async function complete(placed: Placed): Promise<void> {
+  await pay(placed);
+  await harness.ctx.db
+    .update(orders)
+    .set({ status: 'completed', fulfillmentStatus: 'fulfilled' })
+    .where(eq(orders.id, placed.orderId));
+}
+
+async function fileRefund(
+  placed: Placed,
+  status: 'applied' | 'failed' | 'cancelled',
+  { refunded = '0.00' }: { refunded?: string } = {},
+): Promise<void> {
+  sequence += 1;
+  await harness.ctx.db.insert(refunds).values({
+    refundNo: `RF-${sequence}`,
+    outRefundNo: `ORF-${sequence}`,
+    orderId: placed.orderId,
+    userId: placed.userId,
+    kind: 'refund_only',
+    status,
+    quantity: 1,
+    amount: '10.00',
+    cancelledAt: status === 'cancelled' ? new Date() : null,
+    failedAt: status === 'failed' ? new Date() : null,
+  });
+  if (refunded !== '0.00') {
+    await harness.ctx.db
+      .update(orders)
+      .set({ refundStatus: 'partially_refunded', refundedAmount: refunded })
+      .where(eq(orders.id, placed.orderId));
+  }
+}
+
+describe('ORDER-014 — 退款中 means an after-sales request still open', () => {
+  it('lists and counts an open request, and not an order whose request closed after a partial refund', async () => {
+    const adminId = await makeAdmin();
+    const open = await placeOrder();
+    await complete(open);
+    await fileRefund(open, 'applied');
+    // Money went back once and the request is closed: `partially_refunded` for good.
+    const settled = await placeOrder();
+    await complete(settled);
+    await fileRefund(settled, 'cancelled', { refunded: '10.00' });
+    // A failed refund still holds its lines until the merchant retries or closes it.
+    const failed = await placeOrder();
+    await complete(failed);
+    await fileRefund(failed, 'failed');
+
+    const listed = await order.orderConsole.adminList(
+      asAdmin(adminId),
+      listQuery({ refunding: true }),
+    );
+    expect(listed.items.map((row) => row.id).sort()).toEqual(
+      [String(open.orderId), String(failed.orderId)].sort(),
+    );
+
+    const stats = await order.orderConsole.adminStatistics(asAdmin(adminId), {});
+    expect(stats.refunding).toBe(2);
+
+    // The shopper's 退款/售后 badge and tab say the same.
+    expect((await order.counts(as(open.userId))).refunding).toBe(1);
+    expect((await order.counts(as(settled.userId))).refunding).toBe(0);
+    const tab = await order.list(as(settled.userId), {
+      tab: 'refunding',
+      page: 1,
+      pageSize: 20,
+      sortOrder: 'desc',
+    });
+    expect(tab.total).toBe(0);
+  });
+
+  it('neither 删除 nor the shopper’s 删除订单 files away an order whose request is still open', async () => {
+    const adminId = await makeAdmin();
+    const open = await placeOrder();
+    await complete(open);
+    await fileRefund(open, 'applied');
+
+    await expect(
+      order.orderConsole.adminDelete(asAdmin(adminId), { id: String(open.orderId) }),
+    ).rejects.toMatchObject({
+      code: 'ORDER_NOT_DELETABLE',
+      message: '订单还有售后在处理，处理完后才能删除',
+    });
+    expect(
+      await order.orderConsole.adminDeleteMany(asAdmin(adminId), { ids: [String(open.orderId)] }),
+    ).toEqual({ deleted: 0, skippedIds: [String(open.orderId)] });
+    await expect(order.hide(as(open.userId), { id: String(open.orderId) })).rejects.toMatchObject({
+      code: 'ORDER_NOT_DELETABLE',
+    });
+    const row = await orderRow(open.orderId);
+    expect(row.deletedAt).toBeNull();
+    expect(row.hiddenByUserAt).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // statistics
 // ---------------------------------------------------------------------------
 
@@ -677,6 +795,21 @@ describe('the work queue and the totals', () => {
     expect(stats.refunding).toBe(0);
   });
 
+  it('does not count 待开票 for an order an operator deleted', async () => {
+    const adminId = await makeAdmin();
+    const placed = await placeOrder();
+    await complete(placed);
+    await order.orderInvoices.request(
+      as(placed.userId),
+      { id: String(placed.orderId) },
+      { headerType: 'personal', invoiceType: 'plain', name: '张三' },
+    );
+    expect((await order.orderConsole.adminStatistics(asAdmin(adminId), {})).pendingInvoice).toBe(1);
+
+    await order.orderConsole.adminDelete(asAdmin(adminId), { id: String(placed.orderId) });
+    expect((await order.orderConsole.adminStatistics(asAdmin(adminId), {})).pendingInvoice).toBe(0);
+  });
+
   it('pads an unpadded numeric sum into money on the wire', async () => {
     const adminId = await makeAdmin();
     const placed = await placeOrder();
@@ -694,6 +827,33 @@ describe('the work queue and the totals', () => {
     expect(stats.paidOrderCount).toBe(1);
     expect(stats.paidAmount).toBe('60.50');
     expect(stats.refundedAmount).toBe('0.00');
+  });
+
+  it('近 30 天实付 counts what was paid and refunded in the window, as 交易统计 does', async () => {
+    const adminId = await makeAdmin();
+    const placed = await placeOrder();
+    // Paid at the test clock, 08:00 on 1 June in Shanghai; `created_at` is the
+    // database's own now(), so only a `paid_at` population finds it.
+    await pay(placed, '60.50');
+    sequence += 1;
+    await harness.ctx.db.insert(refunds).values({
+      refundNo: `RF-${sequence}`,
+      outRefundNo: `ORF-${sequence}`,
+      orderId: placed.orderId,
+      userId: placed.userId,
+      kind: 'refund_only',
+      status: 'succeeded',
+      quantity: 1,
+      amount: '10.00',
+      refundedAmount: '10.00',
+      succeededAt: new Date(NOW),
+    });
+
+    const stats = await order.orderConsole.adminStatistics(asAdmin(adminId), {});
+    expect(stats.range.to).toBe('2026-06-01T16:00:00.000Z');
+    expect(stats.paidOrderCount).toBe(1);
+    expect(stats.paidAmount).toBe('60.50');
+    expect(stats.refundedAmount).toBe('10.00');
   });
 
   it('counts nothing at all without dividing by zero', async () => {
@@ -719,7 +879,7 @@ describe('导出', () => {
       deleted: false,
     });
     expect(result.contentType).toBe('text/csv');
-    expect(result.filename).toBe('orders-2026-06-01.csv');
+    expect(result.filename).toBe('订单-2026-06-01.csv');
     expect(result.rowCount).toBe(1);
     expect(result.truncated).toBe(false);
 
@@ -729,6 +889,23 @@ describe('导出', () => {
     expect(lines[1]).toContain(row.orderNo);
     // The enum comes out as the label an operator reads, not as `paid`.
     expect(lines[1]).toContain('待发货');
+  });
+
+  it('prints times and dates the file on the Shanghai day', async () => {
+    const adminId = await makeAdmin();
+    const placed = await placeOrder();
+    await pay(placed); // paid at 2026-06-01T00:00Z, 08:00 in Shanghai
+    // 00:30 on 2 June in Shanghai, still 1 June in UTC.
+    harness.clock.set('2026-06-01T16:30:00.000Z');
+
+    const result = await order.orderConsole.adminExport(asAdmin(adminId), {
+      kindOfExport: 'orders',
+      deleted: false,
+    });
+    expect(result.filename).toBe('订单-2026-06-02.csv');
+    const [, line] = result.content.trimEnd().split('\n');
+    expect(line).toContain('2026-06-01 08:00:00');
+    expect(line).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:/);
   });
 
   /** CSV injection, end to end: a receiver name typed by a buyer. */
@@ -768,7 +945,10 @@ describe('导出', () => {
       kindOfExport: 'shipments',
       deleted: false,
     });
-    expect(result.filename).toBe('shipments-2026-06-01.csv');
+    expect(result.filename).toBe('发货单-2026-06-01.csv');
+    // 发货时间 as staff read it: Shanghai wall time, not an ISO string in UTC.
+    expect(result.content).toContain('2026-06-01 08:00:00');
+    expect(result.content).not.toContain('T00:00:00');
     expect(result.rowCount).toBe(1);
     expect(result.content).toContain('SF-EXPORT');
     expect(result.content).toContain('发货单号');

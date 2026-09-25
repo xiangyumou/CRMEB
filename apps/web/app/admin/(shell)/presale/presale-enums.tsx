@@ -9,6 +9,7 @@ import type {
   PresalePaymentMode,
 } from '@shop/contracts/presale/schemas';
 
+import { MoneyInput } from '@/admin/kit/form/money-input';
 import { SkuPicker } from '@/admin/kit/sku-picker';
 import type { FieldSpec } from '@/admin/kit/form/types';
 import type { StatusMap } from '@/admin/kit/status-tag';
@@ -227,15 +228,15 @@ export const presaleFields: FieldSpec<Extract<keyof PresaleActivityForm, string>
             disabled={helpers.disabled}
             onChange={(skuId) => patch({ skuId })}
           />
-          <InputNumber
-            value={sku.price === '' ? null : Number(sku.price)}
-            min={0}
-            precision={2}
-            placeholder="预售价"
-            disabled={helpers.disabled}
-            addonBefore="￥"
-            onChange={(value) => patch({ price: value === null ? '' : value.toFixed(2) })}
-          />
+          <Space size={4}>
+            <Typography.Text type="secondary">预售价</Typography.Text>
+            {/* The kit's money control: a string of yuan end to end, never a float. */}
+            <MoneyInput
+              value={sku.price}
+              disabled={helpers.disabled}
+              onChange={(value) => patch({ price: value ?? '' })}
+            />
+          </Space>
           <InputNumber
             value={sku.stock}
             min={0}

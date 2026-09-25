@@ -57,6 +57,8 @@ A response whose platform certificate cannot be fetched is never trusted, so the
 
 - `packages/core/src/wechat/wechat.crypto.test.ts::TLS-003 — an unfetchable platform certificate is a refusal, not a default > refuses when the key set is empty`
 - `packages/core/src/payment/payment.concurrency.int.test.ts::TLS-006 — an unverifiable gateway answer never becomes closed or paid > leaves the attempt unknown — not closed — when reconciliation cannot trust the answer`
+- `packages/core/src/payment/payment.int.test.ts::PAY-010 — 支付失败 (PAYERROR) is closed at the gateway, like any close > asks the gateway to close it, and answers closed only on its confirmation`
+- `packages/core/src/payment/payment.int.test.ts::PAY-010 — 支付失败 (PAYERROR) is closed at the gateway, like any close > keeps it open, without looping, when the gateway refuses the close`
 
 ### TLS-004
 
@@ -176,7 +178,7 @@ Two callbacks for the same real order pay it exactly once: the losing callback k
 
 ### PAY-010
 
-An attempt is closed only once the gateway has confirmed the close: an answer that cannot be verified, a dropped connection or silence leaves the attempt `unknown` rather than `closed`, and an order whose close the gateway would not confirm cannot be cancelled.
+An attempt is closed only once the gateway has confirmed the close — a 支付失败 (`PAYERROR`) trade included, which is closed at the gateway like any other: an answer that cannot be verified, a dropped connection or silence leaves the attempt `unknown` rather than `closed`, and an order whose close the gateway would not confirm cannot be cancelled.
 
 - `packages/core/src/payment/payment.concurrency.int.test.ts::TLS-006 — an unverifiable gateway answer never becomes closed or paid > refuses to cancel an order whose close the gateway would not confirm`
 - `packages/core/src/payment/payment.concurrency.int.test.ts::TLS-006 — an unverifiable gateway answer never becomes closed or paid > treats a dropped connection as silence, not as a closed order`
@@ -197,14 +199,30 @@ An order a coupon paid for in full (payable ¥0) is paid the moment it is placed
 - `packages/core/src/order/order.zero-amount.int.test.ts::PAY-012 — an order a coupon paid for in full > settles one still waiting at the cashier instead of failing the insert`
 - `packages/core/src/order/order.zero-amount.int.test.ts::PAY-012 — an order a coupon paid for in full > still sends an order with money left to pay to the gateway`
 
+### PAY-013
+
+A WeChat Pay payment is compared and stored by `amount.total`, the total the shop asked for; `payer_total` is smaller whenever a WeChat 立减 or 代金券 covered part of it, and is only noted (the attempt's `last_result`, the capital flow's note). Such a payment pays the order, from the notification and from the reconciliation sweep alike, and a payment exception refunds with the transaction's total as `amount.total`, which is what the gateway checks.
+
+- `packages/core/src/payment/payment.int.test.ts::PAY-013 — a payment a WeChat 立减 or 代金券 paid part of > pays the order from the notification: total is compared, payer_total is only noted`
+- `packages/core/src/payment/payment.int.test.ts::PAY-013 — a payment a WeChat 立减 or 代金券 paid part of > pays it the same way when the reconciliation sweep finds it`
+- `packages/core/src/payment/payment.int.test.ts::PAY-013 — a payment a WeChat 立减 or 代金券 paid part of > refunds an exception with the original transaction total, which the gateway accepts`
+
+### PAY-014
+
+Money that arrives for an attempt already `closed` (or `failed`) is a payment exception with an automatic refund, never a paid order: the shop told the order no money could arrive under that number, and may have released what it held.
+
+- `packages/core/src/payment/payment.int.test.ts::PAY-014 — money for an attempt that was already closed > is an exception to refund, not a second way to pay the order`
+
 ### GATEWAY-001
 
-A signed WeChat Pay callback whose paid amount is short, over or malformed is refused before any payment effect. A body with no usable amount at all (absent, zero or unparseable) is acknowledged and parked as `ignored: invalid amount` instead: there is nothing to book and nothing to refund, and a 500 would ask WeChat to redeliver the same bytes forever.
+A signed WeChat Pay callback whose `amount.total` is short, over or malformed is refused before any payment effect: the money becomes a payment exception refunded in full, and the attempt is closed (the trade is final at the gateway), so the order can still be cancelled and reconciliation answers `closed`, not `paid`. A body with no usable amount at all (absent, zero or unparseable) is acknowledged and parked as `ignored: invalid amount` instead: there is nothing to book and nothing to refund, and a 500 would ask WeChat to redeliver the same bytes forever.
 
 - `packages/core/src/payment/payment.int.test.ts::GATEWAY-001 — an amount that disagrees is never booked > refuses a short amount, however well signed it is`
 - `packages/core/src/payment/payment.int.test.ts::GATEWAY-001 — an amount that disagrees is never booked > refuses a over amount, however well signed it is`
 - `packages/core/src/payment/payment.int.test.ts::GATEWAY-001 — an amount that disagrees is never booked > parks an unparseable amount on the callbacks table instead of looping`
 - `packages/core/src/payment/payment.concurrency.int.test.ts::PAYC-002 — the reconciliation sweep racing a callback > never books a payment whose amount disagrees with the attempt`
+- `packages/core/src/payment/payment.int.test.ts::GATEWAY-001 — an amount that disagrees is never booked > closes the attempt, so the order can still be cancelled and is not re-queried forever`
+- `packages/core/src/payment/payment.int.test.ts::GATEWAY-001 — an amount that disagrees is never booked > answers closed — not paid — when the sweep is the one that finds the disagreement`
 
 ## Pricing
 
@@ -663,6 +681,27 @@ The shopper's order detail names the 拼团 team a group-buy order opened or joi
 
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > ORDER-011 — the order detail names the team an order opened or joined, and nothing for an ordinary order`
 
+### ORDER-012
+
+改价 spreads only the operator's discount: each line keeps what checkout's own rules took off it (a coupon scoped to one product stays on that product's line), the operator's discount is spread over what the lines still cost, and the shares still sum to `coupon_discount`.
+
+- `packages/core/src/order/order.fulfil.rules.test.ts::reprice > ORDER-012 — keeps a scoped coupon on its own line and spreads only the operator’s discount`
+- `packages/core/src/order/order.fulfil.rules.test.ts::reprice > ORDER-012 — a zero 改价 gives every line back exactly its checkout share`
+- `packages/core/src/order/order.reprice-shares.test.ts::ORDER-012 — what checkout took off each line, without the last 改价 > reads each line’s own checkout adjustments after a 改价`
+
+### ORDER-013
+
+Submitting an order checks that its activity is still open before it compares the shopper's `expectedPayableAmount`: an activity that closed after the preview answers with the activity's own refusal, never with 「价格有变动」 and the full price.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > ORDER-013 — an activity that closed after the preview answers 活动未开放, not 价格有变动`
+
+### ORDER-014
+
+退款中 means an after-sales request on the order is still open (`applied`, `approved`, `processing`, `unknown` or `failed`), read from `refunds` rather than the `orders.refund_status` roll-up that stays `partially_refunded` after its request closed. The console's 退款中 tab and counter and the shopper's 退款/售后 tab and badge all use it, and neither 删除 nor the shopper's 删除订单 files away an order in that state.
+
+- `packages/core/src/order/order.console.int.test.ts::ORDER-014 — 退款中 means an after-sales request still open > lists and counts an open request, and not an order whose request closed after a partial refund`
+- `packages/core/src/order/order.console.int.test.ts::ORDER-014 — 退款中 means an after-sales request still open > neither 删除 nor the shopper’s 删除订单 files away an order whose request is still open`
+
 ### COUPON-007
 
 The last coupon cannot be claimed twice: one concurrent claim wins, the other is refused, `remain_count` never goes negative and exactly one user holds it.
@@ -911,6 +950,15 @@ An invoice can only be asked for on an order that was paid for and not refunded,
 - `packages/core/src/order/order.invoice.int.test.ts::申请开票 > refuses an order whose money went back`
 - `packages/core/src/order/order.invoice.int.test.ts::what the buyer can see > tells a stranger the invoice does not exist`
 
+### INVOICE-004
+
+订单详情 offers 申请开票 (`invoiceRequestable`) exactly when the request would be accepted: paid, not refunded in full, something left to invoice (paid less refunded, `invoiceAmount`), and no request already 待开票 or 已开票.
+
+- `packages/core/src/order/order.invoice.rules.test.ts::INVOICE-004 — 订单详情 offers 申请开票 exactly when the request would be accepted > does not offer it while a request is 待开票 or 已开票`
+- `packages/core/src/order/order.invoice.rules.test.ts::INVOICE-004 — 订单详情 offers 申请开票 exactly when the request would be accepted > does not offer it once the order is refunded in full`
+- `packages/core/src/order/order.invoice.rules.test.ts::INVOICE-004 — 订单详情 offers 申请开票 exactly when the request would be accepted > makes it out for what was paid less what came back`
+- `packages/core/src/order/order.invoice.int.test.ts::申请开票 > INVOICE-004 — 订单详情 offers 申请开票 until a request is open, and again once it is cancelled`
+
 ## 小程序发货信息管理 (WeChat mini-program shipping)
 
 ### WXSHIP-001
@@ -978,6 +1026,14 @@ The push URL never takes a delivery it cannot bind to its body (decided 2026-09-
 - `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > refuses in 兼容模式 too, a plaintext and an encrypted delivery alike`
 - `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > still takes an encrypted push in 安全模式, where the signature covers the body`
 - `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > takes a plaintext push in 明文模式 while the store is up, and refuses the triple for another body`
+
+### WXSHIP-009
+
+A split delivery none of whose parts is express is reported once, when its last part is dispatched, as one 统一发货 describing every part (WeChat takes 分拆 only for express). What WeChat cannot be told without an operator is announced to staff (`admin_wechat_shipping_blocked`, once per shipment): a last part that is not express after express parts were reported, and an upload waiting on a carrier's 微信快递编码 or the payer's openid.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > reports a split delivery with no express part once, as 统一发货, when the last part leaves — WXSHIP-009`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > tells staff at dispatch when the last part cannot follow express parts — WXSHIP-009`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > tells staff once when an upload waits on a carrier code, however often it retries — WXSHIP-009`
 
 ## 内容安全 (WeChat content security)
 
@@ -1140,6 +1196,59 @@ A shopper's after-sale evidence photos must each be a live image our own storage
 - `packages/core/src/refund/refund.int.test.ts::REFUND-014 — evidence photos come from our own storage > takes a photo our uploads stored`
 - `packages/core/src/refund/refund.int.test.ts::REFUND-014 — evidence photos come from our own storage > refuses a link to somebody else’s server, and opens no request`
 - `packages/core/src/storage/storage.int.test.ts::image variants > CAT-018 — a thumbnail of a live image counts as ours, a thumbnail of anything else does not`
+
+### REFUND-015
+
+`order_items.refunded_quantity` is always the units the line's refunds count — every succeeded refund, plus a 仅退款 from approval until it is closed (`approved`, `processing`, `unknown`, `failed`) — and it is re-derived inside `transitionRefund`, the one place a refund's status changes. So a shopper withdrawing an approved 仅退款, or the merchant rejecting or closing one, hands its units back to the warehouse in the same transaction. 复核 of a refused refund may keep what it counts but grows only into unshipped units: one whose units shipped meanwhile is refused with `REFUND_LINE_ALREADY_SHIPPED`, never paid.
+
+- `packages/core/src/refund/refund.rules.test.ts::REFUND-015 — the units a request holds follow its status > counts a 仅退款 from approval until it is closed, and a return only once paid`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-015 — a shopper withdrawing an approved 仅退款 hands its units back to the warehouse`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-015 — 复核 refuses a refund whose units shipped since it failed`
+
+### REFUND-016
+
+An order a coupon paid for in full (`paid = 0`) can still be refunded: the request is worth ¥0, settles without the gateway and without a capital-flow row, and releases the units, the coupon and the group-buy seat like any full refund. A failed group buy on such an order settles the same way. The order's roll-up is decided by units when no money was collected.
+
+- `packages/core/src/refund/refund.rules.test.ts::REFUND-016 — an order a coupon paid for in full has a way out > rolls up by units when no money was collected`
+- `packages/core/src/refund/refund.system.int.test.ts::REFUND-016 — a failed group buy on a ¥0 order settles without the gateway and releases stock`
+- `packages/core/src/refund/refund.system.int.test.ts::REFUND-016 — a shopper can ask for a ¥0 order back, and the approval settles it`
+
+### REFUND-017
+
+A refund WeChat refused (`failed`) is still in flight while the merchant can send it again: it holds its lines (`refund_items.is_open`), counts against the ceiling, keeps its units, shows the shopper 处理中 and cannot be hidden. It leaves that state only by 复核 succeeding, the merchant closing it (拒绝) or the shopper withdrawing it. A refund the shop opened by itself (a failed group buy, an expired presale) cannot be withdrawn by the shopper.
+
+- `packages/core/src/refund/refund.rules.test.ts::REFUND-017 — a refused refund is still in flight > holds its lines while the merchant can send it again`
+- `packages/core/src/refund/refund.rules.test.ts::REFUND-017 — a refused refund is still in flight > lets the shopper withdraw it until money can have moved, but never a refund the shop opened`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-017 — keeps its lines and units, so the same units cannot be asked for twice`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-017 — 复核 pays it under the same number`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-017 — the shopper may withdraw it, and the merchant may close it`
+- `packages/core/src/refund/refund.concurrency.int.test.ts::REFUND-017 — keeps the units out of the warehouse while a refused refund can be retried, and hands them back when the merchant closes it`
+- `apps/mini/src/packages/aftersale/shared/refund.test.ts::REFUND-017 — shows a failed refund as in progress, keeps it, and lets the shopper withdraw it`
+- `apps/web/app/admin/(shell)/trade/refunds/refund-requests.test.tsx::REFUND-017 — offers 关闭 on a refund WeChat refused, through the reject route`
+
+### REFUND-018
+
+The freight goes back with the request that takes the rest of an order nothing of which has shipped, once. A line inside another in-flight request counts as taken, so the shopper's second request on an unshipped order carries the freight; the apply screen's `freightRefundable` and the server decide from the same facts, and a request that leaves a takeable unit behind, or comes after the freight was claimed, is refused.
+
+- `packages/core/src/refund/refund.rules.test.ts::REFUND-018 — the freight goes with the rest of an unshipped order > counts a line inside another open request as taken`
+- `packages/core/src/refund/refund.system.int.test.ts::REFUND-018 — gives the freight back with the second request while the first holds the other line`
+- `packages/core/src/refund/refund.system.int.test.ts::REFUND-018 — refuses the freight on a request that leaves a takeable line behind`
+- `apps/mini/src/packages/aftersale/apply/index.test.tsx::REFUND-018 — sends the freight with the rest of an unshipped order when the other line is already in after-sales`
+
+### REFUND-019
+
+What the shopper reads on a refund's timeline is what a person wrote (the shopper, 商家同意/拒绝) or a fixed line per status. Gateway answers, source tags, merchant numbers and a system refund's internal note stay in staff fields (`last_error`, the internal remark, the operator notification).
+
+- `packages/core/src/refund/refund.rules.test.ts::REFUND-019 — the shopper reads fixed lines, never what the gateway said > replaces a system row with the fixed line for its status`
+- `packages/core/src/refund/refund.rules.test.ts::REFUND-019 — the shopper reads fixed lines, never what the gateway said > leaves out a system row that did not move the status, such as a merchant-number mismatch`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-019 — shows a refused refund as 退款未完成 and keeps the gateway text for staff`
+
+### REFUND-020
+
+A fully refunded order takes back the gift coupons it earned that nobody has spent, and returns each one to its template's supply; a spent one stays spent, and a partial refund takes nothing back.
+
+- `packages/core/src/refund/refund.int.test.ts::REFUND-020 — revokes the unused gifts and returns them to the supply, leaving other coupons alone`
+- `packages/core/src/refund/refund.int.test.ts::REFUND-020 — a partial refund leaves the gifts where they are`
 
 ## Registration and notifications
 
@@ -1436,6 +1545,34 @@ A team shows strangers only a masked nickname and never an account id (decided 2
 - `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > answers null for no name at all`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the storefront surface > RISK-D-010 — shows a team to anybody with masked names, no account ids, and isMe from the session`
 
+### RISK-D-011
+
+A 拼团 order ships only once its team has succeeded: manual 发货 is refused with `ORDER_GROUPBUY_NOT_READY` while the team is forming (or failed), auto-delivery of card keys and coupon goods holds back on payment and runs when the team succeeds (the `groupbuy.settle` effect), and the console shows the team's state (`groupbuyTeamStatus`) instead of offering 发货.
+
+- `packages/core/src/order/order.ship-ready.test.ts::RISK-D-011 — an order ships only when its kind says it may > holds a 拼团 order whose team is still forming`
+- `packages/core/src/order/order.ship-ready.test.ts::RISK-D-011 — an order ships only when its kind says it may > lets it go once the team succeeded`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::paying > RISK-D-011 — a paid order does not ship while its team is forming, and ships once it succeeded`
+
+### RISK-D-012
+
+An activity SKU that orders still depend on is never removed by an edit of its 拼团 or 预售 campaign: one with units sold, a live order buying it or (预售) a stock-ledger row is refused with `GROUPBUY_ACTIVITY_SKU_IN_USE` / `PRESALE_ACTIVITY_SKU_IN_USE` — a typed 409, not the foreign-key 500 — and can be switched off instead, which keeps its 已售 and quota.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the admin surface > editing while orders move the stock > RISK-D-012 — refuses to remove a SKU that has sold, and lets it be switched off instead`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the admin surface > editing while orders move the stock > RISK-D-012 — refuses to remove a SKU an unpaid order is still buying`
+- `packages/core/src/presale/presale.int.test.ts::the admin surface > editing while orders move the stock > RISK-D-012 — refuses to remove a SKU orders point at, instead of a foreign-key 500`
+
+### RISK-D-013
+
+取消拼团 (a leader withdrawing a team nobody has paid into) closes the team's unpaid orders with it — the leader's own and any joiner's — through the order domain's cancel, which closes the WeChat payment and gives the activity stock and coupon back, so nobody can pay for a team that no longer exists.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > RISK-D-013 — 取消拼团 closes the leader’s unpaid order with the team`
+
+### RISK-D-014
+
+A running 拼团 campaign whose 结束时间 has passed becomes `ended` (the `groupbuy.sweepEndedActivities` job, every minute, as presale's window sweep), conditionally, so a second pass changes nothing; a paused one is left for the operator.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > RISK-D-014 — ends a campaign whose 结束时间 has passed, and leaves a running one alone`
+
 ## Storefront end to end
 
 ### SMOKE-002
@@ -1522,7 +1659,7 @@ The shop has no 砍价, 秒杀, 抽奖, 直播, 分销, 积分, 签到, 付费�
 
 ### SEQ-001
 
-A fixed-seed sequence of real operations (create payment, gateway payment, cancel, refund, duplicate notification, close task) interleaved over three orders keeps every invariant after every step: a cancelled order keeps no collectible gateway payment, a paid attempt carries its trade number, money taken at the gateway is recorded locally, completed refunds never exceed the payment, and each stock layer keeps every unit in stock or sold. Four seeds run in the suite, and a failure prints the seed and the full event log for an exact replay.
+A fixed-seed sequence of real operations (create payment, gateway payment, cancel, refund — apply, approve, send, a refused send, withdraw, reject, 复核 — duplicate notification, close task) interleaved over three orders keeps every invariant after every step: a cancelled order keeps no collectible gateway payment, a paid attempt carries its trade number, money taken at the gateway is recorded locally, completed refunds never exceed the payment, each stock layer keeps every unit in stock or sold, `refunded_quantity` equals the units the line's refunds count, and a unit is never both shipped and taken by a refund approved before shipping. Four seeds run in the suite, and a failure prints the seed and the full event log for an exact replay.
 
 - `packages/core/src/order/order.sequence.int.test.ts::SEQ-001 — a fixed-seed interleaving of real operations > holds every invariant after every step, seed <seed>`
 
@@ -1981,12 +2118,13 @@ A declared content type that disagrees with the bytes is refused, not silently c
 
 ### STOR-004
 
-A remote import is refused for private, loopback, link-local and cloud-metadata addresses **after** DNS resolution, for a name that resolves to both a public and a private address, and on a redirect into the private network.
+A remote import is refused for private, loopback, link-local and cloud-metadata addresses — an IPv4 address inside an IPv6 one (`::ffff:7f00:1`, `::/96`) judged as the IPv4 it is — **after** DNS resolution, for a name that resolves to both a public and a private address, and on a redirect into the private network.
 
 - `packages/core/src/storage/safe-fetch.test.ts::safeFetch — refusals > refuses a public name that RESOLVES to a private address`
 - `packages/core/src/storage/safe-fetch.test.ts::safeFetch — refusals > refuses a name that resolves to one public AND one private address`
 - `packages/core/src/storage/safe-fetch.test.ts::safeFetch — refusals > refuses a redirect into the private network`
 - `packages/core/src/storage/safe-fetch.test.ts::classifyAddress > blocks every address family a fetch must never reach`
+- `packages/core/src/storage/safe-fetch.test.ts::classifyAddress > STOR-004 — judges the IPv4 inside an IPv6 spelling, however it is written`
 
 ### STOR-005
 

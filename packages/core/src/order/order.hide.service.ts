@@ -50,7 +50,14 @@ export async function hide(ctx: Ctx, params: { id: string }): Promise<OrderHidde
         mine &&
         row.hiddenByUserAt === null &&
         !(HIDEABLE_ORDER_STATUSES as readonly string[]).includes(row.status);
-      throw new DomainError(unfinished ? 'ORDER_NOT_DELETABLE' : 'ORDER_NOT_FOUND');
+      if (unfinished) throw new DomainError('ORDER_NOT_DELETABLE');
+      if (mine && row.hiddenByUserAt === null && (await repo.orderHasOpenRefund(tx, orderId))) {
+        throw new DomainError('ORDER_NOT_DELETABLE', {
+          message: '订单还有售后在处理，处理完后才能删除',
+          details: { openRefund: true },
+        });
+      }
+      throw new DomainError('ORDER_NOT_FOUND');
     }
 
     await repo.insertStatusLog(tx, {

@@ -439,6 +439,13 @@ describe('REFUND-002 — approval racing the buyer withdrawing', () => {
       expect((await refundRow(id)).status).toBe('cancelled');
       expect((await orderRow(order.orderId)).refundedAmount).toBe('0.00');
       expect(releases).toEqual([]);
+      // REFUND-015: withdrawing after the approval hands the units back to the
+      // warehouse; a withdrawn request no longer holds anything.
+      const [line] = await harness.ctx.db
+        .select()
+        .from(orderItems)
+        .where(eq(orderItems.id, order.itemIds[0]!));
+      expect(line!.refundedQuantity).toBe(0);
     } else {
       expect(gateway.refunds.size).toBe(1);
       expect((await refundRow(id)).status).toBe('succeeded');
@@ -818,7 +825,7 @@ describe('shipping the last unshipped units while a 仅退款 is approved', () =
     });
   }
 
-  it('gives the units back to the warehouse when the gateway refuses the refund', async () => {
+  it('REFUND-017 — keeps the units out of the warehouse while a refused refund can be retried, and hands them back when the merchant closes it', async () => {
     const order = await paidOrder([{ quantity: 1, unitPrice: '100.00', totalAmount: '100.00' }]);
     const refundId = await applied(order);
     await admin.adminApprove(racer(adminActor(order.adminId)), { id: String(refundId) });
@@ -828,7 +835,14 @@ describe('shipping the last unshipped units while a 仅退款 is approved', () =
     await service.executeRefund(racer(), refundId);
     expect((await refundRow(refundId)).status).toBe('failed');
 
-    // The money is not coming back, so the goods are the shop's to ship again.
+    // 复核 can still pay it, so shipping the goods now would hand over both.
+    expect((await theLine(order)).refundedQuantity).toBe(1);
+
+    await admin.adminReject(racer(adminActor(order.adminId)), {
+      id: String(refundId),
+      rejectReason: '已线下退款',
+    });
+    // Closed: the goods are the shop's to ship again.
     expect((await theLine(order)).refundedQuantity).toBe(0);
   });
 });

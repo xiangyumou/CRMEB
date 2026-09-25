@@ -1,3 +1,4 @@
+import { Money } from '../kernel/money';
 import { registerNotificationEvents, type NotificationRouteTemplate } from '../notification';
 
 /**
@@ -54,13 +55,22 @@ export function registerPresaleNotificationEvents(): void {
       name: '预售名额已满退款提醒',
       description: '付款时预售限购总量恰好已满、系统发起自动退款时发送',
       audience: 'user',
-      variables: ['orderId', 'orderNo', 'activityTitle', 'amount', 'refundId'],
+      variables: ['orderId', 'orderNo', 'activityTitle', 'amount', 'refundNote', 'refundId'],
       channels: [...USER_CHANNELS],
       defaults: {
         title: '预售名额已满',
-        body: '「{{activityTitle}}」的预售名额已满，订单 {{orderNo}} 的 ¥{{amount}} 将原路退回。',
+        body: '「{{activityTitle}}」的预售名额已满，订单 {{orderNo}} {{refundNote}}。',
       },
       route: REFUND_ROUTE,
     },
   ]);
+}
+
+/**
+ * How the notice speaks of the money: 「的 ¥59.00 将原路退回」, and for an order
+ * that cost the shopper nothing 「已关闭，没有产生扣款」 rather than a ¥0.00 refund.
+ */
+export function refundNoteOf(paidAmount: string | null): string {
+  if (paidAmount === null || Money.parse(paidAmount).isZero()) return '已关闭，没有产生扣款';
+  return `的 ¥${paidAmount} 将原路退回`;
 }

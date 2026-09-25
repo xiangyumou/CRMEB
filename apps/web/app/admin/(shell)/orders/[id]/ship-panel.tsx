@@ -10,10 +10,12 @@ import {
   orderAdminShipmentTracking,
   orderAdminShipments,
   orderAdminTimeline,
+  orderAdminUpdateShipment,
 } from '@shop/contracts/order/order.admin.contract';
 import { expressCompanyPicker } from '@shop/contracts/shipping/shipping.express.contract';
 import {
   shipBody,
+  shipmentUpdateBody,
   type AdminOrderDetail,
   type Shipment,
 } from '@shop/contracts/order/order.fulfil.schemas';
@@ -48,8 +50,14 @@ export function ShipPanel({
   loading: boolean;
 }) {
   const shipModal = useFormModal<AdminOrderDetail>();
-  const companies = useRouteQuery(expressCompanyPicker, {}, { enabled: shipModal.open });
+  const editModal = useFormModal<Shipment>();
+  const companies = useRouteQuery(
+    expressCompanyPicker,
+    {},
+    { enabled: shipModal.open || editModal.open },
+  );
   const [lines, setLines] = useState<Record<string, number>>({});
+  const editing = editModal.record;
 
   const outstanding = useMemo(
     () =>
@@ -62,15 +70,34 @@ export function ShipPanel({
     [order],
   );
 
+  // 拼团 not yet 成团: the server refuses the dispatch, so the button is not offered.
+  const waitingForTeam =
+    order !== null && order.groupbuyTeamStatus !== null && order.groupbuyTeamStatus !== 'succeeded';
+
   const shippable =
     order !== null &&
     order.status === 'paid' &&
+    !waitingForTeam &&
     outstanding.some(
       (entry) =>
         entry.item.productKind === 'physical' || entry.item.productKind === 'virtual_manual',
     );
 
   const invalidate = [orderAdminDetail, orderAdminShipments, orderAdminTimeline, orderAdminList];
+
+  // Every quantity set to 0 would send an empty `lines`, which the server reads
+  // as 「剩余全部发出」 — the opposite of what the operator typed.
+  const nothingSelected =
+    outstanding.length > 0 &&
+    outstanding.every((entry) => (lines[entry.item.id] ?? entry.remaining) === 0);
+  const shipSchema = useMemo(
+    () =>
+      shipBody.refine(() => !nothingSelected, {
+        message: '至少发出一件商品',
+        path: ['lines'],
+      }),
+    [nothingSelected],
+  );
 
   return (
     <Card
@@ -93,7 +120,25 @@ export function ShipPanel({
         ) : null
       }
     >
-      {order && order.status === 'paid' && !shippable ? (
+      {order && order.status === 'paid' && waitingForTeam ? (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={
+            order.groupbuyTeamStatus === 'forming'
+              ? '拼团中，成团后才能发货'
+              : '拼团未成功，不能发货'
+          }
+          description={
+            order.groupbuyTeamStatus === 'forming'
+              ? '未成团的订单会自动退款。'
+              : '这笔订单会按拼团失败退款。'
+          }
+        />
+      ) : null}
+
+      {order && order.status === 'paid' && !waitingForTeam && !shippable ? (
         <Alert
           type="info"
           showIcon
@@ -170,21 +215,30 @@ export function ShipPanel({
             {
               title: '操作',
               key: 'actions',
-              width: 100,
+              width: 150,
               render: (_value: unknown, row: Shipment) =>
-                row.status === 'dispatched' && order?.status === 'paid' ? (
+                row.status === 'dispatched' ? (
                   <Can permission="order:shipment:write">
-                    <ConfirmButton
-                      route={orderAdminCancelShipment}
-                      input={{ params: { id: row.id }, body: {} }}
-                      title="确认撤销这张发货单？"
-                      description="只有订单还没有全部发出时才能撤销；已经整单发货的订单请改发货信息或走退款。"
-                      invalidate={invalidate}
-                      successMessage="已撤销"
-                      buttonProps={{ type: 'link', size: 'small', danger: true }}
-                    >
-                      撤销
-                    </ConfirmButton>
+                    <Space size={0}>
+                      {row.deliveryMode === 'virtual' ? null : (
+                        <Button type="link" size="small" onClick={() => editModal.show(row)}>
+                          修改物流
+                        </Button>
+                      )}
+                      {order?.status === 'paid' ? (
+                        <ConfirmButton
+                          route={orderAdminCancelShipment}
+                          input={{ params: { id: row.id }, body: {} }}
+                          title={`确认撤销发货单 ${row.shipmentNo}？`}
+                          description="单上的商品回到待发货，可以重新发货。整单都已发出后不能撤销，运单填错请用「修改物流」。"
+                          invalidate={invalidate}
+                          successMessage="已撤销"
+                          buttonProps={{ type: 'link', size: 'small', danger: true }}
+                        >
+                          撤销
+                        </ConfirmButton>
+                      ) : null}
+                    </Space>
                   </Can>
                 ) : null,
             },
@@ -196,7 +250,7 @@ export function ShipPanel({
         {...shipModal.props}
         title="发货"
         width={720}
-        schema={shipBody}
+        schema={shipSchema}
         columns={2}
         initialValues={{ deliveryMode: 'express', lines: [] }}
         fields={[
@@ -319,6 +373,50 @@ export function ShipPanel({
         })}
         invalidate={invalidate}
         successMessage="已发货"
+      />
+
+      <ModalForm
+        {...editModal.props}
+        title="修改物流"
+        schema={shipmentUpdateBody}
+        initialValues={
+          editing
+            ? editing.deliveryMode === 'express'
+              ? {
+                  ...(editing.expressCompanyId
+                    ? { expressCompanyId: editing.expressCompanyId }
+                    : {}),
+                  ...(editing.trackingNo ? { trackingNo: editing.trackingNo } : {}),
+                }
+              : {
+                  ...(editing.courierName ? { courierName: editing.courierName } : {}),
+                  ...(editing.courierPhone ? { courierPhone: editing.courierPhone } : {}),
+                }
+            : undefined
+        }
+        fields={
+          editing?.deliveryMode === 'merchant_delivery'
+            ? [
+                { kind: 'text', name: 'courierName', label: '配送人' },
+                { kind: 'text', name: 'courierPhone', label: '配送电话' },
+              ]
+            : [
+                {
+                  kind: 'select',
+                  name: 'expressCompanyId',
+                  label: '物流公司',
+                  options: (companies.data?.items ?? []).map((company) => ({
+                    value: company.id,
+                    label: company.name,
+                  })),
+                },
+                { kind: 'text', name: 'trackingNo', label: '运单号' },
+              ]
+        }
+        route={orderAdminUpdateShipment}
+        toInput={(values) => ({ params: { id: editing?.id ?? '' }, body: values })}
+        invalidate={invalidate}
+        successMessage="物流信息已更新"
       />
     </Card>
   );

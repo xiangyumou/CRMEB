@@ -66,8 +66,13 @@ export interface GatewayTransaction {
   transactionId: string | null;
   tradeState: WechatTradeState;
   tradeStateDesc: string;
-  /** Integer 分, as the gateway reports it. */
+  /** Integer 分, as the gateway reports it: `amount.total`, the order total we asked for. */
   totalFen: number;
+  /**
+   * `amount.payer_total`: what the shopper's own money covered, less than
+   * `totalFen` when a WeChat 立减 / 代金券 paid part of it. Information only —
+   * settlement and refunds use `totalFen` (PAY-013).
+   */
   payerTotalFen: number;
   openid: string | null;
   successTime: string | null;
@@ -147,6 +152,14 @@ interface GatewayError {
   message?: string;
   detail?: unknown;
 }
+
+/**
+ * How long one WeChat Pay call may take, body included. A timeout is a
+ * transport failure: `PAYMENT_STATE_UNKNOWN`, never a confirmed answer. Without
+ * it a gateway that never answers holds the effects dispatcher (one at a time,
+ * 60-second lease) and the cashier's request open indefinitely.
+ */
+export const WECHAT_PAY_TIMEOUT_MS = 10_000;
 
 /** Business refusals the caller is expected to handle rather than retry blindly. */
 const NOT_FOUND_CODES = new Set(['ORDERNOTEXIST', 'RESOURCE_NOT_EXISTS', 'REFUND_NOT_EXIST']);
@@ -230,6 +243,7 @@ export function createWechatPayClient(ctx: Ctx, config: WechatPayCredentials): W
     try {
       response = await fetch(new URL(args.urlPath, config.apiBaseUrl), {
         method: args.method,
+        signal: AbortSignal.timeout(WECHAT_PAY_TIMEOUT_MS),
         headers: {
           accept: 'application/json',
           authorization,

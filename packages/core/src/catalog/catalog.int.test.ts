@@ -1809,7 +1809,7 @@ describe('export', () => {
     const all = await service.adminProductExport(asAdmin(), { tab: 'all', limit: 2000 });
     expect(all.rows).toHaveLength(3);
     expect(all.truncated).toBe(false);
-    expect(all.filename).toBe('products-2026-06-01.csv');
+    expect(all.filename).toBe('商品-2026-06-01.csv');
 
     const clipped = await service.adminProductExport(asAdmin(), { tab: 'all', limit: 1 });
     expect(clipped.truncated).toBe(true);

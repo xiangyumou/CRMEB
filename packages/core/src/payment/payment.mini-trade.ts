@@ -64,9 +64,16 @@ import * as repo from './payment.repo';
  * - Several: `delivery_mode = 2` (分拆发货), one upload per shipment, the last
  *   with `is_all_delivered: true`. WeChat accepts 分拆 only for 快递
  *   (`10060006` otherwise), so a *part* that is a virtual or merchant delivery
- *   is not reported on its own — it is logged, and the express parts carry the
- *   order. The decision is frozen into the effect's payload when the shipment
- *   is dispatched, so a later shipment cannot rewrite what this one was.
+ *   is not reported on its own — the express parts carry the order. The
+ *   decision is frozen into the effect's payload when the shipment is
+ *   dispatched, so a later shipment cannot rewrite what this one was.
+ * - Several, none of them express: nothing could go out part by part, so the
+ *   last part reports the whole order once, as 统一发货 (`wholeOrder`).
+ * - Express parts already reported and a last part that is not express:
+ *   WeChat will take nothing more, and the order would never be 全部发货. That
+ *   is an operator's job in the 小程序后台, and they are told at dispatch
+ *   (`admin_wechat_shipping_blocked`), as they are when an upload waits on
+ *   something only they can fix (a carrier without 微信快递编码).
  * - Parts are reported in dispatch order: an upload waits (the effect retries)
  *   while an earlier shipment's upload is still pending, because WeChat takes
  *   nothing after `is_all_delivered`.
@@ -79,6 +86,8 @@ export const CORRECT_SHIPPING = 'wechat.correctShipping';
 export const SHIPPING_OVERDUE_EVENT = 'admin_shipping_overdue';
 /** `trade_manage_remind_access_api`: the mini program was put under 发货信息管理. */
 export const MINI_TRADE_MANAGED_EVENT = 'admin_mini_trade_managed';
+/** A shipment WeChat cannot be told about without an operator (WXSHIP-009). */
+export const SHIPPING_BLOCKED_EVENT = 'admin_wechat_shipping_blocked';
 
 /**
  * Where WeChat's 发货 / 结算 messages open: the catalogue's `order` page, found
@@ -104,7 +113,19 @@ interface UploadPayload {
   shipmentId: number;
   deliveryMode: 1 | 2;
   isAllDelivered: boolean;
+  /**
+   * The last part of a split delivery none of whose parts were express: this
+   * upload describes every live shipment of the order, as one 统一发货.
+   */
+  wholeOrder?: boolean;
 }
+
+/**
+ * An upload that cannot go out until an operator fixes something. Thrown, so
+ * the ledger keeps retrying (and parks it where the 待处理任务 console shows
+ * it), and announced once per shipment so nobody has to find it there first.
+ */
+class ShippingBlocked extends Error {}
 
 const uploadKey = (shipmentId: number) => ({
   scope: 'shipment',
@@ -148,6 +169,21 @@ export function registerMiniTradeNotificationEvents(): void {
       link: '/admin/orders/{{orderId}}',
     },
     {
+      code: SHIPPING_BLOCKED_EVENT,
+      name: '小程序发货信息未能录入微信',
+      description:
+        '小程序支付订单的发货信息无法自动录入微信（快递公司缺少微信快递编码、分拆发货的最后一个包裹不是快递等），需要处理，否则货款会被冻结',
+      audience: 'admin',
+      permission: 'order:shipment:write',
+      variables: ['orderId', 'orderNo', 'reason'],
+      channels: ['inApp'],
+      defaults: {
+        title: '小程序发货信息未能录入微信',
+        body: '订单 {{orderNo}} 的发货信息未能自动录入微信：{{reason}}。录入前这笔货款会被微信冻结。',
+      },
+      link: '/admin/orders/{{orderId}}',
+    },
+    {
       code: MINI_TRADE_MANAGED_EVENT,
       name: '小程序已纳入发货信息管理',
       description: '微信通知：小程序已被纳入发货信息管理，小程序支付的货款将在确认收货后结算',
@@ -181,10 +217,39 @@ async function recordUpload(tx: Tx, ctx: Ctx, event: ShipmentDispatchedEvent): P
   const unified = event.allDelivered && liveOthers === 0 && !reportedBefore;
 
   if (!unified && event.deliveryMode !== 'express') {
+    if (!event.allDelivered) {
+      ctx.logger.info(
+        { orderId: event.orderId, shipmentId: event.shipmentId, deliveryMode: event.deliveryMode },
+        'wechat shipping: a non-express part of a split delivery is reported with the last part',
+      );
+      return;
+    }
+    if (!reportedBefore) {
+      // No part went to WeChat, because none was express: the last one
+      // reports the whole order, once, as 统一发货.
+      await recordEffect(tx, ctx, {
+        ...uploadKey(event.shipmentId),
+        payload: {
+          orderId: event.orderId,
+          shipmentId: event.shipmentId,
+          deliveryMode: 1,
+          isAllDelivered: true,
+          wholeOrder: true,
+        } satisfies UploadPayload,
+      });
+      return;
+    }
     ctx.logger.warn(
       { orderId: event.orderId, shipmentId: event.shipmentId, deliveryMode: event.deliveryMode },
-      'wechat shipping: a non-express part of a split delivery is not reportable; skipped',
+      'wechat shipping: the last part of a split delivery is not express; WeChat takes nothing more',
     );
+    await announceBlocked(tx, ctx, {
+      orderId: event.orderId,
+      orderNo: event.orderNo,
+      shipmentId: event.shipmentId,
+      reason:
+        '分拆发货已按快递录入过，最后一个包裹不是快递，微信不接受；请在小程序后台「发货信息管理」中手动完成发货录入',
+    });
     return;
   }
 
@@ -215,6 +280,18 @@ async function recordCorrection(tx: Tx, ctx: Ctx, event: ShipmentUpdatedEvent): 
   });
 }
 
+async function announceBlocked(
+  tx: Tx,
+  ctx: Ctx,
+  input: { orderId: number; orderNo: string; shipmentId: number; reason: string },
+): Promise<void> {
+  await notify(tx, ctx, {
+    event: SHIPPING_BLOCKED_EVENT,
+    subject: { scope: 'shipment', id: input.shipmentId },
+    data: { orderId: input.orderId, orderNo: input.orderNo, reason: input.reason },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // after commit: the uploads
 // ---------------------------------------------------------------------------
@@ -226,6 +303,7 @@ function uploadPayloadOf(effect: Pick<Effect, 'payload'>): UploadPayload {
     shipmentId: Number(raw.shipmentId),
     deliveryMode: raw.deliveryMode === 1 ? 1 : 2,
     isAllDelivered: raw.isAllDelivered === true,
+    ...(raw.wholeOrder === true ? { wholeOrder: true } : {}),
   };
 }
 
@@ -235,30 +313,69 @@ const LOGISTICS: Record<ShipmentReportFacts['shipment']['deliveryMode'], MiniLog
   virtual: 3,
 };
 
+/**
+ * What one upload describes: this shipment, or — for a `wholeOrder` upload —
+ * every live shipment of the order, reported as the one delivery WeChat sees.
+ * A mix of 商家配送 and 虚拟发货 is reported as 同城配送 (2), the one of the two
+ * that has something physical in it.
+ */
+async function uploadScope(
+  ctx: Ctx,
+  facts: ShipmentReportFacts,
+  payload: UploadPayload,
+): Promise<{ lines: { name: string; quantity: number }[]; logisticsType: MiniLogisticsType }> {
+  const own = facts.shipment.lines.map((line) => ({
+    name: line.productName,
+    quantity: line.quantity,
+  }));
+  if (!payload.wholeOrder) {
+    return { lines: own, logisticsType: LOGISTICS[facts.shipment.deliveryMode] };
+  }
+  const lines: { name: string; quantity: number }[] = [];
+  const modes = new Set([facts.shipment.deliveryMode]);
+  for (const earlier of facts.earlierShipmentIds) {
+    const part = await shipmentReportFacts(ctx, earlier);
+    if (!part || part.shipment.status === 'cancelled') continue;
+    modes.add(part.shipment.deliveryMode);
+    for (const line of part.shipment.lines) {
+      lines.push({ name: line.productName, quantity: line.quantity });
+    }
+  }
+  lines.push(...own);
+  return {
+    lines,
+    logisticsType: modes.has('merchant_delivery') ? LOGISTICS.merchant_delivery : LOGISTICS.virtual,
+  };
+}
+
 /** Throws — and so waits in the ledger — for what an operator has to fix first. */
 function buildUpload(
   facts: ShipmentReportFacts,
   attempt: repo.AttemptRow,
   payload: UploadPayload,
   at: Date,
+  scope: { lines: { name: string; quantity: number }[]; logisticsType: MiniLogisticsType },
 ): MiniUploadShipping {
   const payerOpenid = attempt.context.openid;
   if (!payerOpenid) {
-    throw new Error(`支付单 ${attempt.outTradeNo} 没有付款人 openid，无法录入微信发货信息`);
+    throw new ShippingBlocked(
+      `支付单 ${attempt.outTradeNo} 没有付款人 openid，无法自动录入；请在小程序后台「发货信息管理」中手动录入`,
+    );
   }
-  const logisticsType = LOGISTICS[facts.shipment.deliveryMode];
-  const itemDesc = describeItems(
-    facts.shipment.lines.map((line) => ({ name: line.productName, quantity: line.quantity })),
-  );
+  const logisticsType = scope.logisticsType;
+  const itemDesc = describeItems(scope.lines);
   const pkg: MiniShippingPackage = { itemDesc };
   if (logisticsType === 1) {
     const company = facts.expressCompany;
     if (!company?.wechatDeliveryId) {
-      throw new Error(
-        `快递公司「${company?.name ?? '未知'}」未填写微信快递编码，请在「快递公司」中补全后重试`,
+      throw new ShippingBlocked(
+        `快递公司「${company?.name ?? '未知'}」未填写微信快递编码，请在「快递公司」中补全，补全后会自动重新录入`,
       );
     }
-    pkg.trackingNo = facts.shipment.trackingNo ?? '';
+    if (!facts.shipment.trackingNo) {
+      throw new ShippingBlocked('快递发货缺少运单号，请在订单中「修改物流」补全后自动重新录入');
+    }
+    pkg.trackingNo = facts.shipment.trackingNo;
     pkg.expressCompany = company.wechatDeliveryId;
     if (isShunfeng(company)) pkg.receiverContact = maskPhone(facts.order.receiverPhone);
   }
@@ -289,6 +406,35 @@ const ALREADY_REPORTED = new Set([10060002, 10060023]);
  */
 const NOTHING_TO_REPORT = new Set([10060003, 10060004]);
 
+/**
+ * `buildUpload`, telling the operators the first time it is blocked on them.
+ * The notice is keyed by the shipment, so a retry does not repeat it; the
+ * throw keeps the effect waiting for the fix.
+ */
+async function buildOrAnnounce(
+  ctx: Ctx,
+  facts: ShipmentReportFacts,
+  attempt: repo.AttemptRow,
+  payload: UploadPayload,
+): Promise<MiniUploadShipping> {
+  const scope = await uploadScope(ctx, facts, payload);
+  try {
+    return buildUpload(facts, attempt, payload, ctx.clock.now(), scope);
+  } catch (error) {
+    if (error instanceof ShippingBlocked) {
+      await ctx.withTx((tx) =>
+        announceBlocked(tx, ctx, {
+          orderId: facts.order.id,
+          orderNo: facts.order.orderNo,
+          shipmentId: payload.shipmentId,
+          reason: error.message,
+        }),
+      );
+    }
+    throw error;
+  }
+}
+
 async function uploadShipping(ctx: Ctx, effect: Effect): Promise<void> {
   const payload = uploadPayloadOf(effect);
   const facts = await shipmentReportFacts(ctx, payload.shipmentId);
@@ -313,7 +459,7 @@ async function uploadShipping(ctx: Ctx, effect: Effect): Promise<void> {
     }
   }
 
-  const request = buildUpload(facts, attempt, payload, ctx.clock.now());
+  const request = await buildOrAnnounce(ctx, facts, attempt, payload);
   await tradeRepo.ensureTradeOrder(ctx.db, {
     orderId: facts.order.id,
     paymentAttemptId: attempt.id,
@@ -362,7 +508,7 @@ async function correctShipping(ctx: Ctx, effect: Effect): Promise<void> {
     return;
   }
 
-  const request = buildUpload(facts, attempt, uploadPayloadOf(upload), ctx.clock.now());
+  const request = await buildOrAnnounce(ctx, facts, attempt, uploadPayloadOf(upload));
   const answer = await miniShippingPort(ctx).uploadShippingInfo(request);
   if (answer.ok || ALREADY_REPORTED.has(answer.errcode) || NOTHING_TO_REPORT.has(answer.errcode)) {
     await tradeRepo.claimCorrection(ctx.db, { orderId: facts.order.id, at: ctx.clock.now() });

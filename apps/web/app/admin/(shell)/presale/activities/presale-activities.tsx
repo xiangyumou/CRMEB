@@ -20,7 +20,6 @@ import { useRouteMutation } from '@/admin/api/hooks';
 import { ConfirmButton } from '@/admin/kit/confirm-button';
 import { ModalForm, useFormModal } from '@/admin/kit/form/modal-form';
 import { PageContainer } from '@/admin/kit/page-container';
-import { StatusTag } from '@/admin/kit/status-tag';
 import {
   actionsColumn,
   enumColumn,
@@ -32,6 +31,7 @@ import {
 import { CrudTable } from '@/admin/kit/table/crud-table';
 import { Can } from '@/admin/session/can';
 
+import { ActivityStatusTag } from '../../groupbuy/activity-window';
 import { PRESALE_ACTIVITY_STATUS, PRESALE_PAYMENT_MODE, presaleFields } from '../presale-enums';
 
 /**
@@ -146,7 +146,7 @@ export function PresaleActivitiesPage() {
             key: 'status',
             width: 100,
             render: (_value: unknown, row: PresaleActivityListItem) => (
-              <StatusTag value={row.status} map={PRESALE_ACTIVITY_STATUS} />
+              <ActivityStatusTag row={row} map={PRESALE_ACTIVITY_STATUS} />
             ),
           },
           actionsColumn<PresaleActivityListItem>({

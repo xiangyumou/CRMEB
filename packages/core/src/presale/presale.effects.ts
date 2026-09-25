@@ -3,7 +3,7 @@ import type { Ctx } from '../kernel/context';
 import { registerEffectHandler, type Effect } from '../effects/index';
 import { formatShopTime, notify } from '../notification';
 import { refundSystemInitiated } from '../refund';
-import { PRESALE_EVENTS } from './presale.notifications';
+import { PRESALE_EVENTS, refundNoteOf } from './presale.notifications';
 import * as repo from './presale.repo';
 
 /**
@@ -185,6 +185,7 @@ async function notifySoldOut(
       orderNo: notice.orderNo,
       activityTitle: notice.activityTitle,
       amount: notice.paidAmount ?? '',
+      refundNote: refundNoteOf(notice.paidAmount),
       refundId: args.refundId,
     },
   });

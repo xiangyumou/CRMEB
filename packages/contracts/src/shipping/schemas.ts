@@ -28,12 +28,16 @@ export type ShippingChargeMode = z.infer<typeof shippingChargeMode>;
 /**
  * A measurement stored as `numeric(12,2)`. Two fraction digits, never
  * negative, and small enough that a double represents it exactly.
+ *
+ * Checked by rounding to two places and comparing, not by `value * 100` being
+ * whole: 1.1 × 100 is 110.00000000000001 in binary floating point, so that
+ * test refused 1.1 kg, 2.3 kg and 0.29 m³.
  */
 export const unitAmount = z
   .number()
   .min(0)
   .max(9_999_999_999)
-  .refine((value) => Number.isFinite(value) && Math.round(value * 100) === value * 100, {
+  .refine((value) => Number.isFinite(value) && Number(value.toFixed(2)) === value, {
     message: '最多两位小数',
   });
 

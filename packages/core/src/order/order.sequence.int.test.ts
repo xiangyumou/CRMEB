@@ -26,6 +26,7 @@ import { handleTransactionNotify, paymentConfig, startPayment } from '../payment
 import { sweepPresaleWindows } from '../presale';
 import * as refundAdmin from '../refund';
 import * as refundService from '../refund';
+import { countsUnits } from '../refund';
 import { registerShippingFreightPort } from '../shipping';
 import { wechatConfig } from '../wechat';
 import * as order from './index';
@@ -42,9 +43,9 @@ import { onOrderPaid, resetOrderPorts } from './ports';
  * services — checkout, payment and after-sales against the fake WeChat gateway,
  * fulfilment, group buy, the presale windows and the two sweeps the worker runs
  * — in an order chosen by a seeded PRNG, and after **every single step** it
- * re-checks six properties that must hold no matter what happened before.
+ * re-checks eight properties that must hold no matter what happened before.
  *
- * Six invariants, from the ledger row:
+ * Eight invariants, from the ledger row:
  *
  *  1. a cancelled order holds no collectible payment;
  *  2. a paid attempt carries its trade number;
@@ -52,7 +53,13 @@ import { onOrderPaid, resetOrderPorts } from './ports';
  *  4. completed refunds never exceed the payment;
  *  5. every stock layer keeps each unit in stock, reserved by a live line, or
  *     sold;
- *  6. the effects ledger has no duplicate `(aggregate, event)`.
+ *  6. the effects ledger has no duplicate `(aggregate, event)`;
+ *  7. `order_items.refunded_quantity` is exactly the units its refunds count
+ *     (REFUND-015) — through withdraw, reject, a refused send and 复核;
+ *  8. a unit is shipped or taken by a refund before shipping, never both
+ *     (`shipped + refunded <= quantity`, for the refunds that took their units
+ *     while the line was unshipped; a 仅退款 approved after dispatch is a
+ *     money-only refund and legitimately counts shipped units).
  *
  * **A refusal is a legal outcome.** Cancelling a paid order, paying a
  * cancelled one, approving a refund twice — the sequence tries all of them,
@@ -66,7 +73,7 @@ import { onOrderPaid, resetOrderPorts } from './ports';
  * through checkout; a two-seat group buy whose every join becomes a fourth,
  * fifth, … shopper the same moves act on; a presale campaign whose window the
  * sweep flips 100 minutes in. The worker's effects dispatcher is one of the
- * moves, and the ledger is drained and the six properties re-checked once more
+ * moves, and the ledger is drained and the eight properties re-checked once more
  * after the last step.
  *
  * Four seeds, fixed, 150 steps each. `SHOP_SEQ_SEEDS=1,2,3` and
@@ -210,6 +217,11 @@ interface World {
     openGroupId: number | null;
   };
   presale: { activityId: number; skuId: number; endAt: Date; swept: number };
+  /**
+   * Refunds approved while every one of their lines was unshipped: their units
+   * are the ones fulfilment must never ship (invariant 8).
+   */
+  reservedUnshipped: Set<number>;
 }
 
 let sequence = 0;
@@ -305,6 +317,7 @@ async function buildWorld(): Promise<World> {
     shoppers: [],
     adminId: operator!.id,
     skuStock: new Map(),
+    reservedUnshipped: new Set(),
     groupbuy: {
       activityId: 0,
       productId: 0,
@@ -468,7 +481,7 @@ function chooseWithRefund(world: World, rng: () => number, wanted: readonly stri
 const REFUNDABLE_ORDER = ['paid', 'shipped', 'received', 'completed'];
 
 /**
- * The moves, with weights. A uniform draw over sixteen moves cancels an order
+ * The moves, with weights. A uniform draw over twenty-one moves cancels an order
  * about as often as it pays one, and the three orders are all gone before the
  * three-step payment chain (立即支付 → 网关收款 → 回调) has come up once — the
  * walk would refuse its way to the end and prove nothing. So the moves that
@@ -486,6 +499,10 @@ const STEP_WEIGHTS = {
   applyRefund: 2,
   approveRefund: 2,
   executeRefund: 2,
+  executeRefundRefused: 1,
+  withdrawRefund: 1,
+  rejectRefund: 1,
+  retryRefund: 1,
   refundNotification: 2,
   ship: 2,
   confirmReceipt: 1,
@@ -629,8 +646,68 @@ const STEPS_BY_NAME: Record<StepName, Step> = {
     const open = (await refundsOf(shopper.orderId)).filter((row) => row.status === 'applied');
     if (open.length === 0) return `approveRefund order=${shopper.orderId} (nothing applied)`;
     const target = pick(rng, open);
+    const shippedBefore = await harness.ctx.db
+      .select({ shipped: orderItems.shippedQuantity })
+      .from(refundItems)
+      .innerJoin(orderItems, eq(orderItems.id, refundItems.orderItemId))
+      .where(eq(refundItems.refundId, target.id));
     await refundAdmin.adminApprove(asAdmin(world.adminId), { id: String(target.id) });
+    if (shippedBefore.every((line) => line.shipped === 0)) world.reservedUnshipped.add(target.id);
     return `approveRefund order=${shopper.orderId} refund=${target.id}`;
+  },
+
+  /** WeChat refuses the send (the merchant account is short): the refund is `failed`. */
+  async executeRefundRefused(world, rng) {
+    const shopper = chooseWithRefund(world, rng, ['approved']);
+    const approved = (await refundsOf(shopper.orderId)).filter((row) => row.status === 'approved');
+    if (approved.length === 0) return `executeRefundRefused order=${shopper.orderId} (none)`;
+    const target = pick(rng, approved);
+    gateway.behaviour.refundBalanceFen = 1;
+    try {
+      const result = await refundService.executeRefund(harness.ctx, target.id);
+      return `executeRefundRefused refund=${target.id} -> ${result.status}`;
+    } finally {
+      gateway.behaviour.refundBalanceFen = null;
+    }
+  },
+
+  /** 撤销申请 — the inverse of applying, from applied, approved or failed. */
+  async withdrawRefund(world, rng) {
+    const shopper = chooseWithRefund(world, rng, ['applied', 'approved', 'failed']);
+    const open = (await refundsOf(shopper.orderId)).filter((row) =>
+      ['applied', 'approved', 'failed'].includes(row.status),
+    );
+    if (open.length === 0) return `withdrawRefund order=${shopper.orderId} (nothing open)`;
+    const target = pick(rng, open);
+    await refundService.cancel(as(target.userId), { id: String(target.id) });
+    return `withdrawRefund refund=${target.id} (was ${target.status})`;
+  },
+
+  /** 拒绝 / 关闭 — the merchant's inverse of approving, and the way out of `failed`. */
+  async rejectRefund(world, rng) {
+    const shopper = chooseWithRefund(world, rng, ['applied', 'approved', 'failed']);
+    const open = (await refundsOf(shopper.orderId)).filter((row) =>
+      ['applied', 'approved', 'failed'].includes(row.status),
+    );
+    if (open.length === 0) return `rejectRefund order=${shopper.orderId} (nothing open)`;
+    const target = pick(rng, open);
+    await refundAdmin.adminReject(asAdmin(world.adminId), {
+      id: String(target.id),
+      rejectReason: '核实后不符合退款条件',
+    });
+    return `rejectRefund refund=${target.id} (was ${target.status})`;
+  },
+
+  /** 复核 — send a refused refund again, or ask WeChat about one in flight. */
+  async retryRefund(world, rng) {
+    const shopper = chooseWithRefund(world, rng, ['failed', 'unknown', 'processing']);
+    const retryable = (await refundsOf(shopper.orderId)).filter((row) =>
+      ['failed', 'unknown', 'processing'].includes(row.status),
+    );
+    if (retryable.length === 0) return `retryRefund order=${shopper.orderId} (nothing to retry)`;
+    const target = pick(rng, retryable);
+    const detail = await refundAdmin.adminRetry(asAdmin(world.adminId), { id: String(target.id) });
+    return `retryRefund refund=${target.id} ${target.status} -> ${detail.status}`;
   },
 
   /** What the effects dispatcher would do: send the approved refund to WeChat. */
@@ -962,6 +1039,34 @@ async function checkInvariants(world: World): Promise<string[]> {
     seen.add(key);
   }
 
+  // --- 7. refunded_quantity is what the refunds count (REFUND-015) ----------
+  const refundById = new Map(refundRows.map((row) => [row.id, row]));
+  const counted = new Map<number, number>();
+  const reserved = new Map<number, number>();
+  for (const line of refundItemRows) {
+    const refund = refundById.get(line.refundId);
+    if (refund === undefined || !countsUnits(refund.kind, refund.status)) continue;
+    counted.set(line.orderItemId, (counted.get(line.orderItemId) ?? 0) + line.quantity);
+    if (refund.isAutomatic || world.reservedUnshipped.has(refund.id)) {
+      reserved.set(line.orderItemId, (reserved.get(line.orderItemId) ?? 0) + line.quantity);
+    }
+  }
+  for (const item of itemRows) {
+    const expected = counted.get(item.id) ?? 0;
+    if (item.refundedQuantity !== expected) {
+      broken.push(
+        `INV7 line ${item.id}: refunded_quantity ${item.refundedQuantity} but its refunds count ${expected}`,
+      );
+    }
+    // --- 8. a unit is shipped or refunded before shipping, never both -------
+    const taken = reserved.get(item.id) ?? 0;
+    if (item.shippedQuantity + taken > item.quantity) {
+      broken.push(
+        `INV8 line ${item.id}: ${item.shippedQuantity} shipped + ${taken} refunded before shipping > ${item.quantity}`,
+      );
+    }
+  }
+
   return broken;
 }
 
@@ -1012,7 +1117,7 @@ async function runSequence(seed: number): Promise<void> {
   }
 
   // The worker catches up: whatever the ledger still holds is delivered, and
-  // the six properties must survive that too.
+  // the eight properties must survive that too.
   const drained = await drainEffects(harness.ctx, { baseBackoffMs: 0, maxBackoffMs: 0 });
   log.push(`drain ${JSON.stringify(drained)}`);
   const settled = await checkInvariants(world);
@@ -1023,7 +1128,7 @@ async function runSequence(seed: number): Promise<void> {
     );
   }
 
-  // A sequence that refused everything would pass all six invariants and prove
+  // A sequence that refused everything would pass all eight invariants and prove
   // nothing, so the run has to have moved money at least once.
   const paid = await harness.ctx.db.select().from(paymentAttempts);
   expect(

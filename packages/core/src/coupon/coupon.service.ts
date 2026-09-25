@@ -607,6 +607,28 @@ export async function release(tx: Tx, ctx: Ctx, input: ReleaseInput): Promise<Re
 }
 
 /**
+ * Take back the gift coupons an order earned and nobody has spent, when the
+ * order is fully refunded (REFUND-020). The inverse of `grantOrderGifts`: each
+ * revoked coupon goes back to its template's supply. Spent ones stay spent —
+ * the order they were spent on stands. Idempotent: a replayed settlement finds
+ * nothing left to revoke.
+ */
+export async function revokeOrderGifts(
+  tx: Tx,
+  ctx: Ctx,
+  input: { orderId: number },
+): Promise<{ revoked: number }> {
+  const revoked = await repo.revokeOrderGiftCoupons(tx, {
+    orderId: input.orderId,
+    now: ctx.clock.now(),
+  });
+  if (revoked > 0) {
+    ctx.logger.info({ orderId: input.orderId, revoked }, 'order gift coupons revoked on refund');
+  }
+  return { revoked };
+}
+
+/**
  * Issue every active new-user coupon to a freshly registered account. Called by
  * sign-in inside the registration transaction.
  *

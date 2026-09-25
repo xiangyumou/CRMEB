@@ -39,6 +39,7 @@ export {
 } from './groupbuy.service';
 
 export {
+  closeEndedActivities,
   settleExpiredGroups,
   settleGroup,
   type SettleResult,

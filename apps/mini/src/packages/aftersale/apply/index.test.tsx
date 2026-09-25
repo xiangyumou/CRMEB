@@ -6,7 +6,7 @@ import { serveApi } from '@/test/fake-api';
 import { refundableItem, refundableItems, refundDetail } from '@/test/order-fixtures';
 import { renderPage } from '@/test/render';
 import { taroFake } from '@/test/taro-fake/taro';
-import RefundApplyPage from './index';
+import RefundApplyPage, { includesFreight } from './index';
 
 const reasons = { items: ['不想要了', '商品与描述不符'] };
 
@@ -156,5 +156,17 @@ describe('申请售后', () => {
       }),
     );
     expect(taroFake.calls.some((c) => c.api === 'redirectTo')).toBe(false);
+  });
+
+  it('REFUND-018 — sends the freight with the rest of an unshipped order when the other line is already in after-sales', () => {
+    const data = refundableItems({
+      items: [
+        refundableItem('7001'),
+        refundableItem('7002', { blockedReason: 'REFUND_ALREADY_OPEN', refundableQuantity: 0 }),
+      ],
+    });
+    expect(includesFreight(data, { '7001': 2 })).toBe(true);
+    expect(includesFreight(data, { '7001': 1 })).toBe(false);
+    expect(includesFreight({ ...data, freightRefundable: false }, { '7001': 2 })).toBe(false);
   });
 });

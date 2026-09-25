@@ -5,7 +5,7 @@ import type {
   ShipmentTracking,
   ShipmentUpdateBody,
 } from '@shop/contracts/order/order.fulfil.schemas';
-import type { Tx } from '@shop/db';
+import type { DbOrTx, Tx } from '@shop/db';
 import { requireAdminId, requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, generateOrderNo, toId, toIdOrNull } from '../kernel/ids';
@@ -17,7 +17,12 @@ import { resolveLogisticsPort, resolveWechatReceiptVerifier } from './order.fulf
 import * as repo from './order.repo';
 import { detailOf } from './order.query.service';
 import { requireOrderRef } from './order.ref';
-import { onOrderCompleted, onShipmentDispatched, onShipmentUpdated } from './ports';
+import {
+  getOrderKindHandler,
+  onOrderCompleted,
+  onShipmentDispatched,
+  onShipmentUpdated,
+} from './ports';
 import { orderStateMachine } from './order.state-machine';
 
 /**
@@ -203,6 +208,18 @@ export async function shipmentReportFacts(
 // shipping
 // ---------------------------------------------------------------------------
 
+/**
+ * RISK-D-011: whether the order's kind lets it ship yet — a 拼团 order only once its team
+ * succeeded. Manual 发货 and auto-delivery both ask.
+ */
+export async function readyToShip(
+  db: DbOrTx,
+  order: { id: number; kind: string },
+): Promise<boolean> {
+  const handler = getOrderKindHandler(order.kind);
+  return handler?.readyToShip ? handler.readyToShip(db, order.id) : true;
+}
+
 export interface ShipInput {
   orderId: number;
   body: ShipBody;
@@ -230,6 +247,8 @@ export async function shipOrder(ctx: Ctx, input: ShipInput): Promise<Shipment> {
       if (order.status !== 'paid') {
         throw new DomainError('ORDER_NOT_SHIPPABLE', { details: { status: order.status } });
       }
+      // RISK-D-011: a 拼团 order waits for its team.
+      if (!(await readyToShip(tx, order))) throw new DomainError('ORDER_GROUPBUY_NOT_READY');
 
       const lines = await fulfilRepo.lockLineProgress(tx, order.id);
       const plan = rules.planShipment(
