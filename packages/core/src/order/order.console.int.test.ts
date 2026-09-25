@@ -795,6 +795,21 @@ describe('the work queue and the totals', () => {
     expect(stats.refunding).toBe(0);
   });
 
+  it('does not count 待开票 for an order an operator deleted', async () => {
+    const adminId = await makeAdmin();
+    const placed = await placeOrder();
+    await complete(placed);
+    await order.orderInvoices.request(
+      as(placed.userId),
+      { id: String(placed.orderId) },
+      { headerType: 'personal', invoiceType: 'plain', name: '张三' },
+    );
+    expect((await order.orderConsole.adminStatistics(asAdmin(adminId), {})).pendingInvoice).toBe(1);
+
+    await order.orderConsole.adminDelete(asAdmin(adminId), { id: String(placed.orderId) });
+    expect((await order.orderConsole.adminStatistics(asAdmin(adminId), {})).pendingInvoice).toBe(0);
+  });
+
   it('pads an unpadded numeric sum into money on the wire', async () => {
     const adminId = await makeAdmin();
     const placed = await placeOrder();

@@ -655,10 +655,12 @@ export async function workQueueCounts(db: DbOrTx): Promise<WorkQueueCounts> {
       })
       .from(orders)
       .where(isNull(orders.deletedAt)),
+    // An operator's deleted order is out of every figure, its 待开票 included.
     db
       .select({ n: sql<number>`count(*)::int` })
       .from(orderInvoices)
-      .where(eq(orderInvoices.status, 'requested')),
+      .innerJoin(orders, eq(orders.id, orderInvoices.orderId))
+      .where(and(eq(orderInvoices.status, 'requested'), isNull(orders.deletedAt))),
   ]);
   return {
     pendingShipment: Number(orderSide[0]?.pendingShipment ?? 0),
