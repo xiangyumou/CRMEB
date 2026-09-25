@@ -978,6 +978,14 @@ The push URL never takes a delivery it cannot bind to its body (decided 2026-09-
 - `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > still takes an encrypted push in 安全模式, where the signature covers the body`
 - `packages/core/src/wechat/wechat.mini-push.test.ts::WXSHIP-008 — without the nonce store, only 安全模式 takes a push > takes a plaintext push in 明文模式 while the store is up, and refuses the triple for another body`
 
+### WXSHIP-009
+
+A split delivery none of whose parts is express is reported once, when its last part is dispatched, as one 统一发货 describing every part (WeChat takes 分拆 only for express). What WeChat cannot be told without an operator is announced to staff (`admin_wechat_shipping_blocked`, once per shipment): a last part that is not express after express parts were reported, and an upload waiting on a carrier's 微信快递编码 or the payer's openid.
+
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > reports a split delivery with no express part once, as 统一发货, when the last part leaves — WXSHIP-009`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > tells staff at dispatch when the last part cannot follow express parts — WXSHIP-009`
+- `packages/core/src/payment/payment.mini-trade.int.test.ts::reporting a shipment of a mini-program payment > tells staff once when an upload waits on a carrier code, however often it retries — WXSHIP-009`
+
 ## 内容安全 (WeChat content security)
 
 The policy table and the reasons are in `docs/mini/wechat-compliance.md` C09 and at the top of `packages/core/src/wechat/wechat.sec-check.ts`.
