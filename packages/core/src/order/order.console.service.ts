@@ -22,6 +22,7 @@ import { requireAdminId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId, toIdOrNull } from '../kernel/ids';
 import { Money } from '../kernel/money';
+import { shopDateTime, shopDay } from '../kernel/shop-time';
 import { notify } from '../notification';
 import { maskPhone } from '../user';
 import { closeOrderPayments, openPaymentState } from './order.cancel.service';
@@ -763,7 +764,7 @@ export async function adminExport(ctx: Ctx, query: OrderExportQuery): Promise<Or
     filter,
     limit: exportMaxRows,
   });
-  const stamp = ctx.clock.now().toISOString().slice(0, 10);
+  const stamp = shopDay(ctx.clock.now());
 
   if (query.kindOfExport === 'shipments') {
     const shipments = await fulfilRepo.listShipments(
@@ -798,12 +799,12 @@ export async function adminExport(ctx: Ctx, query: OrderExportQuery): Promise<Or
           item?.snapshot.productName ?? '',
           item?.snapshot.specText ?? '',
           line.quantity,
-          shipment.dispatchedAt.toISOString(),
+          shopDateTime(shipment.dispatchedAt),
         ]);
       }
     }
     return {
-      filename: `shipments-${stamp}.csv`,
+      filename: `发货单-${stamp}.csv`,
       contentType: 'text/csv',
       rowCount: body.length,
       truncated: total > rows.length,
@@ -814,7 +815,7 @@ export async function adminExport(ctx: Ctx, query: OrderExportQuery): Promise<Or
   const side = await sideDataFor(ctx.db, rows);
   const body = rows.map((row) => [
     row.orderNo,
-    row.createdAt.toISOString(),
+    shopDateTime(row.createdAt),
     ORDER_STATUS[row.status] ?? row.status,
     FULFILLMENT_STATUS[row.fulfillmentStatus] ?? row.fulfillmentStatus,
     REFUND_STATUS[row.refundStatus] ?? row.refundStatus,
@@ -829,14 +830,14 @@ export async function adminExport(ctx: Ctx, query: OrderExportQuery): Promise<Or
     row.payableAmount,
     row.paidAmount ?? '',
     row.refundedAmount,
-    iso(row.paidAt) ?? '',
-    iso(row.shippedAt) ?? '',
+    row.paidAt === null ? '' : shopDateTime(row.paidAt),
+    row.shippedAt === null ? '' : shopDateTime(row.shippedAt),
     row.buyerRemark ?? '',
     row.adminRemark ?? '',
   ]);
 
   return {
-    filename: `orders-${stamp}.csv`,
+    filename: `订单-${stamp}.csv`,
     contentType: 'text/csv',
     rowCount: body.length,
     truncated: total > rows.length,

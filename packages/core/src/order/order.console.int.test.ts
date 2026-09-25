@@ -837,7 +837,7 @@ describe('导出', () => {
       deleted: false,
     });
     expect(result.contentType).toBe('text/csv');
-    expect(result.filename).toBe('orders-2026-06-01.csv');
+    expect(result.filename).toBe('订单-2026-06-01.csv');
     expect(result.rowCount).toBe(1);
     expect(result.truncated).toBe(false);
 
@@ -847,6 +847,23 @@ describe('导出', () => {
     expect(lines[1]).toContain(row.orderNo);
     // The enum comes out as the label an operator reads, not as `paid`.
     expect(lines[1]).toContain('待发货');
+  });
+
+  it('prints times and dates the file on the Shanghai day', async () => {
+    const adminId = await makeAdmin();
+    const placed = await placeOrder();
+    await pay(placed); // paid at 2026-06-01T00:00Z, 08:00 in Shanghai
+    // 00:30 on 2 June in Shanghai, still 1 June in UTC.
+    harness.clock.set('2026-06-01T16:30:00.000Z');
+
+    const result = await order.orderConsole.adminExport(asAdmin(adminId), {
+      kindOfExport: 'orders',
+      deleted: false,
+    });
+    expect(result.filename).toBe('订单-2026-06-02.csv');
+    const [, line] = result.content.trimEnd().split('\n');
+    expect(line).toContain('2026-06-01 08:00:00');
+    expect(line).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:/);
   });
 
   /** CSV injection, end to end: a receiver name typed by a buyer. */
@@ -886,7 +903,10 @@ describe('导出', () => {
       kindOfExport: 'shipments',
       deleted: false,
     });
-    expect(result.filename).toBe('shipments-2026-06-01.csv');
+    expect(result.filename).toBe('发货单-2026-06-01.csv');
+    // 发货时间 as staff read it: Shanghai wall time, not an ISO string in UTC.
+    expect(result.content).toContain('2026-06-01 08:00:00');
+    expect(result.content).not.toContain('T00:00:00');
     expect(result.rowCount).toBe(1);
     expect(result.content).toContain('SF-EXPORT');
     expect(result.content).toContain('发货单号');
