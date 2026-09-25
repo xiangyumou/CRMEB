@@ -116,8 +116,7 @@ function RegionSheetBody({
   }
 
   if (tree.isPending) return <CellSkeleton rows={8} />;
-  if (tree.isError)
-    return <ErrorBlock error={tree.error} onRetry={() => void tree.refetch()} compact />;
+  if (tree.isError) return <ErrorBlock error={tree.error} onRetry={() => tree.refetch()} compact />;
 
   const options: readonly Node[] = level === 0 ? provinces : (path[level - 1]?.children ?? []);
   const chosen = path[level];

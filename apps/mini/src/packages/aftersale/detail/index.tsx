@@ -88,7 +88,7 @@ function Body({ id }: { id: string }) {
   const contact = useContactIcon(sessionFromOf('refund', id));
 
   if (detail.isError) {
-    return <ErrorBlock error={detail.error} onRetry={() => void detail.refetch()} />;
+    return <ErrorBlock error={detail.error} onRetry={() => detail.refetch()} />;
   }
   const refund = detail.data;
   if (!refund) return <CellSkeleton rows={6} />;
@@ -112,7 +112,7 @@ function Body({ id }: { id: string }) {
                 label="复制退货地址"
                 className="refund-detail__link"
                 onClick={() =>
-                  void copyText(
+                  copyText(
                     `${refund.returnAddress!.name} ${refund.returnAddress!.phone} ${refund.returnAddress!.address}`,
                   )
                 }
@@ -173,7 +173,7 @@ function Body({ id }: { id: string }) {
             <Pressable
               label="复制售后单号"
               className="refund-detail__link"
-              onClick={() => void copyText(refund.refundNo)}
+              onClick={() => copyText(refund.refundNo)}
             >
               复制
             </Pressable>
@@ -184,7 +184,7 @@ function Body({ id }: { id: string }) {
               label="查看订单"
               className="refund-detail__fact-value refund-detail__link"
               // Back to 订单详情 when 售后 was opened from it, rather than a second copy of it.
-              onClick={() => void leaveFor({ route: 'order', params: { id: refund.orderId } })}
+              onClick={() => leaveFor({ route: 'order', params: { id: refund.orderId } })}
             >
               {refund.orderNo}
             </Pressable>

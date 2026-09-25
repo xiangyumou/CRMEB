@@ -69,7 +69,7 @@ function ResolvedOrder({
   if (id) return <OrderBody id={id} />;
   if (!outTradeNo) return <Empty image="order" title="没有找到这个订单" />;
   if (byPayment.isError) {
-    return <ErrorBlock error={byPayment.error} onRetry={() => void byPayment.refetch()} />;
+    return <ErrorBlock error={byPayment.error} onRetry={() => byPayment.refetch()} />;
   }
   if (!byPayment.data) return <CellSkeleton rows={6} />;
   return <OrderBody id={byPayment.data.orderId} />;
@@ -99,7 +99,7 @@ function OrderBody({ id }: { id: string }) {
   const contact = useContactIcon(sessionFromOf('order', id));
 
   if (detail.isError) {
-    return <ErrorBlock error={detail.error} onRetry={() => void detail.refetch()} />;
+    return <ErrorBlock error={detail.error} onRetry={() => detail.refetch()} />;
   }
   if (!order) return <CellSkeleton rows={6} />;
 
@@ -116,7 +116,7 @@ function OrderBody({ id }: { id: string }) {
 
   return (
     <View className="order-detail" id="order-detail">
-      <StatusHeader order={order} onExpired={() => void detail.refetch()} />
+      <StatusHeader order={order} onExpired={() => detail.refetch()} />
       <View className="order-detail__body">
         {order.groupbuyTeamId !== null ? <TeamCell teamId={order.groupbuyTeamId} /> : null}
         {parcels.length > 0 ? <ParcelCard orderId={order.id} parcels={parcels} /> : null}

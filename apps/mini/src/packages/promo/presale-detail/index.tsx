@@ -86,11 +86,11 @@ export default function PresaleDetailPage() {
     }
     return (
       <PageShell title="预售商品">
-        <ErrorBlock error={detail.error} onRetry={() => void detail.refetch()} />
+        <ErrorBlock error={detail.error} onRetry={() => detail.refetch()} />
       </PageShell>
     );
   }
-  return <Detail activity={detail.data} onStale={() => void detail.refetch()} />;
+  return <Detail activity={detail.data} onStale={() => detail.refetch()} />;
 }
 
 function Detail({ activity, onStale }: { activity: Activity; onStale: () => void }) {
@@ -171,7 +171,7 @@ function Detail({ activity, onStale }: { activity: Activity; onStale: () => void
         confirmText="立即预订"
         onConfirm={(sku, quantity) => {
           setSheet(null);
-          void startActivityCheckout({
+          return startActivityCheckout({
             kind: 'presale',
             activityId: activity.activityId,
             skuId: sku.skuId,

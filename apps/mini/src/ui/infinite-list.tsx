@@ -84,7 +84,7 @@ export function InfiniteList<T>({
     );
   }
   if (query.isError && items.length === 0) {
-    return <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />;
+    return <ErrorBlock error={query.error} onRetry={() => query.refetch()} />;
   }
   if (items.length === 0) return <>{empty}</>;
 

@@ -92,11 +92,11 @@ export default function GroupbuyDetailPage() {
     }
     return (
       <PageShell title="拼团商品">
-        <ErrorBlock error={detail.error} onRetry={() => void detail.refetch()} />
+        <ErrorBlock error={detail.error} onRetry={() => detail.refetch()} />
       </PageShell>
     );
   }
-  return <Detail activity={detail.data} onStale={() => void detail.refetch()} />;
+  return <Detail activity={detail.data} onStale={() => detail.refetch()} />;
 }
 
 function Detail({ activity, onStale }: { activity: Activity; onStale: () => void }) {
@@ -203,7 +203,7 @@ function Detail({ activity, onStale }: { activity: Activity; onStale: () => void
         confirmText="发起拼团"
         onConfirm={(sku, quantity) => {
           setSheet(null);
-          void startActivityCheckout({
+          return startActivityCheckout({
             kind: 'groupbuy',
             activityId: activity.activityId,
             skuId: sku.skuId,
@@ -245,7 +245,7 @@ function OpenTeams({
             <Text className="groupbuy-detail__team-seats">还差 {team.seatsLeft} 人成团</Text>
             <View className="groupbuy-detail__team-time">
               <Text className="groupbuy-detail__team-label">剩余</Text>
-              <Countdown endsAt={team.expiresAt} onEnd={() => void teams.refetch()} />
+              <Countdown endsAt={team.expiresAt} onEnd={() => teams.refetch()} />
             </View>
           </View>
           <Button

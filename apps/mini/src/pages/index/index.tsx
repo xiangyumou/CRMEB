@@ -70,7 +70,7 @@ export default function Home() {
         <NavBar>
           <SearchBar
             className="home__search"
-            onOpen={() => void navigate({ route: 'search', params: {} })}
+            onOpen={() => navigate({ route: 'search', params: {} })}
           />
         </NavBar>
       )}
@@ -98,7 +98,7 @@ function Body({ query }: { query: ReturnType<typeof useRouteQuery<'decor.pageHom
         </View>
       );
     }
-    return <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />;
+    return <ErrorBlock error={query.error} onRetry={() => query.refetch()} />;
   }
   return (
     <DecorPage

@@ -89,7 +89,7 @@ function ReviewForm({ orderId, only }: { orderId: string; only?: string | undefi
   const [submitting, setSubmitting] = useState(false);
 
   if (detail.isError) {
-    return <ErrorBlock error={detail.error} onRetry={() => void detail.refetch()} />;
+    return <ErrorBlock error={detail.error} onRetry={() => detail.refetch()} />;
   }
   if (!detail.data) return <CellSkeleton rows={6} />;
   const lines = reviewLines(detail.data, only);

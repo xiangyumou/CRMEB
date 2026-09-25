@@ -91,7 +91,7 @@ function Favorites() {
           all={all}
           action="取消收藏"
           busy={remove.isPending}
-          onAction={(ids) => void unfavorite(ids)}
+          onAction={(ids) => unfavorite(ids)}
         />
       ) : null}
     </View>

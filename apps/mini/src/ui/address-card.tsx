@@ -66,7 +66,7 @@ export function AddressCard({
             label="导入微信地址"
             className="shop-address__import"
             onClick={() => {
-              void platform.chooseAddress().then((chosen) => {
+              return platform.chooseAddress().then((chosen) => {
                 if (chosen) onImport(chosen);
               });
             }}

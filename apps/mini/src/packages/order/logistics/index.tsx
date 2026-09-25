@@ -63,7 +63,7 @@ function Parcels({ orderId, initial }: { orderId: string; initial?: string | und
   usePullToRefresh(() => shipments.refetch());
 
   if (shipments.isError) {
-    return <ErrorBlock error={shipments.error} onRetry={() => void shipments.refetch()} />;
+    return <ErrorBlock error={shipments.error} onRetry={() => shipments.refetch()} />;
   }
   if (!shipments.data) return <CellSkeleton rows={5} />;
   const parcels = shipments.data.items.filter((s) => s.status !== 'cancelled');
@@ -171,7 +171,7 @@ function ExpressTrail({ parcel }: { parcel: Shipment }) {
         {tracking.isPending ? (
           <CellSkeleton rows={3} />
         ) : tracking.isError ? (
-          <ErrorBlock error={tracking.error} onRetry={() => void tracking.refetch()} />
+          <ErrorBlock error={tracking.error} onRetry={() => tracking.refetch()} />
         ) : data && data.available && data.traces.length > 0 ? (
           <Timeline
             items={data.traces.map((trace, index) => ({

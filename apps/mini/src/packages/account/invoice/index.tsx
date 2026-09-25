@@ -71,7 +71,7 @@ function Invoice({ id }: { id: string }) {
     invalidate: ['order.myInvoices', 'order.myInvoiceDetail', 'order.detail'],
   });
   if (query.isPending) return <CellSkeleton rows={6} />;
-  if (query.isError) return <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />;
+  if (query.isError) return <ErrorBlock error={query.error} onRetry={() => query.refetch()} />;
   const invoice = query.data;
   const state = invoiceStateOf(invoice);
 

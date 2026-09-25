@@ -41,7 +41,7 @@ export function RefundCard({
       <Pressable
         role="link"
         label={`售后单 ${refund.refundNo}，${status}`}
-        onClick={() => void navigate({ route: 'refund', params: { id: refund.id } })}
+        onClick={() => navigate({ route: 'refund', params: { id: refund.id } })}
       >
         <View className="refund-card__head">
           <View className="refund-card__head-left">

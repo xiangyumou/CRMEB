@@ -49,7 +49,7 @@ export function AddressSheet({
             block
             loading={importing}
             onClick={() => {
-              void platform.chooseAddress().then((chosen) => {
+              return platform.chooseAddress().then((chosen) => {
                 if (chosen) onImport(chosen);
               });
             }}
@@ -60,7 +60,7 @@ export function AddressSheet({
             block
             onClick={() => {
               onClose();
-              void navigate({ route: 'addressEdit', params: {} });
+              return navigate({ route: 'addressEdit', params: {} });
             }}
           >
             新增收货地址
@@ -72,7 +72,7 @@ export function AddressSheet({
         {list.isPending ? (
           <CellSkeleton rows={2} />
         ) : list.isError ? (
-          <ErrorBlock error={list.error} onRetry={() => void list.refetch()} />
+          <ErrorBlock error={list.error} onRetry={() => list.refetch()} />
         ) : addresses.length === 0 ? (
           <Text className="checkout-sheet__empty">还没有收货地址</Text>
         ) : (

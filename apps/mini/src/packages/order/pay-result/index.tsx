@@ -174,7 +174,7 @@ function PaymentStatus({ orderId, outTradeNo }: { orderId: string; outTradeNo: s
               onClick={() => {
                 setGaveUp(false);
                 setRound(round + 1);
-                void status.refetch();
+                return status.refetch();
               }}
             >
               刷新

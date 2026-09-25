@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { useRouteMutation, useRouteQuery } from '@shop/api-client/react';
 import { cx } from '@/lib/cx';
+import { errorMessage } from '@/lib/error-message';
 import { navigate, useRouteParams } from '@/platform';
 import { useSignedIn } from '@/session/session';
 import { confirm, toast } from '@/ui/feedback';
@@ -40,7 +41,7 @@ export default function Search() {
   const clearHistory = async () => {
     if (!(await confirm({ content: '清空全部搜索历史？', confirmText: '清空', danger: true })))
       return;
-    clear.mutate(undefined, { onError: (error) => toast.text(error.message) });
+    clear.mutate(undefined, { onError: (error) => toast.text(errorMessage(error)) });
   };
 
   const historyItems = signedIn ? (history.data?.items ?? []) : [];

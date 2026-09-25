@@ -47,7 +47,7 @@ function ProfileForm() {
 
   if (profile.isPending) return <CellSkeleton rows={3} />;
   if (profile.isError) {
-    return <ErrorBlock error={profile.error} onRetry={() => void profile.refetch()} />;
+    return <ErrorBlock error={profile.error} onRetry={() => profile.refetch()} />;
   }
 
   const value = nickname ?? saved;

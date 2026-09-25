@@ -99,7 +99,7 @@ export default function Cart() {
     update.mutate(
       { params: { id: item.id }, body: { quantity } },
       {
-        onError: (error) => toast.text(error.message),
+        onError: (error) => toast.text(errorMessage(error)),
         onSettled: () =>
           setPending((now) => {
             const next = { ...now };
@@ -132,7 +132,7 @@ export default function Cart() {
             : queryClient.invalidateQueries({ queryKey: CART_KEY }),
         onError: (error) => {
           if (before) queryClient.setQueryData(CART_KEY, before);
-          toast.text(error.message);
+          toast.text(errorMessage(error));
         },
       },
     );
@@ -181,7 +181,10 @@ export default function Cart() {
     if (!ok) return;
     remove.mutate(
       { body: { itemIds: selection.ids, unavailableOnly: false } },
-      { onSuccess: () => toast.success('已删除'), onError: (error) => toast.text(error.message) },
+      {
+        onSuccess: () => toast.success('已删除'),
+        onError: (error) => toast.text(errorMessage(error)),
+      },
     );
   };
 
@@ -202,10 +205,10 @@ export default function Cart() {
             { body: { itemIds: ids, unavailableOnly: false } },
             {
               onSuccess: () => toast.success('已移入收藏'),
-              onError: (error) => toast.text(error.message),
+              onError: (error) => toast.text(errorMessage(error)),
             },
           ),
-        onError: (error) => toast.text(error.message),
+        onError: (error) => toast.text(errorMessage(error)),
       },
     );
   };
@@ -219,7 +222,10 @@ export default function Cart() {
     if (!ok) return;
     remove.mutate(
       { body: { itemIds: [], unavailableOnly: true } },
-      { onSuccess: () => toast.success('已清空'), onError: (error) => toast.text(error.message) },
+      {
+        onSuccess: () => toast.success('已清空'),
+        onError: (error) => toast.text(errorMessage(error)),
+      },
     );
   };
 
@@ -242,7 +248,7 @@ export default function Cart() {
       <ProductCardSkeleton layout="list" />
     </View>
   ) : list.isError ? (
-    <ErrorBlock error={list.error} onRetry={() => void list.refetch()} />
+    <ErrorBlock error={list.error} onRetry={() => list.refetch()} />
   ) : !hasRows ? (
     <Empty
       image="cart"
@@ -284,7 +290,7 @@ export default function Cart() {
               quantity={pending[item.id]}
               onSelect={(isSelected) => setSelected({ itemIds: [item.id], all: false, isSelected })}
               onQuantity={(quantity) => setQuantity(item, quantity)}
-              onSpec={() => void openSpec(item)}
+              onSpec={() => openSpec(item)}
             />
           ))}
         </Card>
@@ -406,7 +412,7 @@ export default function Cart() {
               },
               {
                 onSuccess: () => setEditing(null),
-                onError: (error) => toast.text(error.message),
+                onError: (error) => toast.text(errorMessage(error)),
               },
             );
           }}

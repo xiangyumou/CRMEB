@@ -6,6 +6,7 @@ import type {
   RefundKind,
 } from '@shop/contracts/refund/schemas';
 import { useApiClient, useInvalidateRoutes, useRouteQuery } from '@shop/api-client/react';
+import { errorMessage } from '@/lib/error-message';
 import { formatSpec } from '@/lib/spec';
 import { navigate, subscribe, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
@@ -99,7 +100,7 @@ function ApplyForm({ orderId, only }: { orderId: string; only?: string | undefin
   );
   const reasons = useRouteQuery('refund.reasons');
 
-  if (items.isError) return <ErrorBlock error={items.error} onRetry={() => void items.refetch()} />;
+  if (items.isError) return <ErrorBlock error={items.error} onRetry={() => items.refetch()} />;
   if (!items.data) return <CellSkeleton rows={6} />;
   if (selectable(items.data.items).length === 0) {
     return (
@@ -111,7 +112,7 @@ function ApplyForm({ orderId, only }: { orderId: string; only?: string | undefin
           <Button
             variant="outline"
             size="md"
-            onClick={() => void navigate({ route: 'refundList', params: {} })}
+            onClick={() => navigate({ route: 'refundList', params: {} })}
           >
             查看我的售后
           </Button>
@@ -203,7 +204,7 @@ function Form({
     setSubmitting(true);
     submit()
       .catch((error: unknown) => {
-        toast.text(error instanceof Error ? error.message : '提交失败，请稍后重试');
+        toast.text(errorMessage(error, '提交失败，请稍后重试'));
       })
       .finally(() => {
         setSubmitting(false);

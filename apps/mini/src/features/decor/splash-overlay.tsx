@@ -69,7 +69,7 @@ export function SplashOverlay() {
           className="splash__picture"
           onClick={() => {
             close();
-            void openLinkTarget(link);
+            return openLinkTarget(link);
           }}
         >
           <Image src={assetUrl(ad.imageUrl)} label="开屏图片" ratio={SCREEN_RATIO} lazy={false} />

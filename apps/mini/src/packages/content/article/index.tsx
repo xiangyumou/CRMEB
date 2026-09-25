@@ -43,7 +43,7 @@ function ArticleView({ id }: { id: string }) {
     ...(article?.coverImageUrl ? { imageUrl: assetUrl(article.coverImageUrl) ?? '' } : {}),
   });
   if (query.isPending) return <CellSkeleton rows={6} />;
-  if (query.isError) return <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />;
+  if (query.isError) return <ErrorBlock error={query.error} onRetry={() => query.refetch()} />;
   return <ArticleBody article={query.data} />;
 }
 

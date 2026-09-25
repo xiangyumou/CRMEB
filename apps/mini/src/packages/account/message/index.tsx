@@ -48,7 +48,7 @@ function Message({ id }: { id: string }) {
 
   if (message.isPending) return <CellSkeleton rows={3} />;
   if (message.isError) {
-    return <ErrorBlock error={message.error} onRetry={() => void message.refetch()} />;
+    return <ErrorBlock error={message.error} onRetry={() => message.refetch()} />;
   }
   const route = messageRoute(message.data.data);
 

@@ -94,7 +94,7 @@ export default function CouponCenterPage() {
                 scope={coupon.scope}
                 validity={couponValidity(coupon)}
                 state="claimable"
-                onAction={() => void requireLogin(ROUTE)}
+                onAction={() => requireLogin(ROUTE)}
               />
             ))}
           </View>

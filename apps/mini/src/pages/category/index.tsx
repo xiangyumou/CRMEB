@@ -84,7 +84,7 @@ export default function Category() {
   return (
     <PageShell title="分类" bg="surface">
       <View className="category__search">
-        <SearchBar onOpen={() => void navigate({ route: 'search', params: {} })} />
+        <SearchBar onOpen={() => navigate({ route: 'search', params: {} })} />
       </View>
       {tree.isPending ? (
         <View className="category">
@@ -99,7 +99,7 @@ export default function Category() {
           </View>
         </View>
       ) : tree.isError ? (
-        <ErrorBlock error={tree.error} onRetry={() => void tree.refetch()} />
+        <ErrorBlock error={tree.error} onRetry={() => tree.refetch()} />
       ) : !current ? (
         <Empty title="暂无分类" description="店铺还没有上架分类" />
       ) : (

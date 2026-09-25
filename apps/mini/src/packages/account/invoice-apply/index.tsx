@@ -68,9 +68,9 @@ function Apply({ orderId }: { orderId: string }) {
   });
 
   if (order.isPending || titles.isPending) return <CellSkeleton rows={5} />;
-  if (order.isError) return <ErrorBlock error={order.error} onRetry={() => void order.refetch()} />;
+  if (order.isError) return <ErrorBlock error={order.error} onRetry={() => order.refetch()} />;
   if (titles.isError) {
-    return <ErrorBlock error={titles.error} onRetry={() => void titles.refetch()} />;
+    return <ErrorBlock error={titles.error} onRetry={() => titles.refetch()} />;
   }
   const items = titles.data.items;
   const chosenId =

@@ -41,7 +41,7 @@ export function useQuickAdd(redirect: StorefrontRoute): QuickAdd {
           toast.success('已加入购物车');
           after?.();
         },
-        onError: (error) => toast.text(error.message),
+        onError: (error) => toast.text(errorMessage(error)),
       },
     );
   }

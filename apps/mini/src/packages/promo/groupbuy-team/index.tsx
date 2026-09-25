@@ -94,11 +94,11 @@ export default function GroupbuyTeamPage() {
     }
     return (
       <PageShell title="拼团进度">
-        <ErrorBlock error={team.error} onRetry={() => void team.refetch()} />
+        <ErrorBlock error={team.error} onRetry={() => team.refetch()} />
       </PageShell>
     );
   }
-  return <Team view={team.data} onStale={() => void team.refetch()} />;
+  return <Team view={team.data} onStale={() => team.refetch()} />;
 }
 
 const ACTION_TEXT: Record<TeamAction['kind'], string> = {
@@ -285,7 +285,7 @@ function Team({ view, onStale }: { view: TeamView; onStale: () => void }) {
           confirmText="参与拼团"
           onConfirm={(sku, quantity) => {
             setSheet(null);
-            void startActivityCheckout({
+            return startActivityCheckout({
               kind: 'groupbuy',
               activityId: view.activityId,
               groupId: view.groupId,

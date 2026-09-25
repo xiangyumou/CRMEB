@@ -47,7 +47,7 @@ export function DecorPage({ page, route, reload }: DecorPageProps) {
         data={data}
         personal={page.personal as Readonly<Record<string, PersonalSlots>> | null}
         host={host}
-        onLink={(link) => void openLinkTarget(link)}
+        onLink={(link) => openLinkTarget(link)}
         onIntent={onIntent}
         renderIntent={renderIntent}
       />

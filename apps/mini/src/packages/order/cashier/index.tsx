@@ -155,7 +155,7 @@ function Cashier({ orderId }: { orderId: string }) {
               endsAt={detail.payExpiresAt}
               onEnd={() => {
                 setExpired(true);
-                void order.refetch();
+                return order.refetch();
               }}
             />
           </View>

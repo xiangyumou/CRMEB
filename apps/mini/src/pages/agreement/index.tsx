@@ -39,7 +39,7 @@ export default function AgreementPage() {
         {query.isPending ? (
           <CellSkeleton rows={6} />
         ) : query.isError ? (
-          <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />
+          <ErrorBlock error={query.error} onRetry={() => query.refetch()} />
         ) : (
           <>
             <Text className="agreement__title">{title}</Text>

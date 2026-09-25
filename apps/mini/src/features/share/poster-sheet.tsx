@@ -86,7 +86,7 @@ export function PosterSheet({ visible, onClose, subject }: PosterSheetProps) {
     { enabled: visible && subject !== null, staleTime: Infinity, retry: false },
   );
   const codeUrl = code.data?.url;
-  const codeError = code.isError ? code.error.message : null;
+  const codeError = code.isError ? errorMessage(code.error, '海报生成失败') : null;
 
   // One drawing per (subject, code, options): keyed by value, since a page may rebuild the
   // subject object on every render.

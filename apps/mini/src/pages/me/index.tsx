@@ -52,7 +52,7 @@ export default function Me() {
         {page.isPending ? (
           <DecorSkeleton />
         ) : page.isError ? (
-          <ErrorBlock error={page.error} onRetry={() => void page.refetch()} />
+          <ErrorBlock error={page.error} onRetry={() => page.refetch()} />
         ) : (
           <DecorPage page={page.data} route={ROUTE} reload={() => page.refetch()} />
         )}

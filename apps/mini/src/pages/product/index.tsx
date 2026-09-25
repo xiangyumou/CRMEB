@@ -100,7 +100,7 @@ export default function ProductPage() {
     }
     return (
       <PageShell title="商品详情">
-        <ErrorBlock error={product.error} onRetry={() => void product.refetch()} />
+        <ErrorBlock error={product.error} onRetry={() => product.refetch()} />
       </PageShell>
     );
   }
@@ -191,7 +191,7 @@ function Detail({ product }: { product: Product }) {
           toast.success('已加入购物车');
           setSheet(null);
         },
-        onError: (error) => toast.text(error.message),
+        onError: (error) => toast.text(errorMessage(error)),
       },
     );
   };

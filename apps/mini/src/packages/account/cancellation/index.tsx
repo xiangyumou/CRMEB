@@ -69,7 +69,7 @@ function Cancellation({ onSubmitted }: { onSubmitted: () => void }) {
   const current = useRouteQuery('user.currentCancellation', {}, { enabled: signedIn });
   if (current.isPending) return <CellSkeleton rows={4} />;
   if (current.isError) {
-    return <ErrorBlock error={current.error} onRetry={() => void current.refetch()} />;
+    return <ErrorBlock error={current.error} onRetry={() => current.refetch()} />;
   }
   const request = current.data.request;
   if (request?.status === 'pending') return <Pending request={request} />;
@@ -169,7 +169,7 @@ function Apply({
           {agreement.isPending ? (
             <CellSkeleton rows={3} />
           ) : agreement.isError ? (
-            <ErrorBlock compact error={agreement.error} onRetry={() => void agreement.refetch()} />
+            <ErrorBlock compact error={agreement.error} onRetry={() => agreement.refetch()} />
           ) : agreement.data.content.trim() ? (
             <RichContent html={agreement.data.content} />
           ) : (

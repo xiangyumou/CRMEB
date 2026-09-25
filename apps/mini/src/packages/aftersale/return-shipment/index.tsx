@@ -4,6 +4,7 @@ import type { RefundDetail } from '@shop/contracts/refund/schemas';
 import type { ExpressCompany } from '@shop/contracts/shipping/schemas';
 import { isApiError } from '@shop/api-client';
 import { useApiClient, useInvalidateRoutes, useRouteQuery } from '@shop/api-client/react';
+import { errorMessage } from '@/lib/error-message';
 import { copyText, goBack, leaveFor, subscribe, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
@@ -71,7 +72,7 @@ function Body({ id }: { id: string }) {
   const signedIn = useSignedIn();
   const detail = useRouteQuery('refund.myDetail', { params: { id } }, { enabled: signedIn });
   if (detail.isError) {
-    return <ErrorBlock error={detail.error} onRetry={() => void detail.refetch()} />;
+    return <ErrorBlock error={detail.error} onRetry={() => detail.refetch()} />;
   }
   if (!detail.data) return <CellSkeleton rows={4} />;
   if (!awaitsReturn(detail.data)) {
@@ -84,7 +85,7 @@ function Body({ id }: { id: string }) {
             variant="outline"
             size="md"
             // Back to the 售后详情 this page was opened from, not a second copy of it on top.
-            onClick={() => void leaveFor({ route: 'refund', params: { id } })}
+            onClick={() => leaveFor({ route: 'refund', params: { id } })}
           >
             查看售后详情
           </Button>
@@ -147,9 +148,7 @@ function Form({ refund }: { refund: RefundDetail }) {
     setSubmitting(true);
     submit(company.id, waybill)
       .catch((error: unknown) => {
-        toast.text(
-          error instanceof Error && error.message ? error.message : '提交失败，请稍后重试',
-        );
+        toast.text(errorMessage(error, '提交失败，请稍后重试'));
       })
       .finally(() => {
         setSubmitting(false);
@@ -166,7 +165,7 @@ function Form({ refund }: { refund: RefundDetail }) {
             <Pressable
               label="复制退货地址"
               className="return-shipment__link"
-              onClick={() => void copyText(`${address.name} ${address.phone} ${address.address}`)}
+              onClick={() => copyText(`${address.name} ${address.phone} ${address.address}`)}
             >
               复制
             </Pressable>
@@ -260,7 +259,7 @@ function CompanySheet({
       <Field label="搜索快递公司" value={query} placeholder="输入名称搜索" onChange={setQuery} />
       <View className="return-shipment__companies">
         {search.isError ? (
-          <ErrorBlock error={search.error} onRetry={() => void search.refetch()} compact />
+          <ErrorBlock error={search.error} onRetry={() => search.refetch()} compact />
         ) : !shown ? (
           <CellSkeleton rows={5} />
         ) : shown.length === 0 ? (

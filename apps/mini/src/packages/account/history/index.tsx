@@ -108,7 +108,7 @@ function History() {
           all={all}
           action="删除"
           busy={remove.isPending}
-          onAction={(ids) => void removeRows(ids)}
+          onAction={(ids) => removeRows(ids)}
         />
       ) : null}
     </View>

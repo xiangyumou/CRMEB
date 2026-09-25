@@ -54,7 +54,7 @@ export function AvatarPicker({ src, onChange, size = 'lg' }: AvatarPickerProps) 
     <AvatarButton
       className={cx('shop-avatar', `shop-avatar--${size}`)}
       label={state === 'uploading' ? '头像上传中' : '更换头像'}
-      onResult={(result) => void onResult(result)}
+      onResult={(result) => onResult(result)}
     >
       <View className="shop-avatar__frame">
         {(preview ?? src) ? (

@@ -77,7 +77,7 @@ export default function MicroPage() {
         ) : isApiError(page.error) && page.error.code === 'DECOR_DOCUMENT_NOT_FOUND' ? (
           <Empty title="页面不存在" description="这个页面可能已经下线" />
         ) : (
-          <ErrorBlock error={page.error} onRetry={() => void page.refetch()} />
+          <ErrorBlock error={page.error} onRetry={() => page.refetch()} />
         )
       ) : (
         <DecorPage

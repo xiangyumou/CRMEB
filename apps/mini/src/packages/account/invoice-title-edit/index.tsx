@@ -53,7 +53,7 @@ function ExistingTitle({ id }: { id: string }) {
   const signedIn = useSignedIn();
   const title = useRouteQuery('user.invoiceTitleDetail', { params: { id } }, { enabled: signedIn });
   if (title.isPending) return <CellSkeleton rows={5} />;
-  if (title.isError) return <ErrorBlock error={title.error} onRetry={() => void title.refetch()} />;
+  if (title.isError) return <ErrorBlock error={title.error} onRetry={() => title.refetch()} />;
   return <TitleForm id={id} initial={draftFromTitle(title.data)} />;
 }
 

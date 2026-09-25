@@ -81,7 +81,7 @@ export function PasswordLoginForm({ canSubmit, onCancel }: PasswordLoginFormProp
           maxLength={PASSWORD_MAX}
           error={errors.password}
           confirmType="go"
-          onConfirm={() => void submit()}
+          onConfirm={() => submit()}
           onChange={(value) => {
             clear('password');
             setPassword(value);

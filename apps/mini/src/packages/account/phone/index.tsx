@@ -38,7 +38,7 @@ function PhoneBody() {
   const profile = useRouteQuery('user.getProfile', undefined, { enabled: signedIn });
   if (profile.isPending) return <CellSkeleton rows={2} />;
   if (profile.isError) {
-    return <ErrorBlock error={profile.error} onRetry={() => void profile.refetch()} />;
+    return <ErrorBlock error={profile.error} onRetry={() => profile.refetch()} />;
   }
   return <PhoneForm current={profile.data.phone} />;
 }

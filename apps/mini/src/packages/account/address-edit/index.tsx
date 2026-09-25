@@ -55,7 +55,7 @@ function ExistingAddress({ id }: { id: string }) {
   const address = useRouteQuery('user.addressDetail', { params: { id } }, { enabled: signedIn });
   if (address.isPending) return <CellSkeleton rows={5} />;
   if (address.isError) {
-    return <ErrorBlock error={address.error} onRetry={() => void address.refetch()} />;
+    return <ErrorBlock error={address.error} onRetry={() => address.refetch()} />;
   }
   return <AddressForm id={id} initial={draftFromAddress(address.data)} />;
 }
