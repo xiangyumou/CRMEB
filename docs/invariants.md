@@ -671,6 +671,12 @@ The shopper's order detail names the 拼团 team a group-buy order opened or joi
 - `packages/core/src/order/order.fulfil.rules.test.ts::reprice > ORDER-012 — a zero 改价 gives every line back exactly its checkout share`
 - `packages/core/src/order/order.reprice-shares.test.ts::ORDER-012 — what checkout took off each line, without the last 改价 > reads each line’s own checkout adjustments after a 改价`
 
+### ORDER-013
+
+Submitting an order checks that its activity is still open before it compares the shopper's `expectedPayableAmount`: an activity that closed after the preview answers with the activity's own refusal, never with 「价格有变动」 and the full price.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > ORDER-013 — an activity that closed after the preview answers 活动未开放, not 价格有变动`
+
 ### COUPON-007
 
 The last coupon cannot be claimed twice: one concurrent claim wins, the other is refused, `remain_count` never goes negative and exactly one user holds it.

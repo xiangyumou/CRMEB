@@ -513,6 +513,28 @@ describe('the group-buy price through the real checkout', () => {
     expect((await readActivityCounters(fixture)).activity).toEqual({ stock: 10, sales: 0 });
   });
 
+  it('ORDER-013 — an activity that closed after the preview answers 活动未开放, not 价格有变动', async () => {
+    const fixture = await makeActivity();
+    const { ctx } = await shopper();
+    const meta = { activityId: String(fixture.activityId) };
+    const preview = await checkout.preview(ctx, buyNow(fixture, meta));
+    expect(preview.payableAmount).toBe('59.00');
+
+    // The activity closes between the preview and the submit.
+    await harness.ctx.db
+      .update(groupbuyActivities)
+      .set({ status: 'ended' })
+      .where(eq(groupbuyActivities.id, fixture.activityId));
+
+    await expect(
+      checkout.create(ctx, {
+        ...buyNow(fixture, meta),
+        idempotencyKey: `ended-${fixture.activityId}`,
+        expectedPayableAmount: preview.payableAmount,
+      }),
+    ).rejects.toMatchObject({ code: 'GROUPBUY_ACTIVITY_NOT_OPEN' });
+  });
+
   it('charges freight by the activity’s 运费模板, not the product’s 包邮', async () => {
     const fixture = await makeActivity();
     // ¥6 for the first piece, anywhere.
