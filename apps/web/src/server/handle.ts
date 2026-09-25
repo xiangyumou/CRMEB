@@ -12,7 +12,14 @@ import '@shop/contracts/locale';
 // first dispatcher pass after boot. `handle()` is on the path of every request,
 // which is why it is here and not in the container.
 import '@shop/core/domains';
-import { anonymousActor, createCtx, DomainError, type Actor, type Ctx } from '@shop/core/kernel';
+import {
+  anonymousActor,
+  createCtx,
+  DomainError,
+  foreignKeyViolationOf,
+  type Actor,
+  type Ctx,
+} from '@shop/core/kernel';
 import {
   hasPermission,
   insertAudit,
@@ -36,6 +43,8 @@ import { clientIp } from './request-meta';
  *   validate response -> serialise -> log -> audit
  *
  * Errors: a `DomainError` becomes its registered status and Chinese message;
+ * a foreign-key violation no service caught becomes a 409 (`REFERENCE_IN_USE`
+ * or `REFERENCE_MISSING`, AGENTS rule 7) with the constraint in the log only;
  * anything else becomes a 500 `INTERNAL` with the details logged and *nothing*
  * leaked to the client.
  */
@@ -555,6 +564,21 @@ export function handle<
           logger.error({ code: error.code }, 'DomainError with an unregistered code');
         }
         return fail(error);
+      }
+      // A delete of a row live rows point at, or a write pointing at a row
+      // just deleted: the person can act on that, so it is a 409 and not a
+      // 500 — but the constraint and table names stay in the log.
+      const foreignKey = foreignKeyViolationOf(error);
+      if (foreignKey) {
+        logger.warn(
+          { constraint: foreignKey.constraint, table: foreignKey.table, kind: foreignKey.kind },
+          'foreign-key violation reached handle()',
+        );
+        return fail(
+          new DomainError(
+            foreignKey.kind === 'referenced' ? 'REFERENCE_IN_USE' : 'REFERENCE_MISSING',
+          ),
+        );
       }
       // Never leak an internal message, a stack, or a SQL string.
       logger.error({ err: error }, 'unhandled error');

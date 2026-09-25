@@ -767,6 +767,70 @@ describe('error mapping', () => {
     expect(JSON.stringify(payload)).not.toContain('hunter2');
   });
 
+  // What drizzle throws: its own error, with node-postgres' DatabaseError as the cause.
+  const drizzleError = (pg: Record<string, string>) =>
+    Object.assign(new Error('Failed query: delete from "shipping_templates" where "id" = $1'), {
+      cause: Object.assign(new Error(pg.message), pg),
+    });
+
+  it('ROUTE-002 — a foreign-key violation on delete is a 409 REFERENCE_IN_USE that names no constraint', async () => {
+    const DELETE = handle(
+      okRoute,
+      async () => {
+        throw drizzleError({
+          code: '23503',
+          message:
+            'update or delete on table "shipping_templates" violates foreign key constraint "products_shipping_template_id_fk" on table "products"',
+          detail: 'Key (id)=(3) is still referenced from table "products".',
+          constraint: 'products_shipping_template_id_fk',
+          table: 'products',
+        });
+      },
+      { container: container() },
+    );
+    const response = await DELETE(new Request('https://shop.example/api/v1/things'));
+    expect(response.status).toBe(409);
+    const payload = await body(response);
+    expect(payload).toEqual({
+      code: 'REFERENCE_IN_USE',
+      message: '该数据仍被其他记录使用，无法删除',
+    });
+    expect(JSON.stringify(payload)).not.toMatch(/products|shipping|_fk/);
+  });
+
+  it('ROUTE-002 — a write pointing at a row that is gone is a 409 REFERENCE_MISSING', async () => {
+    const POST = handle(
+      okRoute,
+      async () => {
+        throw drizzleError({
+          code: '23503',
+          message:
+            'insert or update on table "products" violates foreign key constraint "products_category_id_fk"',
+          detail: 'Key (category_id)=(9) is not present in table "categories".',
+          constraint: 'products_category_id_fk',
+          table: 'products',
+        });
+      },
+      { container: container() },
+    );
+    const response = await POST(new Request('https://shop.example/api/v1/things'));
+    expect(response.status).toBe(409);
+    const payload = await body(response);
+    expect(payload.code).toBe('REFERENCE_MISSING');
+    expect(JSON.stringify(payload)).not.toMatch(/products|categor|_fk/);
+  });
+
+  it('leaves other database errors a 500 INTERNAL', async () => {
+    const GET = handle(
+      okRoute,
+      async () => {
+        throw drizzleError({ code: '40P01', message: 'deadlock detected' });
+      },
+      { container: container() },
+    );
+    expect((await GET(new Request('https://shop.example/api/v1/things'))).status).toBe(500);
+  });
+
   it('catches a rejected non-Error too', async () => {
     const GET = handle(okRoute, async () => Promise.reject('nope'), { container: container() });
     expect((await GET(new Request('https://shop.example/api/v1/things'))).status).toBe(500);
