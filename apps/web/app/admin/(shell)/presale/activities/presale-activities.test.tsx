@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   presaleAdminActivityDetail,
   presaleAdminActivityList,
@@ -81,7 +81,15 @@ function stubApi(): StubCall[] {
   ]);
 }
 
+// The 状态 column reads the window against the clock, so the clock is pinned
+// inside the row's 2026-05-01 – 2026-07-01 window. Only `Date` is faked.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-06-01T12:00:00+08:00'));
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   resetApiConfig();
 });
 
@@ -150,6 +158,39 @@ describe('预售活动', () => {
     await waitFor(() => {
       expect(within(dialog).getByDisplayValue('33')).toBeInTheDocument();
     });
+  });
+
+  it('sends each 规格 price back as the money string it loaded', async () => {
+    const calls = stubApi();
+    renderAdmin(withStubAssets(<PresaleActivitiesPage />), { identity: allPermissions });
+    await screen.findByText('春茶预售 · 明前龙井');
+
+    await userEvent.click(screen.getByRole('button', { name: '编辑' }));
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => {
+      expect(within(dialog).getByDisplayValue('33')).toBeInTheDocument();
+    });
+    await userEvent.click(within(dialog).getByRole('button', { name: '保 存' }));
+
+    await waitFor(() => {
+      const save = calls.find((call) => call.method === 'PUT');
+      expect(save?.body).toMatchObject({ skus: [{ skuId: '33', price: '59.00' }] });
+    });
+  });
+
+  it('says 未开始 before the window and 已结束 after it while the status is still active', async () => {
+    vi.setSystemTime(new Date('2026-04-01T12:00:00+08:00'));
+    stubApi();
+    const first = renderAdmin(withStubAssets(<PresaleActivitiesPage />), {
+      identity: allPermissions,
+    });
+    expect(await screen.findByText('未开始')).toBeInTheDocument();
+    first.unmount();
+
+    vi.setSystemTime(new Date('2026-08-01T12:00:00+08:00'));
+    renderAdmin(withStubAssets(<PresaleActivitiesPage />), { identity: allPermissions });
+    expect(await screen.findByText('已结束')).toBeInTheDocument();
+    expect(screen.queryByText('进行中')).not.toBeInTheDocument();
   });
 
   it('opens an empty form for a new campaign without asking for a detail', async () => {

@@ -1,6 +1,7 @@
 import type { DbOrTx, Tx } from '@shop/db';
 import { cartItems } from '@shop/db/schema/cart';
 import { productReviews } from '@shop/db/schema/catalog';
+import { refunds } from '@shop/db/schema/refund';
 import { orderItems, orderStatusLogs, orders } from '@shop/db/schema/order';
 import { userAddresses } from '@shop/db/schema/user';
 import { and, asc, desc, eq, inArray, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm';
@@ -153,6 +154,26 @@ export async function purchasedQuantity(
 }
 
 /**
+ * 退款中: an after-sales request on the order is still being handled. Read from
+ * `refunds` itself, never from `orders.refund_status`: that roll-up says
+ * `partially_refunded` for good once any money went back, open request or not.
+ * A `failed` refund counts: it still holds its lines until the merchant retries
+ * or closes it.
+ */
+export function hasOpenRefund(): SQL {
+  return sql`exists (select 1 from ${refunds} where ${refunds.orderId} = ${orders.id} and ${refunds.status} in ('applied', 'approved', 'processing', 'unknown', 'failed'))`;
+}
+
+/** Whether one order has an after-sales request still being handled. */
+export async function orderHasOpenRefund(db: DbOrTx, orderId: number): Promise<boolean> {
+  const [row] = await db
+    .select({ open: sql<boolean>`${hasOpenRefund()}` })
+    .from(orders)
+    .where(eq(orders.id, orderId));
+  return row?.open === true;
+}
+
+/**
  * The storefront's tabs are not `orders.status` values — 待收货 covers
  * `shipped`, 已完成 covers `received` *and* `completed` — so the mapping lives
  * here, once, and the list and the badges can never disagree about what 待发货
@@ -173,7 +194,7 @@ export function tabFilter(tab: OrderListTab): SQL | undefined {
     case 'cancelled':
       return eq(orders.status, 'cancelled');
     case 'refunding':
-      return ne(orders.refundStatus, 'none');
+      return hasOpenRefund();
     case 'unreviewed':
       return awaitingReview();
     default:
@@ -252,7 +273,7 @@ export async function countByStatus(
   {
     status: OrderStatus;
     fulfillmentStatus: string;
-    refunding: boolean;
+    refunding: number;
     n: number;
     unreviewed: number;
   }[]
@@ -261,14 +282,19 @@ export async function countByStatus(
     .select({
       status: orders.status,
       fulfillmentStatus: orders.fulfillmentStatus,
-      refunding: sql<boolean>`${orders.refundStatus} <> 'none'`,
       n: sql<number>`count(*)::int`,
+      refunding: sql<number>`(count(*) filter (where ${hasOpenRefund()}))::int`,
       unreviewed: sql<number>`(count(*) filter (where ${awaitingReview()}))::int`,
     })
     .from(orders)
     .where(and(eq(orders.userId, userId), liveForUser()))
-    .groupBy(orders.status, orders.fulfillmentStatus, sql`${orders.refundStatus} <> 'none'`);
-  return rows.map((row) => ({ ...row, n: Number(row.n), unreviewed: Number(row.unreviewed) }));
+    .groupBy(orders.status, orders.fulfillmentStatus);
+  return rows.map((row) => ({
+    ...row,
+    n: Number(row.n),
+    refunding: Number(row.refunding),
+    unreviewed: Number(row.unreviewed),
+  }));
 }
 
 /**
@@ -456,6 +482,8 @@ export async function hideFromUser(
       inArray(orders.status, [...args.from]),
       isNull(orders.hiddenByUserAt),
       isNull(orders.deletedAt),
+      // A 已完成 order can still have an after-sales request open.
+      sql`not ${hasOpenRefund()}`,
     ),
     set: { hiddenByUserAt: args.at, updatedAt: sql`now()` },
   });

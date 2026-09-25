@@ -1011,6 +1011,7 @@ describe('the admin surface', () => {
       fixture: ActivityFixture,
       stock: { activity: number; sku: number; expected: number },
       status: 'active' | 'ended' = 'active',
+      sku: 'kept' | 'removed' | 'switched-off' = 'kept',
     ) {
       return service.adminActivityUpdate(
         asAdmin(ADMIN),
@@ -1021,18 +1022,33 @@ describe('the admin surface', () => {
           status,
           stock: stock.activity,
           expectedStock: stock.expected,
-          skus: [
-            {
-              skuId: String(fixture.skuId),
-              price: '59.00',
-              stock: stock.sku,
-              expectedStock: stock.expected,
-              isEnabled: true,
-            },
-          ],
+          skus:
+            sku === 'removed'
+              ? []
+              : [
+                  {
+                    skuId: String(fixture.skuId),
+                    price: '59.00',
+                    stock: stock.sku,
+                    expectedStock: stock.expected,
+                    isEnabled: sku === 'kept',
+                  },
+                ],
         }) as never,
       );
     }
+
+    it('RISK-D-012 — refuses to remove a SKU orders point at, instead of a foreign-key 500', async () => {
+      const fixture = await soldOneSinceTheFormOpened();
+      await expect(
+        edit(fixture, { activity: 10, sku: 10, expected: 10 }, 'active', 'removed'),
+      ).rejects.toMatchObject({
+        code: 'PRESALE_ACTIVITY_SKU_IN_USE',
+        details: { skuIds: [String(fixture.skuId)] },
+      });
+      await edit(fixture, { activity: 10, sku: 10, expected: 10 }, 'active', 'switched-off');
+      expect((await readCounters(fixture)).sku).toEqual({ stock: 9, sales: 1 });
+    });
 
     it('keeps the live stock when the operator only fixed the title', async () => {
       const fixture = await soldOneSinceTheFormOpened();

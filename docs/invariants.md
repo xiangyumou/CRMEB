@@ -681,6 +681,27 @@ The shopper's order detail names the 拼团 team a group-buy order opened or joi
 
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > ORDER-011 — the order detail names the team an order opened or joined, and nothing for an ordinary order`
 
+### ORDER-012
+
+改价 spreads only the operator's discount: each line keeps what checkout's own rules took off it (a coupon scoped to one product stays on that product's line), the operator's discount is spread over what the lines still cost, and the shares still sum to `coupon_discount`.
+
+- `packages/core/src/order/order.fulfil.rules.test.ts::reprice > ORDER-012 — keeps a scoped coupon on its own line and spreads only the operator’s discount`
+- `packages/core/src/order/order.fulfil.rules.test.ts::reprice > ORDER-012 — a zero 改价 gives every line back exactly its checkout share`
+- `packages/core/src/order/order.reprice-shares.test.ts::ORDER-012 — what checkout took off each line, without the last 改价 > reads each line’s own checkout adjustments after a 改价`
+
+### ORDER-013
+
+Submitting an order checks that its activity is still open before it compares the shopper's `expectedPayableAmount`: an activity that closed after the preview answers with the activity's own refusal, never with 「价格有变动」 and the full price.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > ORDER-013 — an activity that closed after the preview answers 活动未开放, not 价格有变动`
+
+### ORDER-014
+
+退款中 means an after-sales request on the order is still open (`applied`, `approved`, `processing`, `unknown` or `failed`), read from `refunds` rather than the `orders.refund_status` roll-up that stays `partially_refunded` after its request closed. The console's 退款中 tab and counter and the shopper's 退款/售后 tab and badge all use it, and neither 删除 nor the shopper's 删除订单 files away an order in that state.
+
+- `packages/core/src/order/order.console.int.test.ts::ORDER-014 — 退款中 means an after-sales request still open > lists and counts an open request, and not an order whose request closed after a partial refund`
+- `packages/core/src/order/order.console.int.test.ts::ORDER-014 — 退款中 means an after-sales request still open > neither 删除 nor the shopper’s 删除订单 files away an order whose request is still open`
+
 ### COUPON-007
 
 The last coupon cannot be claimed twice: one concurrent claim wins, the other is refused, `remain_count` never goes negative and exactly one user holds it.
@@ -909,6 +930,15 @@ An invoice can only be asked for on an order that was paid for and not refunded,
 - `packages/core/src/order/order.invoice.int.test.ts::申请开票 > refuses an order nobody has paid for`
 - `packages/core/src/order/order.invoice.int.test.ts::申请开票 > refuses an order whose money went back`
 - `packages/core/src/order/order.invoice.int.test.ts::what the buyer can see > tells a stranger the invoice does not exist`
+
+### INVOICE-004
+
+订单详情 offers 申请开票 (`invoiceRequestable`) exactly when the request would be accepted: paid, not refunded in full, something left to invoice (paid less refunded, `invoiceAmount`), and no request already 待开票 or 已开票.
+
+- `packages/core/src/order/order.invoice.rules.test.ts::INVOICE-004 — 订单详情 offers 申请开票 exactly when the request would be accepted > does not offer it while a request is 待开票 or 已开票`
+- `packages/core/src/order/order.invoice.rules.test.ts::INVOICE-004 — 订单详情 offers 申请开票 exactly when the request would be accepted > does not offer it once the order is refunded in full`
+- `packages/core/src/order/order.invoice.rules.test.ts::INVOICE-004 — 订单详情 offers 申请开票 exactly when the request would be accepted > makes it out for what was paid less what came back`
+- `packages/core/src/order/order.invoice.int.test.ts::申请开票 > INVOICE-004 — 订单详情 offers 申请开票 until a request is open, and again once it is cancelled`
 
 ## 小程序发货信息管理 (WeChat mini-program shipping)
 
@@ -1495,6 +1525,34 @@ A team shows strangers only a masked nickname and never an account id (decided 2
 - `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > stars out a one-character name entirely`
 - `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > answers null for no name at all`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the storefront surface > RISK-D-010 — shows a team to anybody with masked names, no account ids, and isMe from the session`
+
+### RISK-D-011
+
+A 拼团 order ships only once its team has succeeded: manual 发货 is refused with `ORDER_GROUPBUY_NOT_READY` while the team is forming (or failed), auto-delivery of card keys and coupon goods holds back on payment and runs when the team succeeds (the `groupbuy.settle` effect), and the console shows the team's state (`groupbuyTeamStatus`) instead of offering 发货.
+
+- `packages/core/src/order/order.ship-ready.test.ts::RISK-D-011 — an order ships only when its kind says it may > holds a 拼团 order whose team is still forming`
+- `packages/core/src/order/order.ship-ready.test.ts::RISK-D-011 — an order ships only when its kind says it may > lets it go once the team succeeded`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::paying > RISK-D-011 — a paid order does not ship while its team is forming, and ships once it succeeded`
+
+### RISK-D-012
+
+An activity SKU that orders still depend on is never removed by an edit of its 拼团 or 预售 campaign: one with units sold, a live order buying it or (预售) a stock-ledger row is refused with `GROUPBUY_ACTIVITY_SKU_IN_USE` / `PRESALE_ACTIVITY_SKU_IN_USE` — a typed 409, not the foreign-key 500 — and can be switched off instead, which keeps its 已售 and quota.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the admin surface > editing while orders move the stock > RISK-D-012 — refuses to remove a SKU that has sold, and lets it be switched off instead`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the admin surface > editing while orders move the stock > RISK-D-012 — refuses to remove a SKU an unpaid order is still buying`
+- `packages/core/src/presale/presale.int.test.ts::the admin surface > editing while orders move the stock > RISK-D-012 — refuses to remove a SKU orders point at, instead of a foreign-key 500`
+
+### RISK-D-013
+
+取消拼团 (a leader withdrawing a team nobody has paid into) closes the team's unpaid orders with it — the leader's own and any joiner's — through the order domain's cancel, which closes the WeChat payment and gives the activity stock and coupon back, so nobody can pay for a team that no longer exists.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > RISK-D-013 — 取消拼团 closes the leader’s unpaid order with the team`
+
+### RISK-D-014
+
+A running 拼团 campaign whose 结束时间 has passed becomes `ended` (the `groupbuy.sweepEndedActivities` job, every minute, as presale's window sweep), conditionally, so a second pass changes nothing; a paused one is left for the operator.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the expiry sweep > RISK-D-014 — ends a campaign whose 结束时间 has passed, and leaves a running one alone`
 
 ## Storefront end to end
 

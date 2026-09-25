@@ -17,6 +17,7 @@ import {
   count,
   desc,
   eq,
+  exists,
   gt,
   inArray,
   isNotNull,
@@ -25,6 +26,7 @@ import {
   lte,
   ne,
   notInArray,
+  or,
   sql,
   type SQL,
 } from 'drizzle-orm';
@@ -179,6 +181,41 @@ export async function setActivityStatus(
       inArray(groupbuyActivities.status, [...args.from]),
     ),
     set: { status: args.to, updatedAt: args.now },
+  });
+}
+
+/** `active` campaigns whose window has passed, oldest end first — the close sweep's work. */
+export async function findClosableActivityIds(
+  db: DbOrTx,
+  args: { now: Date; limit: number },
+): Promise<number[]> {
+  const rows = await db
+    .select({ id: groupbuyActivities.id })
+    .from(groupbuyActivities)
+    .where(
+      and(
+        eq(groupbuyActivities.status, 'active'),
+        isNull(groupbuyActivities.deletedAt),
+        lte(groupbuyActivities.endAt, args.now),
+      ),
+    )
+    .orderBy(asc(groupbuyActivities.endAt))
+    .limit(args.limit);
+  return rows.map((row) => row.id);
+}
+
+/** `active -> ended` once `end_at` has passed; conditional, so two sweeps converge. */
+export async function closeActivity(
+  tx: Tx,
+  args: { id: number; now: Date },
+): Promise<ConditionalUpdateResult> {
+  return conditionalUpdate(tx, groupbuyActivities, {
+    where: and(
+      eq(groupbuyActivities.id, args.id),
+      eq(groupbuyActivities.status, 'active'),
+      lte(groupbuyActivities.endAt, args.now),
+    ),
+    set: { status: 'ended', updatedAt: args.now },
   });
 }
 
@@ -400,6 +437,47 @@ export async function lockActivityStock(
     .where(eq(groupbuyActivitySkus.activityId, id))
     .for('update');
   return { ...activity, skus: new Map(skus.map((row) => [row.skuId, row.stock])) };
+}
+
+/**
+ * The activity SKUs an edit would delete that orders still depend on: units already sold, or
+ * a live seat whose order buys that SKU (an unpaid order still has to commit its activity
+ * stock when it is paid). Deleting one would reset its 已售 and quota on a re-add and refund
+ * the order being paid; the service refuses the edit with a typed 409 instead.
+ */
+export async function listRemovedSkusInUse(
+  tx: Tx,
+  args: { activityId: number; keep: readonly number[] },
+): Promise<number[]> {
+  const rows = await tx
+    .select({ skuId: groupbuyActivitySkus.skuId })
+    .from(groupbuyActivitySkus)
+    .where(
+      and(
+        eq(groupbuyActivitySkus.activityId, args.activityId),
+        args.keep.length > 0 ? notInArray(groupbuyActivitySkus.skuId, [...args.keep]) : undefined,
+        or(
+          gt(groupbuyActivitySkus.sales, 0),
+          exists(
+            tx
+              .select({ one: sql`1` })
+              .from(groupbuyMembers)
+              .innerJoin(groupbuyGroups, eq(groupbuyGroups.id, groupbuyMembers.groupId))
+              .innerJoin(orderItems, eq(orderItems.orderId, groupbuyMembers.orderId))
+              .innerJoin(orders, eq(orders.id, groupbuyMembers.orderId))
+              .where(
+                and(
+                  eq(groupbuyGroups.activityId, groupbuyActivitySkus.activityId),
+                  eq(orderItems.skuId, groupbuyActivitySkus.skuId),
+                  eq(groupbuyMembers.status, 'joined'),
+                  notInArray(orders.status, ['cancelled', 'refunded']),
+                ),
+              ),
+          ),
+        ),
+      ),
+    );
+  return rows.map((row) => row.skuId);
 }
 
 /**
@@ -924,6 +1002,20 @@ export function isUniqueViolation(error: unknown): boolean {
   return (error as { code?: string } | null)?.code === '23505';
 }
 
+/** Each order's seat and its team, for 我的订单 (one read for a page of orders). */
+export async function listTeamsByOrders(
+  db: DbOrTx,
+  orderIds: readonly number[],
+): Promise<{ orderId: number; role: GroupbuyMember['role']; group: GroupbuyGroup }[]> {
+  if (orderIds.length === 0) return [];
+  const rows = await db
+    .select({ orderId: groupbuyMembers.orderId, role: groupbuyMembers.role, group: groupbuyGroups })
+    .from(groupbuyMembers)
+    .innerJoin(groupbuyGroups, eq(groupbuyGroups.id, groupbuyMembers.groupId))
+    .where(inArray(groupbuyMembers.orderId, [...orderIds]));
+  return rows;
+}
+
 export async function findMemberByOrder(
   db: DbOrTx,
   orderId: number,
@@ -1171,9 +1263,9 @@ export async function listMyGroups(
 export async function findMyOpenGroup(
   db: DbOrTx,
   args: { activityId: number; userId: number; now: Date },
-): Promise<number | null> {
+): Promise<{ id: number; role: GroupbuyMember['role'] } | null> {
   const [row] = await db
-    .select({ id: groupbuyGroups.id })
+    .select({ id: groupbuyGroups.id, role: groupbuyMembers.role })
     .from(groupbuyGroups)
     .innerJoin(groupbuyMembers, eq(groupbuyMembers.groupId, groupbuyGroups.id))
     .where(
@@ -1187,7 +1279,7 @@ export async function findMyOpenGroup(
     )
     .orderBy(desc(groupbuyGroups.id))
     .limit(1);
-  return row?.id ?? null;
+  return row ?? null;
 }
 
 /** Identity is frozen onto the member row, so a later rename cannot rewrite history. */

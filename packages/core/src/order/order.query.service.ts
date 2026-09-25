@@ -11,9 +11,11 @@ import * as coupon from '../coupon';
 import { requireUserId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { toId, toIdOrNull } from '../kernel/ids';
+import { listOpenInvoiceStatuses } from './order.fulfil.repo';
+import { invoiceableAmount, isInvoiceRequestable } from './order.invoice.service';
 import { requireOrderRef } from './order.ref';
 import * as repo from './order.repo';
-import { getOrderKindHandler } from './ports';
+import { getOrderKindHandler, kindStatesFor, type OrderKindState } from './ports';
 
 /**
  * The buyer's own orders: the list, the tab badges and one order's detail.
@@ -56,8 +58,10 @@ export async function list(
     else byOrder.set(item.orderId, [mapped]);
   }
 
+  const states = await kindStatesFor(ctx.db, rows);
+
   return {
-    items: rows.map((row) => toListItem(row, byOrder.get(row.id) ?? [])),
+    items: rows.map((row) => toListItem(row, byOrder.get(row.id) ?? [], states.get(row.id))),
     total,
     page: query.page,
     pageSize: query.pageSize,
@@ -67,7 +71,7 @@ export async function list(
 /**
  * The badges from one grouped query.
  *
- * `refunding` counts orders with any live after-sales, so an order can be in
+ * `refunding` counts orders with an after-sales request still open, so an order can be in
  * two badges at once — which is what the tab bar has always shown, because an
  * order being refunded is still 待收货 until the refund succeeds. `unreviewed`
  * (待评价, ORDER-010) is likewise a subset of `finished`.
@@ -89,7 +93,7 @@ export async function counts(ctx: Ctx): Promise<OrderCounts> {
   for (const row of rows) {
     out.all += row.n;
     out.unreviewed += row.unreviewed;
-    if (row.refunding) out.refunding += row.n;
+    out.refunding += row.refunding;
     switch (row.status) {
       case 'pending_payment':
         out.unpaid += row.n;
@@ -138,12 +142,18 @@ export async function detailOf(
   // The kind's own links (the 拼团 team) come from the kind's domain through the port: this
   // domain never reads a `groupbuy_*` table.
   const links = (await getOrderKindHandler(row.kind)?.detailLinks?.(ctx.db, row.id)) ?? {};
+  const states = await kindStatesFor(ctx.db, [row]);
+  const invoices = await listOpenInvoiceStatuses(ctx.db, [row.id]);
+  const hasOpenInvoice = invoices.some((i) => i.status === 'requested' || i.status === 'issued');
   return {
     ...toDetail(
       row,
       items.map((item) => toOrderItem(item, row.status, reviewed)),
+      states.get(row.id),
     ),
     groupbuyTeamId: toIdOrNull(links.groupbuyTeamId ?? null),
+    invoiceRequestable: isInvoiceRequestable(row, hasOpenInvoice),
+    invoiceAmount: invoiceableAmount(row).toString(),
   };
 }
 
@@ -232,7 +242,12 @@ function toOrderItem(
   };
 }
 
-function toListItem(row: repo.OrderRow, items: StorefrontOrderItem[]): StorefrontOrderListItem {
+function toListItem(
+  row: repo.OrderRow,
+  items: StorefrontOrderItem[],
+  state: OrderKindState | undefined,
+): StorefrontOrderListItem {
+  const team = state?.groupbuyTeam;
   return {
     id: toId(row.id),
     orderNo: row.orderNo,
@@ -250,15 +265,27 @@ function toListItem(row: repo.OrderRow, items: StorefrontOrderItem[]): Storefron
     payExpiresAt: row.status === 'pending_payment' ? iso(row.payExpiresAt) : null,
     createdAt: row.createdAt.toISOString(),
     items,
+    refundedAmount: row.refundedAmount,
+    groupbuyTeam: team
+      ? {
+          id: toId(team.id),
+          status: team.status,
+          role: team.role,
+          seatsTotal: team.seatsTotal,
+          seatsTaken: team.seatsTaken,
+          expiresAt: team.expiresAt.toISOString(),
+        }
+      : null,
   };
 }
 
 function toDetail(
   row: repo.OrderRow,
   items: StorefrontOrderItem[],
-): Omit<OrderDetail, 'groupbuyTeamId'> {
+  state: OrderKindState | undefined,
+): Omit<OrderDetail, 'groupbuyTeamId' | 'invoiceRequestable' | 'invoiceAmount'> {
   return {
-    ...toListItem(row, items),
+    ...toListItem(row, items, state),
     receiver: {
       // The order carries a snapshot, not a link: editing the address book
       // later must never rewrite where an order was sent.

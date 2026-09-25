@@ -32,6 +32,7 @@ import { resolveActivityStocks } from '../kernel/stock-edit';
 import { toId, toIdOrNull } from '../kernel/ids';
 import type { Ctx } from '../kernel/context';
 import { recordEffect } from '../effects/index';
+import { cancelOrder } from '../order';
 import { groupbuyConfig } from './groupbuy.config';
 import { settleGroup } from './groupbuy.jobs';
 import { groupbuyPermissions } from './permissions';
@@ -140,6 +141,16 @@ export async function adminActivityUpdate(
     }
     await assertSkusBelongToProduct(tx, body);
     const skus = skuValues(body);
+    // RISK-D-012: a SKU orders still point at is switched off, never removed.
+    const inUse = await repo.listRemovedSkusInUse(tx, {
+      activityId: id,
+      keep: skus.map((sku) => sku.skuId),
+    });
+    if (inUse.length > 0) {
+      throw new DomainError('GROUPBUY_ACTIVITY_SKU_IN_USE', {
+        details: { skuIds: inUse.map(String) },
+      });
+    }
     // Orders moved these counters while the form was open; see `resolveStockEdit`.
     const stocks = resolveActivityStocks(
       locked,
@@ -491,7 +502,7 @@ export async function detail(ctx: Ctx, input: { id: string }): Promise<GroupbuyD
   // "开团", so the page needs to know. `null` for an anonymous visitor: "cannot
   // join" and "we do not know you" are different answers.
   const userId = ctx.actor.kind === 'user' ? ctx.actor.id : null;
-  const myOpenGroupId =
+  const myOpenGroup =
     userId === null ? null : await repo.findMyOpenGroup(ctx.db, { activityId: id, userId, now });
 
   await repo.bumpViews(ctx.db, id);
@@ -513,7 +524,8 @@ export async function detail(ctx: Ctx, input: { id: string }): Promise<GroupbuyD
         originalPrice: sku.skuOriginalPrice ?? sku.skuPrice,
         stock: sku.stock,
       })),
-    myOpenGroupId: toIdOrNull(myOpenGroupId),
+    myOpenGroupId: toIdOrNull(myOpenGroup?.id ?? null),
+    myOpenGroupRole: myOpenGroup?.role ?? null,
   };
 }
 
@@ -559,6 +571,15 @@ export async function groupDetail(ctx: Ctx, input: { id: string }): Promise<Grou
  * for a paid one — and the membership follows through `onOrderCancelled` /
  * `onOrderRefunded`. Deleting the membership rows directly would leave the
  * orders behind.
+ *
+ * The unpaid orders in the team — the leader's own 开团 order, and any joiner's
+ * that was never paid — are closed with it (RISK-D-013): left open, the leader
+ * could still pay for a team that no longer exists and be refunded
+ * automatically. The team is cancelled first, so no new order can join it, and
+ * the orders after, through the order domain's own cancel, which closes the
+ * WeChat payment before it gives back stock and coupon. An order whose payment
+ * lands in between stays paid and leaves through the refund a dead team's seat
+ * already triggers.
  */
 export async function withdraw(ctx: Ctx, input: { id: string }): Promise<GroupbuyGroupView> {
   const id = Number(input.id);
@@ -572,6 +593,27 @@ export async function withdraw(ctx: Ctx, input: { id: string }): Promise<Groupbu
     const cancelled = await repo.cancelEmptyGroup(tx, { groupId: id, now });
     if (!cancelled.won) throw new DomainError('GROUPBUY_GROUP_NOT_WITHDRAWABLE');
   });
+
+  const unpaid = (await repo.listMembers(ctx.db, id)).filter(
+    (member) => member.status === 'joined' && member.orderStatus === 'pending_payment',
+  );
+  for (const member of unpaid) {
+    try {
+      await cancelOrder(ctx, {
+        orderId: member.orderId,
+        reason: 'user',
+        message: member.userId === userId ? '取消拼团，订单已关闭' : '团长已取消拼团，订单已关闭',
+        ...(member.userId === userId ? { userId } : {}),
+      });
+    } catch (error) {
+      // Paid, or the gateway could not say: the order stays as it is and the dead team's
+      // seat refunds it if the money arrives. Nothing else here may fail the withdrawal.
+      ctx.logger.warn(
+        { err: error, orderId: member.orderId, groupId: id },
+        'groupbuy: order of a withdrawn team left open',
+      );
+    }
+  }
 
   return buildGroupView(ctx, id);
 }

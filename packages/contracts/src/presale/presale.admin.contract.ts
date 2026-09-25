@@ -116,6 +116,7 @@ export const presaleAdminActivityUpdate = defineRoute({
     'PRESALE_DEPOSIT_NOT_SUPPORTED',
     'PRESALE_STOCK_CHANGED',
     'PRESALE_ACTIVITY_ENDED',
+    'PRESALE_ACTIVITY_SKU_IN_USE',
   ],
   examples: [
     {

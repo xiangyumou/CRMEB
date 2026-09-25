@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   groupbuyActivityDetailExample,
   groupbuyActivityExample,
@@ -52,7 +52,15 @@ function stubApi(): StubCall[] {
   ]);
 }
 
+// The 状态 column reads the window against the clock, so the clock is pinned
+// inside the example's 2026-09-01 – 2026-10-31 window. Only `Date` is faked.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-09-15T12:00:00+08:00'));
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   resetApiConfig();
 });
 
@@ -137,6 +145,9 @@ describe('拼团活动', () => {
       expect(save?.url).toContain('/admin-api/groupbuy-activities/1');
       expect(save?.body).toMatchObject({
         title: '三人成团 · 坚果礼盒',
+        // A decimal-string id, as the contract wants — not the number a
+        // numeric control would hand it.
+        productId: groupbuyActivityDetailExample.productId,
         seatsRequired: 3,
         groupTtlSeconds: 86400,
         skus: [{ skuId: '21', price: '59.00', stock: 200, quota: 500, isEnabled: true }],
@@ -144,6 +155,15 @@ describe('拼团活动', () => {
       // `sales` is the server's; the form never sends it back.
       expect(save?.body).not.toHaveProperty('sales');
     });
+  });
+
+  it('says 未开始 for an active campaign before its start, not 进行中', async () => {
+    vi.setSystemTime(new Date('2026-08-01T12:00:00+08:00'));
+    stubApi();
+    renderAdmin(withStubAssets(<GroupbuyActivitiesPage />), { identity: allPermissions });
+
+    expect(await screen.findByText('未开始')).toBeInTheDocument();
+    expect(screen.queryByText('进行中')).not.toBeInTheDocument();
   });
 
   it('opens the campaign orders through the nested route', async () => {

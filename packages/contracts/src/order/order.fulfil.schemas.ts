@@ -339,6 +339,11 @@ export const adminOrderListItem = orderListItem.extend({
   adminRemark: z.string().nullable(),
   /** `null` when the buyer never asked for one. */
   invoiceStatus: z.enum(['requested', 'issued', 'rejected', 'cancelled']).nullable(),
+  /**
+   * 拼团 orders: where the order's team stands. Only a `succeeded` team's orders ship
+   * (RISK-D-011), so the console says 拼团中 instead of offering 发货. `null` for other kinds.
+   */
+  groupbuyTeamStatus: z.enum(['forming', 'succeeded', 'failed', 'cancelled']).nullable(),
   paidAt: instant.nullable(),
   shippedAt: instant.nullable(),
   receivedAt: instant.nullable(),
@@ -361,6 +366,7 @@ export const adminOrderListItemExample = {
   buyerRemark: '请在工作日送达',
   adminRemark: null,
   invoiceStatus: null,
+  groupbuyTeamStatus: null,
   paidAt: '2026-02-01T10:03:00+08:00',
   shippedAt: null,
   receivedAt: null,
@@ -413,6 +419,12 @@ export const adminOrderListQuery = pageQuery
       .union([orderFulfillmentStatus, z.array(orderFulfillmentStatus)])
       .optional(),
     refundStatus: z.union([orderRefundStatus, z.array(orderRefundStatus)]).optional(),
+    /**
+     * `true` keeps only orders with an after-sales request still open (退款中).
+     * Not a `refundStatus` value: that roll-up stays `partially_refunded` after
+     * the request that caused it has closed.
+     */
+    refunding: z.stringbool().optional(),
     kind: orderKind.optional(),
     platform: clientPlatform.optional(),
     /** Order number, receiver name, receiver phone or a product name in the order. */
