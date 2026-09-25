@@ -494,6 +494,70 @@ describe('the operator', () => {
     ).toBe('requested');
   });
 
+  it('INVOICE-005 — keeps an issued invoice 已开票 when the order is refunded in full, flags it for 冲红, and lets staff void it', async () => {
+    const { adminId, placed, invoiceId } = await requested();
+    await order.orderInvoices.adminIssue(
+      asAdmin(adminId),
+      { id: invoiceId },
+      { invoiceNumber: 'FP-20260601-0005' },
+    );
+    await harness.ctx.db
+      .update(orders)
+      .set({ refundedAmount: '60.00', refundStatus: 'refunded', status: 'refunded' })
+      .where(eq(orders.id, placed.orderId));
+
+    const flagged = await order.orderInvoices.adminDetail(asAdmin(adminId), { id: invoiceId });
+    expect(flagged).toMatchObject({
+      status: 'issued',
+      invoiceNumber: 'FP-20260601-0005',
+      orderRefundedInFull: true,
+      voided: false,
+    });
+    const listed = await order.orderInvoices.adminList(asAdmin(adminId), invoiceListQuery());
+    expect(listed.items.find((item) => item.id === invoiceId)?.orderRefundedInFull).toBe(true);
+
+    const voided = await order.orderInvoices.adminVoid(asAdmin(adminId), { id: invoiceId });
+    expect(voided).toMatchObject({
+      status: 'cancelled',
+      invoiceNumber: 'FP-20260601-0005',
+      issuedAt: null,
+      voided: true,
+    });
+    await expect(
+      order.orderInvoices.adminVoid(asAdmin(adminId), { id: invoiceId }),
+    ).rejects.toMatchObject({ code: 'ORDER_INVOICE_NOT_ACTIONABLE' });
+    // Nothing is left to invoice: the refunded order cannot ask again.
+    await expect(
+      order.orderInvoices.request(as(placed.userId), { id: String(placed.orderId) }, header),
+    ).rejects.toMatchObject({ code: 'ORDER_INVOICE_NOT_REQUESTABLE' });
+  });
+
+  it('INVOICE-005 — voids only an issued invoice, and a voided one frees the order to ask again', async () => {
+    const { adminId, placed, invoiceId } = await requested();
+    await expect(
+      order.orderInvoices.adminVoid(asAdmin(adminId), { id: invoiceId }),
+    ).rejects.toMatchObject({ code: 'ORDER_INVOICE_NOT_ACTIONABLE' });
+    expect(
+      (await order.orderInvoices.adminDetail(asAdmin(adminId), { id: invoiceId })).status,
+    ).toBe('requested');
+
+    await order.orderInvoices.adminIssue(
+      asAdmin(adminId),
+      { id: invoiceId },
+      { invoiceNumber: 'FP-20260601-0006' },
+    );
+    await order.orderInvoices.adminVoid(asAdmin(adminId), { id: invoiceId });
+    const again = await order.orderInvoices.request(
+      as(placed.userId),
+      { id: String(placed.orderId) },
+      header,
+    );
+    expect(again).toMatchObject({ status: 'requested', voided: false, orderRefundedInFull: false });
+    // The buyer's own withdrawal is still 已撤回, not 已作废.
+    const withdrawn = await order.orderInvoices.cancel(as(placed.userId), { id: again.id });
+    expect(withdrawn).toMatchObject({ status: 'cancelled', voided: false });
+  });
+
   it('refuses to issue the same invoice twice', async () => {
     const { adminId, invoiceId } = await requested();
     await order.orderInvoices.adminIssue(

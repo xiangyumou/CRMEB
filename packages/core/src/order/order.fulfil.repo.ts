@@ -882,7 +882,7 @@ export async function listInvoices(
     offset: number;
     limit: number;
   },
-): Promise<{ rows: (OrderInvoiceRow & { orderNo: string })[]; total: number }> {
+): Promise<{ rows: InvoiceWithOrder[]; total: number }> {
   const keyword = args.filter.keyword?.trim();
   const where = allOf(
     args.filter.userId === undefined ? undefined : eq(orderInvoices.userId, args.filter.userId),
@@ -909,7 +909,7 @@ export async function listInvoices(
   const direction = args.sortOrder === 'asc' ? asc : desc;
 
   const rows = await db
-    .select({ invoice: orderInvoices, orderNo: orders.orderNo })
+    .select({ invoice: orderInvoices, ...INVOICE_ORDER })
     .from(orderInvoices)
     .innerJoin(orders, eq(orders.id, orderInvoices.orderId))
     .where(where)
@@ -924,21 +924,65 @@ export async function listInvoices(
     .where(where);
 
   return {
-    rows: rows.map((row) => ({ ...row.invoice, orderNo: row.orderNo })),
+    rows: rows.map(withOrder),
     total: Number(counted[0]?.total ?? 0),
+  };
+}
+
+/**
+ * An invoice with its order's number and money, read in the same join: whether
+ * the order has since been refunded in full is shown on the invoice (a 已开票
+ * one then needs 冲红 in the tax system), and it is read, never copied, so it
+ * cannot drift from the order.
+ */
+export type InvoiceWithOrder = OrderInvoiceRow & {
+  orderNo: string;
+  order: {
+    status: string;
+    refundStatus: string;
+    paidAmount: string | null;
+    refundedAmount: string;
+  };
+};
+
+const INVOICE_ORDER = {
+  orderNo: orders.orderNo,
+  orderStatus: orders.status,
+  refundStatus: orders.refundStatus,
+  paidAmount: orders.paidAmount,
+  refundedAmount: orders.refundedAmount,
+};
+
+function withOrder(row: {
+  invoice: OrderInvoiceRow;
+  orderNo: string;
+  orderStatus: string;
+  refundStatus: string;
+  paidAmount: string | null;
+  refundedAmount: string;
+}): InvoiceWithOrder {
+  return {
+    ...row.invoice,
+    orderNo: row.orderNo,
+    order: {
+      status: row.orderStatus,
+      refundStatus: row.refundStatus,
+      paidAmount: row.paidAmount,
+      refundedAmount: row.refundedAmount,
+    },
   };
 }
 
 export async function findInvoiceWithOrderNo(
   db: DbOrTx,
   id: number,
-): Promise<(OrderInvoiceRow & { orderNo: string }) | null> {
+): Promise<InvoiceWithOrder | null> {
   const rows = await db
-    .select({ invoice: orderInvoices, orderNo: orders.orderNo })
+    .select({ invoice: orderInvoices, ...INVOICE_ORDER })
     .from(orderInvoices)
     .innerJoin(orders, eq(orders.id, orderInvoices.orderId))
     .where(eq(orderInvoices.id, id))
     .limit(1);
   const row = rows[0];
-  return row ? { ...row.invoice, orderNo: row.orderNo } : null;
+  return row ? withOrder(row) : null;
 }

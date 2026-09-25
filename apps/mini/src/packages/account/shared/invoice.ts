@@ -87,6 +87,17 @@ export const INVOICE_STATUS_TEXT: Readonly<
   cancelled: { text: '已撤回', tone: 'neutral' },
 };
 
+/**
+ * The state to show: an issued invoice the shop voided (冲红) is `cancelled` with `voided` set,
+ * and reads 已作废 rather than 已撤回 — the shopper did not withdraw it.
+ */
+export function invoiceStateOf(invoice: Pick<OrderInvoice, 'status' | 'voided'>): {
+  text: string;
+  tone: 'primary' | 'success' | 'neutral';
+} {
+  return invoice.voided ? { text: '已作废', tone: 'neutral' } : INVOICE_STATUS_TEXT[invoice.status];
+}
+
 /** A 专票 is for a company only: a personal title is always 普通发票. */
 export function effectiveInvoiceType(draft: InvoiceDraft): InvoiceDraft['invoiceType'] {
   return draft.headerType === 'company' ? draft.invoiceType : 'plain';

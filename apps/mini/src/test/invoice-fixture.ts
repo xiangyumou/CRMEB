@@ -54,6 +54,8 @@ export const orderInvoiceFixture: ResponseOf<'order.myInvoiceDetail'> = {
     lineCount: 2,
     totalQuantity: 3,
   },
+  orderRefundedInFull: false,
+  voided: false,
   issuedAt: null,
   createdAt: '2026-09-21T10:00:00+08:00',
 };

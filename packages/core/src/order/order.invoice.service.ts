@@ -46,7 +46,7 @@ import { checkText } from '../wechat';
 // wire mapping
 // ---------------------------------------------------------------------------
 
-type InvoiceRow = fulfilRepo.OrderInvoiceRow & { orderNo: string };
+type InvoiceRow = fulfilRepo.InvoiceWithOrder;
 
 /**
  * What the order was for, for the 发票记录 row.
@@ -104,6 +104,8 @@ function toWire(row: InvoiceRow, orderSummary: InvoiceOrderSummary | null): Orde
     invoiceNumber: row.invoiceNumber,
     remark: row.remark,
     orderSummary,
+    orderRefundedInFull: refundedInFull(row.order),
+    voided: row.status === 'cancelled' && row.invoiceNumber !== null,
     issuedAt: row.issuedAt === null ? null : row.issuedAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
   };
@@ -149,6 +151,21 @@ export function invoiceableAmount(order: {
 }): Money {
   if (order.paidAmount === null) return Money.ZERO;
   return Money.parse(order.paidAmount).sub(Money.parse(order.refundedAmount)).clampToZero();
+}
+
+/**
+ * INVOICE-005: every yuan the order collected has come back. An invoice already
+ * issued stays 已开票 — a refund does not undo it in the tax system — and the
+ * admin says 订单已全额退款，请到税务系统冲红 until staff mark it 已作废.
+ */
+export function refundedInFull(order: {
+  status: string;
+  refundStatus: string;
+  paidAmount: string | null;
+  refundedAmount: string;
+}): boolean {
+  if (order.status === 'refunded' || order.refundStatus === 'refunded') return true;
+  return order.paidAmount !== null && !invoiceableAmount(order).isPositive();
 }
 
 /**
@@ -400,6 +417,36 @@ export async function adminReject(
       operatorKind: 'admin',
       operatorAdminId: adminId,
     });
+  });
+
+  return readInvoice(ctx, invoiceId);
+}
+
+/**
+ * 作废 (INVOICE-005). Records that staff reversed an issued invoice in the tax
+ * system (冲红); nothing is sent anywhere. The row becomes `cancelled` keeping its
+ * number — `issued_at` goes, since `order_invoices_issued_shape` gives only an
+ * `issued` row one — which frees the order to ask again for what is left.
+ */
+export async function adminVoid(ctx: Ctx, params: { id: string }): Promise<OrderInvoice> {
+  requireAdminId(ctx);
+  const invoiceId = fromId(params.id);
+
+  await ctx.withTx(async (tx) => {
+    const row = await fulfilRepo.findInvoice(tx, invoiceId);
+    if (!row) throw new DomainError('ORDER_INVOICE_NOT_FOUND');
+
+    const moved = await fulfilRepo.transitionInvoice(tx, {
+      invoiceId,
+      from: ['issued'],
+      to: 'cancelled',
+      set: { issuedAt: null },
+    });
+    if (!moved.won) {
+      throw new DomainError('ORDER_INVOICE_NOT_ACTIONABLE', { details: { status: row.status } });
+    }
+    // Who voided it is the route's audit entry: the order timeline has no
+    // 作废 change type yet (adding one is a migration).
   });
 
   return readInvoice(ctx, invoiceId);

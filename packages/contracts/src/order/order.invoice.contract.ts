@@ -18,8 +18,9 @@ import {
  *
  * The buyer asks, an operator issues the invoice **outside** the system and
  * records the number, or rejects with a reason. There is no e-invoice provider
- * and no red-ink reversal, so the status set is the four values
- * `order_invoices_status` actually has.
+ * and no red-ink reversal here — staff 冲红 in the tax system and then mark the
+ * invoice 已作废 — so the status set is the four values `order_invoices_status`
+ * actually has.
  *
  * `order_invoices_open_uq` allows exactly one `requested`-or-`issued` row per
  * order, which is why `invoiceRequest` can be a plain insert and learn "already
@@ -218,6 +219,39 @@ export const invoiceAdminReject = defineRoute({
         ...orderInvoiceExample,
         status: 'rejected',
         remark: '税号与抬头不匹配，请重新提交',
+      },
+    },
+  ],
+});
+
+/**
+ * 作废 an issued invoice, by hand, once staff have reversed it (冲红) in the tax
+ * system — this only records that. The row becomes `cancelled` keeping its
+ * number (`voided: true`), which frees the order to ask for a new invoice. The
+ * admin offers it most loudly when the order has been refunded in full
+ * (`orderRefundedInFull`), but a wrong header is a reason too.
+ */
+export const invoiceAdminVoid = defineRoute({
+  id: 'order.adminVoidInvoice',
+  method: 'POST',
+  path: '/admin-api/order-invoices/:id/void',
+  auth: 'admin',
+  permission: 'order:invoice:write',
+  summary: '作废已开发票',
+  tags: ['order'],
+  params: z.object({ id }),
+  response: orderInvoice,
+  errors: ['ORDER_INVOICE_NOT_FOUND', 'ORDER_INVOICE_NOT_ACTIONABLE'],
+  examples: [
+    {
+      name: 'ok',
+      params: { id: '3001' },
+      response: {
+        ...orderInvoiceExample,
+        status: 'cancelled',
+        invoiceNumber: '24332000000012345678',
+        orderRefundedInFull: true,
+        voided: true,
       },
     },
   ],

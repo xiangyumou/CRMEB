@@ -978,6 +978,15 @@ An invoice can only be asked for on an order that was paid for and not refunded,
 - `packages/core/src/order/order.invoice.rules.test.ts::INVOICE-004 — 订单详情 offers 申请开票 exactly when the request would be accepted > makes it out for what was paid less what came back`
 - `packages/core/src/order/order.invoice.int.test.ts::申请开票 > INVOICE-004 — 订单详情 offers 申请开票 until a request is open, and again once it is cancelled`
 
+### INVOICE-005
+
+A refund never changes an invoice's status: an invoice issued on an order since refunded in full stays 已开票, and the admin shows 订单已全额退款，请到税务系统冲红 on it (`orderRefundedInFull`) until staff, having reversed it in the tax system, mark it 已作废. Only an issued invoice can be voided; it becomes `cancelled` keeping its number (`voided`), reads 已作废 to the buyer rather than 已撤回, and frees the order to ask again for whatever is left to invoice.
+
+- `packages/core/src/order/order.invoice.int.test.ts::the operator > INVOICE-005 — keeps an issued invoice 已开票 when the order is refunded in full, flags it for 冲红, and lets staff void it`
+- `packages/core/src/order/order.invoice.int.test.ts::the operator > INVOICE-005 — voids only an issued invoice, and a voided one frees the order to ask again`
+- `apps/mini/src/packages/account/invoice/index.test.tsx::发票详情 > INVOICE-005 — reads 已作废 for an invoice the shop voided, and offers no new one for a refunded order`
+- `apps/web/app/admin/(shell)/orders/invoices/order-invoices.test.tsx::发票管理 > INVOICE-005 — tells finance to 冲红 an issued invoice whose order was refunded in full, and voids it only after confirming`
+
 ## 小程序发货信息管理 (WeChat mini-program shipping)
 
 ### WXSHIP-001
