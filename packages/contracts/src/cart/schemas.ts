@@ -34,10 +34,25 @@ export const cartItemState = z.enum([
   'off_shelf',
   /** Live, but `stock < quantity`. */
   'out_of_stock',
-  /** A `virtual_card` line that holds more than the one card an order item may bind. */
+  /** The quantity breaks a rule of the product: `quantityRule` says which. */
   'quantity_not_allowed',
 ]);
 export type CartItemState = z.infer<typeof cartItemState>;
+
+/**
+ * The quantity rule a row runs into, so the storefront can say which (and how far to lower
+ * it): a 卡密 is one per order, a minimum (起购), a per-order limit, or a lifetime limit with
+ * the units already bought. On a `quantity_not_allowed` row it is the rule broken; on an `ok`
+ * row it is a lifetime limit, shown as a note. `null` when no rule binds.
+ */
+export const cartQuantityRule = z.object({
+  kind: z.enum(['virtual_card', 'min_purchase', 'per_order', 'lifetime']),
+  /** 1 for a card; the minimum; the per-order or lifetime limit. */
+  limit: z.number().int().min(0),
+  /** `lifetime`: units already bought on paid, not refunded orders. `null` otherwise. */
+  purchased: z.number().int().min(0).nullable(),
+});
+export type CartQuantityRule = z.infer<typeof cartQuantityRule>;
 
 export const cartItem = z.object({
   id,
@@ -63,6 +78,8 @@ export const cartItem = z.object({
   subtotal: money,
   /** Live variant stock, so the quantity stepper can cap itself. */
   stock: z.number().int().min(0),
+  /** Absent from servers before it existed; treat as `null`. */
+  quantityRule: cartQuantityRule.nullable().optional(),
   createdAt: instant,
 });
 export type CartItem = z.infer<typeof cartItem>;
@@ -85,6 +102,7 @@ export const cartItemExample = {
   originalUnitPrice: '88.00',
   subtotal: '120.00',
   stock: 42,
+  quantityRule: null,
   createdAt: '2026-02-01T10:00:00+08:00',
 } satisfies CartItem;
 

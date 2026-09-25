@@ -1,4 +1,4 @@
-import type { CartItemState } from '@shop/contracts/cart/schemas';
+import type { CartItemState, CartQuantityRule } from '@shop/contracts/cart/schemas';
 import type { SkuForSale } from '../order';
 
 /**
@@ -16,18 +16,61 @@ export const MAX_CART_QUANTITY = 9999;
 /** How many rows one cart may hold. Beyond this the storefront stops paging. */
 export const MAX_CART_ROWS = 300;
 
-export function stateOf(sku: SkuForSale | undefined, quantity: number): CartItemState {
+/**
+ * `purchased`: units of the product this shopper already bought, for a
+ * `lifetime` limit (0 when the caller did not look them up). Checkout refuses
+ * a row past it, so the cart greys it out first instead of letting 结算 lead
+ * to a refusal.
+ */
+export function stateOf(
+  sku: SkuForSale | undefined,
+  quantity: number,
+  purchased = 0,
+): CartItemState {
   if (!sku || sku.deleted) return 'deleted';
   if (!sku.onSale) return 'off_shelf';
-  // `product_virtual_cards_order_item_uq`: one card key binds to one order
-  // item, so a card variant can never be checked out more than one at a time.
-  if (sku.productKind === 'virtual_card' && quantity > 1) return 'quantity_not_allowed';
-  if (quantity < sku.minPurchaseQuantity) return 'quantity_not_allowed';
-  if (sku.purchaseLimitMode === 'per_order' && sku.purchaseLimitQuantity !== null) {
-    if (quantity > sku.purchaseLimitQuantity) return 'quantity_not_allowed';
-  }
+  if (brokenRule(sku, quantity, purchased)) return 'quantity_not_allowed';
   if (sku.stock < quantity) return 'out_of_stock';
   return 'ok';
+}
+
+/** The quantity rule a live row breaks, or `null`. */
+function brokenRule(sku: SkuForSale, quantity: number, purchased: number): CartQuantityRule | null {
+  // `product_virtual_cards_order_item_uq`: one card key binds to one order
+  // item, so a card variant can never be checked out more than one at a time.
+  if (sku.productKind === 'virtual_card' && quantity > 1) {
+    return { kind: 'virtual_card', limit: 1, purchased: null };
+  }
+  if (quantity < sku.minPurchaseQuantity) {
+    return { kind: 'min_purchase', limit: sku.minPurchaseQuantity, purchased: null };
+  }
+  const limit = sku.purchaseLimitQuantity;
+  if (sku.purchaseLimitMode === 'per_order' && limit !== null && quantity > limit) {
+    return { kind: 'per_order', limit, purchased: null };
+  }
+  if (sku.purchaseLimitMode === 'lifetime' && limit !== null && purchased + quantity > limit) {
+    return { kind: 'lifetime', limit, purchased };
+  }
+  return null;
+}
+
+/**
+ * What the storefront says about a row's quantity: the rule it breaks, or, for
+ * a row within a lifetime limit, that limit (每人限购 2 件，已购 1 件) so the
+ * shopper is not surprised at checkout. `null` for a gone row or no rule.
+ */
+export function quantityRuleOf(
+  sku: SkuForSale | undefined,
+  quantity: number,
+  purchased = 0,
+): CartQuantityRule | null {
+  if (!sku || sku.deleted || !sku.onSale) return null;
+  const broken = brokenRule(sku, quantity, purchased);
+  if (broken) return broken;
+  if (sku.purchaseLimitMode === 'lifetime' && sku.purchaseLimitQuantity !== null) {
+    return { kind: 'lifetime', limit: sku.purchaseLimitQuantity, purchased };
+  }
+  return null;
 }
 
 export const isAvailable = (state: CartItemState): boolean => state === 'ok';

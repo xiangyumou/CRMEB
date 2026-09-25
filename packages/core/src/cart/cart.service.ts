@@ -18,11 +18,13 @@ import { DomainError } from '../kernel/errors';
 import { fromId, toId } from '../kernel/ids';
 import { Money } from '../kernel/money';
 import { rebuyLines, resolveCatalogPort, type SkuForSale } from '../order';
+import { getOrderFacts } from '../order/ports';
 import * as repo from './cart.repo';
 import {
   MAX_CART_ROWS,
   capFor,
   isAvailable,
+  quantityRuleOf,
   refuseQuantity,
   stateOf,
   type QuantityRefusal,
@@ -49,6 +51,7 @@ interface EnrichedRow {
   row: repo.CartRow;
   sku: SkuForSale | undefined;
   state: ReturnType<typeof stateOf>;
+  quantityRule: ReturnType<typeof quantityRuleOf>;
   available: boolean;
   unitPrice: Money;
   subtotal: Money;
@@ -60,19 +63,45 @@ async function loadCart(ctx: Ctx, db: DbOrTx, userId: number): Promise<EnrichedR
     db,
     rows.map((row) => row.skuId),
   );
+  const purchased = await lifetimePurchases(db, userId, [...skus.values()]);
   return rows.map((row) => {
     const sku = skus.get(row.skuId);
-    const state = stateOf(sku, row.quantity);
+    const bought = sku ? (purchased.get(sku.productId) ?? 0) : 0;
+    const state = stateOf(sku, row.quantity, bought);
     const unitPrice = sku ? Money.parse(sku.unitPrice) : Money.ZERO;
     return {
       row,
       sku,
       state,
+      quantityRule: quantityRuleOf(sku, row.quantity, bought),
       available: isAvailable(state),
       unitPrice,
       subtotal: unitPrice.mul(row.quantity),
     };
   });
+}
+
+/**
+ * Units already bought of each product in the cart that has a `lifetime`
+ * limit, through the order domain's facts port (one read per such product;
+ * a cart rarely holds more than a few).
+ */
+async function lifetimePurchases(
+  db: DbOrTx,
+  userId: number,
+  skus: readonly SkuForSale[],
+): Promise<Map<number, number>> {
+  const out = new Map<number, number>();
+  const products = new Set(
+    skus
+      .filter((sku) => sku.purchaseLimitMode === 'lifetime' && sku.purchaseLimitQuantity !== null)
+      .map((sku) => sku.productId),
+  );
+  for (const productId of products) {
+    // The port is typed for a transaction; a plain read through the pool is the same query.
+    out.set(productId, await getOrderFacts().purchasedQuantity(db as Tx, { userId, productId }));
+  }
+  return out;
 }
 
 function toCartItem(entry: EnrichedRow): CartItem {
@@ -97,6 +126,7 @@ function toCartItem(entry: EnrichedRow): CartItem {
     originalUnitPrice: sku?.originalUnitPrice ?? null,
     subtotal: entry.subtotal.toString(),
     stock: sku?.stock ?? 0,
+    quantityRule: entry.quantityRule,
     createdAt: entry.row.createdAt.toISOString(),
   };
 }
@@ -365,7 +395,9 @@ export async function setSelection(ctx: Ctx, body: CartSelectionBody): Promise<C
     return loadCart(ctx, tx, userId);
   });
 
-  return listOf(entries, { page: 1, pageSize: 20, filter: 'all' });
+  // The whole cart, not a first page: the storefront puts this answer in place of the cart it
+  // shows, and a 20-row page would drop every row past the 20th from it.
+  return listOf(entries, { page: 1, pageSize: MAX_CART_ROWS, filter: 'all' });
 }
 
 /**

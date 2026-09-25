@@ -75,6 +75,30 @@ export const cartGetList = defineRoute({
         unavailableCount: 1,
       },
     },
+    {
+      // A lifetime limit used up: greyed, and the rule says why (每人限购 2 件，已购 2 件).
+      name: 'over-a-lifetime-limit',
+      query: { page: 1, pageSize: 20, filter: 'all' },
+      response: {
+        ...cartListExample,
+        items: [
+          {
+            ...cartItemExample,
+            quantity: 1,
+            subtotal: '60.00',
+            isSelected: false,
+            available: false,
+            state: 'quantity_not_allowed',
+            quantityRule: { kind: 'lifetime', limit: 2, purchased: 2 },
+          },
+        ],
+        total: 1,
+        availableCount: 0,
+        unavailableCount: 1,
+        selectedQuantity: 0,
+        selectedTotal: '0.00',
+      },
+    },
   ],
 });
 
@@ -261,6 +285,7 @@ export const cartRemoveItems = defineRoute({
   ],
 });
 
+/** Answers with the whole cart (every row, one page): the storefront swaps it in for its own. */
 export const cartSetSelection = defineRoute({
   id: 'cart.setSelection',
   method: 'POST',

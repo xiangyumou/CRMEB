@@ -3,10 +3,14 @@ import { cartItemFixture, cartListFixture } from '@/test/cart-fixture';
 import {
   couponHint,
   couponLines,
+  quantityCeiling,
+  quantityFloor,
+  quantityRuleText,
   rescueQuantity,
   selectionOf,
   unavailableReason,
   type ApplicableCoupons,
+  type CartItem,
 } from './cart-view';
 
 const userCoupon = (minSpend: string, discountAmount: string) => ({
@@ -34,6 +38,59 @@ describe('cart view', () => {
     expect(rescueQuantity(gone)).toBeNull();
     const none = cartItemFixture({ available: false, state: 'out_of_stock', stock: 0 });
     expect(unavailableReason(none)).toBe('已售罄');
+  });
+
+  it('names the quantity rule a greyed row breaks, and the quantity that meets it', () => {
+    const greyed = (quantity: number, quantityRule: CartItem['quantityRule'], stock = 50) =>
+      cartItemFixture({
+        available: false,
+        state: 'quantity_not_allowed',
+        quantity,
+        stock,
+        quantityRule,
+      });
+
+    const card = greyed(3, { kind: 'virtual_card', limit: 1, purchased: null });
+    expect(unavailableReason(card)).toBe('该商品每单只能购买 1 件');
+    expect(rescueQuantity(card)).toBe(1);
+
+    const minimum = greyed(1, { kind: 'min_purchase', limit: 3, purchased: null });
+    expect(unavailableReason(minimum)).toBe('该商品最少购买 3 件');
+    expect(rescueQuantity(minimum)).toBe(3);
+    // Not enough stock to reach the minimum: nothing to change it to.
+    expect(rescueQuantity(greyed(1, minimum.quantityRule, 2))).toBeNull();
+
+    const perOrder = greyed(8, { kind: 'per_order', limit: 5, purchased: null });
+    expect(unavailableReason(perOrder)).toBe('该商品每单限购 5 件');
+    expect(rescueQuantity(perOrder)).toBe(5);
+
+    const lifetime = greyed(2, { kind: 'lifetime', limit: 3, purchased: 2 });
+    expect(unavailableReason(lifetime)).toBe('每人限购 3 件，你已购买 2 件');
+    expect(rescueQuantity(lifetime)).toBe(1);
+    const usedUp = greyed(1, { kind: 'lifetime', limit: 2, purchased: 2 });
+    expect(rescueQuantity(usedUp)).toBeNull();
+
+    // A server that predates `quantityRule` greyed rows only for the one-card limit.
+    const older = greyed(2, undefined);
+    expect(unavailableReason(older)).toBe('购买数量不符合要求');
+    expect(rescueQuantity(older)).toBe(1);
+  });
+
+  it('caps a live row by its limit, and says a lifetime limit up front', () => {
+    const limited = cartItemFixture({
+      quantity: 1,
+      stock: 40,
+      quantityRule: { kind: 'lifetime', limit: 3, purchased: 1 },
+    });
+    expect(quantityRuleText(limited)).toBe('每人限购 3 件，你已购买 1 件');
+    expect(quantityCeiling(limited)).toBe(2);
+    expect(quantityFloor(limited)).toBe(1);
+    const fresh = cartItemFixture({ quantityRule: { kind: 'lifetime', limit: 3, purchased: 0 } });
+    expect(quantityRuleText(fresh)).toBe('每人限购 3 件');
+
+    const plain = cartItemFixture({ stock: 7, quantityRule: null });
+    expect(quantityRuleText(plain)).toBeNull();
+    expect(quantityCeiling(plain)).toBe(7);
   });
 
   it('counts 全选 over the available rows only', () => {

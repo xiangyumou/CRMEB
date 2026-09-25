@@ -3,7 +3,6 @@ import { Text, View } from '@tarojs/components';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   routeKey,
-  routeQueryKey,
   routeQueryOptions,
   useApiClient,
   useRouteMutation,
@@ -12,7 +11,6 @@ import {
 import { useTabPage } from '@/app-shell/tab-page';
 import { CartRow } from '@/features/cart/cart-row';
 import {
-  CART_QUERY,
   couponHint,
   couponLines,
   selectionOf,
@@ -21,6 +19,7 @@ import {
   type CartList,
 } from '@/features/cart/cart-view';
 import { useQuickAdd } from '@/features/cart/quick-add';
+import { CART_KEY, useWholeCart } from '@/features/cart/whole-cart';
 import { useCheckoutDraft } from '@/features/checkout/draft';
 import { SkuSheet } from '@/features/product/sku-sheet';
 import type { SkuMatrix } from '@/features/product/sku-select';
@@ -43,7 +42,6 @@ import { ProductCardSkeleton } from '@/ui/skeleton';
 import './index.scss';
 import { errorMessage } from '@/lib/error-message';
 
-const CART_KEY = routeQueryKey('cart.list', CART_QUERY);
 const HOME = { route: 'home', params: {} } as const;
 const HERE = { route: 'cart', params: {} } as const;
 
@@ -65,7 +63,7 @@ export default function Cart() {
     null,
   );
 
-  const list = useRouteQuery('cart.list', CART_QUERY, { enabled: signedIn });
+  const list = useWholeCart(signedIn);
   useRefetchOnShow(routeKey('cart.list'));
   const recommended = useRouteQuery(
     'catalog.productList',
@@ -127,7 +125,11 @@ export default function Cart() {
     select.mutate(
       { body },
       {
-        onSuccess: (fresh) => queryClient.setQueryData(CART_KEY, fresh),
+        // The answer is the whole cart; an older server answered 20 rows, so re-read then.
+        onSuccess: (fresh) =>
+          fresh.items.length >= fresh.total
+            ? queryClient.setQueryData(CART_KEY, fresh)
+            : queryClient.invalidateQueries({ queryKey: CART_KEY }),
         onError: (error) => {
           if (before) queryClient.setQueryData(CART_KEY, before);
           toast.text(error.message);

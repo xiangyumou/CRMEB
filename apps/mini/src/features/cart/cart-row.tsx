@@ -8,7 +8,14 @@ import { Image } from '@/ui/image';
 import { Price } from '@/ui/price';
 import { Pressable } from '@/ui/pressable';
 import { Stepper } from '@/ui/stepper';
-import { rescueQuantity, unavailableReason, type CartItem } from './cart-view';
+import {
+  quantityCeiling,
+  quantityFloor,
+  quantityRuleText,
+  rescueQuantity,
+  unavailableReason,
+  type CartItem,
+} from './cart-view';
 import './cart-row.scss';
 
 export interface CartRowProps {
@@ -30,6 +37,8 @@ export function CartRow({ item, quantity, onSelect, onQuantity, onSpec }: CartRo
   const open = () => void navigate({ route: 'product', params: { id: item.productId } });
   const rescue = item.available ? null : rescueQuantity(item);
   const specs = formatSpec(item.specText);
+  // A live row's rule is a lifetime limit: said up front, not first at 结算.
+  const note = item.available ? quantityRuleText(item) : null;
   return (
     <View className={cx('cart-row', !item.available && 'cart-row--off')} id={`cart-row-${item.id}`}>
       {item.available ? (
@@ -71,7 +80,11 @@ export function CartRow({ item, quantity, onSelect, onQuantity, onSpec }: CartRo
             <Text className="cart-row__spec">{specs}</Text>
           )
         ) : null}
-        {item.available ? null : (
+        {item.available ? (
+          note ? (
+            <Text className="cart-row__note">{note}</Text>
+          ) : null
+        ) : (
           <Text className="cart-row__reason">{unavailableReason(item)}</Text>
         )}
         <View className="cart-row__foot">
@@ -79,8 +92,8 @@ export function CartRow({ item, quantity, onSelect, onQuantity, onSpec }: CartRo
           {item.available ? (
             <Stepper
               value={quantity ?? item.quantity}
-              min={1}
-              max={Math.max(1, item.stock)}
+              min={quantityFloor(item)}
+              max={quantityCeiling(item)}
               label={`${item.productName}的数量`}
               onChange={(next) => onQuantity?.(next)}
             />

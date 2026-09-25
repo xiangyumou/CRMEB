@@ -398,6 +398,11 @@ A lifetime limit counts what the shopper already bought and a per-order limit ig
 - `packages/core/src/catalog/catalog.int.test.ts::a per-order limit ignores history`
 - `packages/core/src/catalog/catalog.int.test.ts::refuses below the minimum`
 
+The cart applies the same limits before 结算: a row past a lifetime limit (counting what the shopper already bought), past a per-order limit or below the minimum is greyed as `quantity_not_allowed`, and its `quantityRule` names the rule so the storefront can say which and offer a quantity that meets it.
+
+- `packages/core/src/cart/cart.rules.test.ts::stateOf > CAT-014: counts a lifetime limit with what the order domain says was bought before`
+- `packages/core/src/cart/cart.int.test.ts::listing the cart > CAT-014: greys a row past a lifetime limit the shopper already used up, and names the rule`
+
 ### CAT-015
 
 Search takes the shopper's keyword as text, not as SQL: a Chinese substring matches, case is ignored, and `%` is a literal. A search is recorded, offered back as history newest-first and de-duplicated, and a fruitless one never becomes a hot word.

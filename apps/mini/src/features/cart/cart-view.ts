@@ -30,20 +30,67 @@ export function unavailableReason(item: CartItem): string {
     case 'out_of_stock':
       return item.stock > 0 ? `库存不足，仅剩 ${item.stock} 件` : '已售罄';
     case 'quantity_not_allowed':
-      return '该商品每次只能购买 1 件';
+      return quantityRuleText(item) ?? '购买数量不符合要求';
     default:
       return '暂不可购买';
   }
 }
 
 /**
- * A greyed row the shopper can still rescue by lowering the quantity: live, but short of stock
- * (or a card that may only be bought one at a time). The quantity it can go down to.
+ * The quantity rule a row runs into, in the shopper's words: the one it breaks on a greyed row,
+ * or a lifetime limit on a live one (「每人限购 2 件，已购 1 件」). `null` when none binds.
+ */
+export function quantityRuleText(item: CartItem): string | null {
+  const rule = item.quantityRule;
+  if (!rule) return null;
+  switch (rule.kind) {
+    case 'virtual_card':
+      return '该商品每单只能购买 1 件';
+    case 'min_purchase':
+      return `该商品最少购买 ${rule.limit} 件`;
+    case 'per_order':
+      return `该商品每单限购 ${rule.limit} 件`;
+    case 'lifetime':
+      return rule.purchased
+        ? `每人限购 ${rule.limit} 件，你已购买 ${rule.purchased} 件`
+        : `每人限购 ${rule.limit} 件`;
+  }
+}
+
+/** The most this row may hold under its quantity rule, or `null` when no rule caps it. */
+function ruleCeiling(item: CartItem): number | null {
+  const rule = item.quantityRule;
+  if (!rule) return null;
+  if (rule.kind === 'virtual_card' || rule.kind === 'per_order') return rule.limit;
+  if (rule.kind === 'lifetime') return rule.limit - (rule.purchased ?? 0);
+  return null;
+}
+
+/** The stepper's ceiling on a live row: the stock, and a per-order or lifetime limit. */
+export function quantityCeiling(item: CartItem): number {
+  const ceiling = ruleCeiling(item);
+  return Math.max(1, ceiling === null ? item.stock : Math.min(item.stock, ceiling));
+}
+
+/** The stepper's floor on a live row: 1, or the product's minimum. */
+export function quantityFloor(item: CartItem): number {
+  const rule = item.quantityRule;
+  return rule?.kind === 'min_purchase' ? Math.max(1, rule.limit) : 1;
+}
+
+/**
+ * A greyed row the shopper can still rescue by changing the quantity: live, but short of stock,
+ * or past a quantity rule that some quantity still meets. The quantity to change it to.
  */
 export function rescueQuantity(item: CartItem): number | null {
   if (item.state === 'out_of_stock' && item.stock > 0) return item.stock;
-  if (item.state === 'quantity_not_allowed') return 1;
-  return null;
+  if (item.state !== 'quantity_not_allowed') return null;
+  const rule = item.quantityRule;
+  // An older server says nothing more: the one rule it greyed rows for was the one-card limit.
+  if (!rule) return 1;
+  const target = rule.kind === 'min_purchase' ? rule.limit : ruleCeiling(item);
+  if (target === null || target < 1 || target > item.stock) return null;
+  return target === item.quantity ? null : target;
 }
 
 /** 全选's state: every available row ticked, some of them, or none. */

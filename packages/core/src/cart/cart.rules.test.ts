@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { SkuForSale } from '../order';
-import { capFor, isAvailable, refuseQuantity, stateOf, MAX_CART_QUANTITY } from './cart.rules';
+import {
+  capFor,
+  isAvailable,
+  quantityRuleOf,
+  refuseQuantity,
+  stateOf,
+  MAX_CART_QUANTITY,
+} from './cart.rules';
 
 /**
  * The cart's availability rules, with nothing behind them.
@@ -78,8 +85,11 @@ describe('stateOf', () => {
     );
   });
 
-  it('leaves a lifetime limit alone — only the order knows what was bought before', () => {
-    expect(stateOf(sku({ purchaseLimitMode: 'lifetime', purchaseLimitQuantity: 1 }), 5)).toBe('ok');
+  it('CAT-014: counts a lifetime limit with what the order domain says was bought before', () => {
+    const limited = sku({ purchaseLimitMode: 'lifetime', purchaseLimitQuantity: 3 });
+    expect(stateOf(limited, 2)).toBe('ok');
+    expect(stateOf(limited, 2, 1)).toBe('ok');
+    expect(stateOf(limited, 2, 2)).toBe('quantity_not_allowed');
   });
 });
 
@@ -133,5 +143,34 @@ describe('capFor', () => {
         }),
       ),
     ).toBe(1);
+  });
+});
+
+describe('quantityRuleOf — the rule a row runs into, for the storefront to name', () => {
+  it('names the broken rule of a quantity_not_allowed row', () => {
+    expect(quantityRuleOf(sku({ productKind: 'virtual_card' }), 2)).toEqual({
+      kind: 'virtual_card',
+      limit: 1,
+      purchased: null,
+    });
+    expect(quantityRuleOf(sku({ minPurchaseQuantity: 3 }), 2)).toEqual({
+      kind: 'min_purchase',
+      limit: 3,
+      purchased: null,
+    });
+    expect(
+      quantityRuleOf(sku({ purchaseLimitMode: 'per_order', purchaseLimitQuantity: 2 }), 3),
+    ).toEqual({ kind: 'per_order', limit: 2, purchased: null });
+    expect(quantityRuleOf(sku(), 2)).toBeNull();
+    expect(quantityRuleOf(undefined, 2)).toBeNull();
+  });
+
+  it('greys a row past a lifetime limit already used up, which checkout would refuse', () => {
+    const limited = sku({ purchaseLimitMode: 'lifetime', purchaseLimitQuantity: 2 });
+    expect(stateOf(limited, 1, 2)).toBe('quantity_not_allowed');
+    expect(quantityRuleOf(limited, 1, 2)).toEqual({ kind: 'lifetime', limit: 2, purchased: 2 });
+    // Within it: fine, and the limit comes along as a note.
+    expect(stateOf(limited, 1, 1)).toBe('ok');
+    expect(quantityRuleOf(limited, 1, 1)).toEqual({ kind: 'lifetime', limit: 2, purchased: 1 });
   });
 });

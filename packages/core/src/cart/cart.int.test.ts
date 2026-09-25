@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { cartItems } from '@shop/db/schema/cart';
+import { orders } from '@shop/db/schema/order';
 import { productSkus, products } from '@shop/db/schema/catalog';
 import { userAddresses, users } from '@shop/db/schema/user';
 import { createTestCtx, forkTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
@@ -71,6 +72,8 @@ interface ProductOptions {
   stock?: number;
   price?: string;
   purchaseLimit?: number;
+  /** A `lifetime` limit instead of a per-order one. */
+  lifetimeLimit?: number;
   minPurchaseQuantity?: number;
 }
 
@@ -90,8 +93,12 @@ async function makeProduct(
       stock: options.stock ?? 10,
       freightMode: 'free',
       minPurchaseQuantity: options.minPurchaseQuantity ?? 1,
-      purchaseLimitMode: options.purchaseLimit ? 'per_order' : 'none',
-      purchaseLimitQuantity: options.purchaseLimit ?? null,
+      purchaseLimitMode: options.lifetimeLimit
+        ? 'lifetime'
+        : options.purchaseLimit
+          ? 'per_order'
+          : 'none',
+      purchaseLimitQuantity: options.lifetimeLimit ?? options.purchaseLimit ?? null,
     })
     .returning({ id: products.id });
   const [sku] = await harness.ctx.db
@@ -201,6 +208,32 @@ describe('listing the cart', () => {
     // Ticked but unsellable: it must not inflate the 结算 total.
     expect(listed.selectedTotal).toBe('60.00');
     expect(listed.selectedQuantity).toBe(1);
+  });
+
+  it('CAT-014: greys a row past a lifetime limit the shopper already used up, and names the rule', async () => {
+    const userId = await makeUser();
+    const limited = await makeProduct({ lifetimeLimit: 2 });
+    await cart.addItem(as(userId), { skuId: String(limited.skuId), quantity: 2 });
+    const bought = await order.create(as(userId), {
+      source: 'cart',
+      cartItemIds: [],
+      kind: 'normal',
+      idempotencyKey: `lifetime-${(sequence += 1).toString().padStart(8, '0')}`,
+    });
+    await harness.ctx.db
+      .update(orders)
+      .set({ status: 'paid' })
+      .where(eq(orders.id, Number(bought.id)));
+
+    await cart.addItem(as(userId), { skuId: String(limited.skuId), quantity: 1 });
+    const listed = await cart.list(as(userId), { page: 1, pageSize: 20, filter: 'all' });
+
+    expect(listed.items[0]).toMatchObject({
+      available: false,
+      state: 'quantity_not_allowed',
+      quantityRule: { kind: 'lifetime', limit: 2, purchased: 2 },
+    });
+    expect(listed.selectedQuantity).toBe(0);
   });
 
   it('reads the price live rather than from the row', async () => {
@@ -345,6 +378,23 @@ describe('editing the cart', () => {
     const dying = listed.items.find((row) => row.id === deadRow.item!.id);
     expect(dying?.isSelected).toBe(false);
     expect(listed.selectedQuantity).toBe(1);
+  });
+
+  it('answers a tick with every row, not a first page of 20', async () => {
+    const userId = await makeUser();
+    for (let index = 0; index < 21; index += 1) {
+      const product = await makeProduct();
+      await cart.addItem(as(userId), { skuId: String(product.skuId), quantity: 1 });
+    }
+
+    const listed = await cart.setSelection(as(userId), {
+      itemIds: [],
+      all: true,
+      isSelected: false,
+    });
+
+    expect(listed.items).toHaveLength(21);
+    expect(listed.total).toBe(21);
   });
 });
 
