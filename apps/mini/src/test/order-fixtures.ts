@@ -64,6 +64,7 @@ export function orderListItem(
     createdAt: '2026-02-01T10:00:00+08:00',
     items: [orderItem('7001')],
     refundedAmount: '0.00',
+    hasOpenRefund: false,
     groupbuyTeam: null,
     ...overrides,
   };

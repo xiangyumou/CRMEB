@@ -37,6 +37,8 @@ type OrderShape = Pick<OrderListItem, 'status' | 'refundStatus' | 'fulfillmentSt
    * only while some line can still be reviewed.
    */
   items: ReadonlyArray<Pick<StorefrontOrderItem, 'reviewable'>>;
+  /** An after-sales request is still being handled: the order cannot be deleted (ORDER-014). */
+  hasOpenRefund?: boolean | undefined;
 };
 
 /** Some line can be reviewed now (the order was received and the line has no review yet). */
@@ -66,12 +68,13 @@ export function orderActions(order: OrderShape): OrderAction[] {
       if (awaitsReview(order)) keys.push('review');
       break;
     case 'completed':
-      keys.push('delete', 'rebuy');
+      if (!order.hasOpenRefund) keys.push('delete');
+      keys.push('rebuy');
       if (awaitsReview(order)) keys.push('review');
       break;
     case 'cancelled':
     case 'refunded':
-      keys.push('delete');
+      if (!order.hasOpenRefund) keys.push('delete');
       if (order.kind === 'normal') keys.push('rebuy');
       break;
   }

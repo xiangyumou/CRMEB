@@ -156,6 +156,7 @@ export function orderFixture(overrides: Partial<Order> = {}): Order {
     cancelReason: null,
     groupbuyTeamId: null,
     refundedAmount: '0.00',
+    hasOpenRefund: false,
     groupbuyTeam: null,
     invoiceRequestable: false,
     invoiceAmount: '0.00',

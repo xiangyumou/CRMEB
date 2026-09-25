@@ -161,7 +161,33 @@ export async function purchasedQuantity(
  * or closes it.
  */
 export function hasOpenRefund(): SQL {
-  return sql`exists (select 1 from ${refunds} where ${refunds.orderId} = ${orders.id} and ${refunds.status} in ('applied', 'approved', 'processing', 'unknown', 'failed'))`;
+  return sql`exists (select 1 from ${refunds} where ${refunds.orderId} = ${orders.id} and ${inArray(refunds.status, [...OPEN_REFUND_STATUSES])})`;
+}
+
+/**
+ * The refund domain's `IN_FLIGHT_STATUSES`, spelled out: that domain imports
+ * this one, so importing it back would be a cycle. `order.open-refund.test.ts`
+ * holds the two lists equal.
+ */
+export const OPEN_REFUND_STATUSES = [
+  'applied',
+  'approved',
+  'processing',
+  'unknown',
+  'failed',
+] as const;
+
+/** Which of these orders have an after-sales request still being handled. */
+export async function ordersWithOpenRefund(
+  db: DbOrTx,
+  orderIds: readonly number[],
+): Promise<Set<number>> {
+  if (orderIds.length === 0) return new Set();
+  const rows = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(and(inArray(orders.id, [...new Set(orderIds)]), hasOpenRefund()));
+  return new Set(rows.map((row) => row.id));
 }
 
 /** Whether one order has an after-sales request still being handled. */

@@ -59,9 +59,15 @@ export async function list(
   }
 
   const states = await kindStatesFor(ctx.db, rows);
+  const openRefund = await repo.ordersWithOpenRefund(
+    ctx.db,
+    rows.map((row) => row.id),
+  );
 
   return {
-    items: rows.map((row) => toListItem(row, byOrder.get(row.id) ?? [], states.get(row.id))),
+    items: rows.map((row) =>
+      toListItem(row, byOrder.get(row.id) ?? [], states.get(row.id), openRefund.has(row.id)),
+    ),
     total,
     page: query.page,
     pageSize: query.pageSize,
@@ -145,11 +151,13 @@ export async function detailOf(
   const states = await kindStatesFor(ctx.db, [row]);
   const invoices = await listOpenInvoiceStatuses(ctx.db, [row.id]);
   const hasOpenInvoice = invoices.some((i) => i.status === 'requested' || i.status === 'issued');
+  const openRefund = await repo.orderHasOpenRefund(ctx.db, row.id);
   return {
     ...toDetail(
       row,
       items.map((item) => toOrderItem(item, row.status, reviewed)),
       states.get(row.id),
+      openRefund,
     ),
     groupbuyTeamId: toIdOrNull(links.groupbuyTeamId ?? null),
     invoiceRequestable: isInvoiceRequestable(row, hasOpenInvoice),
@@ -246,6 +254,7 @@ function toListItem(
   row: repo.OrderRow,
   items: StorefrontOrderItem[],
   state: OrderKindState | undefined,
+  hasOpenRefund: boolean,
 ): StorefrontOrderListItem {
   const team = state?.groupbuyTeam;
   return {
@@ -266,6 +275,7 @@ function toListItem(
     createdAt: row.createdAt.toISOString(),
     items,
     refundedAmount: row.refundedAmount,
+    hasOpenRefund,
     groupbuyTeam: team
       ? {
           id: toId(team.id),
@@ -283,9 +293,10 @@ function toDetail(
   row: repo.OrderRow,
   items: StorefrontOrderItem[],
   state: OrderKindState | undefined,
+  hasOpenRefund: boolean,
 ): Omit<OrderDetail, 'groupbuyTeamId' | 'invoiceRequestable' | 'invoiceAmount'> {
   return {
-    ...toListItem(row, items, state),
+    ...toListItem(row, items, state, hasOpenRefund),
     receiver: {
       // The order carries a snapshot, not a link: editing the address book
       // later must never rewrite where an order was sent.

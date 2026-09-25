@@ -7,14 +7,14 @@ export function statusHeadline(
     OrderDetail,
     | 'status'
     | 'fulfillmentStatus'
-    | 'refundStatus'
+    | 'hasOpenRefund'
     | 'cancelReason'
     | 'items'
     | 'groupbuyTeam'
     | 'paidAmount'
   >,
 ): { title: string; note: string | null } {
-  const refunding = order.refundStatus === 'requested' ? '售后处理中' : null;
+  const refunding = order.hasOpenRefund ? '售后处理中' : null;
   const team = order.groupbuyTeam;
   switch (order.status) {
     case 'pending_payment':
