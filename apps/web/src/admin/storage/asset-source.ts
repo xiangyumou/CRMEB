@@ -29,6 +29,7 @@ export function createStorageAssetSource(): AssetSource {
       list: storageAttachmentList.permission,
       upload: storageAttachmentUpload.permission,
       categories: storageCategoryTree.permission,
+      remove: storageAttachmentDeleteMany.permission,
     },
 
     async listCategories(): Promise<AssetCategory[]> {

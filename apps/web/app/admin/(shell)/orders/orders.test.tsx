@@ -99,6 +99,24 @@ describe('订单列表', () => {
     );
   });
 
+  it('shows the work queue only to a role that may read 订单统计', async () => {
+    const calls = stubApi();
+    renderAdmin(<OrdersPage />, { identity: staff });
+    await screen.findByText(adminOrderListItemExample.orderNo);
+    expect(screen.queryByText('近 30 天实付')).toBeNull();
+    expect(calls.some((call) => call.url.includes('/admin-api/orders/statistics'))).toBe(false);
+    expect(feedback.error).not.toHaveBeenCalled();
+  });
+
+  it('a role with 订单统计 sees the work queue', async () => {
+    const calls = stubApi();
+    renderAdmin(<OrdersPage />, {
+      identity: { ...staff, permissions: [...staff.permissions, 'order:stats:read'] },
+    });
+    expect(await screen.findByText('近 30 天实付')).toBeInTheDocument();
+    expect(calls.some((call) => call.url.includes('/admin-api/orders/statistics'))).toBe(true);
+  });
+
   it('a tab change goes back to page 1 and keeps the tab in the URL', async () => {
     navigation.search = 'page=3';
     stubApi();
