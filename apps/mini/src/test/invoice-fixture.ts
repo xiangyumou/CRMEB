@@ -54,6 +54,8 @@ export const orderInvoiceFixture: ResponseOf<'order.myInvoiceDetail'> = {
     lineCount: 2,
     totalQuantity: 3,
   },
+  orderRefundedInFull: false,
+  voided: false,
   issuedAt: null,
   createdAt: '2026-09-21T10:00:00+08:00',
 };
@@ -75,6 +77,7 @@ export const paidOrderFixture: ResponseOf<'order.detail'> = {
   payExpiresAt: null,
   createdAt: '2026-09-20T10:00:00+08:00',
   refundedAmount: '0.00',
+  hasOpenRefund: false,
   groupbuyTeam: null,
   invoiceRequestable: true,
   invoiceAmount: '118.00',

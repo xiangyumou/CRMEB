@@ -81,7 +81,9 @@ function Favorites() {
             }
           />
         }
-        renderItem={(item) => <ProductRow product={item.product} selection={selection} />}
+        renderItem={(item) => (
+          <ProductRow product={item.product} unavailable={!item.available} selection={selection} />
+        )}
       />
       {selection.managing ? (
         <ManageBar

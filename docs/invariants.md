@@ -247,6 +247,13 @@ Multi-item order pricing splits the coupon across every line. A line written at 
 - `packages/core/src/order/order.adjustments.int.test.ts::a 预售 order with a stacked coupon > lists only the coupon on an ordinary order, split over its lines`
 - `packages/core/src/order/order.pricing.test.ts::splitAdjustments > keeps each adjustment's own per-line share, which the order lines persist`
 
+### PRICE-005
+
+A coupon's 使用门槛 is measured against what the lines cost after the 拼团/预售 price, before the coupon: the checkout quotes it on the same line totals the preview shows and the mini-program sends to the coupon picker, so a coupon the picker lists as 未达到使用门槛 is refused at checkout and one it lists as usable is applied.
+
+- `packages/core/src/order/order.adjustments.int.test.ts::PRICE-005 — a coupon’s 使用门槛 is measured against the 拼团/预售 price > refuses a ¥80 threshold on a ¥78 预售 of an ¥88 item, as the coupon picker says`
+- `packages/core/src/order/order.adjustments.int.test.ts::PRICE-005 — a coupon’s 使用门槛 is measured against the 拼团/预售 price > still applies a threshold the 预售 price meets`
+
 ## Stock
 
 ### STOCK-001
@@ -410,9 +417,10 @@ The auto-review job writes its five-star default once the window has passed and 
 
 ### CAT-014
 
-A lifetime limit counts what the shopper already bought and a per-order limit ignores history; below the minimum is refused.
+A lifetime limit counts what the shopper already bought and a per-order limit ignores history; below the minimum is refused. "Already bought" has one definition, which checkout, the cart and the product page all read: units on the shopper's orders that are not cancelled (unpaid ones included), less the units refunded.
 
 - `packages/core/src/catalog/catalog.int.test.ts::purchase limits > counts what the shopper already bought against a lifetime limit`
+- `packages/core/src/order/order.int.test.ts::checkout preview > CAT-014 — counts a lifetime limit the way the cart and the product page do: unpaid in, refunded out`
 - `packages/core/src/catalog/catalog.int.test.ts::a per-order limit ignores history`
 - `packages/core/src/catalog/catalog.int.test.ts::refuses below the minimum`
 
@@ -982,6 +990,15 @@ An invoice can only be asked for on an order that was paid for and not refunded,
 - `packages/core/src/order/order.invoice.rules.test.ts::INVOICE-004 — 订单详情 offers 申请开票 exactly when the request would be accepted > makes it out for what was paid less what came back`
 - `packages/core/src/order/order.invoice.int.test.ts::申请开票 > INVOICE-004 — 订单详情 offers 申请开票 until a request is open, and again once it is cancelled`
 
+### INVOICE-005
+
+A refund never changes an invoice's status: an invoice issued on an order since refunded in full stays 已开票, and the admin shows 订单已全额退款，请到税务系统冲红 on it (`orderRefundedInFull`) until staff, having reversed it in the tax system, mark it 已作废. Only an issued invoice can be voided; it becomes `cancelled` keeping its number (`voided`), reads 已作废 to the buyer rather than 已撤回, and frees the order to ask again for whatever is left to invoice.
+
+- `packages/core/src/order/order.invoice.int.test.ts::the operator > INVOICE-005 — keeps an issued invoice 已开票 when the order is refunded in full, flags it for 冲红, and lets staff void it`
+- `packages/core/src/order/order.invoice.int.test.ts::the operator > INVOICE-005 — voids only an issued invoice, and a voided one frees the order to ask again`
+- `apps/mini/src/packages/account/invoice/index.test.tsx::发票详情 > INVOICE-005 — reads 已作废 for an invoice the shop voided, and offers no new one for a refunded order`
+- `apps/web/app/admin/(shell)/orders/invoices/order-invoices.test.tsx::发票管理 > INVOICE-005 — tells finance to 冲红 an issued invoice whose order was refunded in full, and voids it only after confirming`
+
 ## 小程序发货信息管理 (WeChat mini-program shipping)
 
 ### WXSHIP-001
@@ -1272,6 +1289,14 @@ A fully refunded order takes back the gift coupons it earned that nobody has spe
 
 - `packages/core/src/refund/refund.int.test.ts::REFUND-020 — revokes the unused gifts and returns them to the supply, leaving other coupons alone`
 - `packages/core/src/refund/refund.int.test.ts::REFUND-020 — a partial refund leaves the gifts where they are`
+
+### REFUND-021
+
+Approving a 仅退款 takes what the request covered when the buyer applied: units shipped before the request are goods the buyer keeps (a money-only refund), units shipped after it are not the request's to take, and the approval is refused (`REFUND_LINE_ALREADY_SHIPPED`). The approval takes the order row and its lines in the order shipping takes them, so an approval and a dispatch of the same units (the last units, or the rest of a line shipped in part) have exactly one winner.
+
+- `packages/core/src/refund/refund.concurrency.int.test.ts::shipping the last unshipped units while a 仅退款 is approved > REFUND-021 — has exactly one winner on a line shipped in part before the request, when the warehouse goes first`
+- `packages/core/src/refund/refund.concurrency.int.test.ts::shipping the last unshipped units while a 仅退款 is approved > REFUND-021 — has exactly one winner on a line shipped in part before the request, when the operator goes first`
+- `packages/core/src/refund/refund.concurrency.int.test.ts::shipping the last unshipped units while a 仅退款 is approved > REFUND-021 — refuses a 仅退款 whose units shipped after the buyer asked, and still approves one on goods shipped before`
 
 ## Registration and notifications
 

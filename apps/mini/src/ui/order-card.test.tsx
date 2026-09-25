@@ -44,6 +44,7 @@ const order: StorefrontOrderListItem = {
   payExpiresAt: null,
   createdAt: '2026-02-01T10:00:00+08:00',
   refundedAmount: '0.00',
+  hasOpenRefund: false,
   groupbuyTeam: null,
   items: [item('1'), item('2'), item('3'), item('4')],
 };
@@ -236,11 +237,33 @@ describe('OrderCard', () => {
   it('tags a group-buy order and says 售后中 while a refund is open', () => {
     render(
       <OrderCard
-        order={{ ...order, kind: 'groupbuy', refundStatus: 'requested' }}
+        order={{ ...order, kind: 'groupbuy', refundStatus: 'requested', hasOpenRefund: true }}
         onAction={() => undefined}
       />,
     );
     expect(screen.getByText('拼团')).toBeTruthy();
     expect(screen.getByText('售后中')).toBeTruthy();
+  });
+
+  it('says 售后中 for a second request after a partial refund, and not once none is open', () => {
+    const { rerender } = render(
+      <OrderCard
+        order={{ ...order, refundStatus: 'partially_refunded', hasOpenRefund: true }}
+        onAction={() => undefined}
+      />,
+    );
+    expect(screen.getByText('售后中')).toBeTruthy();
+    rerender(
+      <OrderCard
+        order={{ ...order, refundStatus: 'partially_refunded', hasOpenRefund: false }}
+        onAction={() => undefined}
+      />,
+    );
+    expect(screen.queryByText('售后中')).toBeNull();
+  });
+
+  it('offers no 删除订单 while a request is open (ORDER-014)', () => {
+    expect(keys({ status: 'completed', hasOpenRefund: true })).not.toContain('delete');
+    expect(keys({ status: 'completed', hasOpenRefund: false })).toContain('delete');
   });
 });

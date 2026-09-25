@@ -141,7 +141,7 @@ export type PresaleActivityForm = z.infer<typeof presaleActivityForm>;
 
 export const presaleActivityListQuery = pageQuery
   .extend({
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     status: z.union([presaleActivityStatus, z.array(presaleActivityStatus)]).optional(),
     productId: id.optional(),
   })

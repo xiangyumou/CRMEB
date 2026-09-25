@@ -495,6 +495,12 @@ export const storefrontOrderListItem = orderListItem.extend({
   items: z.array(storefrontOrderItem),
   /** Every refund that has succeeded, added up (`orders.refunded_amount`). */
   refundedAmount: money,
+  /**
+   * An after-sales request on the order is still being handled (申请中, 已同意, 退款中, or
+   * refused by WeChat and waiting for the merchant): 售后中. `refundStatus` cannot say it —
+   * that roll-up stays `partially_refunded` once any money went back, open request or not.
+   */
+  hasOpenRefund: z.boolean(),
   /** 拼团 orders only; `null` for every other kind. */
   groupbuyTeam: orderGroupbuyTeam.nullable(),
 });
@@ -504,6 +510,7 @@ export const storefrontOrderListItemExample = {
   ...orderListItemExample,
   items: [storefrontOrderItemExample],
   refundedAmount: '0.00',
+  hasOpenRefund: false,
   groupbuyTeam: null,
 } satisfies StorefrontOrderListItem;
 
@@ -579,7 +586,7 @@ export const orderListQuery = pageQuery
   .extend({
     tab: orderListTab.default('all'),
     /** Order number or product name substring. */
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
   })
   .extend(sortQuery(['createdAt', 'payableAmount']).shape);
 export type OrderListQuery = z.infer<typeof orderListQuery>;

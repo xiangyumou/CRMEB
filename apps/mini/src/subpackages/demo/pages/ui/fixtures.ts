@@ -172,6 +172,7 @@ export const orders: StorefrontOrderListItem[] = [
     payExpiresAt: inMinutes(14.5),
     createdAt: new Date().toISOString(),
     refundedAmount: '0.00',
+    hasOpenRefund: false,
     groupbuyTeam: null,
     items: [
       item('1', '每日坚果礼盒 30 袋装', art(28, 'gift'), '79.90', '混合装 | 750g'),
@@ -194,6 +195,7 @@ export const orders: StorefrontOrderListItem[] = [
     payExpiresAt: null,
     createdAt: new Date().toISOString(),
     refundedAmount: '0.00',
+    hasOpenRefund: false,
     groupbuyTeam: null,
     items: [item('3', '手工蜂蜜 百花蜜 500g 玻璃瓶装', art(45, 'jar'), '39.90', '500g', 3)],
   },

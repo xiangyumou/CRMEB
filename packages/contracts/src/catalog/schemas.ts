@@ -1087,6 +1087,12 @@ export const storefrontCategoryTree = z.object({
 
 export const favoriteItem = z.object({
   product: productCard,
+  /**
+   * Still for sale: on the shelf and not deleted. A product taken off sale stays
+   * on the list (so the shopper can see and remove it) with this `false`, and
+   * the storefront draws it 已下架 instead of an ordinary sold-out card.
+   */
+  available: z.boolean(),
   createdAt: instant,
 });
 export type FavoriteItem = z.infer<typeof favoriteItem>;
@@ -1140,6 +1146,8 @@ export const favoriteRemoveResult = z.object({
  */
 export const historyItem = z.object({
   product: productCard,
+  /** See `favoriteItem.available`. */
+  available: z.boolean(),
   viewedAt: instant,
 });
 export type HistoryItem = z.infer<typeof historyItem>;

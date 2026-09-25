@@ -262,6 +262,12 @@ describe('the list', () => {
     );
     expect(found.total).toBe(1);
     expect(found.items[0]!.orderNo).toBe(row.orderNo);
+
+    // `%` and `_` are literal: a lone one matches nothing rather than every order.
+    for (const keyword of ['%', '_']) {
+      const literal = await order.orderConsole.adminList(asAdmin(adminId), listQuery({ keyword }));
+      expect(literal.total).toBe(0);
+    }
   });
 
   it('masks the buyer’s account phone in the list and shows it whole in the detail', async () => {
@@ -729,6 +735,21 @@ describe('ORDER-014 — 退款中 means an after-sales request still open', () =
       sortOrder: 'desc',
     });
     expect(tab.total).toBe(0);
+
+    // The shopper's own rows carry it, so the card says 售后中 after a partial
+    // refund too, and stops once the request closed.
+    const mine = async (userId: number) =>
+      (await order.list(as(userId), { tab: 'all', page: 1, pageSize: 20, sortOrder: 'desc' }))
+        .items[0]!.hasOpenRefund;
+    expect(await mine(open.userId)).toBe(true);
+    expect(await mine(failed.userId)).toBe(true);
+    expect(await mine(settled.userId)).toBe(false);
+    expect((await order.detail(as(open.userId), { id: String(open.orderId) })).hasOpenRefund).toBe(
+      true,
+    );
+    expect(
+      (await order.detail(as(settled.userId), { id: String(settled.orderId) })).hasOpenRefund,
+    ).toBe(false);
   });
 
   it('neither 删除 nor the shopper’s 删除订单 files away an order whose request is still open', async () => {

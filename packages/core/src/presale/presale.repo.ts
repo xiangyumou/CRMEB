@@ -30,6 +30,7 @@ import {
 } from 'drizzle-orm';
 import { conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
 import type { StockDeltas } from './presale.rules';
+import { containsPattern } from '../kernel/like';
 
 /**
  * Every statement the presale domain runs. Statements, not decisions: no
@@ -93,7 +94,7 @@ const activitySort = {
 function activityWhere(filters: ActivityListFilters): SQL | undefined {
   const parts: (SQL | undefined)[] = [isNull(presaleActivities.deletedAt)];
   if (filters.keyword) {
-    parts.push(sql`${presaleActivities.title} ilike ${`%${filters.keyword}%`}`);
+    parts.push(sql`${presaleActivities.title} ilike ${containsPattern(filters.keyword)}`);
   }
   if (filters.statuses && filters.statuses.length > 0) {
     parts.push(inArray(presaleActivities.status, [...filters.statuses]));

@@ -314,20 +314,23 @@ export async function clearSearchHistory(ctx: Ctx): Promise<void> {
  * they are still for sale**. Dropping the off-shelf ones left `total` (and
  * 我的's count) counting rows nobody could see, opened a list on an empty page
  * (「还没有收藏」 over a full list) and gave the shopper no way to remove them.
- * One no longer for sale is drawn sold out — no stock, no 加入购物车 — and its
- * product page says 已下架.
+ * One no longer for sale is drawn sold out — no stock, no 加入购物车 — and carries
+ * `available: false`, so the list says 已下架 the way its product page does.
  */
 async function listedCards(
   db: Ctx['db'],
   productIds: readonly number[],
-): Promise<Map<number, ProductCard>> {
+): Promise<Map<number, { product: ProductCard; available: boolean }>> {
   const products = await repo.productsByIds(db, productIds);
   const labels = await repo.labelsFor(db, [...products.keys()]);
-  const cards = new Map<number, ProductCard>();
+  const cards = new Map<number, { product: ProductCard; available: boolean }>();
   for (const product of products.values()) {
     const card = toProductCard(product, labels.get(product.id) ?? []);
-    const forSale = product.status === 'on_shelf' && product.deletedAt === null;
-    cards.set(product.id, forSale ? card : { ...card, stock: 0, canAddToCart: false });
+    const available = product.status === 'on_shelf' && product.deletedAt === null;
+    cards.set(product.id, {
+      product: available ? card : { ...card, stock: 0, canAddToCart: false },
+      available,
+    });
   }
   return cards;
 }
@@ -346,9 +349,9 @@ export async function favoriteList(
 
   const items: FavoriteItem[] = [];
   for (const row of rows) {
-    const product = cards.get(row.productId);
-    if (!product) continue;
-    items.push({ product, createdAt: row.createdAt.toISOString() });
+    const listed = cards.get(row.productId);
+    if (!listed) continue;
+    items.push({ ...listed, createdAt: row.createdAt.toISOString() });
   }
   return { items, total, page: query.page, pageSize: query.pageSize };
 }
@@ -484,9 +487,9 @@ export async function historyList(
 
   const items: HistoryItem[] = [];
   for (const row of rows) {
-    const product = cards.get(row.productId);
-    if (!product) continue;
-    items.push({ product, viewedAt: row.viewedAt.toISOString() });
+    const listed = cards.get(row.productId);
+    if (!listed) continue;
+    items.push({ ...listed, viewedAt: row.viewedAt.toISOString() });
   }
   return { items, total, page: query.page, pageSize: query.pageSize };
 }

@@ -1,5 +1,5 @@
 import type { DbOrTx, Tx } from '@shop/db';
-import { orderItems, orders } from '@shop/db/schema/order';
+import { orderItems, orders, shipmentItems, shipments } from '@shop/db/schema/order';
 import {
   refundItems,
   refundLogs,
@@ -306,36 +306,60 @@ const countedUnits = (orderItemId: number) => sql<number>`(
 )`;
 
 /**
+ * Units of a line that left the warehouse *after* this refund was applied, in
+ * shipments still standing.
+ *
+ * The request is dated by `refunds.created_at` and a dispatch by
+ * `shipments.created_at`, both written with `clock_timestamp()` while the
+ * writer holds the order row (`apply`, `shipOrder`, auto-delivery all lock it
+ * first), so the two are in the order the lock let them through.
+ */
+const shippedSinceApplied = (refundId: number, orderItemId: number) => sql<number>`(
+  select coalesce(sum(${shipmentItems.quantity}), 0)::int
+    from ${shipmentItems}
+    join ${shipments} on ${shipments.id} = ${shipmentItems.shipmentId}
+   where ${shipmentItems.orderItemId} = ${orderItemId}
+     and ${shipments.status} <> 'cancelled'
+     and ${shipments.createdAt} > (select ${refunds.createdAt} from ${refunds} where ${refunds.id} = ${refundId})
+)`;
+
+/**
  * Re-derives `order_items.refunded_quantity` from the refunds themselves.
  *
- * `bound` is the mirror of fulfilment's dispatch guard (FULFILL-002). For units
- * that were never shipped — a `refund_only` on an undispatched line — the
- * ceiling is `quantity - shipped_quantity`, computed *inside* the statement: a
- * shipment that commits first pushes `shipped_quantity` up and this update
- * refuses; if this one commits first the shipment's own `WHERE` sees the raised
- * `refunded_quantity` and refuses. Exactly one wins, in either order, and
- * `shipped + refunded <= quantity` never breaks.
+ * `bound` is the mirror of fulfilment's dispatch guard (FULFILL-002,
+ * `shipped + q <= quantity - refunded_quantity`):
  *
- * Goods that came back are a different path: they were shipped, so the ceiling
- * is the line's whole quantity.
- *
- * `retry` is for a request that is sent again: it may keep what it already
- * counts, and grow only into units that have not shipped. A failed 仅退款
- * written before failed requests kept their units lost them at the failure,
- * and the warehouse may have shipped them since; paying it again then would
- * hand over goods and money (REFUND-015).
+ *  - `approval` — a 仅退款 taking its units. What it may take is decided by
+ *    what the line looked like **when the buyer applied**: units that had
+ *    shipped by then are goods the buyer keeps (a money-only refund), units
+ *    that had not are units the warehouse must now hold back. So the ceiling
+ *    is `quantity - (units shipped since the request)`: a dispatch that went
+ *    out between the request and the approval — the last units, or the other
+ *    two of a line of three with one shipped earlier — makes the approval
+ *    refuse instead of refunding goods that are on their way (REFUND-021).
+ *    `transitionRefund` holds the order and its lines first, as shipping
+ *    does, so a dispatch either committed before this statement and is
+ *    counted, or waits and then meets the raised `refunded_quantity`.
+ *  - `whole-line` — goods that came back, a settlement, a release: the ceiling
+ *    is the line's whole quantity, and lowering a count never crosses it.
+ *  - `retry` — a request that is sent again: it may keep what it already
+ *    counts, and grow only into units that have not shipped. A failed 仅退款
+ *    written before failed requests kept their units lost them at the failure,
+ *    and the warehouse may have shipped them since; paying it again then would
+ *    hand over goods and money (REFUND-015).
  */
-export type UnitBound = 'unshipped' | 'whole-line' | 'retry';
+export type UnitBound = 'approval' | 'whole-line' | 'retry';
 
 export async function recomputeItemRefundedQuantity(
   tx: DbOrTx,
+  refundId: number,
   orderItemId: number,
   bound: UnitBound,
 ): Promise<ConditionalUpdateResult> {
   const counted = countedUnits(orderItemId);
   const ceiling =
-    bound === 'unshipped'
-      ? sql`${orderItems.quantity} - ${orderItems.shippedQuantity}`
+    bound === 'approval'
+      ? sql`${orderItems.quantity} - ${shippedSinceApplied(refundId, orderItemId)}`
       : bound === 'retry'
         ? sql`greatest(${orderItems.quantity} - ${orderItems.shippedQuantity}, ${orderItems.refundedQuantity})`
         : sql`${orderItems.quantity}`;
@@ -380,8 +404,16 @@ export interface NewRefundInput {
   isAutomatic: boolean;
 }
 
+/**
+ * `created_at` is the moment of the insert, not of the transaction's start:
+ * the caller holds the order row, and `shippedSinceApplied` compares this
+ * against a dispatch made under the same lock (REFUND-021).
+ */
 export async function insertRefund(tx: Tx, input: NewRefundInput): Promise<RefundRow> {
-  const rows = await tx.insert(refunds).values(input).returning();
+  const rows = await tx
+    .insert(refunds)
+    .values({ ...input, createdAt: sql`clock_timestamp()` })
+    .returning();
   const row = rows[0];
   if (!row) throw new Error('insertRefund: 插入未返回行');
   return row;
@@ -494,18 +526,11 @@ export interface TransitionPatch {
 }
 
 /**
- * How a transition re-derives its lines' `refunded_quantity`.
- *
- * - `whole-line` (the default): anything but taking unshipped units — a
- *   withdrawal, a rejection, a settlement. Lowering a count cannot cross
- *   fulfilment's bound, so it always lands.
- * - `approval`: a 仅退款 taking its units. A line that has not shipped is bound
- *   by `quantity - shipped_quantity` inside the statement, so an approval
- *   racing a dispatch has exactly one winner; a line that already shipped is a
- *   money-only refund of goods the buyer keeps, bound by the whole line.
- * - `retry`: sending a failed request again (see `UnitBound`).
+ * How a transition re-derives its lines' `refunded_quantity` — see `UnitBound`.
+ * `whole-line` (the default) is anything but taking units: a withdrawal, a
+ * rejection, a settlement.
  */
-export type TransitionUnits = 'whole-line' | 'approval' | 'retry';
+export type TransitionUnits = UnitBound;
 
 export interface TransitionResult extends ConditionalUpdateResult {
   /** Order lines whose units could not be taken. Empty unless the bound refused. */
@@ -540,23 +565,46 @@ export async function transitionRefund(
   });
   if (!result.won) return { ...result, refusedLines: [] };
 
+  await lockOrderLines(tx, id);
+
   const open = isOpenFor(to);
   await tx.update(refundItems).set({ isOpen: open }).where(eq(refundItems.refundId, id));
 
   const lines = await tx
-    .select({ orderItemId: refundItems.orderItemId, shipped: orderItems.shippedQuantity })
+    .select({ orderItemId: refundItems.orderItemId })
     .from(refundItems)
-    .innerJoin(orderItems, eq(orderItems.id, refundItems.orderItemId))
     .where(eq(refundItems.refundId, id))
     .orderBy(asc(refundItems.orderItemId));
   const refusedLines: number[] = [];
   for (const line of lines) {
-    const bound: UnitBound =
-      units === 'approval' ? (line.shipped === 0 ? 'unshipped' : 'whole-line') : units;
-    const derived = await recomputeItemRefundedQuantity(tx, line.orderItemId, bound);
+    const derived = await recomputeItemRefundedQuantity(tx, id, line.orderItemId, units);
     if (!derived.won) refusedLines.push(line.orderItemId);
   }
   return { ...result, refusedLines };
+}
+
+/**
+ * The order row, then every one of its lines in ascending id: the locks
+ * `shipOrder` takes, in the order it takes them (`lockOrder`, then
+ * `lockLineProgress`). A refund moving units and a dispatch of the same order
+ * therefore run one after the other, never interleaved, and a transition never
+ * holds a line while waiting for the order that a dispatch holds while waiting
+ * for the line. The refund row is locked before this by every caller.
+ */
+async function lockOrderLines(tx: Tx, refundId: number): Promise<void> {
+  const [row] = await tx
+    .select({ orderId: refunds.orderId })
+    .from(refunds)
+    .where(eq(refunds.id, refundId))
+    .limit(1);
+  if (!row) return;
+  await lockOrder(tx, row.orderId);
+  await tx
+    .select({ id: orderItems.id })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, row.orderId))
+    .orderBy(asc(orderItems.id))
+    .for('update');
 }
 
 export async function setReturnShipment(

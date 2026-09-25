@@ -469,6 +469,37 @@ describe('checkout preview', () => {
       'ORDER_PURCHASE_LIMIT_REACHED',
     );
   });
+
+  it('CAT-014 — counts a lifetime limit the way the cart and the product page do: unpaid in, refunded out', async () => {
+    const userId = await makeUser();
+    const item = await makeProduct({ purchaseLimit: { mode: 'lifetime', quantity: 2 } });
+    await addToCart(userId, item, 2);
+    await makeAddress(userId);
+    const placed = await order.create(as(userId), {
+      source: 'cart',
+      cartItemIds: [],
+      kind: 'normal',
+      idempotencyKey: idempotencyKey(),
+    });
+
+    // Unpaid, it already holds the allowance, for checkout and the port alike.
+    const facts = () =>
+      harness.ctx.withTx((tx) =>
+        orderFacts.purchasedQuantity(tx, { userId, productId: item.productId }),
+      );
+    expect(await facts()).toBe(2);
+
+    // Both units sent back: the allowance is free again, everywhere.
+    await harness.ctx.db
+      .update(orderItems)
+      .set({ refundedQuantity: 2 })
+      .where(eq(orderItems.orderId, Number(placed.id)));
+    expect(await facts()).toBe(0);
+    await addToCart(userId, item, 2);
+    await expect(
+      order.preview(as(userId), { source: 'cart', cartItemIds: [], kind: 'normal' }),
+    ).resolves.toMatchObject({ totalQuantity: 2 });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1126,6 +1157,18 @@ describe('my orders', () => {
       sortOrder: 'desc',
     });
     expect(byName.total).toBe(1);
+
+    // `%` and `_` are what the shopper typed, not wildcards that list everything.
+    for (const keyword of ['%', '_']) {
+      const literal = await order.list(as(userId), {
+        page: 1,
+        pageSize: 20,
+        tab: 'all',
+        keyword,
+        sortOrder: 'desc',
+      });
+      expect(literal.total).toBe(0);
+    }
   });
 
   it('answers a stranger’s detail request with the same 404 as an unknown id', async () => {

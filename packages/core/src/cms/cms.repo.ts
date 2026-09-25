@@ -1,6 +1,7 @@
 import type { DbOrTx } from '@shop/db';
 import { articleCategories, articleContents, articles } from '@shop/db/schema/cms';
 import { and, asc, count, desc, eq, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { containsPattern } from '../kernel/like';
 
 /**
  * The only file in the CMS domain that touches Drizzle tables
@@ -41,7 +42,7 @@ export async function listCategories(
 ): Promise<(CategoryRow & { articleCount: number })[]> {
   const where: SQL[] = [liveCategory];
   if (filter.keyword !== undefined) {
-    where.push(ilike(articleCategories.title, `%${filter.keyword}%`));
+    where.push(ilike(articleCategories.title, containsPattern(filter.keyword)));
   }
   if (filter.status !== undefined) where.push(eq(articleCategories.status, filter.status));
 
@@ -172,7 +173,7 @@ export interface ArticlePage extends ArticleFilter {
 function articleWhere(filter: ArticleFilter): SQL[] {
   const where: SQL[] = [liveArticle];
   if (filter.keyword !== undefined) {
-    const like = `%${filter.keyword}%`;
+    const like = containsPattern(filter.keyword);
     const match = or(ilike(articles.title, like), ilike(articles.summary, like));
     if (match !== undefined) where.push(match);
   }

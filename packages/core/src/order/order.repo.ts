@@ -13,6 +13,7 @@ import {
 } from '../kernel/tx';
 import type { OrderListTab } from '@shop/contracts/order/schemas';
 import type { OrderStatus } from './ports';
+import { containsPattern } from '../kernel/like';
 
 /**
  * The only file in the order domain that touches Drizzle tables.
@@ -125,8 +126,14 @@ export async function reviewedItemIds(
 
 /**
  * Units of each product this buyer has already committed to, for a `lifetime`
- * purchase limit. Cancelled orders do not count — a shopper who abandoned a
- * checkout has not used up their allowance.
+ * purchase limit — the one definition checkout, the cart and the product page
+ * all read (`OrderFactsPort.purchasedQuantity` is this, for one product).
+ *
+ * An unpaid order counts: it holds the units until it is paid or closed, and
+ * not counting it would let a shopper open three unpaid orders under a limit of
+ * one and pay all three. A cancelled order does not count, and neither do
+ * refunded units — a shopper who abandoned a checkout or sent the goods back
+ * has not used up their allowance.
  */
 export async function purchasedQuantity(
   db: DbOrTx,
@@ -137,7 +144,7 @@ export async function purchasedQuantity(
   const rows = await db
     .select({
       productId: orderItems.productId,
-      quantity: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int`,
+      quantity: sql<number>`coalesce(sum(${orderItems.quantity} - ${orderItems.refundedQuantity}), 0)::int`,
     })
     .from(orderItems)
     .innerJoin(orders, eq(orders.id, orderItems.orderId))
@@ -161,7 +168,33 @@ export async function purchasedQuantity(
  * or closes it.
  */
 export function hasOpenRefund(): SQL {
-  return sql`exists (select 1 from ${refunds} where ${refunds.orderId} = ${orders.id} and ${refunds.status} in ('applied', 'approved', 'processing', 'unknown', 'failed'))`;
+  return sql`exists (select 1 from ${refunds} where ${refunds.orderId} = ${orders.id} and ${inArray(refunds.status, [...OPEN_REFUND_STATUSES])})`;
+}
+
+/**
+ * The refund domain's `IN_FLIGHT_STATUSES`, spelled out: that domain imports
+ * this one, so importing it back would be a cycle. `order.open-refund.test.ts`
+ * holds the two lists equal.
+ */
+export const OPEN_REFUND_STATUSES = [
+  'applied',
+  'approved',
+  'processing',
+  'unknown',
+  'failed',
+] as const;
+
+/** Which of these orders have an after-sales request still being handled. */
+export async function ordersWithOpenRefund(
+  db: DbOrTx,
+  orderIds: readonly number[],
+): Promise<Set<number>> {
+  if (orderIds.length === 0) return new Set();
+  const rows = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(and(inArray(orders.id, [...new Set(orderIds)]), hasOpenRefund()));
+  return new Set(rows.map((row) => row.id));
 }
 
 /** Whether one order has an after-sales request still being handled. */
@@ -237,8 +270,8 @@ export async function listOrders(
     filter.where,
     keyword
       ? or(
-          sql`${orders.orderNo} like ${`%${keyword}%`}`,
-          sql`exists (select 1 from order_items oi where oi.order_id = ${orders.id} and oi.snapshot->>'productName' ilike ${`%${keyword}%`})`,
+          sql`${orders.orderNo} like ${containsPattern(keyword)}`,
+          sql`exists (select 1 from order_items oi where oi.order_id = ${orders.id} and oi.snapshot->>'productName' ilike ${containsPattern(keyword)})`,
         )
       : undefined,
   );

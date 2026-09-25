@@ -163,7 +163,7 @@ export type GroupbuyActivityForm = z.infer<typeof groupbuyActivityForm>;
 
 export const groupbuyActivityListQuery = pageQuery
   .extend({
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     status: z.union([groupbuyActivityStatus, z.array(groupbuyActivityStatus)]).optional(),
     productId: id.optional(),
   })

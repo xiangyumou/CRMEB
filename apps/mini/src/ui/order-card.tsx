@@ -91,7 +91,8 @@ export function OrderCard({ order, onAction, onClick, busy, onExpire, className 
   const shown = order.items.slice(0, MAX_ROWS);
   const { unitPrices } = orderPrices(order);
   const paid = order.paidAmount ?? order.payableAmount;
-  const refunding = order.refundStatus === 'requested';
+  // Any request still being handled, including one after an earlier partial refund.
+  const refunding = order.hasOpenRefund;
 
   return (
     <View className={cx('shop-order', className)}>

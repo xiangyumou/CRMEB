@@ -12,6 +12,7 @@ import { registerAllDomains } from '../domains.gen';
 import type { Actor, Ctx } from '../kernel/context';
 import { Money } from '../kernel/money';
 import { registerShippingFreightPort } from '../shipping';
+import * as coupon from '../coupon';
 import * as order from './index';
 import { resetOrderPorts } from './ports';
 
@@ -145,7 +146,7 @@ async function presaleOn(skuId: number): Promise<number> {
 }
 
 /** A store-wide ¥`off` coupon already in the shopper's wallet. */
-async function couponFor(userId: number, off: string): Promise<number> {
+async function couponFor(userId: number, off: string, minSpend = '0.00'): Promise<number> {
   const [template] = await harness.ctx.db
     .insert(couponTemplates)
     .values({
@@ -153,7 +154,7 @@ async function couponFor(userId: number, off: string): Promise<number> {
       status: 'active',
       claimMode: 'manual',
       discountAmount: off,
-      minSpend: '0.00',
+      minSpend,
       validityMode: 'days_after_claim',
       validDays: 30,
       isUnlimitedSupply: true,
@@ -169,7 +170,7 @@ async function couponFor(userId: number, off: string): Promise<number> {
       sourceKind: 'claim',
       title: `减 ${off}`,
       discountAmount: off,
-      minSpend: '0.00',
+      minSpend,
       validFrom: new Date('2026-01-01T00:00:00.000Z'),
       validTo: new Date('2026-12-31T00:00:00.000Z'),
     })
@@ -308,5 +309,53 @@ describe('a 预售 order with a stacked coupon', () => {
       .where(eq(orderItems.id, row!.id));
     const detail = await order.detail(asUser(userId), { id: created.id });
     expect(detail.items[0]!.adjustments).toEqual([]);
+  });
+});
+
+describe('PRICE-005 — a coupon’s 使用门槛 is measured against the 拼团/预售 price', () => {
+  it('refuses a ¥80 threshold on a ¥78 预售 of an ¥88 item, as the coupon picker says', async () => {
+    const userId = await shopper();
+    const skuId = await sku(LIST);
+    const activityId = await presaleOn(skuId);
+    const userCouponId = await couponFor(userId, '5.00', '80.00');
+    const body = {
+      source: 'buy-now' as const,
+      cartItemIds: [],
+      item: { skuId: String(skuId), quantity: 1 },
+      kind: 'presale' as const,
+      kindMeta: { activityId: String(activityId) },
+    };
+
+    // What the mini-program asks the picker with: the preview's lines after
+    // the activity price.
+    const base = await order.preview(asUser(userId), body);
+    expect(base.lines[0]!.totalAmount).toBe(PRESALE);
+    const picker = await coupon.listApplicable(asUser(userId), {
+      lines: base.lines.map((line) => ({ productId: line.productId, amount: line.totalAmount })),
+    });
+    const listed = picker.items.find((row) => row.coupon.id === String(userCouponId));
+    expect(listed).toMatchObject({ usable: false, reason: 'COUPON_MIN_SPEND_NOT_MET' });
+
+    // … and the checkout agrees instead of taking ¥5 off the catalogue price.
+    await expect(
+      order.preview(asUser(userId), { ...body, userCouponId: String(userCouponId) }),
+    ).rejects.toMatchObject({ code: 'COUPON_MIN_SPEND_NOT_MET' });
+  });
+
+  it('still applies a threshold the 预售 price meets', async () => {
+    const userId = await shopper();
+    const skuId = await sku(LIST);
+    const activityId = await presaleOn(skuId);
+    const userCouponId = await couponFor(userId, '5.00', '78.00');
+
+    const priced = await order.preview(asUser(userId), {
+      source: 'buy-now',
+      cartItemIds: [],
+      item: { skuId: String(skuId), quantity: 1 },
+      kind: 'presale',
+      kindMeta: { activityId: String(activityId) },
+      userCouponId: String(userCouponId),
+    });
+    expect(priced.payableAmount).toBe('73.00');
   });
 });

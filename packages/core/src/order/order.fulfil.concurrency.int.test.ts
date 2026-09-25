@@ -17,7 +17,12 @@ import * as order from './index';
 import { autoDeliver, installFulfilmentHooks } from './order.fulfil.effects';
 import { resetFulfilmentPorts } from './order.fulfil.ports';
 import { orderStateMachine } from './order.state-machine';
-import { onOrderPaid, registerOrderStateMachine, resetOrderPorts } from './ports';
+import {
+  onOrderPaid,
+  onShipmentDispatched,
+  registerOrderStateMachine,
+  resetOrderPorts,
+} from './ports';
 
 /**
  * The fulfilment races.
@@ -535,26 +540,50 @@ describe('two dispatchers replaying the same virtual delivery', () => {
     const first = await paidOrder([card]);
     const second = await paidOrder([card]);
 
-    const report = await runConcurrently<Attempt>(
-      2,
-      (index) =>
-        attempt(() => autoDeliver(racerSystem(), index === 0 ? first.orderId : second.orderId)),
-      { isWinner: (outcome) => outcome.won },
-    );
+    // The first delivery stops just before it commits, still holding the card
+    // it claimed, and stays there until the second has finished (or a second
+    // has passed). A barrier start alone lets one run finish before the other
+    // claims, and then a claim without `FOR UPDATE SKIP LOCKED` passes too
+    // (MUT-001 `virtual-card-claim`): the second must reach the card while the
+    // first still holds it. With the skip it finds no free card at once; without
+    // it, it waits for the first to commit and then takes the same card again.
+    let holding!: () => void;
+    const firstHolds = new Promise<void>((resolve) => {
+      holding = resolve;
+    });
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    onShipmentDispatched.register('test: hold the first claim open', async (_tx, _ctx, event) => {
+      if (event.orderId !== first.orderId) return;
+      holding();
+      await Promise.race([released, new Promise((resolve) => setTimeout(resolve, 1_000))]);
+    });
+
+    const firstRun = attempt(() => autoDeliver(racerSystem(), first.orderId));
+    await firstHolds;
+    const secondOutcome = await autoDeliver(racerSystem(), second.orderId)
+      .then(
+        () => ({ delivered: true, error: null as unknown }),
+        (error: unknown) => ({ delivered: false, error }),
+      )
+      .finally(release);
+    const firstOutcome = await firstRun;
 
     // One delivers; the other throws, which is what hands its effect row back
     // to the ledger to retry and eventually park for a human.
-    expect(report.winners).toBe(1);
-    expect(report.rejected).toHaveLength(1);
-    expect(String(report.rejected[0])).toMatch(/卡密库存不足/);
+    expect(firstOutcome).toEqual({ won: true });
+    expect(secondOutcome.delivered).toBe(false);
+    expect(String(secondOutcome.error)).toMatch(/卡密库存不足/);
 
     expect(await harness.ctx.db.select().from(shipments)).toHaveLength(1);
-    expect(
-      await harness.ctx.db
-        .select()
-        .from(productVirtualCards)
-        .where(eq(productVirtualCards.state, 'claimed')),
-    ).toHaveLength(1);
+    const claimed = await harness.ctx.db
+      .select()
+      .from(productVirtualCards)
+      .where(eq(productVirtualCards.state, 'claimed'));
+    expect(claimed).toHaveLength(1);
+    expect(claimed[0]!.orderItemId).toBe(first.itemIds[0]);
   });
 });
 

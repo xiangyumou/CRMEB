@@ -20,6 +20,7 @@ import {
 import type { WechatMenuButtonShape } from '@shop/contracts/wechat-oa/schemas';
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { allOf, conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
+import { containsPattern } from '../kernel/like';
 
 /**
  * The button tree crosses the boundary in the contract's shape.
@@ -213,7 +214,7 @@ export async function listReplies(
       : eq(wechatAutoReplies.triggerKind, filter.triggerKind),
     filter.keyword === undefined
       ? undefined
-      : ilike(wechatAutoReplies.keyword, `%${filter.keyword}%`),
+      : ilike(wechatAutoReplies.keyword, containsPattern(filter.keyword)),
     filter.isEnabled === undefined ? undefined : eq(wechatAutoReplies.isEnabled, filter.isEnabled),
   );
   const rows = await db
@@ -569,7 +570,9 @@ export async function listQrcodes(
     isNull(wechatQrcodes.deletedAt),
     filter.categoryId === undefined ? undefined : eq(wechatQrcodes.categoryId, filter.categoryId),
     filter.status === undefined ? undefined : eq(wechatQrcodes.status, filter.status),
-    filter.keyword === undefined ? undefined : ilike(wechatQrcodes.name, `%${filter.keyword}%`),
+    filter.keyword === undefined
+      ? undefined
+      : ilike(wechatQrcodes.name, containsPattern(filter.keyword)),
   );
 
   const column =

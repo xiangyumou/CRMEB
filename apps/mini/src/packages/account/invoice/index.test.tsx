@@ -38,6 +38,24 @@ describe('发票详情', () => {
     expect(client.getQueryState(orderKey)?.isInvalidated).toBe(true);
   });
 
+  it('INVOICE-005 — reads 已作废 for an invoice the shop voided, and offers no new one for a refunded order', async () => {
+    serveApi({
+      'GET /api/v1/invoices/3001': () => ({
+        body: {
+          ...orderInvoiceFixture,
+          status: 'cancelled',
+          invoiceNumber: '24332000000012345678',
+          voided: true,
+          orderRefundedInFull: true,
+        },
+      }),
+    });
+    await renderPage(<InvoicePage />);
+    expect(await screen.findByText('已作废')).toBeTruthy();
+    expect(screen.getByText('订单已退款，商家已作废这张发票')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '重新申请' })).toBeNull();
+  });
+
   it('goes back to the 订单详情 it was opened from for 查看订单, not to a second copy', async () => {
     serveApi({ 'GET /api/v1/invoices/3001': () => ({ body: orderInvoiceFixture }) });
     taroFake.pageStack = [

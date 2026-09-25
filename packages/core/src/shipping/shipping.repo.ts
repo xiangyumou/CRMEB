@@ -2,6 +2,7 @@ import type { DbOrTx } from '@shop/db';
 import { cities, expressCompanies } from '@shop/db/schema/reference';
 import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
+import { containsPattern } from '../kernel/like';
 
 /**
  * The only file in the shipping domain that touches Drizzle tables
@@ -121,11 +122,6 @@ export async function listEnabledExpressCompanies(db: DbOrTx): Promise<ExpressCo
     .orderBy(desc(expressCompanies.sortOrder), asc(expressCompanies.id));
 }
 
-/** `%`, `_` and `\` are literal in a shopper's search, not wildcards. */
-function containsPattern(keyword: string): string {
-  return `%${keyword.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-}
-
 /**
  * The shopper's picker (SHIP-003): enabled only, a WeChat courier code first (a return
  * shipped with one can be reported to 小程序发货信息管理), then `sortOrder DESC, id ASC`,
@@ -175,7 +171,7 @@ export async function listExpressCompanies(
 ): Promise<{ rows: ExpressCompanyRow[]; total: number }> {
   const filters: SQL[] = [];
   if (args.keyword !== undefined && args.keyword !== '') {
-    const like = `%${args.keyword}%`;
+    const like = containsPattern(args.keyword);
     const match = or(ilike(expressCompanies.name, like), ilike(expressCompanies.code, like));
     if (match) filters.push(match);
   }

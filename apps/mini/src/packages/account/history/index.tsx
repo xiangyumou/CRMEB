@@ -93,7 +93,11 @@ function History() {
           return (
             <>
               {first ? <Text className="history__day">{day}</Text> : null}
-              <ProductRow product={item.product} selection={selection} />
+              <ProductRow
+                product={item.product}
+                unavailable={!item.available}
+                selection={selection}
+              />
             </>
           );
         }}

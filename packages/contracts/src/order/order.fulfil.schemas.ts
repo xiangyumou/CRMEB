@@ -428,7 +428,7 @@ export const adminOrderListQuery = pageQuery
     kind: orderKind.optional(),
     platform: clientPlatform.optional(),
     /** Order number, receiver name, receiver phone or a product name in the order. */
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     userId: id.optional(),
     createdFrom: instant.optional(),
     createdTo: instant.optional(),
@@ -635,6 +635,20 @@ export const orderInvoice = z.object({
    * rather than the normal case it used to be.
    */
   orderSummary: invoiceOrderSummary.nullable(),
+  /**
+   * Every yuan the order collected has since been refunded. The invoice keeps
+   * its status — an issued invoice is not undone by a refund — so on a
+   * 已开票 one the admin says 订单已全额退款，请到税务系统冲红, and staff mark it
+   * 已作废 once they have (`voided`). Read from the order, never copied.
+   */
+  orderRefundedInFull: z.boolean(),
+  /**
+   * An issued invoice staff marked 已作废 (after 冲红 in the tax system). It is
+   * `status: 'cancelled'` with the invoice number kept, which is what tells it
+   * apart from a request the buyer withdrew; `issuedAt` is cleared (only an
+   * `issued` row has one). The order may then ask for a new invoice.
+   */
+  voided: z.boolean(),
   issuedAt: instant.nullable(),
   createdAt: instant,
 });
@@ -667,6 +681,8 @@ export const orderInvoiceExample = {
     lineCount: 1,
     totalQuantity: 2,
   },
+  orderRefundedInFull: false,
+  voided: false,
   issuedAt: null,
   createdAt: '2026-02-03T10:00:00+08:00',
 } satisfies OrderInvoice;
@@ -757,7 +773,7 @@ export const adminInvoiceListQuery = pageQuery
     headerType: invoiceHeaderType.optional(),
     invoiceType: invoiceType.optional(),
     /** Invoice header, duty number or order number. */
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     userId: id.optional(),
     createdFrom: instant.optional(),
     createdTo: instant.optional(),

@@ -187,7 +187,7 @@ export type WechatAutoReplyForm = z.infer<typeof wechatAutoReplyForm>;
 
 export const wechatAutoReplyListQuery = pageQuery.extend({
   triggerKind: wechatReplyTrigger.optional(),
-  keyword: z.string().max(64).optional(),
+  keyword: z.string().trim().max(64).optional(),
   isEnabled: z.stringbool().optional(),
 });
 export type WechatAutoReplyListQuery = z.infer<typeof wechatAutoReplyListQuery>;
@@ -365,7 +365,7 @@ export type WechatQrcodeForm = z.infer<typeof wechatQrcodeForm>;
 export const wechatQrcodeListQuery = pageQuery
   .extend({
     categoryId: id.optional(),
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     status: wechatQrcodeStatus.optional(),
   })
   .extend(sortQuery(['createdAt', 'scanCount', 'followCount']).shape);

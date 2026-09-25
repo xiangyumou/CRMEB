@@ -516,7 +516,7 @@ export interface OrderFactsPort {
     tx: Tx,
     args: { orderItemId: number; userId: number },
   ): Promise<ReviewableLine | null>;
-  /** Units of the product this user bought on orders that still count (paid or beyond, not refunded). */
+  /** Units of the product this user has committed to (not cancelled, not refunded, unpaid included): `order.repo.purchasedQuantity`. */
   purchasedQuantity(tx: Tx, args: { userId: number; productId: number }): Promise<number>;
   /** Lines of orders completed at or before the instant that still have no review, oldest first. */
   findLinesAwaitingReview(

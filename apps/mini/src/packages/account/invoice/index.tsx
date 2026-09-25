@@ -17,7 +17,7 @@ import { Tag } from '@/ui/tag';
 import { SubmitBar, errorMessage } from '../shared/form';
 import {
   HEADER_TYPE_TEXT,
-  INVOICE_STATUS_TEXT,
+  invoiceStateOf,
   INVOICE_TYPE_TEXT,
   orderSummaryText,
   type OrderInvoice,
@@ -34,7 +34,10 @@ function stateNote(invoice: OrderInvoice): string {
     case 'rejected':
       return invoice.remark ? `原因：${invoice.remark}` : '可以修改抬头后重新申请';
     case 'cancelled':
-      return '申请已撤回，可以重新申请';
+      if (!invoice.voided) return '申请已撤回，可以重新申请';
+      return invoice.orderRefundedInFull
+        ? '订单已退款，商家已作废这张发票'
+        : '商家已作废这张发票，可以重新申请';
   }
 }
 
@@ -70,7 +73,7 @@ function Invoice({ id }: { id: string }) {
   if (query.isPending) return <CellSkeleton rows={6} />;
   if (query.isError) return <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />;
   const invoice = query.data;
-  const state = INVOICE_STATUS_TEXT[invoice.status];
+  const state = invoiceStateOf(invoice);
 
   async function withdraw() {
     const ok = await confirm({
@@ -139,7 +142,8 @@ function Invoice({ id }: { id: string }) {
           </Button>
         </SubmitBar>
       ) : null}
-      {invoice.status === 'rejected' || invoice.status === 'cancelled' ? (
+      {(invoice.status === 'rejected' || invoice.status === 'cancelled') &&
+      !invoice.orderRefundedInFull ? (
         <SubmitBar>
           <Button
             size="lg"

@@ -30,6 +30,7 @@ import {
 import { allOf, conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
 import { hasOpenRefund } from './order.repo';
 import type { OrderStatus } from './ports';
+import { containsPattern } from '../kernel/like';
 
 /**
  * Every Drizzle statement fulfilment owns. `order.repo.ts` keeps the checkout
@@ -108,8 +109,17 @@ export async function listShipmentItems(
     .orderBy(asc(shipmentItems.id));
 }
 
+/**
+ * `created_at` is the moment of the insert, under the order lock the caller
+ * holds, not the transaction's start: a 仅退款 approval compares it with the
+ * request's own `created_at` to tell goods shipped before the buyer asked from
+ * goods shipped after (REFUND-021).
+ */
 export async function insertShipment(tx: Tx, values: NewShipmentValues): Promise<ShipmentRow> {
-  const rows = await tx.insert(shipments).values(values).returning();
+  const rows = await tx
+    .insert(shipments)
+    .values({ ...values, createdAt: sql`clock_timestamp()` })
+    .returning();
   return rows[0]!;
 }
 
@@ -466,10 +476,10 @@ function adminWhere(filter: AdminOrderFilter): SQL | undefined {
     filter.paidTo ? lte(orders.paidAt, filter.paidTo) : undefined,
     keyword
       ? or(
-          sql`${orders.orderNo} like ${`%${keyword}%`}`,
-          sql`${orders.receiverName} ilike ${`%${keyword}%`}`,
-          sql`${orders.receiverPhone} like ${`%${keyword}%`}`,
-          sql`exists (select 1 from order_items oi where oi.order_id = ${orders.id} and oi.snapshot->>'productName' ilike ${`%${keyword}%`})`,
+          sql`${orders.orderNo} like ${containsPattern(keyword)}`,
+          sql`${orders.receiverName} ilike ${containsPattern(keyword)}`,
+          sql`${orders.receiverPhone} like ${containsPattern(keyword)}`,
+          sql`exists (select 1 from order_items oi where oi.order_id = ${orders.id} and oi.snapshot->>'productName' ilike ${containsPattern(keyword)})`,
         )
       : undefined,
   );
@@ -872,7 +882,7 @@ export async function listInvoices(
     offset: number;
     limit: number;
   },
-): Promise<{ rows: (OrderInvoiceRow & { orderNo: string })[]; total: number }> {
+): Promise<{ rows: InvoiceWithOrder[]; total: number }> {
   const keyword = args.filter.keyword?.trim();
   const where = allOf(
     args.filter.userId === undefined ? undefined : eq(orderInvoices.userId, args.filter.userId),
@@ -883,9 +893,9 @@ export async function listInvoices(
     args.filter.createdTo ? lte(orderInvoices.createdAt, args.filter.createdTo) : undefined,
     keyword
       ? or(
-          sql`${orderInvoices.name} ilike ${`%${keyword}%`}`,
-          sql`${orderInvoices.dutyNumber} like ${`%${keyword}%`}`,
-          sql`${orders.orderNo} like ${`%${keyword}%`}`,
+          sql`${orderInvoices.name} ilike ${containsPattern(keyword)}`,
+          sql`${orderInvoices.dutyNumber} like ${containsPattern(keyword)}`,
+          sql`${orders.orderNo} like ${containsPattern(keyword)}`,
         )
       : undefined,
   );
@@ -899,7 +909,7 @@ export async function listInvoices(
   const direction = args.sortOrder === 'asc' ? asc : desc;
 
   const rows = await db
-    .select({ invoice: orderInvoices, orderNo: orders.orderNo })
+    .select({ invoice: orderInvoices, ...INVOICE_ORDER })
     .from(orderInvoices)
     .innerJoin(orders, eq(orders.id, orderInvoices.orderId))
     .where(where)
@@ -914,21 +924,65 @@ export async function listInvoices(
     .where(where);
 
   return {
-    rows: rows.map((row) => ({ ...row.invoice, orderNo: row.orderNo })),
+    rows: rows.map(withOrder),
     total: Number(counted[0]?.total ?? 0),
+  };
+}
+
+/**
+ * An invoice with its order's number and money, read in the same join: whether
+ * the order has since been refunded in full is shown on the invoice (a 已开票
+ * one then needs 冲红 in the tax system), and it is read, never copied, so it
+ * cannot drift from the order.
+ */
+export type InvoiceWithOrder = OrderInvoiceRow & {
+  orderNo: string;
+  order: {
+    status: string;
+    refundStatus: string;
+    paidAmount: string | null;
+    refundedAmount: string;
+  };
+};
+
+const INVOICE_ORDER = {
+  orderNo: orders.orderNo,
+  orderStatus: orders.status,
+  refundStatus: orders.refundStatus,
+  paidAmount: orders.paidAmount,
+  refundedAmount: orders.refundedAmount,
+};
+
+function withOrder(row: {
+  invoice: OrderInvoiceRow;
+  orderNo: string;
+  orderStatus: string;
+  refundStatus: string;
+  paidAmount: string | null;
+  refundedAmount: string;
+}): InvoiceWithOrder {
+  return {
+    ...row.invoice,
+    orderNo: row.orderNo,
+    order: {
+      status: row.orderStatus,
+      refundStatus: row.refundStatus,
+      paidAmount: row.paidAmount,
+      refundedAmount: row.refundedAmount,
+    },
   };
 }
 
 export async function findInvoiceWithOrderNo(
   db: DbOrTx,
   id: number,
-): Promise<(OrderInvoiceRow & { orderNo: string }) | null> {
+): Promise<InvoiceWithOrder | null> {
   const rows = await db
-    .select({ invoice: orderInvoices, orderNo: orders.orderNo })
+    .select({ invoice: orderInvoices, ...INVOICE_ORDER })
     .from(orderInvoices)
     .innerJoin(orders, eq(orders.id, orderInvoices.orderId))
     .where(eq(orderInvoices.id, id))
     .limit(1);
   const row = rows[0];
-  return row ? { ...row.invoice, orderNo: row.orderNo } : null;
+  return row ? withOrder(row) : null;
 }

@@ -1065,7 +1065,7 @@ describe('favourites', () => {
     expect((await storefront.favoriteList(ctx, { page: 1, pageSize: 20 })).total).toBe(0);
   });
 
-  it('keeps a favourite taken off the shelf on the list, sold out and removable, as counted', async () => {
+  it('keeps a favourite taken off the shelf on the list, marked unavailable and removable, as counted', async () => {
     const kept = await makeProduct(asAdmin());
     const gone = await makeProduct(asAdmin());
     const ctx = asUser(await makeUser(harness));
@@ -1079,6 +1079,9 @@ describe('favourites', () => {
     expect(first.total).toBe(2);
     expect(first.items.map((i) => i.product.id)).toEqual([gone.id]);
     expect(first.items[0]?.product).toMatchObject({ stock: 0, canAddToCart: false });
+    expect(first.items[0]?.available).toBe(false);
+    const second = await storefront.favoriteList(ctx, { page: 2, pageSize: 1 });
+    expect(second.items[0]?.available).toBe(true);
 
     await storefront.favoriteRemoveBatch(ctx, { productIds: [gone.id] });
     const after = await storefront.favoriteList(ctx, { page: 1, pageSize: 20 });
@@ -1113,7 +1116,7 @@ describe('browse history', () => {
     expect(history.items.map((i) => i.product.id)).toEqual([first.id, second.id]);
   });
 
-  it('lists a viewed product taken off the shelf as sold out, so it can be removed', async () => {
+  it('lists a viewed product taken off the shelf as unavailable, so it can be removed', async () => {
     const product = await makeProduct(asAdmin());
     const ctx = asUser(await makeUser(harness));
     await storefront.productDetail(ctx, { id: product.id });
@@ -1122,6 +1125,7 @@ describe('browse history', () => {
     const history = await storefront.historyList(ctx, { page: 1, pageSize: 20 });
     expect(history.total).toBe(1);
     expect(history.items[0]?.product).toMatchObject({ id: product.id, stock: 0 });
+    expect(history.items[0]?.available).toBe(false);
     await storefront.historyRemove(ctx, { productIds: [product.id] });
     expect((await storefront.historyList(ctx, { page: 1, pageSize: 20 })).total).toBe(0);
   });

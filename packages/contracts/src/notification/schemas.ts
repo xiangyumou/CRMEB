@@ -134,7 +134,7 @@ export type NotificationTemplate = z.infer<typeof notificationTemplate>;
 
 export const notificationTemplateListQuery = pageQuery.extend({
   audience: notificationAudience.optional(),
-  keyword: z.string().max(64).optional(),
+  keyword: z.string().trim().max(64).optional(),
 });
 export type NotificationTemplateListQuery = z.infer<typeof notificationTemplateListQuery>;
 

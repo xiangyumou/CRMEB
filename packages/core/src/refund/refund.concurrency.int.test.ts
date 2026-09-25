@@ -752,7 +752,12 @@ describe('shipping the last unshipped units while a 仅退款 is approved', () =
 
   type Outcome = { who: 'warehouse' | 'operator'; won: boolean };
 
-  async function race(order: PaidOrder, refundId: number, shipFirst: boolean): Promise<Outcome[]> {
+  async function race(
+    order: PaidOrder,
+    refundId: number,
+    shipFirst: boolean,
+    shipQuantity = 1,
+  ): Promise<Outcome[]> {
     const companyId = await expressCompany();
     const report = await runConcurrently<Outcome>(2, async (index) => {
       const shipping = shipFirst ? index === 0 : index === 1;
@@ -765,7 +770,7 @@ describe('shipping the last unshipped units while a 仅退款 is approved', () =
               deliveryMode: 'express',
               expressCompanyId: String(companyId),
               trackingNo: `SF-${(sequence += 1).toString()}`,
-              lines: [{ orderItemId: String(order.itemIds[0]!), quantity: 1 }],
+              lines: [{ orderItemId: String(order.itemIds[0]!), quantity: shipQuantity }],
             },
           });
           return { who: 'warehouse', won: true };
@@ -780,10 +785,10 @@ describe('shipping the last unshipped units while a 仅退款 is approved', () =
     return report.fulfilled;
   }
 
-  async function applied(order: PaidOrder): Promise<number> {
+  async function applied(order: PaidOrder, quantity = 1): Promise<number> {
     const refund = await service.apply(
       racer(userActor(order.userId)),
-      applyBody(order, [{ orderItemId: order.itemIds[0]!, quantity: 1 }]),
+      applyBody(order, [{ orderItemId: order.itemIds[0]!, quantity }]),
     );
     return Number(refund.id);
   }
@@ -824,6 +829,65 @@ describe('shipping the last unshipped units while a 仅退款 is approved', () =
       }
     });
   }
+
+  for (const shipFirst of [true, false]) {
+    it(`REFUND-021 — has exactly one winner on a line shipped in part before the request, when ${shipFirst ? 'the warehouse' : 'the operator'} goes first`, async () => {
+      // Three units, one sent earlier; the buyer asks for the other two as a
+      // 仅退款 while the warehouse sends those same two.
+      const order = await paidOrder([{ quantity: 3, unitPrice: '10.00', totalAmount: '30.00' }], {
+        shippedQuantities: [1],
+      });
+      const refundId = await applied(order, 2);
+
+      const outcomes = await race(order, refundId, shipFirst, 2);
+      expect(outcomes.filter((outcome) => outcome.won)).toHaveLength(1);
+
+      const line = await theLine(order);
+      const winner = outcomes.find((outcome) => outcome.won)!.who;
+      if (winner === 'warehouse') {
+        expect(line.shippedQuantity).toBe(3);
+        expect(line.refundedQuantity).toBe(0);
+        expect((await refundRow(refundId)).status).toBe('applied');
+      } else {
+        expect(line.shippedQuantity).toBe(1);
+        expect(line.refundedQuantity).toBe(2);
+        expect((await refundRow(refundId)).status).toBe('approved');
+      }
+    });
+  }
+
+  it('REFUND-021 — refuses a 仅退款 whose units shipped after the buyer asked, and still approves one on goods shipped before', async () => {
+    const companyId = await expressCompany();
+    const ship = (order: PaidOrder, quantity: number) =>
+      shipOrder(racer(adminActor(order.adminId)), {
+        orderId: order.orderId,
+        operatorAdminId: order.adminId,
+        body: {
+          deliveryMode: 'express',
+          expressCompanyId: String(companyId),
+          trackingNo: `SF-${(sequence += 1).toString()}`,
+          lines: [{ orderItemId: String(order.itemIds[0]!), quantity }],
+        },
+      });
+
+    // Shipped after the request: the approval is refused and nothing moves.
+    const late = await paidOrder([{ quantity: 1, unitPrice: '100.00', totalAmount: '100.00' }]);
+    const lateRefund = await applied(late);
+    await ship(late, 1);
+    await expect(
+      admin.adminApprove(racer(adminActor(late.adminId)), { id: String(lateRefund) }),
+    ).rejects.toMatchObject({ code: 'REFUND_LINE_ALREADY_SHIPPED' });
+    expect((await refundRow(lateRefund)).status).toBe('applied');
+    expect((await theLine(late)).refundedQuantity).toBe(0);
+
+    // Shipped before the request: a money-only refund of goods the buyer keeps.
+    const early = await paidOrder([{ quantity: 1, unitPrice: '100.00', totalAmount: '100.00' }]);
+    await ship(early, 1);
+    const earlyRefund = await applied(early);
+    await admin.adminApprove(racer(adminActor(early.adminId)), { id: String(earlyRefund) });
+    expect((await refundRow(earlyRefund)).status).toBe('approved');
+    expect((await theLine(early)).refundedQuantity).toBe(1);
+  });
 
   it('REFUND-017 — keeps the units out of the warehouse while a refused refund can be retried, and hands them back when the merchant closes it', async () => {
     const order = await paidOrder([{ quantity: 1, unitPrice: '100.00', totalAmount: '100.00' }]);

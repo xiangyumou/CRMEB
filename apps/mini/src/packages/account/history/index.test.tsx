@@ -15,9 +15,9 @@ describe('浏览记录', () => {
     serveApi({
       'GET /api/v1/me/history': () => ({
         body: page([
-          { product: productFixture, viewedAt: '2026-09-23T20:00:00+08:00' },
-          { product: other, viewedAt: '2026-09-23T09:00:00+08:00' },
-          { product: third, viewedAt: '2026-09-21T09:00:00+08:00' },
+          { product: productFixture, available: true, viewedAt: '2026-09-23T20:00:00+08:00' },
+          { product: other, available: true, viewedAt: '2026-09-23T09:00:00+08:00' },
+          { product: third, available: true, viewedAt: '2026-09-21T09:00:00+08:00' },
         ]),
       }),
     });
@@ -33,7 +33,9 @@ describe('浏览记录', () => {
   it('clears everything after a confirmation', async () => {
     const seen = serveApi({
       'GET /api/v1/me/history': () => ({
-        body: page([{ product: productFixture, viewedAt: '2026-09-23T20:00:00+08:00' }]),
+        body: page([
+          { product: productFixture, available: true, viewedAt: '2026-09-23T20:00:00+08:00' },
+        ]),
       }),
       'DELETE /api/v1/me/history': () => ({ status: 204, body: null }),
     });

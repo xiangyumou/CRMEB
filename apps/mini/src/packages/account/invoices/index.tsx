@@ -28,7 +28,7 @@ import { Tag } from '@/ui/tag';
 import { SubmitBar, errorMessage } from '../shared/form';
 import {
   HEADER_TYPE_TEXT,
-  INVOICE_STATUS_TEXT,
+  invoiceStateOf,
   INVOICE_TITLE_READS,
   orderSummaryText,
   titleSummary,
@@ -189,7 +189,7 @@ function Records() {
 }
 
 function RecordRow({ invoice }: { invoice: OrderInvoice }) {
-  const state = INVOICE_STATUS_TEXT[invoice.status];
+  const state = invoiceStateOf(invoice);
   return (
     <Pressable
       label={`${invoice.name}，${state.text}，查看详情`}
