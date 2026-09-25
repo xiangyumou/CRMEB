@@ -909,6 +909,44 @@ describe('audit log', () => {
     expect(audits).toHaveLength(0);
   });
 
+  it('AUTH-013: records a GET the handler named with ctx.audit (an export), with its filters', async () => {
+    const exportRoute = defineRoute({
+      id: 'test.adminExport',
+      method: 'GET',
+      path: '/admin-api/things/exports',
+      auth: 'admin',
+      permission: 'catalog:product:read',
+      summary: 'admin export',
+      tags: ['test'],
+      query: z.object({ status: z.string().optional() }),
+      response: z.object({ ok: z.boolean() }),
+      examples: [{ name: 'ok', query: {}, response: { ok: true } }],
+    });
+    const GET = handle(
+      exportRoute,
+      async (ctx) => {
+        ctx.audit('thing-export:3');
+        return { ok: true };
+      },
+      { container: container() },
+    );
+    const response = await GET(
+      new Request('https://shop.example/admin-api/things/exports?status=paid', {
+        headers: { cookie: `${ADMIN_COOKIE}=good-super` },
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      routeId: 'test.adminExport',
+      method: 'GET',
+      target: 'thing-export:3',
+    });
+    expect(JSON.parse(String((audits[0] as { payload: unknown }).payload))).toEqual({
+      status: 'paid',
+    });
+  });
+
   it('never fails the request when the audit write fails', async () => {
     const broken = fakeContainer({
       db: {

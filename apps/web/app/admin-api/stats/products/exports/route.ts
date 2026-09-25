@@ -9,6 +9,11 @@ import { handle } from '../../../../../src/server';
  * download. Its own permission atom: reading the page and walking out with the
  * window as a file are different acts.
  */
-export const GET = handle(statsProductExport, (ctx, { query }) => stats.productExport(ctx, query));
+export const GET = handle(statsProductExport, async (ctx, { query }) => {
+  const result = await stats.productExport(ctx, query);
+  // Written to the operation log although it is a read: who took the file.
+  ctx.audit(`stats-product-export:${result.rowCount}`);
+  return result;
+});
 
 export const dynamic = 'force-dynamic';

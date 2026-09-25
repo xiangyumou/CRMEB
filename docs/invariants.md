@@ -832,6 +832,12 @@ An API token (MCP, the `shop` CLI) cannot manage admins, roles or tokens, nor sa
 - `packages/admin-ops/src/admin-ops.test.ts::the operation catalogue > AUTH-012 — leaves out every console-only route: admins, roles and tokens are not an agent’s to manage`
 - `apps/web/src/server/api-token.int.test.ts::a personal API token > AUTH-012 — cannot create a role or an admin, nor save the payment settings`
 
+### AUTH-013
+
+Every export an admin takes — orders, products, 交易统计, 商品统计 — writes an operation-log row naming who took it and with which filters, although it is a GET: a handler that calls `ctx.audit` on a read asks `handle()` for the row. Other reads write none.
+
+- `apps/web/src/server/handle.test.ts::audit log > AUTH-013: records a GET the handler named with ctx.audit (an export), with its filters`
+
 ## Fulfilment, the order console and invoices
 
 ### FULFILL-001

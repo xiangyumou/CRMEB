@@ -98,7 +98,10 @@ export interface RequestCtx extends Ctx {
    * validation, the headers set so far (the `ETag` included) kept.
    */
   notModified(): never;
-  /** Names the thing this admin operation acted on, for the audit log. */
+  /**
+   * Names the thing this admin operation acted on, for the audit log. On a
+   * GET it also asks for the row (an export), which reads otherwise skip.
+   */
   audit(target: string): void;
 }
 
@@ -522,8 +525,10 @@ export function handle<
       }
 
       // -- 7. audit ----------------------------------------------------------
-      // Every successful write by a console admin.
-      if (MUTATING.has(request.method) && surface === 'admin' && actor.kind === 'admin') {
+      // Every successful write by a console admin, and every read the handler
+      // named with ctx.audit — an export: who took the file, with its filters.
+      const mutating = MUTATING.has(request.method);
+      if ((mutating || auditTarget !== null) && surface === 'admin' && actor.kind === 'admin') {
         await writeAudit(container, {
           actor,
           routeId: anyRoute.id,
@@ -531,7 +536,7 @@ export function handle<
           path: url.pathname,
           target: auditTarget,
           status,
-          payload: parsedBody,
+          payload: mutating ? parsedBody : query,
           requestId,
           ip: clientIp(request),
         });
