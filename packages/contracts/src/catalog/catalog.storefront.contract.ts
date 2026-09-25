@@ -256,7 +256,9 @@ export const catalogFavoriteList = defineRoute({
       name: 'first-page',
       query: { page: 1, pageSize: 20 },
       response: {
-        items: [{ product: productCardExample, createdAt: '2026-09-01T12:00:00+08:00' }],
+        items: [
+          { product: productCardExample, available: true, createdAt: '2026-09-01T12:00:00+08:00' },
+        ],
         total: 1,
         page: 1,
         pageSize: 20,
@@ -383,7 +385,9 @@ export const catalogHistoryList = defineRoute({
       name: 'first-page',
       query: { page: 1, pageSize: 20 },
       response: {
-        items: [{ product: productCardExample, viewedAt: '2026-09-21T10:15:00+08:00' }],
+        items: [
+          { product: productCardExample, available: true, viewedAt: '2026-09-21T10:15:00+08:00' },
+        ],
         total: 1,
         page: 1,
         pageSize: 20,

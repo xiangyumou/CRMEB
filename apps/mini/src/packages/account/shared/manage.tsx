@@ -36,14 +36,20 @@ export function useSelection() {
 
 export type Selection = ReturnType<typeof useSelection>;
 
-/** A product row: a list card, with a tick box in front while managing (a tap then ticks). */
+/**
+ * A product row: a list card, with a tick box in front while managing (a tap then ticks).
+ * `unavailable` (the list's `available: false`) greys it out as 已下架; its tick box still works,
+ * so the shopper can remove it.
+ */
 export function ProductRow({
   product,
   selection,
+  unavailable,
   aside,
 }: {
   product: ProductCardData;
   selection: Selection;
+  unavailable?: boolean | undefined;
   aside?: ReactNode;
 }) {
   const on = selection.ids.has(product.id);
@@ -64,6 +70,7 @@ export function ProductRow({
         <ProductCard
           product={product}
           layout="list"
+          unavailable={unavailable}
           {...(selection.managing ? { onClick: () => selection.toggle(product.id) } : {})}
         />
         {aside}
