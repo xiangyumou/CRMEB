@@ -126,6 +126,9 @@ export const paymentMiniTradeSync = defineRoute({
   path: '/admin-api/wechat-mini-trade/sync',
   auth: 'admin',
   permission: 'payment:config:write',
+  // Payment configuration is changed from the console only, never with an API
+  // token (AUTH-012) — the same rule the payment settings groups follow.
+  consoleOnly: true,
   summary: '同步小程序发货信息管理',
   tags: ['payment', 'wechat'],
   body: z.object({}).default({}),

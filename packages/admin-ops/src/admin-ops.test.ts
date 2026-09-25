@@ -35,6 +35,7 @@ describe('the operation catalogue', () => {
         'system.adminResetPassword',
         'system.roleUpdate',
         'auth.apiTokenCreate',
+        'payment.miniTradeSync',
       ]),
     );
     for (const id of consoleOnly) expect(ids.has(id)).toBe(false);
