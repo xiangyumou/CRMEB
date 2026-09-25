@@ -66,8 +66,13 @@ export interface GatewayTransaction {
   transactionId: string | null;
   tradeState: WechatTradeState;
   tradeStateDesc: string;
-  /** Integer 分, as the gateway reports it. */
+  /** Integer 分, as the gateway reports it: `amount.total`, the order total we asked for. */
   totalFen: number;
+  /**
+   * `amount.payer_total`: what the shopper's own money covered, less than
+   * `totalFen` when a WeChat 立减 / 代金券 paid part of it. Information only —
+   * settlement and refunds use `totalFen` (PAY-013).
+   */
   payerTotalFen: number;
   openid: string | null;
   successTime: string | null;

@@ -588,11 +588,17 @@ describe('PAY-003 — a failure on our side asks WeChat to deliver again', () =>
 
 describe('GATEWAY-001 — an amount that disagrees is never booked', () => {
   const cases = [
-    { label: 'short', amount: { total: 9900, payer_total: 100, currency: 'CNY' } },
-    { label: 'over', amount: { total: 19900, payer_total: 19900, currency: 'CNY' } },
+    // `total` is what is compared. A short `payer_total` alone is a WeChat-side
+    // discount, and that is a payment (PAY-013).
+    { label: 'short', amount: { total: 9800, payer_total: 9800, currency: 'CNY' }, held: '98.00' },
+    {
+      label: 'over',
+      amount: { total: 19900, payer_total: 19900, currency: 'CNY' },
+      held: '199.00',
+    },
   ];
 
-  for (const { label, amount } of cases) {
+  for (const { label, amount, held } of cases) {
     it(`refuses a ${label} amount, however well signed it is`, async () => {
       const started = await startedPayment();
       gateway.markPaid(started.outTradeNo);
@@ -614,8 +620,45 @@ describe('GATEWAY-001 — an amount that disagrees is never booked', () => {
       const exceptions = await exceptionRows();
       expect(exceptions).toHaveLength(1);
       expect(exceptions[0]!.reason).toBe('amount_mismatch');
+      // What the gateway holds, so the automatic refund sends back all of it.
+      expect(exceptions[0]!.paidAmount).toBe(held);
     });
   }
+
+  it('closes the attempt, so the order can still be cancelled and is not re-queried forever', async () => {
+    const started = await startedPayment();
+    gateway.markPaid(started.outTradeNo);
+    await notify(
+      gateway.signTransactionNotification({
+        outTradeNo: started.outTradeNo,
+        resource: resource(started.outTradeNo, {
+          amount: { total: 9800, payer_total: 9800, currency: 'CNY' },
+        }),
+      }),
+    );
+
+    const [attempt] = await attemptRows(started.orderId);
+    expect(attempt!.status).toBe('closed');
+    expect(attempt!.closedConfirmedAt).not.toBeNull();
+    expect(await service.reconcileAttempt(racer(), attempt!.id)).toBe('closed');
+    expect(await cancelOrder(racer(started.userId), started.orderId)).toBe('cancelled');
+    expect(await exceptionRows()).toHaveLength(1);
+  });
+
+  it('answers closed — not paid — when the sweep is the one that finds the disagreement', async () => {
+    const started = await startedPayment();
+    // The gateway holds a different total than the attempt asked for.
+    gateway.transactions.get(started.outTradeNo)!.amountFen = 9800;
+    gateway.markPaid(started.outTradeNo);
+    const id = (await attemptRows(started.orderId))[0]!.id;
+
+    expect(await service.reconcileAttempt(racer(), id)).toBe('closed');
+
+    expect((await attemptRows(started.orderId))[0]!.status).toBe('closed');
+    expect((await exceptionRows())[0]!.reason).toBe('amount_mismatch');
+    expect((await orderRow(started.orderId)).status).toBe('pending_payment');
+    expect(await cancelOrder(racer(started.userId), started.orderId)).toBe('cancelled');
+  });
 
   /**
    * A body with no usable amount is a different animal from a wrong one. There
@@ -644,6 +687,135 @@ describe('GATEWAY-001 — an amount that disagrees is never booked', () => {
       expect(await flowRows('order_payment')).toEqual([]);
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// PAY-013 — a WeChat-side discount is still the whole payment
+// ---------------------------------------------------------------------------
+
+describe('PAY-013 — a payment a WeChat 立减 or 代金券 paid part of', () => {
+  /** 99.00 asked for; WeChat's own promotion covered 5.00 of it. */
+  const DISCOUNT_FEN = 500;
+
+  it('pays the order from the notification: total is compared, payer_total is only noted', async () => {
+    const started = await startedPayment();
+    gateway.markPaid(started.outTradeNo, { discountFen: DISCOUNT_FEN });
+
+    const result = await notify(
+      gateway.signTransactionNotification({ outTradeNo: started.outTradeNo }),
+    );
+    expect(result.status).toBe(200);
+
+    const order = await orderRow(started.orderId);
+    expect(order.status).toBe('paid');
+    expect(order.paidAmount).toBe('99.00');
+    expect(await exceptionRows()).toEqual([]);
+
+    const [attempt] = await attemptRows(started.orderId);
+    expect(attempt!.status).toBe('paid');
+    expect(attempt!.lastResult).toContain('payer_total 9400 of 9900');
+
+    const [flow] = await flowRows('order_payment');
+    expect(flow!.amount).toBe('99.00');
+    expect(flow!.note).toContain('微信优惠 5.00');
+  });
+
+  it('pays it the same way when the reconciliation sweep finds it', async () => {
+    const started = await startedPayment();
+    gateway.markPaid(started.outTradeNo, { discountFen: DISCOUNT_FEN });
+    const id = (await attemptRows(started.orderId))[0]!.id;
+
+    expect(await service.reconcileAttempt(racer(), id)).toBe('paid');
+
+    expect((await orderRow(started.orderId)).status).toBe('paid');
+    expect(await exceptionRows()).toEqual([]);
+    // …and the order is then not cancellable, because it is paid.
+    expect(await cancelOrder(racer(started.userId), started.orderId)).toBe('paid');
+  });
+
+  it('refunds an exception with the original transaction total, which the gateway accepts', async () => {
+    const started = await startedPayment();
+    expect(await cancelOrder(racer(started.userId), started.orderId)).toBe('cancelled');
+    // The money lands anyway, with a WeChat discount on it.
+    gateway.markPaid(started.outTradeNo, { discountFen: DISCOUNT_FEN });
+    gateway.behaviour.refundStatus = 'SUCCESS';
+    await notify(gateway.signTransactionNotification({ outTradeNo: started.outTradeNo }));
+
+    const [exception] = await exceptionRows();
+    expect(exception!.reason).toBe('cancelled_order_payment');
+    expect(exception!.paidAmount).toBe('99.00');
+
+    // The fake refuses a refund whose `amount.total` is not the transaction's
+    // total, as WeChat does; payer_total (94.00) here was `refund_failed`.
+    const settled = await service.refundException(racer(), exception!.id);
+    expect(settled.status).toBe('refunded');
+    const refund = gateway.refunds.get(settled.refundNo!)!;
+    expect(refund.refundFen).toBe(9900);
+    expect(refund.totalFen).toBe(9900);
+    expect((await flowRows('exception_refund'))[0]!.amount).toBe('99.00');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PAY-014 — an attempt already closed never becomes a paid order
+// ---------------------------------------------------------------------------
+
+describe('PAY-014 — money for an attempt that was already closed', () => {
+  it('is an exception to refund, not a second way to pay the order', async () => {
+    const started = await startedPayment();
+    const id = (await attemptRows(started.orderId))[0]!.id;
+    await racer().withTx((tx) =>
+      repo.markAttemptClosed(tx, id, { confirmedAt: new Date(NOW), lastResult: 'closed: test' }),
+    );
+    gateway.markPaid(started.outTradeNo);
+
+    expect(
+      (await notify(gateway.signTransactionNotification({ outTradeNo: started.outTradeNo })))
+        .status,
+    ).toBe(200);
+
+    const order = await orderRow(started.orderId);
+    expect(order.status).toBe('pending_payment');
+    expect(order.paidAt).toBeNull();
+    expect(await flowRows('order_payment')).toEqual([]);
+    expect((await attemptRows(started.orderId))[0]!.status).toBe('closed');
+    const exceptions = await exceptionRows();
+    expect(exceptions).toHaveLength(1);
+    expect(exceptions[0]!.reason).toBe('unmatched_payment');
+    expect(await effectRows('payment.exception.refund')).toHaveLength(1);
+  });
+});
+
+describe('PAY-010 — 支付失败 (PAYERROR) is closed at the gateway, like any close', () => {
+  it('asks the gateway to close it, and answers closed only on its confirmation', async () => {
+    const started = await startedPayment();
+    gateway.setTradeState(started.outTradeNo, 'PAYERROR');
+    const id = (await attemptRows(started.orderId))[0]!.id;
+    gateway.calls.length = 0;
+
+    expect(await service.reconcileAttempt(racer(), id)).toBe('closed');
+
+    expect(gateway.calls.map((call) => call.path)).toContain(
+      `/v3/pay/transactions/out-trade-no/${started.outTradeNo}/close`,
+    );
+    expect(gateway.transactions.get(started.outTradeNo)!.tradeState).toBe('CLOSED');
+    expect((await attemptRows(started.orderId))[0]!.status).toBe('closed');
+  });
+
+  it('keeps it open, without looping, when the gateway refuses the close', async () => {
+    const started = await startedPayment();
+    gateway.setTradeState(started.outTradeNo, 'PAYERROR');
+    // The close is the first call `closeOrderPayments` makes; refuse it.
+    gateway.behaviour.failNext = { status: 400, code: 'INVALID_REQUEST', message: '拒绝关单' };
+
+    expect(await service.closeOrderPayments(racer(), started.orderId)).toBe('unknown');
+
+    const [attempt] = await attemptRows(started.orderId);
+    expect(attempt!.status).toBe('unknown');
+    expect(attempt!.lastResult).toMatch(/PAYERROR/);
+    // The next pass asks again, the gateway closes it, and the cancel goes on.
+    expect(await cancelOrder(racer(started.userId), started.orderId)).toBe('cancelled');
+  });
 });
 
 // ---------------------------------------------------------------------------

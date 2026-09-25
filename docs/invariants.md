@@ -57,6 +57,8 @@ A response whose platform certificate cannot be fetched is never trusted, so the
 
 - `packages/core/src/wechat/wechat.crypto.test.ts::TLS-003 — an unfetchable platform certificate is a refusal, not a default > refuses when the key set is empty`
 - `packages/core/src/payment/payment.concurrency.int.test.ts::TLS-006 — an unverifiable gateway answer never becomes closed or paid > leaves the attempt unknown — not closed — when reconciliation cannot trust the answer`
+- `packages/core/src/payment/payment.int.test.ts::PAY-010 — 支付失败 (PAYERROR) is closed at the gateway, like any close > asks the gateway to close it, and answers closed only on its confirmation`
+- `packages/core/src/payment/payment.int.test.ts::PAY-010 — 支付失败 (PAYERROR) is closed at the gateway, like any close > keeps it open, without looping, when the gateway refuses the close`
 
 ### TLS-004
 
@@ -176,7 +178,7 @@ Two callbacks for the same real order pay it exactly once: the losing callback k
 
 ### PAY-010
 
-An attempt is closed only once the gateway has confirmed the close: an answer that cannot be verified, a dropped connection or silence leaves the attempt `unknown` rather than `closed`, and an order whose close the gateway would not confirm cannot be cancelled.
+An attempt is closed only once the gateway has confirmed the close — a 支付失败 (`PAYERROR`) trade included, which is closed at the gateway like any other: an answer that cannot be verified, a dropped connection or silence leaves the attempt `unknown` rather than `closed`, and an order whose close the gateway would not confirm cannot be cancelled.
 
 - `packages/core/src/payment/payment.concurrency.int.test.ts::TLS-006 — an unverifiable gateway answer never becomes closed or paid > refuses to cancel an order whose close the gateway would not confirm`
 - `packages/core/src/payment/payment.concurrency.int.test.ts::TLS-006 — an unverifiable gateway answer never becomes closed or paid > treats a dropped connection as silence, not as a closed order`
@@ -197,14 +199,30 @@ An order a coupon paid for in full (payable ¥0) is paid the moment it is placed
 - `packages/core/src/order/order.zero-amount.int.test.ts::PAY-012 — an order a coupon paid for in full > settles one still waiting at the cashier instead of failing the insert`
 - `packages/core/src/order/order.zero-amount.int.test.ts::PAY-012 — an order a coupon paid for in full > still sends an order with money left to pay to the gateway`
 
+### PAY-013
+
+A WeChat Pay payment is compared and stored by `amount.total`, the total the shop asked for; `payer_total` is smaller whenever a WeChat 立减 or 代金券 covered part of it, and is only noted (the attempt's `last_result`, the capital flow's note). Such a payment pays the order, from the notification and from the reconciliation sweep alike, and a payment exception refunds with the transaction's total as `amount.total`, which is what the gateway checks.
+
+- `packages/core/src/payment/payment.int.test.ts::PAY-013 — a payment a WeChat 立减 or 代金券 paid part of > pays the order from the notification: total is compared, payer_total is only noted`
+- `packages/core/src/payment/payment.int.test.ts::PAY-013 — a payment a WeChat 立减 or 代金券 paid part of > pays it the same way when the reconciliation sweep finds it`
+- `packages/core/src/payment/payment.int.test.ts::PAY-013 — a payment a WeChat 立减 or 代金券 paid part of > refunds an exception with the original transaction total, which the gateway accepts`
+
+### PAY-014
+
+Money that arrives for an attempt already `closed` (or `failed`) is a payment exception with an automatic refund, never a paid order: the shop told the order no money could arrive under that number, and may have released what it held.
+
+- `packages/core/src/payment/payment.int.test.ts::PAY-014 — money for an attempt that was already closed > is an exception to refund, not a second way to pay the order`
+
 ### GATEWAY-001
 
-A signed WeChat Pay callback whose paid amount is short, over or malformed is refused before any payment effect. A body with no usable amount at all (absent, zero or unparseable) is acknowledged and parked as `ignored: invalid amount` instead: there is nothing to book and nothing to refund, and a 500 would ask WeChat to redeliver the same bytes forever.
+A signed WeChat Pay callback whose `amount.total` is short, over or malformed is refused before any payment effect: the money becomes a payment exception refunded in full, and the attempt is closed (the trade is final at the gateway), so the order can still be cancelled and reconciliation answers `closed`, not `paid`. A body with no usable amount at all (absent, zero or unparseable) is acknowledged and parked as `ignored: invalid amount` instead: there is nothing to book and nothing to refund, and a 500 would ask WeChat to redeliver the same bytes forever.
 
 - `packages/core/src/payment/payment.int.test.ts::GATEWAY-001 — an amount that disagrees is never booked > refuses a short amount, however well signed it is`
 - `packages/core/src/payment/payment.int.test.ts::GATEWAY-001 — an amount that disagrees is never booked > refuses a over amount, however well signed it is`
 - `packages/core/src/payment/payment.int.test.ts::GATEWAY-001 — an amount that disagrees is never booked > parks an unparseable amount on the callbacks table instead of looping`
 - `packages/core/src/payment/payment.concurrency.int.test.ts::PAYC-002 — the reconciliation sweep racing a callback > never books a payment whose amount disagrees with the attempt`
+- `packages/core/src/payment/payment.int.test.ts::GATEWAY-001 — an amount that disagrees is never booked > closes the attempt, so the order can still be cancelled and is not re-queried forever`
+- `packages/core/src/payment/payment.int.test.ts::GATEWAY-001 — an amount that disagrees is never booked > answers closed — not paid — when the sweep is the one that finds the disagreement`
 
 ## Pricing
 

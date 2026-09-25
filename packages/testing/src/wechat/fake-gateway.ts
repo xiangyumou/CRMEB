@@ -127,6 +127,12 @@ export interface FakeTransaction {
   outTradeNo: string;
   transactionId: string;
   amountFen: number;
+  /**
+   * What a WeChat-side 立减 / 代金券 covered, in 分: `payer_total` is
+   * `amountFen` minus this, while `total` (and a refund's `amount.total`) stays
+   * `amountFen`. Set by `markPaid(…, { discountFen })`.
+   */
+  discountFen?: number;
   tradeState: FakeTradeState;
   openid: string;
   /** Cumulative refunded 分. The cap every refund is checked against. */
@@ -230,8 +236,11 @@ export interface FakeWechatGateway {
   /** Keyed by merchant refund number — the number the app is certain it owns. */
   refunds: Map<string, FakeRefund>;
   behaviour: FakeGatewayBehaviour;
-  /** Marks a transaction paid, as if the shopper completed payment. */
-  markPaid(outTradeNo: string): FakeTransaction;
+  /**
+   * Marks a transaction paid, as if the shopper completed payment — with a
+   * WeChat-side discount covering `discountFen` of it when given.
+   */
+  markPaid(outTradeNo: string, options?: { discountFen?: number }): FakeTransaction;
   /** Forces any trade state, for the paths a shopper cannot reach on demand. */
   setTradeState(outTradeNo: string, state: FakeTradeState): FakeTransaction;
   /** Expires an unpaid transaction now, without waiting for `time_expire`. */
@@ -600,7 +609,11 @@ export async function startFakeWechatGateway(
       fail(res, 400, 'ORDERPAID', '订单已支付，不能关闭');
       return;
     }
-    if (transaction.tradeState === 'NOTPAY' || transaction.tradeState === 'USERPAYING') {
+    if (
+      transaction.tradeState === 'NOTPAY' ||
+      transaction.tradeState === 'USERPAYING' ||
+      transaction.tradeState === 'PAYERROR'
+    ) {
       transaction.tradeState = 'CLOSED';
     }
     // Closing an already-closed order is a success: close must be retryable.
@@ -796,10 +809,11 @@ export async function startFakeWechatGateway(
     refunds,
     behaviour,
     server,
-    markPaid(outTradeNo) {
+    markPaid(outTradeNo, options) {
       const transaction = transactions.get(outTradeNo);
       if (!transaction) throw new Error(`fake gateway: 未知交易 ${outTradeNo}`);
       transaction.tradeState = 'SUCCESS';
+      if (options?.discountFen !== undefined) transaction.discountFen = options.discountFen;
       transaction.successTime ??= new Date(now()).toISOString();
       return transaction;
     },
@@ -863,7 +877,7 @@ function transactionBody(transaction: FakeTransaction, keys: FakeWechatKeys) {
     payer: { openid: transaction.openid },
     amount: {
       total: transaction.amountFen,
-      payer_total: paid ? transaction.amountFen : 0,
+      payer_total: paid ? transaction.amountFen - (transaction.discountFen ?? 0) : 0,
       currency: 'CNY',
     },
   };
