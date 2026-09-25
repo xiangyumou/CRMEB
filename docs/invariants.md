@@ -1988,12 +1988,13 @@ A declared content type that disagrees with the bytes is refused, not silently c
 
 ### STOR-004
 
-A remote import is refused for private, loopback, link-local and cloud-metadata addresses **after** DNS resolution, for a name that resolves to both a public and a private address, and on a redirect into the private network.
+A remote import is refused for private, loopback, link-local and cloud-metadata addresses — an IPv4 address inside an IPv6 one (`::ffff:7f00:1`, `::/96`) judged as the IPv4 it is — **after** DNS resolution, for a name that resolves to both a public and a private address, and on a redirect into the private network.
 
 - `packages/core/src/storage/safe-fetch.test.ts::safeFetch — refusals > refuses a public name that RESOLVES to a private address`
 - `packages/core/src/storage/safe-fetch.test.ts::safeFetch — refusals > refuses a name that resolves to one public AND one private address`
 - `packages/core/src/storage/safe-fetch.test.ts::safeFetch — refusals > refuses a redirect into the private network`
 - `packages/core/src/storage/safe-fetch.test.ts::classifyAddress > blocks every address family a fetch must never reach`
+- `packages/core/src/storage/safe-fetch.test.ts::classifyAddress > STOR-004 — judges the IPv4 inside an IPv6 spelling, however it is written`
 
 ### STOR-005
 
