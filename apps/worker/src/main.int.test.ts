@@ -102,6 +102,17 @@ describe('syncRepeatables', () => {
     );
   });
 
+  it('OPS-018 — bounds the failed runs a schedule keeps in Redis', async () => {
+    // Redis runs `noeviction`: a sweep failing every five seconds through an
+    // outage must not fill it until sessions cannot be written.
+    await syncRepeatables(queue, indexJobs([fakeJob('system.alpha', 1000)]), logger);
+    const [scheduler] = await queue.getJobSchedulers();
+    expect(scheduler?.template?.opts).toMatchObject({
+      removeOnComplete: { count: 100 },
+      removeOnFail: { age: 24 * 3600, count: 200 },
+    });
+  });
+
   it('uses Asia/Shanghai for a cron schedule', async () => {
     const nightly = defineJob({
       name: 'system.nightly',

@@ -545,8 +545,11 @@ directory: `web` answers it, and a `robots.txt` put there is ignored.
 - `/api/v1/health` is the app answering, shallowly. It carries the version and no dependency
   detail.
 - `/readyz` is proxied to the app's `/api/v1/readyz`, the deep check: database, Redis, migrations
-  and worker heartbeat. It answers 503 naming the check that failed, and nothing else: no error
-  text, no host, no connection string. The detail is in `./shop compose logs web`.
+  and worker heartbeat. The worker check needs both beats: `worker:heartbeat` (the process is
+  alive) and `worker:heartbeat:job`, written when a job completes, no older than three minutes
+  (`JOB_HEARTBEAT_MAX_AGE_MS`), so a worker whose queue consumer is stuck is not ready. It
+  answers 503 naming the check that failed, and nothing else: no error text, no host, no
+  connection string. The detail is in `./shop compose logs web`.
 
 The container healthchecks use only the shallow probes. A container probe that opens a database
 connection restarts the container whenever the database blips, which turns a degradation into an

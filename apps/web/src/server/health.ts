@@ -43,6 +43,24 @@ export const EXPECTED_MIGRATIONS = 15;
 const HEARTBEAT_KEY = 'worker:heartbeat';
 
 /**
+ * The key the worker writes when a job *completes*
+ * (`apps/worker/src/job-heartbeat.ts`). The loop beat above is a timer, and a
+ * timer keeps ticking while BullMQ's consumer is stuck; this one only moves
+ * when work is actually done.
+ */
+const JOB_HEARTBEAT_KEY = 'worker:heartbeat:job';
+
+/**
+ * `system.dispatchEffects` completes every 5 s and `system.heartbeat` every
+ * 60 s, so three missed minutes is a worker that has stopped consuming — not a
+ * slow one. Overridable, like the loop beat's.
+ */
+function jobHeartbeatMaxAgeMs(): number {
+  const configured = Number(process.env.JOB_HEARTBEAT_MAX_AGE_MS ?? '180000');
+  return Number.isFinite(configured) && configured > 0 ? configured : 180_000;
+}
+
+/**
  * Two missed beats is a wedged loop; one is a slow tick. Same default, same
  * environment variables and the same reasoning as the worker image's own probe
  * (`docker/healthcheck/worker.mjs`), so the two cannot disagree about what
@@ -73,6 +91,15 @@ async function within<T>(promise: Promise<T>): Promise<T> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** A millisecond timestamp no older than `maxAge` (and not from the future). */
+function assertFresh(beat: string | null, maxAge: number, nowMs: number): void {
+  if (beat === null) throw new Error('no heartbeat');
+  const age = nowMs - Number(beat);
+  if (!Number.isFinite(age)) throw new Error('the heartbeat is not a timestamp');
+  // A clock running backwards is a real fault, not a healthy worker.
+  if (age > maxAge || age < -maxAge) throw new Error('the heartbeat is stale');
 }
 
 async function settled(check: () => Promise<unknown>): Promise<'ok' | 'failed'> {
@@ -121,19 +148,16 @@ export async function readinessPayload(ctx: Ctx): Promise<ReadinessPayload> {
         throw new Error(`${applied} migration(s) applied, expected ${EXPECTED_MIGRATIONS}`);
       }
     }),
-    // The heartbeat is written from the same event loop that runs the jobs and
-    // deleted before draining on SIGTERM, so this asks "are jobs being
-    // consumed", not "is a process alive". A web that serves while nothing
-    // drains the queue looks well and quietly stops paying, shipping and
-    // refunding.
+    // "Are jobs being consumed", not "is a process alive": a web that serves
+    // while nothing drains the queue looks well and quietly stops paying,
+    // shipping and refunding. So both beats, in one read. The loop's is
+    // written by a timer and deleted before draining on SIGTERM; the job one
+    // only moves when a job completes. A worker whose BullMQ connection is
+    // wedged keeps the first fresh and lets the second go stale.
     settled(async () => {
-      const beat = await ctx.redis.get(HEARTBEAT_KEY);
-      if (beat === null) throw new Error('no heartbeat');
-      const age = ctx.clock.nowMs() - Number(beat);
-      if (!Number.isFinite(age)) throw new Error('the heartbeat is not a timestamp');
-      const maxAge = heartbeatMaxAgeMs();
-      // A clock running backwards is a real fault, not a healthy worker.
-      if (age > maxAge || age < -maxAge) throw new Error('the heartbeat is stale');
+      const [beat, jobBeat] = await ctx.redis.mget(HEARTBEAT_KEY, JOB_HEARTBEAT_KEY);
+      assertFresh(beat ?? null, heartbeatMaxAgeMs(), ctx.clock.nowMs());
+      assertFresh(jobBeat ?? null, jobHeartbeatMaxAgeMs(), ctx.clock.nowMs());
     }),
   ]);
 

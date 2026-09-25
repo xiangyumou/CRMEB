@@ -48,8 +48,11 @@ export function createBullQueue(options: BullQueueOptions): JobQueue & { close()
       attempts: options.defaultAttempts ?? 5,
       backoff: { type: 'exponential', delay: 5_000 },
       removeOnComplete: { age: 3600, count: 1000 },
-      // Keep failures around long enough for an operator to look at them.
-      removeOnFail: { age: 7 * 24 * 3600 },
+      // Keep failures around long enough for an operator to look at them, but
+      // not without bound: Redis runs `noeviction`, and an outage that fails a
+      // thousand per-order jobs must not fill it (exhausted ones are also in
+      // `failed_jobs`).
+      removeOnFail: { age: 7 * 24 * 3600, count: 1000 },
     },
   });
 

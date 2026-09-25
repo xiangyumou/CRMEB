@@ -3,6 +3,7 @@ import type { Ctx } from '../kernel/context';
 import { withTx } from '../kernel/tx';
 import {
   claimDue,
+  countParked,
   findById,
   findOne,
   insertIgnore,
@@ -11,6 +12,7 @@ import {
   markDone,
   markUnknown,
   oldestDue,
+  pruneDone,
   retryEffect,
   scheduleRetry,
   type EffectConsoleRow,
@@ -340,6 +342,37 @@ export async function effectsBacklogMs(ctx: Ctx): Promise<number | null> {
   const now = ctx.clock.now();
   const at = await oldestDue(ctx.db, now);
   return at === null ? null : Math.max(0, now.getTime() - at.getTime());
+}
+
+/**
+ * Scopes whose `done` rows are kept for good, because code reads them back as
+ * a record rather than as a ledger entry: `shipment` answers "has WeChat been
+ * told about this shipment" (`payment.mini-trade.ts`), which a 修改发货信息 or
+ * the last part of a split delivery asks months later if it likes.
+ */
+export const EFFECT_SCOPES_KEPT = ['shipment'] as const;
+
+/**
+ * Retention for the ledger, called nightly by `system.pruneEffects`.
+ *
+ * Only `done` rows older than `retentionDays` go. Parked and pending rows are
+ * work, never history, and stay whatever their age. Deleting a done row frees
+ * its `(scope, scope_id, event_type)` key, so "recorded exactly once" holds
+ * within the retention window, not forever — acceptable because every
+ * `recordEffect` sits beside a guarded state change that does not happen
+ * twice, and the window is months.
+ */
+export async function pruneEffects(
+  ctx: Ctx,
+  input: { retentionDays: number; limit: number },
+): Promise<number> {
+  const before = new Date(ctx.clock.nowMs() - input.retentionDays * 24 * 60 * 60 * 1000);
+  return pruneDone(ctx.db, { before, limit: input.limit, keepScopes: EFFECT_SCOPES_KEPT });
+}
+
+/** How many effects in `scopes` are parked, waiting for a person. */
+export async function countParkedEffects(ctx: Ctx, scopes: readonly string[]): Promise<number> {
+  return countParked(ctx.db, scopes);
 }
 
 /**

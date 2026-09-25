@@ -1,6 +1,6 @@
 import type { DbOrTx, Tx } from '@shop/db';
 import { effects, type EffectStatus } from '@shop/db/schema/system';
-import { and, asc, desc, eq, inArray, like, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, like, lt, lte, notInArray, sql } from 'drizzle-orm';
 import { allOf, conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
 
 /** The only file that touches the `effects` table. */
@@ -176,6 +176,50 @@ export async function listByStatus(
     .orderBy(asc(effects.id))
     .limit(limit);
   return rows as EffectRow[];
+}
+
+/**
+ * Deletes up to `limit` `done` rows that finished before `before`, except in
+ * `keepScopes`. Parked (`unknown`) and `pending` rows are never touched.
+ *
+ * "Finished" is `next_run_at`: a claim pushes it to claim time + lease, and a
+ * done row is never claimed again, so it is the last attempt give or take a
+ * minute — and `(status, next_run_at)` is `effects_due_idx`, so the scan is an
+ * index range rather than the whole table.
+ */
+export async function pruneDone(
+  db: DbOrTx,
+  input: { before: Date; limit: number; keepScopes: readonly string[] },
+): Promise<number> {
+  const victims = db
+    .select({ id: effects.id })
+    .from(effects)
+    .where(
+      allOf(
+        eq(effects.status, 'done' satisfies EffectStatus),
+        lt(effects.nextRunAt, input.before),
+        input.keepScopes.length > 0 ? notInArray(effects.scope, [...input.keepScopes]) : undefined,
+      ),
+    )
+    .orderBy(asc(effects.id))
+    .limit(input.limit);
+  const result = await db.delete(effects).where(inArray(effects.id, victims));
+  return (result as { rowCount?: number | null }).rowCount ?? 0;
+}
+
+/** Parked rows in these scopes: the 「异常待处理」 figure on the admin home. */
+export async function countParked(db: DbOrTx, scopes: readonly string[]): Promise<number> {
+  if (scopes.length === 0) return 0;
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(effects)
+    .where(
+      and(
+        eq(effects.status, 'unknown' satisfies EffectStatus),
+        inArray(effects.scope, [...scopes]),
+      ),
+    );
+  return row?.n ?? 0;
 }
 
 // ---------------------------------------------------------------------------

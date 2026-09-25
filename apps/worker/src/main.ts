@@ -3,6 +3,7 @@ import { buildWorkerContainer, type WorkerContainer } from './container';
 import { enqueueCommand } from './enqueue';
 import { HEARTBEAT_KEY } from './env';
 import { indexJobs, parsePayload, type AnyJobDefinition } from './define-job';
+import { createJobHeartbeat } from './job-heartbeat';
 import { allJobs } from './jobs.gen';
 import { recordFailedJob } from '@shop/core/kernel';
 
@@ -16,7 +17,10 @@ import { recordFailedJob } from '@shop/core/kernel';
  * Two operational promises:
  *  - **liveness**: `worker:heartbeat` is refreshed every `HEARTBEAT_INTERVAL_MS`
  *    with a TTL of four intervals, so the container healthcheck is a single
- *    `redis-cli exists`. A wedged event loop stops refreshing it.
+ *    `redis-cli exists`. A wedged event loop stops refreshing it. And
+ *    `worker:heartbeat:job` is written when a job *completes*
+ *    (`job-heartbeat.ts`), so readiness can tell a live process from a worker
+ *    that is actually consuming the queue.
  *  - **graceful shutdown**: SIGTERM stops accepting new jobs and waits up to
  *    `SHUTDOWN_TIMEOUT_MS` for the in-flight ones, so a redeploy does not tear
  *    a half-finished payment notification in two.
@@ -99,6 +103,15 @@ export async function start(): Promise<{ stop: () => Promise<void>; container: W
 
   worker.on('error', (error) => {
     logger.error({ err: error }, 'worker error');
+  });
+
+  const jobDone = createJobHeartbeat({
+    set: (key, value, mode, ttlMs) => container.redis.set(key, value, mode, ttlMs),
+    nowMs: () => ctx.clock.nowMs(),
+    onError: (error) => logger.warn({ err: error }, 'job heartbeat write failed'),
+  });
+  worker.on('completed', () => {
+    void jobDone();
   });
 
   // -- heartbeat ------------------------------------------------------------
@@ -184,7 +197,15 @@ export async function syncRepeatables(
       {
         name: job.name,
         data: {},
-        opts: { attempts: job.attempts ?? 3, removeOnComplete: { count: 100 } },
+        // Both bounded. A sweep that fails every five seconds during an outage
+        // would otherwise pile its failed runs into a Redis that does not
+        // evict (`noeviction`), until sessions cannot be written either. The
+        // exhausted ones are in `failed_jobs` already (the `failed` handler).
+        opts: {
+          attempts: job.attempts ?? 3,
+          removeOnComplete: { count: 100 },
+          removeOnFail: { age: 24 * 3600, count: 200 },
+        },
       },
     );
   }

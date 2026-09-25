@@ -57,9 +57,13 @@ async function recordMigrations(applied: number): Promise<void> {
   }
 }
 
-/** What the worker writes every `HEARTBEAT_INTERVAL_MS` from its job loop. */
+/**
+ * What a working worker leaves: the loop beat it writes every
+ * `HEARTBEAT_INTERVAL_MS`, and the beat it writes when a job completes.
+ */
 async function beat(): Promise<void> {
   await harness.redis.set('worker:heartbeat', String(harness.clock.nowMs()));
+  await harness.redis.set('worker:heartbeat:job', String(harness.clock.nowMs()));
 }
 
 async function readyzResponse(): Promise<{ status: number; body: unknown }> {
@@ -167,6 +171,26 @@ describe('GET /api/v1/readyz', () => {
     // Present, parseable, and older than three beats. `EXISTS` would call this
     // worker healthy for as long as the key's TTL lasts.
     await harness.redis.set('worker:heartbeat', String(harness.clock.nowMs() - 10 * 60 * 1000));
+
+    const { status, body } = await readyzResponse();
+
+    expect(status).toBe(503);
+    expect(body).toMatchObject({ details: { checks: { worker: 'failed' } } });
+  });
+
+  it('OPS-017 — is 503 when the process beats but no job has completed for minutes', async () => {
+    // The loop beat is a timer: it keeps ticking while BullMQ's consumer is
+    // stuck. Only the completed-job beat says the queue is being consumed.
+    await harness.redis.set('worker:heartbeat:job', String(harness.clock.nowMs() - 10 * 60 * 1000));
+
+    const { status, body } = await readyzResponse();
+
+    expect(status).toBe(503);
+    expect(body).toMatchObject({ details: { checks: { worker: 'failed' } } });
+  });
+
+  it('OPS-017 — is 503 when no job has ever completed', async () => {
+    await harness.redis.del('worker:heartbeat:job');
 
     const { status, body } = await readyzResponse();
 

@@ -5,6 +5,7 @@ import { createTestCtx, runConcurrently, type TestCtx } from '@shop/testing';
 import { withTx } from '../kernel/tx';
 import type { EffectInput, EffectKey } from './index';
 import {
+  countParkedEffects,
   dispatchDueEffects,
   dispatchEffectsOnce,
   drainEffects,
@@ -13,6 +14,7 @@ import {
   findEffectById,
   listEffects,
   listEffectsByStatus,
+  pruneEffects,
   recordEffect,
   registerEffectHandler,
   registeredEffectTypes,
@@ -560,5 +562,64 @@ describe('retryEffect', () => {
     expect((await drainEffects(harness.ctx)).done).toBe(1);
     expect(runs).toBe(1);
     expect((await findEffect(harness.ctx.db, key))?.status).toBe('done');
+  });
+});
+
+describe('OPS-019 — pruneEffects keeps work and records, drops delivered history', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it('deletes only done rows past the window, never parked, pending or shipment rows', async () => {
+    registerEffectHandler('order', 'order.paid', async () => {});
+    registerEffectHandler('shipment', 'shipment.upload', async () => {});
+    registerEffectHandler('refund', 'refund.execute', async () => {
+      throw new Error('gateway down');
+    });
+    await record(); // order: done
+    await record({ scope: 'shipment', scopeId: '9', eventType: 'shipment.upload' }); // kept scope
+    await record({ scope: 'refund', scopeId: '3', eventType: 'refund.execute' }); // parked
+    await drainEffects(harness.ctx, { maxAttempts: 1, baseBackoffMs: 0, maxBackoffMs: 0 });
+    await record({ scope: 'order', scopeId: '2', eventType: 'order.paid' }); // still pending
+
+    harness.clock.advance(100 * DAY);
+    const removed = await pruneEffects(harness.ctx, { retentionDays: 90, limit: 100 });
+
+    expect(removed).toBe(1);
+    expect(await findEffect(harness.ctx.db, key)).toBeNull();
+    const left = await harness.ctx.db
+      .select({ scope: effectsTable.scope, status: effectsTable.status })
+      .from(effectsTable);
+    expect(left).toEqual(
+      expect.arrayContaining([
+        { scope: 'shipment', status: 'done' },
+        { scope: 'refund', status: 'unknown' },
+        { scope: 'order', status: 'pending' },
+      ]),
+    );
+    expect(left).toHaveLength(3);
+  });
+
+  it('keeps a done row inside the window, and deletes at most the limit per run', async () => {
+    registerEffectHandler('order', 'order.paid', async () => {});
+    for (let i = 1; i <= 3; i += 1) await record({ scopeId: String(i) });
+    await drainEffects(harness.ctx);
+
+    harness.clock.advance(30 * DAY);
+    expect(await pruneEffects(harness.ctx, { retentionDays: 90, limit: 100 })).toBe(0);
+
+    harness.clock.advance(70 * DAY);
+    expect(await pruneEffects(harness.ctx, { retentionDays: 90, limit: 2 })).toBe(2);
+    expect(await pruneEffects(harness.ctx, { retentionDays: 90, limit: 2 })).toBe(1);
+  });
+
+  it('OPS-020 — counts parked rows in the named scopes only', async () => {
+    registerEffectHandler('order', 'order.paid', async () => {
+      throw new Error('broken');
+    });
+    await record();
+    await drainEffects(harness.ctx, { maxAttempts: 1, baseBackoffMs: 0, maxBackoffMs: 0 });
+
+    expect(await countParkedEffects(harness.ctx, ['order', 'refund'])).toBe(1);
+    expect(await countParkedEffects(harness.ctx, ['refund'])).toBe(0);
+    expect(await countParkedEffects(harness.ctx, [])).toBe(0);
   });
 });

@@ -63,7 +63,10 @@ export const readinessPayload = z.object({
     redis: checkResult,
     /** The schema is at least as new as the one this build was compiled against. */
     migrations: checkResult,
-    /** The worker heartbeat is fresh — a stack whose jobs are not running is not ready. */
+    /**
+     * The worker's loop heartbeat is fresh and it completed a job in the last
+     * few minutes — a stack whose jobs are not running is not ready.
+     */
     worker: checkResult,
   }),
   /**
