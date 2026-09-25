@@ -32,7 +32,7 @@ const LOG_TEXT: Record<RefundDetail['status'], string> = {
   rejected: '商家已拒绝',
   processing: '退款处理中',
   succeeded: '退款成功',
-  failed: '退款异常',
+  failed: '退款未完成，商家处理中',
   unknown: '退款处理中',
   cancelled: '已撤销',
 };

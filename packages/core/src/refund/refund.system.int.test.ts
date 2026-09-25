@@ -17,6 +17,7 @@ import {
   type TestCtx,
 } from '@shop/testing';
 import { resetEffectHandlers } from '../effects';
+import { Money } from '../kernel/money';
 import type { Actor, Ctx } from '../kernel/context';
 import { installFulfilmentHooks } from '../order';
 import { registerStockPort, resetOrderPorts, type StockLine } from '../order/ports';
@@ -221,17 +222,26 @@ async function paidOrder(
     itemIds.push(item!.id);
   }
 
-  const intent = await startPayment(racer(userActor(user!.id)), {
-    orderId: order!.id,
-    channel: 'wechat_mini',
-    openid: 'oFakeOpenid',
-  });
-  gateway.markPaid(intent.outTradeNo);
-  const ack = await handleTransactionNotify(
-    racer(),
-    gateway.signTransactionNotification({ outTradeNo: intent.outTradeNo }),
-  );
-  expect(ack.status).toBe(200);
+  if (Money.parse(payable).isZero()) {
+    // A coupon paid for all of it: settled without a payment attempt, the way
+    // `settleZeroAmountOrder` marks it (REFUND-016).
+    await db
+      .update(orders)
+      .set({ status: 'paid', paidAt: harness.clock.now(), paidAmount: '0.00' })
+      .where(eq(orders.id, order!.id));
+  } else {
+    const intent = await startPayment(racer(userActor(user!.id)), {
+      orderId: order!.id,
+      channel: 'wechat_mini',
+      openid: 'oFakeOpenid',
+    });
+    gateway.markPaid(intent.outTradeNo);
+    const ack = await handleTransactionNotify(
+      racer(),
+      gateway.signTransactionNotification({ outTradeNo: intent.outTradeNo }),
+    );
+    expect(ack.status).toBe(200);
+  }
 
   if (options.shippedFirstLine === true) {
     // One parcel is already moving. Its units are the warehouse's business and
@@ -309,7 +319,10 @@ describe('a refund the shop opens by itself', () => {
       returnStage: 'not_required',
       isAutomatic: true,
       reason: GROUPBUY_REASON,
-      explanation: '拼团 9 未成团',
+      // The note names internal ids: staff remark, not the shopper's
+      // explanation (REFUND-019).
+      explanation: null,
+      adminRemark: '拼团 9 未成团',
       quantity: 2,
       amount: '100.00',
       includesFreight: false,
@@ -485,5 +498,108 @@ describe('a refund the shop opens by itself', () => {
     const fixture = await paidOrder();
     const result = await systemRefund(fixture, 'presale_expired');
     expect((await refundRow(result.refundId)).reason).toBe(PRESALE_REASON);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// REFUND-016 — an order a coupon paid for in full
+// ---------------------------------------------------------------------------
+
+describe('REFUND-016 — an order a coupon paid for in full has a way out', () => {
+  it('REFUND-016 — a failed group buy on a ¥0 order settles without the gateway and releases stock', async () => {
+    const fixture = await paidOrder({ paid: '0.00' });
+
+    const result = await systemRefund(fixture);
+    expect(result.created).toBe(true);
+    expect(await refundRow(result.refundId)).toMatchObject({
+      status: 'approved',
+      amount: '0.00',
+      includesFreight: false,
+      quantity: 2,
+    });
+
+    expect(await service.executeRefund(racer(), result.refundId)).toEqual({
+      status: 'succeeded',
+      message: '已退款',
+    });
+
+    expect((await refundRow(result.refundId)).status).toBe('succeeded');
+    // Nothing moved, so nothing is booked and WeChat never heard of it.
+    expect(await harness.ctx.db.select().from(capitalFlows)).toEqual([]);
+    expect(gateway.refunds.size).toBe(0);
+    // The goods and the order come back all the same.
+    expect(releases).toHaveLength(1);
+    const after = await orderRow(fixture.orderId);
+    expect(after.refundStatus).toBe('refunded');
+    expect(after.status).toBe('refunded');
+    expect(after.refundedAmount).toBe('0.00');
+    expect((await itemRows(fixture.orderId)).map((item) => item.refundedQuantity)).toEqual([1, 1]);
+  });
+
+  it('REFUND-016 — a shopper can ask for a ¥0 order back, and the approval settles it', async () => {
+    const fixture = await paidOrder({ paid: '0.00' });
+    const applied = await service.apply(racer(userActor(fixture.userId)), {
+      orderId: String(fixture.orderId),
+      kind: 'refund_only',
+      lines: fixture.itemIds.map((id) => ({ orderItemId: String(id), quantity: 1 })),
+      reason: '不想要了',
+      images: [],
+      includeFreight: true,
+    });
+    expect(applied).toMatchObject({ amount: '0.00', includesFreight: false });
+
+    await admin.adminApprove(racer(adminActor(fixture.adminId)), { id: applied.id });
+    await service.executeRefund(racer(), Number(applied.id));
+
+    expect((await refundRow(Number(applied.id))).status).toBe('succeeded');
+    expect((await orderRow(fixture.orderId)).status).toBe('refunded');
+    expect(releases).toHaveLength(1);
+
+    const seen = await service.myDetail(racer(userActor(fixture.userId)), { id: applied.id });
+    expect(seen.logs.at(-1)?.message).toBe('售后已完成');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// REFUND-018 — the freight on a second request
+// ---------------------------------------------------------------------------
+
+describe('REFUND-018 — the freight goes with the rest of an unshipped order', () => {
+  const ask = (fixture: Fixture, index: number, includeFreight: boolean) =>
+    service.apply(racer(userActor(fixture.userId)), {
+      orderId: String(fixture.orderId),
+      kind: 'refund_only',
+      lines: [{ orderItemId: String(fixture.itemIds[index]!), quantity: 1 }],
+      reason: '不想要了',
+      images: [],
+      includeFreight,
+    });
+
+  it('REFUND-018 — gives the freight back with the second request while the first holds the other line', async () => {
+    const fixture = await paidOrder({ freight: '8.00', paid: '108.00' });
+    await ask(fixture, 0, false);
+
+    // What the apply screen reads, and decides `includesFreight` from.
+    const offered = await service.applicableItems(racer(userActor(fixture.userId)), {
+      orderId: String(fixture.orderId),
+    });
+    expect(offered.freightRefundable).toBe(true);
+
+    const second = await ask(fixture, 1, true);
+    expect(second).toMatchObject({ amount: '58.00', includesFreight: true });
+
+    // And only once.
+    const after = await service.applicableItems(racer(userActor(fixture.userId)), {
+      orderId: String(fixture.orderId),
+    });
+    expect(after.freightRefundable).toBe(false);
+  });
+
+  it('REFUND-018 — refuses the freight on a request that leaves a takeable line behind', async () => {
+    const fixture = await paidOrder({ freight: '8.00', paid: '108.00' });
+    await expect(ask(fixture, 1, true)).rejects.toMatchObject({
+      code: 'REFUND_FREIGHT_NOT_REFUNDABLE',
+      details: { reason: 'partial-refund' },
+    });
   });
 });

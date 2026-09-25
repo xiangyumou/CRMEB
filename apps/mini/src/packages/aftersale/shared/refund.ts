@@ -36,8 +36,9 @@ export function refundStatusText(
     case 'processing':
     case 'unknown':
       return '退款处理中';
+    // The merchant can still retry it: in progress, not closed (REFUND-017).
     case 'failed':
-      return '退款异常，商家处理中';
+      return '退款处理中';
     case 'succeeded':
       return '退款成功';
     case 'rejected':
@@ -47,9 +48,13 @@ export function refundStatusText(
   }
 }
 
-/** 撤销申请: only before any money moved (`applied`, `approved`). */
-export function canCancel(refund: Pick<RefundListItem, 'status'>): boolean {
-  return refund.status === 'applied' || refund.status === 'approved';
+/**
+ * 撤销申请: only while no money can have moved (`applied`, `approved`, `failed`), and never for a
+ * refund the shop opened itself — the server's `buyerMayWithdraw`.
+ */
+export function canCancel(refund: Pick<RefundListItem, 'status' | 'isAutomatic'>): boolean {
+  if (refund.isAutomatic) return false;
+  return refund.status === 'applied' || refund.status === 'approved' || refund.status === 'failed';
 }
 
 /** 填写退货物流: an approved return still waiting for the parcel. */
@@ -63,7 +68,7 @@ export function awaitsReturn(
   );
 }
 
-/** 删除记录: only a finished request leaves the list. */
+/** 删除记录: only a finished request leaves the list — not a failed one the merchant can retry. */
 export function canHide(refund: Pick<RefundListItem, 'status'>): boolean {
-  return ['rejected', 'succeeded', 'failed', 'cancelled'].includes(refund.status);
+  return ['rejected', 'succeeded', 'cancelled'].includes(refund.status);
 }

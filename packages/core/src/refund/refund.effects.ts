@@ -36,9 +36,10 @@ export function registerRefundEffects(): void {
       ctx.logger.warn({ refundId }, 'refund vanished before its gateway call ran');
       return;
     }
-    // A human, a sweep or the buyer got there first. Not a failure.
+    // A human, a sweep or the buyer got there first. Not a failure. A failed
+    // refund waits for 复核 or 关闭 by a person, not a replayed effect.
     if (!(repo.OPEN_REFUND_STATUSES as readonly string[]).includes(row.status)) return;
-    if (row.status === 'applied') return;
+    if (row.status === 'applied' || row.status === 'failed') return;
 
     const result = await executeRefund(ctx, refundId);
     if (result.status === 'failed' || result.status === 'unknown') {

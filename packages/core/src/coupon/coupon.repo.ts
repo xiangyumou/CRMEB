@@ -674,6 +674,45 @@ export async function releaseUserCoupon(
   });
 }
 
+/**
+ * Takes back the unused gift coupons an order earned, and returns each one's
+ * unit to its template's supply — the inverse of `insertUserCoupon` +
+ * `takeOneFromSupply` for a `gift_order` grant. One conditional `UPDATE`
+ * decides which rows are this call's to revoke, so a replay revokes nothing
+ * and returns nothing twice. A spent gift is left alone; so is one whose
+ * template has since been deleted or whose supply is already full.
+ */
+export async function revokeOrderGiftCoupons(
+  tx: Tx,
+  args: { orderId: number; now: Date },
+): Promise<number> {
+  const revoked = await tx
+    .update(userCoupons)
+    .set({ status: 'revoked', updatedAt: args.now })
+    .where(
+      and(
+        eq(userCoupons.sourceKind, 'gift_order'),
+        eq(userCoupons.sourceOrderId, args.orderId),
+        eq(userCoupons.status, 'unused'),
+      ),
+    )
+    .returning({ templateId: userCoupons.templateId });
+  for (const row of revoked) {
+    await conditionalUpdate(tx, couponTemplates, {
+      where: and(
+        eq(couponTemplates.id, row.templateId),
+        eq(couponTemplates.isUnlimitedSupply, false),
+        sql`${couponTemplates.remainingCount} < ${couponTemplates.totalCount}`,
+      ),
+      set: {
+        remainingCount: sql`${couponTemplates.remainingCount} + 1`,
+        updatedAt: args.now,
+      },
+    });
+  }
+  return revoked.length;
+}
+
 /** The sweep the repeatable job runs. Batched by id so a big backlog drains over several passes. */
 export async function expireOverdue(tx: Tx, args: { now: Date; limit: number }): Promise<number> {
   const due = await tx
