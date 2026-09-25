@@ -30,8 +30,11 @@ export const refundErrors = defineErrors({
   REFUND_EXCEEDS_PAID: { status: 409, message: '退款金额超过实付金额' },
   /** Nothing to refund: every chosen line computes to zero. */
   REFUND_AMOUNT_ZERO: { status: 422, message: '退款金额必须大于 0' },
-  /** Freight was asked for after the order shipped. */
-  REFUND_FREIGHT_NOT_REFUNDABLE: { status: 409, message: '订单已发货，运费不可退' },
+  /**
+   * Freight was asked for when it is not this request's to give back: the order
+   * shipped, another request already carries it, or units are left behind.
+   */
+  REFUND_FREIGHT_NOT_REFUNDABLE: { status: 409, message: '运费仅在订单未发货、整单退款时退回' },
   /**
    * An evidence photo that is not an image our own storage holds — what
    * `POST /api/v1/uploads` returned (REFUND-014), as for a review picture
