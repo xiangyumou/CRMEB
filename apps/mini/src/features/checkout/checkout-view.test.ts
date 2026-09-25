@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { ApiError } from '@shop/api-client';
 import { applicableFixture, previewFixture } from '@/test/checkout-fixture';
 import {
+  checkoutPrices,
+  checkoutRefusal,
   couponLinesOf,
+  freightText,
   couponReason,
   customFormBody,
   customFormProblem,
@@ -79,5 +83,81 @@ describe('checkout view', () => {
       colors: ['红'],
     });
     expect(customFormBody(fields, {})).toBeUndefined();
+  });
+
+  it('prints a 拼团 line at the 拼团 price, and 优惠券 as the coupon alone', () => {
+    // ¥88 catalogue × 1, 拼团 ¥78 (an adjustment of -10) and a ¥5 coupon: couponDiscount 15.
+    const preview = previewFixture({
+      lines: [
+        {
+          ...previewFixture().lines[0]!,
+          quantity: 1,
+          unitPrice: '88.00',
+          subtotal: '88.00',
+          discountAmount: '15.00',
+          totalAmount: '73.00',
+        },
+      ],
+      itemsAmount: '88.00',
+      couponDiscount: '15.00',
+      adjustments: [
+        { source: 'groupbuy:activity-price', label: '拼团价', amount: '-10.00' },
+        { source: 'coupon:full-reduction', label: '优惠券抵扣', amount: '-5.00' },
+        { source: 'promo:full-reduction', label: '满减', amount: '-0.00' },
+      ],
+    });
+    const prices = checkoutPrices(preview);
+    expect(prices.unitPrices['sku-103']).toBe('78.00');
+    expect(prices.itemsAmount).toBe('78.00');
+    expect(prices.couponDiscount).toBe('5.00');
+    expect(prices.otherAdjustments.map((row) => row.label)).toEqual(['满减']);
+    // A plain order reads as sent.
+    const plain = checkoutPrices(previewFixture());
+    expect(plain).toMatchObject({ itemsAmount: '118.00', couponDiscount: '0.00' });
+    expect(plain.unitPrices['sku-103']).toBe('59.00');
+  });
+
+  it('says 请选择收货地址 for freight before there is an address, not 包邮', () => {
+    expect(freightText(previewFixture({ receiver: null, freightAmount: '0.00' }))).toBe(
+      '请选择收货地址',
+    );
+    expect(freightText(previewFixture({ freightAmount: '0.00' }))).toBe('包邮');
+    expect(freightText(previewFixture())).toBe('¥8.00');
+    expect(
+      freightText(
+        previewFixture({ receiver: null, addressRequired: false, freightAmount: '0.00' }),
+      ),
+    ).toBe('包邮');
+  });
+
+  it('names the item a refusal is about, and leaves the rest to the page', () => {
+    const draft = {
+      source: 'cart' as const,
+      cartItemIds: ['1'],
+      kind: 'normal' as const,
+      names: { '103': '柔雾丝绒礼盒' },
+    };
+    const refused = (code: string, details: unknown, status = 409) =>
+      checkoutRefusal(new ApiError({ status, code, message: '服务端的话', details }), draft);
+    expect(
+      refused('ORDER_PURCHASE_LIMIT_REACHED', { skuId: '103', limit: 2, purchased: 2 }),
+    ).toEqual({
+      title: '「柔雾丝绒礼盒」每人限购 2 件',
+      description: '你已购买过 2 件，不能再购买了',
+    });
+    expect(refused('ORDER_PURCHASE_LIMIT_REACHED', { skuId: '103', limit: 3 })?.title).toBe(
+      '「柔雾丝绒礼盒」每单限购 3 件',
+    );
+    expect(refused('ORDER_ITEM_UNAVAILABLE', { skuIds: ['103'] })).toEqual({
+      title: '「柔雾丝绒礼盒」已下架或暂不可购买',
+      description: '请返回购物车调整后再结算',
+    });
+    expect(refused('ORDER_BELOW_MIN_PURCHASE', { skuId: '9', minimum: 2 }, 422)?.title).toBe(
+      '该商品最少购买 2 件',
+    );
+    expect(refused('GROUPBUY_ACTIVITY_ENDED', {})?.title).toBe('服务端的话');
+    expect(refused('COUPON_NOT_USABLE', {})).toBeNull();
+    expect(refused('SHIPPING_NOT_DELIVERABLE', {})).toBeNull();
+    expect(refused('INTERNAL', {}, 500)).toBeNull();
   });
 });

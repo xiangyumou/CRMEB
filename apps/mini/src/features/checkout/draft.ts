@@ -19,7 +19,11 @@ export type CheckoutKind =
  * What 立即购买, the cart and the activity pages hand the checkout page. In memory, never in
  * the URL: the checkout page is not linkable (docs/mini/pages.md §2.3).
  */
-export type CheckoutDraft = CheckoutItems & CheckoutKind;
+export type CheckoutDraft = CheckoutItems &
+  CheckoutKind & {
+    /** Product names by SKU id, so a refusal can name the item (「…」每人限购 2 件). */
+    names?: Readonly<Record<string, string>> | undefined;
+  };
 
 /** The subscribe scene (C08) for 提交订单 of this kind. */
 export function subscribeSceneOf(draft: CheckoutKind): SubscribeScene {

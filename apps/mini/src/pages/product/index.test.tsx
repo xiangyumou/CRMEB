@@ -324,10 +324,11 @@ describe('商品详情', () => {
     fireEvent.click(within(sheet).getByRole('radio', { name: 'M' }));
     fireEvent.click(screen.getAllByRole('button', { name: '立即购买' }).at(-1) as HTMLElement);
 
-    expect(useCheckoutDraft.getState().draft).toEqual({
+    expect(useCheckoutDraft.getState().draft).toMatchObject({
       source: 'buy-now',
       item: { skuId: '101', quantity: 1 },
       kind: 'normal',
+      names: { '101': expect.any(String) },
     });
     await waitFor(() =>
       expect(taroFake.calls).toContainEqual({

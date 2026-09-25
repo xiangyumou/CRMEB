@@ -11,7 +11,7 @@ import {
   previewFixture,
   previewWithCoupon,
 } from '@/test/checkout-fixture';
-import { cityTreeFixture } from '@/test/address-fixture';
+import { addressFixture, cityTreeFixture } from '@/test/address-fixture';
 import { serveApi, type FakeReply } from '@/test/fake-api';
 import { renderPage } from '@/test/render';
 import { routeQueryKey } from '@shop/api-client/react';
@@ -328,6 +328,103 @@ describe('确认订单', () => {
       }),
     );
     await waitFor(() => expect(previews).toBeGreaterThan(before));
+  });
+});
+
+describe('确认订单 — when the server says no', () => {
+  beforeEach(() => {
+    useSession.setState({ session: { status: 'idle' } });
+    useAppConfigStore.setState({ config: appConfigFixture, source: 'network' });
+  });
+
+  it('keeps an undeliverable address on the page, marked, and lets the shopper change it', async () => {
+    serve({
+      'POST /api/v1/checkout/preview': (body) =>
+        (body as { addressId?: string }).addressId === '302'
+          ? { body: previewFixture() }
+          : {
+              status: 409,
+              body: { code: 'SHIPPING_NOT_DELIVERABLE', message: '部分商品不支持配送到所选地区' },
+            },
+      'GET /api/v1/addresses': () => ({
+        body: {
+          items: [
+            { ...addressFixture, id: '301', isDefault: true, receiverName: '林小姐' },
+            { ...addressFixture, id: '302', isDefault: false, receiverName: '周先生' },
+          ],
+          page: 1,
+          pageSize: 50,
+          total: 2,
+        },
+      }),
+    });
+    await open();
+
+    expect(await screen.findByText('林小姐')).toBeTruthy();
+    expect(screen.getByText('部分商品不支持配送到所选地区')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '更换收货地址' }));
+    const sheet = document.getElementById('address-sheet') as HTMLElement;
+    fireEvent.click(await within(sheet).findByRole('radio', { name: /周先生/ }));
+    expect(await screen.findByRole('button', { name: '提交订单' })).toBeTruthy();
+  });
+
+  it('names the item over its purchase limit and offers the way back to the cart', async () => {
+    serve({
+      'POST /api/v1/checkout/preview': () => ({
+        status: 409,
+        body: {
+          code: 'ORDER_PURCHASE_LIMIT_REACHED',
+          message: '超出该商品的限购数量',
+          details: { skuId: '103', limit: 1, purchased: 1 },
+        },
+      }),
+    });
+    await open({
+      source: 'cart',
+      cartItemIds: ['7'],
+      kind: 'normal',
+      names: { '103': '柔雾丝绒礼盒' },
+    });
+
+    expect(await screen.findByText('「柔雾丝绒礼盒」每人限购 1 件')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '返回购物车' }));
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'switchTab',
+        args: { url: '/pages/cart/index' },
+      }),
+    );
+  });
+
+  it('drops a coupon the server refused at submit, so the next tap is not the same refusal', async () => {
+    let orders = 0;
+    const seen = serve({
+      'POST /api/v1/orders': () => {
+        orders += 1;
+        return orders === 1
+          ? { status: 409, body: { code: 'COUPON_NOT_USABLE', message: '优惠券不可用' } }
+          : { status: 201, body: orderFixture() };
+      },
+    });
+    await open();
+
+    expect(await screen.findByText('-¥10.00')).toBeTruthy();
+    await ready();
+    fireEvent.click(submitButton());
+    await waitFor(() =>
+      expect(taroFake.calls).toContainEqual({
+        api: 'showToast',
+        args: expect.objectContaining({
+          title: '优惠券已不可用，已为你取消使用，请确认金额后重新提交',
+        }),
+      }),
+    );
+    expect(await screen.findByText('不使用')).toBeTruthy();
+    await ready();
+    fireEvent.click(submitButton());
+    await waitFor(() => expect(orders).toBe(2));
+    const second = seen.filter((r) => r.key === 'POST /api/v1/orders')[1]?.body;
+    expect(second).toMatchObject({ userCouponId: null, expectedPayableAmount: '126.00' });
   });
 });
 

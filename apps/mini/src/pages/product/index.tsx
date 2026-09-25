@@ -178,7 +178,12 @@ function Detail({ product }: { product: Product }) {
   const confirm = (action: SkuAction | 'confirm', sku: { id: string }, quantity: number) => {
     setSkuId(sku.id);
     if (action === 'buy') {
-      setDraft({ source: 'buy-now', item: { skuId: sku.id, quantity }, kind: 'normal' });
+      setDraft({
+        source: 'buy-now',
+        item: { skuId: sku.id, quantity },
+        kind: 'normal',
+        names: { [sku.id]: product.name },
+      });
       setSheet(null);
       void navigate({ route: 'checkout', params: {} });
       return;

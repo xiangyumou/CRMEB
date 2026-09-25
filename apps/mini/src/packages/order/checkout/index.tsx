@@ -4,9 +4,12 @@ import { isApiError } from '@shop/api-client';
 import { routeKey, useRouteMutation, useRouteQuery } from '@shop/api-client/react';
 import { AddressSheet } from '@/features/checkout/address-sheet';
 import {
+  checkoutPrices,
+  checkoutRefusal,
   couponLinesOf,
   customFormBody,
   customFormProblem,
+  freightText,
   receiverCard,
   resolveCoupon,
   type CouponChoice,
@@ -24,6 +27,7 @@ import {
 import { useCityTree } from '@/data/cities';
 import { ADDRESS_READS, COUPON_READS } from '@/data/stale-reads';
 import { useRefetchOnShow } from '@/data/use-refetch-on-show';
+import { errorMessage } from '@/lib/error-message';
 import { formatSpec } from '@/lib/spec';
 import {
   addressBody,
@@ -31,7 +35,7 @@ import {
   draftFromChosen,
   handOffImportedAddress,
 } from '@/packages/account/shared/address';
-import { navigate, subscribe, type ChosenAddress } from '@/platform';
+import { goBack, navigate, subscribe, type ChosenAddress } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { AddressCard } from '@/ui/address-card';
 import { Button } from '@/ui/button';
@@ -85,8 +89,6 @@ export default function CheckoutPage() {
     </PageShell>
   );
 }
-
-const yuanOrFree = (amount: string) => (Number(amount) === 0 ? '包邮' : `¥${amount}`);
 
 /** The presale ship time, from the preview (`shipAfterDays`, H4; `null` from an older server). */
 function presaleNote(shipAfterDays: number | null): string {
@@ -158,7 +160,7 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
           setSheet(null);
           toast.success('已导入微信地址');
         },
-        onError: (error) => toast.text(error.message),
+        onError: (error) => toast.text(errorMessage(error)),
       },
     );
   };
@@ -172,21 +174,70 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
       </View>
     );
   }
+  const addressSheet = (selectedId: string | null) => (
+    <AddressSheet
+      visible={sheet === 'address'}
+      onClose={() => setSheet(null)}
+      selectedId={selectedId}
+      importing={addAddress.isPending}
+      onPick={(id) => {
+        setAddressId(id);
+        setSheet(null);
+      }}
+      onImport={importAddress}
+    />
+  );
+
   if (base.isError) {
-    const gone = isApiError(base.error) && base.error.code === 'ORDER_ADDRESS_NOT_FOUND';
-    return gone ? (
-      <Empty
-        title="收货地址已失效"
-        description="请重新选择收货地址"
-        actions={
-          <Button size="md" onClick={() => setAddressId(undefined)}>
-            使用默认地址
-          </Button>
-        }
-      />
-    ) : (
-      <ErrorBlock error={base.error} onRetry={() => void base.refetch()} />
-    );
+    // Widened: SHIPPING_NOT_DELIVERABLE is thrown by the freight quote, not yet in the contract.
+    const code: string | null = isApiError(base.error) ? base.error.code : null;
+    if (code === 'ORDER_ADDRESS_NOT_FOUND') {
+      return (
+        <Empty
+          title="收货地址已失效"
+          description="请重新选择收货地址"
+          actions={
+            <Button size="md" onClick={() => setAddressId(undefined)}>
+              使用默认地址
+            </Button>
+          }
+        />
+      );
+    }
+    if (code === 'SHIPPING_NOT_DELIVERABLE') {
+      // The address stays on the page, marked, and can be changed right here.
+      return (
+        <View className="checkout">
+          <UndeliverableAddress
+            addressId={addressId}
+            reason={errorMessage(base.error, '该地址暂不支持配送')}
+            onChange={() => setSheet('address')}
+          />
+          {addressSheet(addressId ?? null)}
+        </View>
+      );
+    }
+    const refusal = checkoutRefusal(base.error, draft);
+    if (refusal) {
+      return (
+        <Empty
+          title={refusal.title}
+          description={refusal.description}
+          actions={
+            draft.source === 'cart' ? (
+              <Button size="md" onClick={() => leaveCheckout({ route: 'cart', params: {} })}>
+                返回购物车
+              </Button>
+            ) : (
+              <Button size="md" variant="outline" onClick={() => leaveCheckout(null)}>
+                返回
+              </Button>
+            )
+          }
+        />
+      );
+    }
+    return <ErrorBlock error={base.error} onRetry={() => base.refetch()} />;
   }
   if (!preview) return null;
 
@@ -194,11 +245,9 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
   const receiver = preview.receiver;
   const couponRows = coupons.data?.items ?? [];
   const usableCount = couponRows.filter((row) => row.usable).length;
-  const otherAdjustments = preview.adjustments.filter(
-    (adjustment) => !adjustment.source.startsWith('coupon:'),
-  );
+  const prices = checkoutPrices(preview);
   const couponValue = withCoupon
-    ? `-¥${priced.data.couponDiscount}`
+    ? `-¥${prices.couponDiscount}`
     : choice.mode === 'none' && usableCount > 0
       ? '不使用'
       : usableCount > 0
@@ -251,7 +300,22 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
             if (couponId !== null) void priced.refetch();
             return;
           }
-          toast.text(error.message);
+          if (isApiError(error) && error.code.startsWith('COUPON_')) {
+            // Used on another order, expired, or no longer fits: drop it, so the next tap is
+            // not the same refusal, and ask again which coupons are usable.
+            toast.text('优惠券已不可用，已为你取消使用，请确认金额后重新提交');
+            setChoice({ mode: 'none' });
+            void coupons.refetch();
+            void base.refetch();
+            return;
+          }
+          const refusal = checkoutRefusal(error, draft);
+          if (refusal) {
+            toast.text(refusal.title);
+            void base.refetch();
+            return;
+          }
+          toast.text(errorMessage(error));
         },
       },
     );
@@ -295,7 +359,7 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
                 <Text className="checkout__line-spec">{formatSpec(line.specText)}</Text>
               ) : null}
               <View className="checkout__line-foot">
-                <Price value={line.unitPrice} size="sm" />
+                <Price value={prices.unitPrices[line.itemKey] ?? line.unitPrice} size="sm" />
                 <Text className="checkout__line-qty">×{line.quantity}</Text>
               </View>
             </View>
@@ -304,12 +368,9 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
       </Card>
 
       <Card className="checkout__card" padded={false}>
-        <Cell
-          title="商品金额"
-          value={<Price value={preview.itemsAmount} size="sm" tone="text" />}
-        />
-        <Cell title="运费" value={yuanOrFree(preview.freightAmount)} />
-        {otherAdjustments.map((adjustment) => (
+        <Cell title="商品金额" value={<Price value={prices.itemsAmount} size="sm" tone="text" />} />
+        <Cell title="运费" value={freightText(preview)} />
+        {prices.otherAdjustments.map((adjustment) => (
           <Cell
             key={`${adjustment.source}-${adjustment.label}`}
             title={adjustment.label}
@@ -357,8 +418,8 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
         <View className="checkout__total">
           <Text className="checkout__total-label">共 {preview.totalQuantity} 件，合计</Text>
           <Price value={preview.payableAmount} />
-          {withCoupon && Number(priced.data.couponDiscount) > 0 ? (
-            <Text className="checkout__saved">已优惠 ¥{priced.data.couponDiscount}</Text>
+          {withCoupon && prices.couponDiscount !== '0.00' ? (
+            <Text className="checkout__saved">已优惠 ¥{prices.couponDiscount}</Text>
           ) : null}
         </View>
         <Button
@@ -372,17 +433,7 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
         </Button>
       </View>
 
-      <AddressSheet
-        visible={sheet === 'address'}
-        onClose={() => setSheet(null)}
-        selectedId={receiver?.addressId ?? null}
-        importing={addAddress.isPending}
-        onPick={(id) => {
-          setAddressId(id);
-          setSheet(null);
-        }}
-        onImport={importAddress}
-      />
+      {addressSheet(receiver?.addressId ?? null)}
       <CouponSheet
         visible={sheet === 'coupon'}
         onClose={() => setSheet(null)}
@@ -394,5 +445,51 @@ function Checkout({ draft }: { draft: CheckoutDraft }) {
         }}
       />
     </View>
+  );
+}
+
+/** Leaves 确认订单 for the cart (a tab), or back to where the purchase started. */
+async function leaveCheckout(target: { route: 'cart'; params: Record<string, never> } | null) {
+  if (target) await navigate(target);
+  else await goBack();
+}
+
+/**
+ * The address the preview could not deliver to, still on the page with the server's reason,
+ * so the shopper changes it here instead of meeting a dead end (加载失败).
+ */
+function UndeliverableAddress({
+  addressId,
+  reason,
+  onChange,
+}: {
+  addressId: string | undefined;
+  reason: string;
+  onChange: () => void;
+}) {
+  const list = useRouteQuery('user.addressList', { query: { pageSize: 50 } });
+  const items = list.data?.items ?? [];
+  const address =
+    items.find((row) => row.id === addressId) ?? items.find((row) => row.isDefault) ?? null;
+  return (
+    <>
+      {address ? (
+        <AddressCard
+          className="checkout__address"
+          address={address}
+          undeliverable={reason}
+          onClick={onChange}
+        />
+      ) : null}
+      <Empty
+        title="该地址暂不支持配送"
+        description={address ? '请更换收货地址后继续结算' : reason}
+        actions={
+          <Button size="md" onClick={onChange}>
+            更换收货地址
+          </Button>
+        }
+      />
+    </>
   );
 }

@@ -159,7 +159,10 @@ export default function Cart() {
       toast.text('请选择要结算的商品');
       return;
     }
-    setDraft({ source: 'cart', cartItemIds: selection.ids, kind: 'normal' });
+    const chosen = new Set(selection.ids);
+    const names: Record<string, string> = {};
+    for (const item of cart.items) if (chosen.has(item.id)) names[item.skuId] = item.productName;
+    setDraft({ source: 'cart', cartItemIds: selection.ids, kind: 'normal', names });
     void navigate({ route: 'checkout', params: {} });
   };
 

@@ -170,11 +170,13 @@ describe('购物车', () => {
     await renderPage(<Cart />);
 
     fireEvent.click(await screen.findByRole('button', { name: '结算(2)' }));
-    expect(useCheckoutDraft.getState().draft).toEqual({
+    expect(useCheckoutDraft.getState().draft).toMatchObject({
       source: 'cart',
       cartItemIds: ['501'],
       kind: 'normal',
     });
+    // Names by SKU, so 确认订单 can say which item a refusal is about.
+    expect(Object.keys(useCheckoutDraft.getState().draft?.names ?? {})).toHaveLength(1);
     await waitFor(() =>
       expect(taroFake.calls).toContainEqual({
         api: 'navigateTo',
