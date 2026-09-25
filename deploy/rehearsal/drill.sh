@@ -751,6 +751,9 @@ case_edge_proxies_every_page() {
       tr -d '\\r' | grep -qix 'location: /'"
   while IFS= read -r file; do
     url="$(route_url "${file#"$app"}")" || continue
+    # Only reached through `next.config.ts`'s fallback rewrite, never by its own
+    # path; what it answers is checked below, on an API path nothing serves.
+    [ "$url" = '/api-not-found' ] && continue
     case "${file##*/}" in
       route.*)
         prefix="${url#/}"
@@ -774,6 +777,9 @@ case_edge_proxies_every_page() {
   done < <(find "$app" -type f -regextype posix-extended \
     -regex '.*/(page|route)\.(tsx|ts|jsx|js|mdx)' | sort)
   check "$checked route(s) reach web through the edge" [ "$checked" -gt 0 ]
+  check 'an API path no route serves is a JSON 404 from web' \
+    sh -c "curl -sS --max-time 10 -o /dev/null -w '%{http_code} %{content_type}' \
+      'http://127.0.0.1:$edge_port/api/v1/drill-no-such-route' | grep -q '^404 application/json'"
 
   check '/favicon.ico is an image from web' edge_serves_image /favicon.ico
   local page href links

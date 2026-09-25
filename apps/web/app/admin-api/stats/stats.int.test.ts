@@ -241,18 +241,19 @@ describe('/admin-api/stats', () => {
     expect(body.tiles.map((tile: { key: string }) => tile.key)).not.toContain('stats.revenue');
   });
 
-  it('reads leave no audit row', async () => {
+  it('reads leave no audit row; exports leave one each (AUTH-013)', async () => {
     const headers = await adminCookie();
     for (const route of ROUTES) {
       const { GET } = await route.load();
       expect((await GET(get(route.path, headers))).status).toBe(200);
     }
-    expect(
-      (await harness.ctx.db.select().from(auditLogs)).filter(
-        // Sign-ins are audited too; this test is about the operation.
-        (row) => row.routeId !== 'auth.adminLogin',
-      ),
-    ).toEqual([]);
+    const audited = (await harness.ctx.db.select().from(auditLogs))
+      // Sign-ins are audited too; this test is about the operation.
+      .filter((row) => row.routeId !== 'auth.adminLogin')
+      .map((row) => row.routeId)
+      .sort();
+    // Taking the data out of the shop is recorded; looking at it is not.
+    expect(audited).toEqual(['stats.productExport', 'stats.tradeExport']);
   });
 });
 
@@ -309,7 +310,7 @@ describe('exports', () => {
       await GET(get('/admin-api/stats/products/exports?sortBy=paidAmount&limit=20', headers))
     ).json();
     expect(body).toMatchObject({ contentType: 'text/csv', rowCount: 0, truncated: false });
-    expect(body.filename).toMatch(/^products-\d{8}-\d{8}\.csv$/);
+    expect(body.filename).toMatch(/^商品统计-\d{4}-\d{2}-\d{2}(至\d{4}-\d{2}-\d{2})?\.csv$/);
     expect(body.content.split('\n')[0]).toContain('商品ID');
   });
 

@@ -20,6 +20,7 @@ import { decorDocuments, decorRevisions } from '@shop/db/schema/decor';
 import { groupbuyActivities } from '@shop/db/schema/groupbuy';
 import { orders } from '@shop/db/schema/order';
 import { presaleActivities } from '@shop/db/schema/presale';
+import { refunds } from '@shop/db/schema/refund';
 import { users } from '@shop/db/schema/user';
 import { createTestCtx, forkTestCtx, type TestCtx } from '@shop/testing';
 import * as coupon from '../coupon';
@@ -1075,30 +1076,46 @@ describe('the batch-1 blocks (G1)', () => {
   describe('per-shopper state of the 个人中心 blocks — DECOR-015', () => {
     async function order(userId: number, status: 'pending_payment' | 'paid' | 'shipped') {
       sequence += 1;
-      await ctx.db.insert(orders).values({
-        orderNo: `G1${String(sequence).padStart(10, '0')}`,
-        userId,
-        platform: 'wechat_mini',
-        status,
-        ...(status === 'pending_payment'
-          ? {}
-          : { paidAt: new Date(NOW), paidAmount: '10.00', transactionNo: `T${sequence}` }),
-        ...(status === 'shipped'
-          ? {
-              fulfillmentStatus: 'fulfilled' as const,
-              shippedAt: new Date(NOW),
-              refundStatus: 'requested' as const,
-            }
-          : {}),
-        totalQuantity: 1,
-        itemsAmount: '10.00',
-        payableAmount: '10.00',
-        receiverName: '张三',
-        receiverPhone: '13800000000',
-        receiverProvince: '广东省',
-        receiverCity: '深圳市',
-        receiverDetail: '某路 1 号',
-      });
+      const [row] = await ctx.db
+        .insert(orders)
+        .values({
+          orderNo: `G1${String(sequence).padStart(10, '0')}`,
+          userId,
+          platform: 'wechat_mini',
+          status,
+          ...(status === 'pending_payment'
+            ? {}
+            : { paidAt: new Date(NOW), paidAmount: '10.00', transactionNo: `T${sequence}` }),
+          ...(status === 'shipped'
+            ? {
+                fulfillmentStatus: 'fulfilled' as const,
+                shippedAt: new Date(NOW),
+                refundStatus: 'requested' as const,
+              }
+            : {}),
+          totalQuantity: 1,
+          itemsAmount: '10.00',
+          payableAmount: '10.00',
+          receiverName: '张三',
+          receiverPhone: '13800000000',
+          receiverProvince: '广东省',
+          receiverCity: '深圳市',
+          receiverDetail: '某路 1 号',
+        })
+        .returning({ id: orders.id });
+      // 售后 counts orders with a request still open, read from `refunds`
+      // itself, not from the order's roll-up flag.
+      if (status === 'shipped') {
+        await ctx.db.insert(refunds).values({
+          refundNo: `G1RF${sequence}`,
+          outRefundNo: `G1ORF${sequence}`,
+          orderId: row!.id,
+          userId,
+          kind: 'refund_only',
+          quantity: 1,
+          amount: '10.00',
+        });
+      }
     }
 
     const userCenter = (showStats = true) => [

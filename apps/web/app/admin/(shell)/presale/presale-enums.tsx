@@ -233,6 +233,7 @@ export const presaleFields: FieldSpec<Extract<keyof PresaleActivityForm, string>
             {/* The kit's money control: a string of yuan end to end, never a float. */}
             <MoneyInput
               value={sku.price}
+              placeholder="预售价"
               disabled={helpers.disabled}
               onChange={(value) => patch({ price: value ?? '' })}
             />

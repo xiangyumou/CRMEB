@@ -161,7 +161,9 @@ test('the product export is a BOM-prefixed CSV whose formula-looking name is def
     adminPage.waitForEvent('download'),
     adminPage.getByRole('button', { name: /导出商品统计/ }).click(),
   ]);
-  expect(download.suggestedFilename()).toMatch(/^products-\d{8}-\d{8}\.csv$/);
+  expect(download.suggestedFilename()).toMatch(
+    /^商品统计-\d{4}-\d{2}-\d{2}(至\d{4}-\d{2}-\d{2})?\.csv$/,
+  );
 
   const bytes = await readFile(await download.path());
   // The BOM, so Excel on Windows reads UTF-8 rather than GBK.
