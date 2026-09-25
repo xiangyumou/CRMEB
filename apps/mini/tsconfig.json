@@ -9,5 +9,7 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "config", "types", "scripts", "*.mts"]
+  "include": ["src", "config", "types", "scripts", "*.mts"],
+  // Only for tsconfig.weapp.json, which leaves @types/node out.
+  "exclude": ["types/weapp"]
 }

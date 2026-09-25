@@ -187,7 +187,8 @@ export const platform: MiniPlatform = {
       return result.tempFiles.map((file) => file.tempFilePath);
     } catch (error) {
       if (isCancel(error)) return [];
-      throw new Error(errMsg(error), { cause: error });
+      // Not `new Error(m, { cause })`: iOS 12 drops the second argument.
+      throw Object.assign(new Error(errMsg(error)), { cause: error });
     }
   },
   async uploadFile({ url, filePath, name, headers }) {

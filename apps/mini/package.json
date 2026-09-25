@@ -16,7 +16,7 @@
     "build": "pnpm run build:weapp && pnpm run build:h5",
     "size": "node scripts/size-report.mjs",
     "tab-icons": "node scripts/tab-icons.mjs",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.weapp.json",
     "lint": "eslint .",
     "test:unit": "vitest run --project unit"
   },

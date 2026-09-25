@@ -49,7 +49,8 @@ export type BlockType = keyof typeof BLOCKS;
 export const BLOCK_TYPES = Object.keys(BLOCKS) as BlockType[];
 
 export function isBlockType(type: string): type is BlockType {
-  return Object.hasOwn(BLOCKS, type);
+  // Not Object.hasOwn: the mini-program type-checks this file against iOS 12's library.
+  return Object.prototype.hasOwnProperty.call(BLOCKS, type);
 }
 
 export type BlockPropsOf<T extends BlockType> = z.infer<(typeof BLOCKS)[T]['props']>;
