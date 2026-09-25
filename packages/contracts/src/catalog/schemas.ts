@@ -576,6 +576,13 @@ export const adminProductForm = z
         path: ['purchaseLimitQuantity'],
         message: '请填写限购数量',
       });
+    } else if (value.minPurchaseQuantity > value.purchaseLimitQuantity) {
+      // 起购 3、限购 2 is a product nobody can buy.
+      ctx.addIssue({
+        code: 'custom',
+        path: ['minPurchaseQuantity'],
+        message: '起购数量不能大于限购数量',
+      });
     }
 
     if (value.specMode) {

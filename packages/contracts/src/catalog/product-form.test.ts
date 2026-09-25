@@ -61,3 +61,20 @@ describe('what an API client (MCP, the CLI) sends is trimmed too', () => {
     expect(userLabelForm.safeParse({ name: '  ' }).success).toBe(false);
   });
 });
+
+describe('起购 and 限购', () => {
+  it('refuses 起购 above 限购, a product nobody could buy', () => {
+    const limited = { ...base, purchaseLimitMode: 'per_order', skus: [{ ...sku, stock: 0 }] };
+    const refused = adminProductForm.safeParse({
+      ...limited,
+      minPurchaseQuantity: 3,
+      purchaseLimitQuantity: 2,
+    });
+    expect(refused.success).toBe(false);
+    expect(refused.error?.issues[0]?.path).toEqual(['minPurchaseQuantity']);
+    expect(
+      adminProductForm.safeParse({ ...limited, minPurchaseQuantity: 2, purchaseLimitQuantity: 2 })
+        .success,
+    ).toBe(true);
+  });
+});
