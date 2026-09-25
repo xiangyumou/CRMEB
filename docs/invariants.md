@@ -663,6 +663,14 @@ The shopper's order detail names the 拼团 team a group-buy order opened or joi
 
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the group-buy price through the real checkout > ORDER-011 — the order detail names the team an order opened or joined, and nothing for an ordinary order`
 
+### ORDER-012
+
+改价 spreads only the operator's discount: each line keeps what checkout's own rules took off it (a coupon scoped to one product stays on that product's line), the operator's discount is spread over what the lines still cost, and the shares still sum to `coupon_discount`.
+
+- `packages/core/src/order/order.fulfil.rules.test.ts::reprice > ORDER-012 — keeps a scoped coupon on its own line and spreads only the operator’s discount`
+- `packages/core/src/order/order.fulfil.rules.test.ts::reprice > ORDER-012 — a zero 改价 gives every line back exactly its checkout share`
+- `packages/core/src/order/order.reprice-shares.test.ts::ORDER-012 — what checkout took off each line, without the last 改价 > reads each line’s own checkout adjustments after a 改价`
+
 ### COUPON-007
 
 The last coupon cannot be claimed twice: one concurrent claim wins, the other is refused, `remain_count` never goes negative and exactly one user holds it.

@@ -30,6 +30,7 @@ import { orderFulfilConfig } from './order.fulfil.config';
 import { orderPermissions } from './permissions';
 import * as fulfilRepo from './order.fulfil.repo';
 import * as rules from './order.fulfil.rules';
+import { distribute } from './order.pricing';
 import { receiveOrder, shipmentContextFor, toWireShipment } from './order.fulfil.service';
 import * as repo from './order.repo';
 
@@ -396,6 +397,33 @@ export async function adminRemark(
  * `orders.operator_discount`), so the form means what it says and 0.00 undoes.
  */
 /** `paid`: the money is in, so the price is final. `unknown`: it still might be. */
+/**
+ * What checkout took off each line, without the last 改价.
+ *
+ * Before any 改价 that is the line's `discount_amount`. After one, it is the line's own
+ * checkout adjustments (the snapshot keeps them per line since the adjustments release). An
+ * order written before that, repriced once and still unpaid, has no per-line record: its
+ * checkout discount is spread by line subtotal, as 改价 always used to.
+ */
+export function checkoutShares(
+  items: readonly repo.OrderItemRow[],
+  operatorDiscount: string,
+): Money[] {
+  const current = items.map((item) => Money.parse(item.discountAmount));
+  const previous = Money.parse(operatorDiscount);
+  if (previous.isZero()) return current;
+  if (items.every((item) => item.snapshot.adjustments !== undefined)) {
+    return items.map((item) =>
+      Money.sum((item.snapshot.adjustments ?? []).map((a) => Money.parse(a.amount).abs())),
+    );
+  }
+  const checkoutTotal = Money.sum(current).sub(previous).clampToZero();
+  return distribute(
+    checkoutTotal,
+    items.map((item) => Money.parse(item.unitPrice).mul(item.quantity)),
+  );
+}
+
 function refuseRepriceOn(state: PaymentState): void {
   if (state === 'paid') throw new DomainError('ORDER_PRICE_NOT_ADJUSTABLE');
   if (state === 'unknown') throw new DomainError('ORDER_PAYMENT_STATE_UNKNOWN');
@@ -421,19 +449,16 @@ export async function adminAdjustPrice(
     refuseRepriceOn(await openPaymentState(ctx, tx, orderId));
 
     const items = await repo.listItems(tx, [orderId]);
-    // Checkout's goods-level discounts stay; only the last 改价 is taken out
-    // before the new one goes on.
-    const existing = Money.sum(items.map((item) => Money.parse(item.discountAmount))).sub(
-      Money.parse(order.operatorDiscount),
-    );
+    // Checkout's goods-level discounts stay on their lines (ORDER-012); only the
+    // last 改价 is taken out before the new one goes on.
+    const shares = checkoutShares(items, order.operatorDiscount);
     const outcome = rules.reprice({
-      lines: items.map((item) => ({
+      lines: items.map((item, index) => ({
         orderItemId: item.id,
         quantity: item.quantity,
         unitPrice: Money.parse(item.unitPrice),
-        discountAmount: Money.parse(item.discountAmount),
+        checkoutDiscount: shares[index] ?? Money.ZERO,
       })),
-      existingDiscount: existing,
       freightAmount: Money.parse(body.freightAmount ?? order.freightAmount),
       operatorDiscount: Money.parse(body.operatorDiscount),
     });

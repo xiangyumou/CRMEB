@@ -253,14 +253,18 @@ describe('applyPlan', () => {
 
 describe('reprice', () => {
   const twoLines = [
-    { orderItemId: 1, quantity: 1, unitPrice: yuan('60.00'), discountAmount: Money.ZERO },
-    { orderItemId: 2, quantity: 2, unitPrice: yuan('20.00'), discountAmount: Money.ZERO },
+    { orderItemId: 1, quantity: 1, unitPrice: yuan('60.00'), checkoutDiscount: Money.ZERO },
+    { orderItemId: 2, quantity: 2, unitPrice: yuan('20.00'), checkoutDiscount: Money.ZERO },
+  ];
+  /** A 满 50 减 10 coupon scoped to the first product: all 10.00 sit on line 1. */
+  const couponOnFirst = [
+    { ...twoLines[0]!, checkoutDiscount: yuan('10.00') },
+    { ...twoLines[1]!, checkoutDiscount: Money.ZERO },
   ];
 
   it('splits the new discount across the lines and sums back exactly', () => {
     const outcome = reprice({
       lines: twoLines,
-      existingDiscount: Money.ZERO,
       freightAmount: yuan('10.00'),
       operatorDiscount: yuan('10.00'),
     });
@@ -274,8 +278,7 @@ describe('reprice', () => {
 
   it('adds the operator discount to what the coupon already took', () => {
     const outcome = reprice({
-      lines: twoLines,
-      existingDiscount: yuan('10.00'),
+      lines: couponOnFirst,
       freightAmount: Money.ZERO,
       operatorDiscount: yuan('5.00'),
     });
@@ -284,14 +287,35 @@ describe('reprice', () => {
     expect(outcome.payableAmount.toString()).toBe('85.00');
   });
 
+  it('ORDER-012 — keeps a scoped coupon on its own line and spreads only the operator’s discount', () => {
+    const outcome = reprice({
+      lines: couponOnFirst,
+      freightAmount: Money.ZERO,
+      operatorDiscount: yuan('9.00'),
+    });
+    if (outcome.kind !== 'ok') throw new Error(outcome.kind);
+    // Left to pay per line before 改价: 50.00 and 40.00, so 9.00 splits 5.00 / 4.00.
+    expect(outcome.lines.map((l) => l.discountAmount.toString())).toEqual(['15.00', '4.00']);
+    expect(outcome.lines.map((l) => l.totalAmount.toString())).toEqual(['45.00', '36.00']);
+  });
+
+  it('ORDER-012 — a zero 改价 gives every line back exactly its checkout share', () => {
+    const outcome = reprice({
+      lines: couponOnFirst,
+      freightAmount: Money.ZERO,
+      operatorDiscount: Money.ZERO,
+    });
+    if (outcome.kind !== 'ok') throw new Error(outcome.kind);
+    expect(outcome.lines.map((l) => l.discountAmount.toString())).toEqual(['10.00', '0.00']);
+  });
+
   it('keeps every fen when the split does not divide evenly', () => {
     const outcome = reprice({
       lines: [
-        { orderItemId: 1, quantity: 1, unitPrice: yuan('0.01'), discountAmount: Money.ZERO },
-        { orderItemId: 2, quantity: 1, unitPrice: yuan('0.01'), discountAmount: Money.ZERO },
-        { orderItemId: 3, quantity: 1, unitPrice: yuan('0.01'), discountAmount: Money.ZERO },
+        { orderItemId: 1, quantity: 1, unitPrice: yuan('0.01'), checkoutDiscount: Money.ZERO },
+        { orderItemId: 2, quantity: 1, unitPrice: yuan('0.01'), checkoutDiscount: Money.ZERO },
+        { orderItemId: 3, quantity: 1, unitPrice: yuan('0.01'), checkoutDiscount: Money.ZERO },
       ],
-      existingDiscount: Money.ZERO,
       freightAmount: Money.ZERO,
       operatorDiscount: yuan('0.02'),
     });
@@ -302,10 +326,9 @@ describe('reprice', () => {
 
   it('never pushes a line below zero', () => {
     const outcome = reprice({
-      lines: twoLines,
-      existingDiscount: Money.ZERO,
+      lines: couponOnFirst,
       freightAmount: Money.ZERO,
-      operatorDiscount: yuan('100.00'),
+      operatorDiscount: yuan('90.00'),
     });
     if (outcome.kind !== 'ok') throw new Error(outcome.kind);
     for (const l of outcome.lines) expect(l.totalAmount.fen).toBeGreaterThanOrEqual(0);
@@ -314,8 +337,7 @@ describe('reprice', () => {
 
   it('refuses a discount past the goods total rather than clamping it silently', () => {
     const outcome = reprice({
-      lines: twoLines,
-      existingDiscount: yuan('10.00'),
+      lines: couponOnFirst,
       freightAmount: Money.ZERO,
       operatorDiscount: yuan('1000.00'),
     });
@@ -328,7 +350,6 @@ describe('reprice', () => {
   it('leaves the freight where it was — 改价 discounts goods, not postage', () => {
     const outcome = reprice({
       lines: twoLines,
-      existingDiscount: Money.ZERO,
       freightAmount: yuan('12.34'),
       operatorDiscount: yuan('1.00'),
     });
@@ -339,7 +360,6 @@ describe('reprice', () => {
   it('is a no-op for a zero discount', () => {
     const outcome = reprice({
       lines: twoLines,
-      existingDiscount: Money.ZERO,
       freightAmount: Money.ZERO,
       operatorDiscount: Money.ZERO,
     });
