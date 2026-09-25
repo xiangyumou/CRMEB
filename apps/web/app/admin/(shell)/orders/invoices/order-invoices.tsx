@@ -32,9 +32,6 @@ import { Button } from 'antd';
 
 import { INVOICE_HEADER_TYPE, INVOICE_STATUS, INVOICE_TYPE, optionsOf } from '../order-enums';
 
-/** 开票, 驳回 and 作废 each write the order's timeline and change its detail. */
-const INVALIDATE = [invoiceAdminList, orderAdminDetail, orderAdminTimeline];
-
 /**
  * 发票管理.
  *
@@ -46,6 +43,10 @@ const INVALIDATE = [invoiceAdminList, orderAdminDetail, orderAdminTimeline];
  *
  * A refund does not undo an issued invoice (INVOICE-005): the row stays 已开票
  * and says 订单已全额退款，请到税务系统冲红 until someone has, and marks it 已作废.
+ *
+ * 开票, 驳回 and 作废 each write the order's timeline and change its detail, so
+ * each refreshes those too. The lists stay inline: the admin-permissions guard
+ * reads an `invalidate={[…]}` as a cache key, not a read.
  */
 export function OrderInvoicesPage() {
   const issue = useFormModal<OrderInvoice>();
@@ -122,7 +123,7 @@ export function OrderInvoicesPage() {
                   title={`作废发票 ${row.invoiceNumber ?? ''}？`}
                   description="请先在税务系统完成冲红。作废后买家可以重新申请开票。"
                   okText="作废"
-                  invalidate={INVALIDATE}
+                  invalidate={[invoiceAdminList, orderAdminDetail, orderAdminTimeline]}
                   successMessage="已作废"
                   permission="order:invoice:write"
                   buttonProps={{ type: 'link', size: 'small', danger: true }}
@@ -157,7 +158,7 @@ export function OrderInvoicesPage() {
         ]}
         route={invoiceAdminIssue}
         toInput={(values) => ({ params: { id: issue.record?.id ?? '' }, body: values })}
-        invalidate={INVALIDATE}
+        invalidate={[invoiceAdminList, orderAdminDetail, orderAdminTimeline]}
         successMessage="已开票"
       />
 
@@ -177,7 +178,7 @@ export function OrderInvoicesPage() {
         ]}
         route={invoiceAdminReject}
         toInput={(values) => ({ params: { id: reject.record?.id ?? '' }, body: values })}
-        invalidate={INVALIDATE}
+        invalidate={[invoiceAdminList, orderAdminDetail, orderAdminTimeline]}
         successMessage="已驳回"
       />
     </PageContainer>
