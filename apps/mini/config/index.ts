@@ -170,6 +170,13 @@ export default defineConfig<'webpack5'>(async (merge) => {
       // package's common chunk (the main package has a 2 MB hard limit).
       optimizeMainPackage: { enable: true },
       postcss: {
+        // The phones the package runs on, whatever file the rule comes from (storefront-blocks'
+        // stylesheets have no browserslist of their own): iOS 12's WebKit needs
+        // `position: -webkit-sticky`, which the package.json list (modern browsers) never asked for.
+        autoprefixer: {
+          enable: true,
+          config: { overrideBrowserslist: ['ios >= 12', 'android >= 7'] },
+        },
         pxtransform: { enable: true, config: {} },
         cssModules: {
           enable: true,
