@@ -118,8 +118,8 @@ export function ProductListPage() {
           },
           { kind: 'select', name: 'kind', label: '商品类型', options: options(PRODUCT_KIND) },
           { kind: 'text', name: 'labelId', label: '标签 ID' },
-          { kind: 'number', name: 'priceFrom', label: '价格从', min: 0, width: 120 },
-          { kind: 'number', name: 'priceTo', label: '价格到', min: 0, width: 120 },
+          { kind: 'money', name: 'priceFrom', label: '价格从', width: 120 },
+          { kind: 'money', name: 'priceTo', label: '价格到', width: 120 },
         ]}
         toolbar={
           <>
