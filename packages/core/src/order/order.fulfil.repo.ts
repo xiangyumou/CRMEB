@@ -108,8 +108,17 @@ export async function listShipmentItems(
     .orderBy(asc(shipmentItems.id));
 }
 
+/**
+ * `created_at` is the moment of the insert, under the order lock the caller
+ * holds, not the transaction's start: a 仅退款 approval compares it with the
+ * request's own `created_at` to tell goods shipped before the buyer asked from
+ * goods shipped after (REFUND-021).
+ */
 export async function insertShipment(tx: Tx, values: NewShipmentValues): Promise<ShipmentRow> {
-  const rows = await tx.insert(shipments).values(values).returning();
+  const rows = await tx
+    .insert(shipments)
+    .values({ ...values, createdAt: sql`clock_timestamp()` })
+    .returning();
   return rows[0]!;
 }
 

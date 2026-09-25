@@ -269,7 +269,8 @@ export async function refundSystemInitiated(
   //
   // The same step `adminApprove` takes for a 仅退款: raise `refunded_quantity`
   // now so the warehouse cannot ship goods the shop has just decided to refund.
-  // Every line here is unshipped, so the approval bound is the unshipped one.
+  // The request is minutes old, so nothing has shipped since it; the order lock
+  // held above keeps it that way until commit.
   // Losing means the units went out the door first, and rolling back is right —
   // the effect retries, finds a shipped line, and the order falls to a person.
   const { won, refusedLines } = await repo.transitionRefund(

@@ -1261,6 +1261,14 @@ A fully refunded order takes back the gift coupons it earned that nobody has spe
 - `packages/core/src/refund/refund.int.test.ts::REFUND-020 — revokes the unused gifts and returns them to the supply, leaving other coupons alone`
 - `packages/core/src/refund/refund.int.test.ts::REFUND-020 — a partial refund leaves the gifts where they are`
 
+### REFUND-021
+
+Approving a 仅退款 takes what the request covered when the buyer applied: units shipped before the request are goods the buyer keeps (a money-only refund), units shipped after it are not the request's to take, and the approval is refused (`REFUND_LINE_ALREADY_SHIPPED`). The approval takes the order row and its lines in the order shipping takes them, so an approval and a dispatch of the same units (the last units, or the rest of a line shipped in part) have exactly one winner.
+
+- `packages/core/src/refund/refund.concurrency.int.test.ts::shipping the last unshipped units while a 仅退款 is approved > REFUND-021 — has exactly one winner on a line shipped in part before the request, when the warehouse goes first`
+- `packages/core/src/refund/refund.concurrency.int.test.ts::shipping the last unshipped units while a 仅退款 is approved > REFUND-021 — has exactly one winner on a line shipped in part before the request, when the operator goes first`
+- `packages/core/src/refund/refund.concurrency.int.test.ts::shipping the last unshipped units while a 仅退款 is approved > REFUND-021 — refuses a 仅退款 whose units shipped after the buyer asked, and still approves one on goods shipped before`
+
 ## Registration and notifications
 
 ### USER-001

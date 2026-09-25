@@ -216,16 +216,16 @@ async function notifyReview(
  * The warehouse must not ship goods an operator has just agreed to refund, and
  * fulfilment's dispatch guard reads `quantity - refunded_quantity`, so the only
  * way to stop it is to raise that column now rather than when the money lands.
- * `transitionRefund`'s approval bound carries the mirror of fulfilment's own
- * (`refunded + q <= quantity - shipped_quantity`) for a line that has not
- * shipped, so an approval racing a dispatch of the same units has exactly one
- * winner whichever commits first. A line that already shipped is a money-only
- * refund of goods the buyer keeps; there is nothing left to race for, and the
- * ceiling is the whole line.
+ * What the request may take is what it covered when the buyer applied: units
+ * already shipped then are goods the buyer keeps (a money-only refund), units
+ * shipped since are not the request's to take (`transitionRefund`'s approval
+ * bound, under the order and line locks shipping takes too). An approval
+ * racing a dispatch of the same units has exactly one winner whichever gets
+ * there first (REFUND-021).
  *
- * Losing means the units went out of the door first. The approval rolls back
- * and the operator is told, which is right: the request is now a return, not a
- * refund.
+ * Losing means the units went out of the door after the buyer asked. The
+ * approval rolls back and the operator is told, which is right: the request is
+ * now a return, not a refund.
  */
 function refusedShipped(refusedLines: readonly number[]): void {
   const [first] = refusedLines;
