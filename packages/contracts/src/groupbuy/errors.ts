@@ -26,6 +26,11 @@ export const groupbuyErrors = defineErrors({
   },
   /** Editing an `ended` 拼团 activity back to life. It is copied, not re-opened. */
   GROUPBUY_ACTIVITY_ENDED: { status: 409, message: '已结束的活动不能重新开启，请复制一个新活动' },
+  /**
+   * The edit removes an activity SKU that has sold units or a live order (RISK-D-012). It can be
+   * switched off (`isEnabled: false`) instead. `details: { skuIds }`.
+   */
+  GROUPBUY_ACTIVITY_SKU_IN_USE: { status: 409, message: '该规格已有订单，不能移除，可改为停用' },
   GROUPBUY_ACTIVITY_NOT_OPEN: { status: 409, message: '该拼团活动当前不可参与' },
   /** The order's lines are not the activity's product, or name a SKU the activity does not sell. */
   GROUPBUY_SKU_NOT_IN_ACTIVITY: { status: 422, message: '所选规格不参与该拼团活动' },

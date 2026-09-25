@@ -17,6 +17,7 @@ import {
   count,
   desc,
   eq,
+  exists,
   gt,
   inArray,
   isNotNull,
@@ -25,6 +26,7 @@ import {
   lte,
   ne,
   notInArray,
+  or,
   sql,
   type SQL,
 } from 'drizzle-orm';
@@ -400,6 +402,47 @@ export async function lockActivityStock(
     .where(eq(groupbuyActivitySkus.activityId, id))
     .for('update');
   return { ...activity, skus: new Map(skus.map((row) => [row.skuId, row.stock])) };
+}
+
+/**
+ * The activity SKUs an edit would delete that orders still depend on: units already sold, or
+ * a live seat whose order buys that SKU (an unpaid order still has to commit its activity
+ * stock when it is paid). Deleting one would reset its 已售 and quota on a re-add and refund
+ * the order being paid; the service refuses the edit with a typed 409 instead.
+ */
+export async function listRemovedSkusInUse(
+  tx: Tx,
+  args: { activityId: number; keep: readonly number[] },
+): Promise<number[]> {
+  const rows = await tx
+    .select({ skuId: groupbuyActivitySkus.skuId })
+    .from(groupbuyActivitySkus)
+    .where(
+      and(
+        eq(groupbuyActivitySkus.activityId, args.activityId),
+        args.keep.length > 0 ? notInArray(groupbuyActivitySkus.skuId, [...args.keep]) : undefined,
+        or(
+          gt(groupbuyActivitySkus.sales, 0),
+          exists(
+            tx
+              .select({ one: sql`1` })
+              .from(groupbuyMembers)
+              .innerJoin(groupbuyGroups, eq(groupbuyGroups.id, groupbuyMembers.groupId))
+              .innerJoin(orderItems, eq(orderItems.orderId, groupbuyMembers.orderId))
+              .innerJoin(orders, eq(orders.id, groupbuyMembers.orderId))
+              .where(
+                and(
+                  eq(groupbuyGroups.activityId, groupbuyActivitySkus.activityId),
+                  eq(orderItems.skuId, groupbuyActivitySkus.skuId),
+                  eq(groupbuyMembers.status, 'joined'),
+                  notInArray(orders.status, ['cancelled', 'refunded']),
+                ),
+              ),
+          ),
+        ),
+      ),
+    );
+  return rows.map((row) => row.skuId);
 }
 
 /**

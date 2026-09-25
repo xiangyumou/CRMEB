@@ -1434,6 +1434,14 @@ A 拼团 order ships only once its team has succeeded: manual 发货 is refused 
 - `packages/core/src/order/order.ship-ready.test.ts::RISK-D-011 — an order ships only when its kind says it may > lets it go once the team succeeded`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::paying > RISK-D-011 — a paid order does not ship while its team is forming, and ships once it succeeded`
 
+### RISK-D-012
+
+An activity SKU that orders still depend on is never removed by an edit of its 拼团 or 预售 campaign: one with units sold, a live order buying it or (预售) a stock-ledger row is refused with `GROUPBUY_ACTIVITY_SKU_IN_USE` / `PRESALE_ACTIVITY_SKU_IN_USE` — a typed 409, not the foreign-key 500 — and can be switched off instead, which keeps its 已售 and quota.
+
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the admin surface > editing while orders move the stock > RISK-D-012 — refuses to remove a SKU that has sold, and lets it be switched off instead`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::the admin surface > editing while orders move the stock > RISK-D-012 — refuses to remove a SKU an unpaid order is still buying`
+- `packages/core/src/presale/presale.int.test.ts::the admin surface > editing while orders move the stock > RISK-D-012 — refuses to remove a SKU orders point at, instead of a foreign-key 500`
+
 ## Storefront end to end
 
 ### SMOKE-002

@@ -131,6 +131,7 @@ export const groupbuyAdminActivityUpdate = defineRoute({
     'GROUPBUY_SKU_NOT_IN_ACTIVITY',
     'GROUPBUY_STOCK_CHANGED',
     'GROUPBUY_ACTIVITY_ENDED',
+    'GROUPBUY_ACTIVITY_SKU_IN_USE',
   ],
   examples: [
     {

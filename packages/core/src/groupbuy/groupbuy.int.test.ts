@@ -1486,6 +1486,7 @@ describe('the admin surface', () => {
       fixture: ActivityFixture,
       stock: { activity: number; sku: number; expected: number },
       status: 'active' | 'ended' = 'active',
+      sku: 'kept' | 'removed' | 'switched-off' = 'kept',
     ) {
       const admin = asAdmin(['groupbuy:activity:read', 'groupbuy:activity:write']);
       const before = await service.adminActivityDetail(admin, { id: String(fixture.activityId) });
@@ -1506,18 +1507,42 @@ describe('the admin surface', () => {
           startAt: before.startAt,
           endAt: before.endAt,
           sortOrder: 0,
-          skus: [
-            {
-              skuId: String(fixture.skuId),
-              price: '59.00',
-              stock: stock.sku,
-              expectedStock: stock.expected,
-              isEnabled: true,
-            },
-          ],
+          skus:
+            sku === 'removed'
+              ? []
+              : [
+                  {
+                    skuId: String(fixture.skuId),
+                    price: '59.00',
+                    stock: stock.sku,
+                    expectedStock: stock.expected,
+                    isEnabled: sku === 'kept',
+                  },
+                ],
         },
       );
     }
+
+    it('RISK-D-012 — refuses to remove a SKU that has sold, and lets it be switched off instead', async () => {
+      const fixture = await soldOneSinceTheFormOpened();
+      await expect(
+        edit(fixture, { activity: 10, sku: 10, expected: 10 }, 'active', 'removed'),
+      ).rejects.toMatchObject({
+        code: 'GROUPBUY_ACTIVITY_SKU_IN_USE',
+        details: { skuIds: [String(fixture.skuId)] },
+      });
+      // Switched off, it keeps its 已售 — the counters are the order history.
+      await edit(fixture, { activity: 10, sku: 10, expected: 10 }, 'active', 'switched-off');
+      expect((await readActivityCounters(fixture)).sku).toEqual({ stock: 9, sales: 1 });
+    });
+
+    it('RISK-D-012 — refuses to remove a SKU an unpaid order is still buying', async () => {
+      const fixture = await makeActivity({ stock: 10 });
+      await placeOrder({ userId: await makeUser(), fixture });
+      await expect(
+        edit(fixture, { activity: 10, sku: 10, expected: 9 }, 'active', 'removed'),
+      ).rejects.toMatchObject({ code: 'GROUPBUY_ACTIVITY_SKU_IN_USE' });
+    });
 
     it('keeps the live stock when the operator only fixed the title', async () => {
       const fixture = await soldOneSinceTheFormOpened();

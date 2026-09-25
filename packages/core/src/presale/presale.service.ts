@@ -102,6 +102,16 @@ export async function adminActivityUpdate(
     }
     await assertSkusBelongToProduct(tx, body);
     const skus = skuValues(body);
+    // RISK-D-012: a SKU orders still point at is switched off, never removed.
+    const inUse = await repo.listRemovedSkusInUse(tx, {
+      activityId: id,
+      keep: skus.map((sku) => sku.skuId),
+    });
+    if (inUse.length > 0) {
+      throw new DomainError('PRESALE_ACTIVITY_SKU_IN_USE', {
+        details: { skuIds: inUse.map(String) },
+      });
+    }
     // Orders moved these counters while the form was open; see `resolveStockEdit`.
     const stocks = resolveActivityStocks(
       locked,
