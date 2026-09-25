@@ -24,7 +24,10 @@ export function resolveCoupon(
   return applicable?.items.find((row) => row.usable)?.coupon.id ?? null;
 }
 
-/** `coupon.applicableList`'s lines: each priced line after the activity discounts. */
+/**
+ * `coupon.applicableList`'s lines: each priced line after the activity discounts, before any
+ * coupon — the amounts the server measures a 使用门槛 against at checkout too (PRICE-005).
+ */
 export function couponLinesOf(
   preview: CheckoutPreview,
 ): { productId: string; amount: string }[] | null {

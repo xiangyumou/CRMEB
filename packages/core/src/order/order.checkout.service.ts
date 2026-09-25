@@ -211,6 +211,12 @@ function readingThrough(ctx: Ctx, db: DbOrTx): Ctx {
  * order first, then the coupon. The coupon runs last on purpose — it is the
  * thing the shopper picked, so it should apply to what the automatic rules
  * left, not the other way round.
+ *
+ * That includes its 使用门槛: a coupon's minimum spend is measured against what
+ * the lines cost after the 拼团/预售 price, the same `totalAmount` the checkout
+ * shows and the mini-program sends to `coupon.applicableList` (PRICE-005). A
+ * coupon listed as usable is therefore never refused here, and one listed as
+ * 未达到使用门槛 is never quietly applied.
  */
 async function gatherAdjustments(
   ctx: Ctx,
@@ -234,13 +240,14 @@ async function gatherAdjustments(
   }
 
   if (userCouponId !== null) {
+    const activity = splitAdjustments(lines, out).perLine;
     const quoted = await coupon.quote(reading, {
       userCouponId,
       userId,
-      lines: lines.map((line) => ({
+      lines: lines.map((line, index) => ({
         productId: line.sku.productId,
         categoryIds: line.sku.categoryIds,
-        amount: line.subtotal,
+        amount: line.subtotal.sub(activity[index] ?? Money.ZERO),
       })),
     });
     out.push(

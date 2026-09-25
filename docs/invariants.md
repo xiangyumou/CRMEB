@@ -247,6 +247,13 @@ Multi-item order pricing splits the coupon across every line. A line written at 
 - `packages/core/src/order/order.adjustments.int.test.ts::a 预售 order with a stacked coupon > lists only the coupon on an ordinary order, split over its lines`
 - `packages/core/src/order/order.pricing.test.ts::splitAdjustments > keeps each adjustment's own per-line share, which the order lines persist`
 
+### PRICE-005
+
+A coupon's 使用门槛 is measured against what the lines cost after the 拼团/预售 price, before the coupon: the checkout quotes it on the same line totals the preview shows and the mini-program sends to the coupon picker, so a coupon the picker lists as 未达到使用门槛 is refused at checkout and one it lists as usable is applied.
+
+- `packages/core/src/order/order.adjustments.int.test.ts::PRICE-005 — a coupon’s 使用门槛 is measured against the 拼团/预售 price > refuses a ¥80 threshold on a ¥78 预售 of an ¥88 item, as the coupon picker says`
+- `packages/core/src/order/order.adjustments.int.test.ts::PRICE-005 — a coupon’s 使用门槛 is measured against the 拼团/预售 price > still applies a threshold the 预售 price meets`
+
 ## Stock
 
 ### STOCK-001
