@@ -38,7 +38,9 @@ export function ScanUploadModal({
 
   const status = useRouteQuery(storageScanTokenStatus, token ? { params: { token } } : undefined, {
     enabled: token !== null,
-    refetchInterval: 2000,
+    // Only a code still waiting for a phone is worth asking about again.
+    refetchInterval: (query) =>
+      query.state.data === undefined || query.state.data.state === 'pending' ? 2000 : false,
     // A used or expired token answers 200 with a state; only a real failure
     // should shout, and the dialog shows that itself.
     presentError: false,
@@ -63,7 +65,14 @@ export function ScanUploadModal({
   return (
     <Modal open onCancel={onClose} onOk={onClose} title="扫码上传" footer={null} width={420}>
       <Space direction="vertical" align="center" style={{ width: '100%' }} size="middle">
-        {mint.isPending || !status.data ? (
+        {mint.isError || (status.isError && !status.data) ? (
+          <Alert
+            type="error"
+            showIcon
+            message="二维码获取失败"
+            description="关闭后重新打开再试。"
+          />
+        ) : mint.isPending || !status.data ? (
           <Spin />
         ) : state === 'used' ? (
           <Alert type="success" showIcon message="已收到手机上传的文件，素材库已刷新。" />
