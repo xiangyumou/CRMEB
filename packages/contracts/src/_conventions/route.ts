@@ -38,6 +38,15 @@ export interface RouteDef<
   auth: AuthMode;
   /** Permission atom from `core/<domain>/permissions.ts`. Required iff `auth === 'admin'`. */
   permission?: string;
+  /**
+   * Refused to an API token (the MCP endpoint, the `shop` CLI) with
+   * `AUTH_TOKEN_CONSOLE_ONLY`, whatever its owner's atoms: the route changes
+   * who may act (admins, roles, tokens) or where the money goes (payment
+   * keys), and a leaked token must not be able to outlive its own revocation
+   * by minting an account. `handle()` enforces it; the agent catalogue leaves
+   * these out. Admin routes only.
+   */
+  consoleOnly?: boolean;
   summary: string;
   tags: readonly string[];
   params?: TParams;
@@ -61,6 +70,9 @@ export interface RouteDef<
 export type AnyRouteDef = RouteDef<z.ZodType, z.ZodType, z.ZodType, z.ZodType>;
 
 const PATH_PREFIXES = ['/admin-api/', '/api/v1/'] as const;
+
+/** What a console-only route answers an API token (`auth/errors.ts`). */
+export const CONSOLE_ONLY_ERROR = 'AUTH_TOKEN_CONSOLE_ONLY';
 
 export function surfaceOf(path: string): Surface {
   return path.startsWith('/admin-api/') ? 'admin' : 'storefront';
@@ -88,11 +100,18 @@ export function defineRoute<
   if (def.auth !== 'admin' && def.permission) {
     throw new Error(`${def.id}: only admin routes declare a permission`);
   }
+  if (def.consoleOnly && def.auth !== 'admin') {
+    throw new Error(`${def.id}: only admin routes can be console-only`);
+  }
   if ((def.method === 'GET' || def.method === 'DELETE') && def.body) {
     throw new Error(`${def.id}: ${def.method} routes take no body`);
   }
   if (def.examples.length === 0) {
     throw new Error(`${def.id}: at least one example is required (the mock server serves it)`);
+  }
+  // A console-only route can answer AUTH_TOKEN_CONSOLE_ONLY; say so once, here.
+  if (def.consoleOnly && !(def.errors ?? []).includes(CONSOLE_ONLY_ERROR)) {
+    return { ...def, errors: [...(def.errors ?? []), CONSOLE_ONLY_ERROR] };
   }
   return def;
 }

@@ -140,13 +140,13 @@ describe('a personal API token', () => {
   it('skips the CSRF check — a token is not ambient — and audits the write with its id', async () => {
     await seedAdmin();
     const token = await mintToken(await consoleHeaders(), '老板的助手');
-    const { POST } = await import('../../app/admin-api/roles/route');
+    const { POST } = await import('../../app/admin-api/user-groups/route');
 
     const response = await POST(
       request(
         'POST',
-        '/admin-api/roles',
-        { name: '客服' },
+        '/admin-api/user-groups',
+        { name: '高价值客户', sortOrder: 10 },
         {
           ...bearer(token),
           'sec-fetch-site': 'cross-site',
@@ -157,7 +157,7 @@ describe('a personal API token', () => {
     expect(response.status).toBe(201);
 
     const rows = (await harness.ctx.db.select().from(auditLogs)).filter(
-      (row) => row.routeId === 'system.roleCreate',
+      (row) => row.routeId === 'user.groupCreate',
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]!.apiTokenId).not.toBeNull();
@@ -167,12 +167,44 @@ describe('a personal API token', () => {
     const logs = await list(
       request(
         'GET',
-        '/admin-api/audit-logs?routeId=system.roleCreate',
+        '/admin-api/audit-logs?routeId=user.groupCreate',
         undefined,
         await consoleHeaders(),
       ),
     );
     expect((await logs.json()).items[0]).toMatchObject({ apiTokenName: '老板的助手' });
+  });
+
+  it('AUTH-012 — cannot create a role or an admin, nor save the payment settings', async () => {
+    await seedAdmin();
+    const token = await mintToken(await consoleHeaders());
+    const { POST: createRole } = await import('../../app/admin-api/roles/route');
+    const { POST: createAdmin } = await import('../../app/admin-api/admins/route');
+
+    const role = await createRole(
+      request('POST', '/admin-api/roles', { name: '后门' }, bearer(token)),
+    );
+    expect(role.status).toBe(403);
+    expect((await role.json()).code).toBe('AUTH_TOKEN_CONSOLE_ONLY');
+
+    const admin = await createAdmin(
+      request(
+        'POST',
+        '/admin-api/admins',
+        { account: 'backdoor', name: '后门', password: 'secret-pass-1', roleIds: [] },
+        bearer(token),
+      ),
+    );
+    expect(admin.status).toBe(403);
+    expect((await admin.json()).code).toBe('AUTH_TOKEN_CONSOLE_ONLY');
+
+    const { PUT: saveConfig } = await import('../../app/admin-api/system/config/[group]/route');
+    const payment = await saveConfig(
+      request('PUT', '/admin-api/system/config/payment', { values: {} }, bearer(token)),
+      { params: Promise.resolve({ group: 'payment' }) },
+    );
+    expect(payment.status).toBe(403);
+    expect((await payment.json()).code).toBe('AUTH_TOKEN_CONSOLE_ONLY');
   });
 
   it('cannot mint, list or revoke tokens itself', async () => {

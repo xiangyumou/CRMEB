@@ -9,6 +9,25 @@ import {
   silentLogger,
 } from '@shop/core/kernel';
 import { resetUserLookup } from '@shop/core/auth';
+
+// One live API token, acting as a super admin; every other bearer is unknown.
+vi.mock('@shop/core/auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@shop/core/auth')>();
+  return {
+    ...actual,
+    resolveApiToken: async (_deps: unknown, token: string) =>
+      token === 'shp_live-test-token'
+        ? {
+            tokenId: 9,
+            tokenName: '助手',
+            adminId: 1,
+            account: 'admin',
+            isSuper: true,
+            permissions: [],
+          }
+        : null,
+  };
+});
 import { toApiError } from '../admin/api/errors';
 import { ADMIN_COOKIE, checkCsrf, handle, readCookie, searchParamsToObject } from './handle';
 import type { Container } from './container';
@@ -388,6 +407,43 @@ describe('authentication', () => {
     const cookie = response.headers.get('set-cookie') ?? '';
     expect(cookie).toContain('Max-Age=0');
     expect(cookie).not.toContain(`${ADMIN_COOKIE}=remembered`);
+  });
+
+  it('AUTH-012 — refuses an API token on a console-only route, and serves it on the others', async () => {
+    const consoleOnlyRoute = defineRoute({
+      id: 'test.consoleOnly',
+      method: 'POST',
+      path: '/admin-api/things/grant',
+      auth: 'admin',
+      permission: 'catalog:product:read',
+      consoleOnly: true,
+      summary: 'console only',
+      tags: ['test'],
+      response: z.object({ ok: z.boolean() }),
+      examples: [{ name: 'ok', response: { ok: true } }],
+    });
+    expect(consoleOnlyRoute.errors).toContain('AUTH_TOKEN_CONSOLE_ONLY');
+    let ran = false;
+    const POST = handle(
+      consoleOnlyRoute,
+      async () => {
+        ran = true;
+        return { ok: true };
+      },
+      { container: container() },
+    );
+    const withToken = { headers: { authorization: 'Bearer shp_live-test-token' } };
+
+    const refused = await POST(
+      new Request('https://shop.example/admin-api/things/grant', { method: 'POST', ...withToken }),
+    );
+    expect(refused.status).toBe(403);
+    expect((await body(refused)).code).toBe('AUTH_TOKEN_CONSOLE_ONLY');
+    expect(ran).toBe(false);
+
+    const GET = handle(adminRoute, async () => ({ ok: true }), { container: container() });
+    const served = await GET(new Request('https://shop.example/admin-api/things', withToken));
+    expect(served.status).toBe(200);
   });
 
   it('builds an admin actor from the session', async () => {

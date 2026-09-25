@@ -150,7 +150,13 @@ export const systemConfigSave = defineRoute({
   params: configGroupParams,
   body: configSaveBody,
   response: configGroupValues,
-  errors: ['SYSTEM_CONFIG_GROUP_NOT_FOUND', 'SYSTEM_CONFIG_UNKNOWN_KEY', 'CONFIG_FIELD_READ_ONLY'],
+  // A payment group answers an API token AUTH_TOKEN_CONSOLE_ONLY.
+  errors: [
+    'SYSTEM_CONFIG_GROUP_NOT_FOUND',
+    'SYSTEM_CONFIG_UNKNOWN_KEY',
+    'CONFIG_FIELD_READ_ONLY',
+    'AUTH_TOKEN_CONSOLE_ONLY',
+  ],
   examples: [
     {
       name: 'rename-the-shop',
@@ -189,6 +195,7 @@ export const systemConfigTest = defineRoute({
     'SYSTEM_CONFIG_UNKNOWN_KEY',
     'CONFIG_FIELD_READ_ONLY',
     'SYSTEM_CONFIG_TEST_UNSUPPORTED',
+    'AUTH_TOKEN_CONSOLE_ONLY',
     'RATE_LIMITED',
   ],
   examples: [

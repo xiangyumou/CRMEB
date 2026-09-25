@@ -785,6 +785,14 @@ An admin session ends after eight idle hours, or seven idle days when 「记住�
 - `apps/web/app/admin/login/login-form.test.tsx::admin login > AUTH-011: sends 记住登录状态 with the credentials`
 - `apps/web/app/admin/login/login-form.test.tsx::admin login > AUTH-011 — says 登录已过期 when a session ran out, and nothing when there was none`
 
+### AUTH-012
+
+An API token (MCP, the `shop` CLI) cannot manage admins, roles or tokens, nor save the payment settings: those routes are `consoleOnly`, `handle()` answers a token `AUTH_TOKEN_CONSOLE_ONLY` before the handler runs, and the agent catalogue does not list them. Reading them stays open to a token with the atom.
+
+- `apps/web/src/server/handle.test.ts::authentication > AUTH-012 — refuses an API token on a console-only route, and serves it on the others`
+- `packages/admin-ops/src/admin-ops.test.ts::the operation catalogue > AUTH-012 — leaves out every console-only route: admins, roles and tokens are not an agent’s to manage`
+- `apps/web/src/server/api-token.int.test.ts::a personal API token > AUTH-012 — cannot create a role or an admin, nor save the payment settings`
+
 ## Fulfilment, the order console and invoices
 
 ### FULFILL-001

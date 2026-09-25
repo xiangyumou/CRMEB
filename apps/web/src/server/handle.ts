@@ -371,6 +371,10 @@ export function handle<
             display: resolved.account,
             apiTokenId: resolved.tokenId,
           };
+          // Admins, roles, tokens and payment keys are managed from the
+          // console only: a leaked token must not mint the account that
+          // outlives its revocation.
+          if (anyRoute.consoleOnly) return fail(new DomainError('AUTH_TOKEN_CONSOLE_ONLY'));
         }
       }
 
