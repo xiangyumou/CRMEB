@@ -226,7 +226,7 @@ function CategoriesTable() {
         toInput={(values) =>
           modal.record ? { params: { id: modal.record.id }, body: values } : { body: values }
         }
-        invalidate={[userLabelCategoryList]}
+        invalidate={[userLabelCategoryList, userLabelList]}
         successMessage="已保存"
       />
     </>

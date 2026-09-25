@@ -6,6 +6,7 @@ import {
   wechatOaQrcodeCategoryDelete,
   wechatOaQrcodeCategoryList,
   wechatOaQrcodeCategoryUpdate,
+  wechatOaQrcodeList,
 } from '@shop/contracts/wechat-oa/wechat-oa.qrcode.contract';
 import {
   wechatQrcodeCategoryForm,
@@ -74,7 +75,7 @@ export function WechatQrcodeCategoriesPage() {
                       route={wechatOaQrcodeCategoryDelete}
                       input={{ params: { id: row.id } }}
                       title={`删除分类「${row.name}」？`}
-                      invalidate={[wechatOaQrcodeCategoryList]}
+                      invalidate={[wechatOaQrcodeCategoryList, wechatOaQrcodeList]}
                       successMessage="已删除"
                       permission="wechat-oa:qrcode:write"
                       buttonProps={{
@@ -116,7 +117,7 @@ export function WechatQrcodeCategoriesPage() {
         toInput={(values) =>
           modal.record ? { params: { id: modal.record.id }, body: values } : { body: values }
         }
-        invalidate={[wechatOaQrcodeCategoryList]}
+        invalidate={[wechatOaQrcodeCategoryList, wechatOaQrcodeList]}
         successMessage="已保存"
       />
     </PageContainer>

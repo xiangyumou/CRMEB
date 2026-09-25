@@ -312,7 +312,7 @@ function LabelCategoriesTable() {
                   input={{ params: { id: row.id } }}
                   title={`删除标签分类「${row.name}」？`}
                   description="分类下仍有标签时会被拒绝。"
-                  invalidate={[catalogAdminLabelCategoryList]}
+                  invalidate={[catalogAdminLabelCategoryList, catalogAdminLabelList]}
                   successMessage="已删除"
                   permission="catalog:label:write"
                   buttonProps={{ type: 'link', size: 'small', danger: true }}
@@ -339,7 +339,7 @@ function LabelCategoriesTable() {
         toInput={(values) =>
           modal.record ? { params: { id: modal.record.id }, body: values } : { body: values }
         }
-        invalidate={[catalogAdminLabelCategoryList]}
+        invalidate={[catalogAdminLabelCategoryList, catalogAdminLabelList]}
         successMessage="已保存"
       />
     </>

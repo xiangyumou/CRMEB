@@ -10,6 +10,7 @@ import {
   catalogAdminCategoryTree,
   catalogAdminCategoryUpdate,
 } from '@shop/contracts/catalog/catalog.category.admin.contract';
+import { catalogAdminProductList } from '@shop/contracts/catalog/catalog.product.admin.contract';
 import { productCategoryForm, type ProductCategory } from '@shop/contracts/catalog/schemas';
 
 import { useRouteMutation } from '@/admin/api/hooks';
@@ -179,7 +180,7 @@ export function ProductCategoriesPage() {
         toInput={(values) =>
           modal.record ? { params: { id: modal.record.id }, body: values } : { body: values }
         }
-        invalidate={[catalogAdminCategoryList]}
+        invalidate={[catalogAdminCategoryList, catalogAdminProductList]}
         successMessage="已保存"
         onSuccess={invalidateTree}
       />

@@ -2,6 +2,7 @@
 
 import { Button, Space, Switch, Table, Typography } from 'antd';
 import {
+  cmsArticleList,
   cmsCategoryCreate,
   cmsCategoryDelete,
   cmsCategoryList,
@@ -117,7 +118,7 @@ export function ArticleCategoriesPage() {
                   input={{ params: { id: row.id } }}
                   title={`删除分类「${row.title}」？`}
                   description="还有子分类或文章时无法删除，改用隐藏。"
-                  invalidate={[cmsCategoryList]}
+                  invalidate={[cmsCategoryList, cmsArticleList]}
                   successMessage="已删除"
                   permission="cms:category:write"
                   buttonProps={{ type: 'link', size: 'small', danger: true }}
@@ -165,7 +166,7 @@ export function ArticleCategoriesPage() {
         toInput={(values) =>
           modal.record ? { params: { id: modal.record.id }, body: values } : { body: values }
         }
-        invalidate={[cmsCategoryList]}
+        invalidate={[cmsCategoryList, cmsArticleList]}
         successMessage="已保存"
       />
     </PageContainer>
