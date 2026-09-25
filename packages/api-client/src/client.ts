@@ -210,6 +210,7 @@ function withRoute(error: ApiError, routeId: string): ApiError {
   return new ApiError({
     status: error.status,
     code: error.code,
+    // eslint-disable-next-line weapp/no-raw-error-text -- an ApiError's message: already the server's Chinese
     message: error.message,
     details: error.details,
     routeId,

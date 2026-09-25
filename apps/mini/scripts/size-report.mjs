@@ -258,7 +258,7 @@ for (const file of files.filter((candidate) => candidate.rel.endsWith('.js'))) {
 // `URL`, `window`, `document`, `navigator`, `location`, `requestAnimationFrame`…), which leave
 // no bare name here, and `fetch`, `setImmediate`, `MessageChannel` and `globalThis`, which the
 // libraries mention behind a `typeof` check. The source is linted for all of them
-// (apps/mini/eslint.config.mjs, `no-restricted-globals`).
+// (packages/config/eslint/weapp.js, `no-restricted-globals`).
 const MISSING_GLOBALS = new RegExp(
   `(?<![\\w$.'"\`])(${[
     'AbortController',

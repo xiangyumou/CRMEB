@@ -6,6 +6,7 @@
   "exports": {
     "./eslint": "./eslint/index.js",
     "./eslint/boundaries": "./eslint/boundaries.js",
+    "./eslint/weapp": "./eslint/weapp.js",
     "./vitest": "./vitest/index.js",
     "./tsconfig/node.json": "./tsconfig/node.json",
     "./tsconfig/lib.json": "./tsconfig/lib.json"

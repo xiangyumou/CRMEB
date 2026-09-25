@@ -1,4 +1,5 @@
 import { shopConfig } from '@shop/config/eslint';
+import { weappConfig } from '@shop/config/eslint/weapp';
 import reactHooks from 'eslint-plugin-react-hooks';
 
 /**
@@ -39,65 +40,6 @@ const REACT_19_ONLY = {
   importNames: ['use', 'useActionState', 'useOptimistic'],
   message: '小程序运行的是 React 18（Taro 4.2），没有这个 API',
 };
-
-/**
- * Browser globals a phone's mini-program runtime does not have, or has only as Taro's partial
- * stand-in (the build swaps `URLSearchParams`, `URL`, `window`, `document`… for its own, which
- * lack most of the browser API: `Object.fromEntries(new URLSearchParams(q))` threw on phones).
- * DevTools' simulator, the H5 e2e build and Node's vitest all have the real ones, so nothing
- * before a device shows the crash. apps/mini/scripts/size-report.mjs checks the build for the
- * ones Taro does not swap.
- */
-const MISSING_ON_WEAPP = [
-  ['URLSearchParams', 'Taro 的 URLSearchParams 不能遍历；用 src/lib/query.ts 的 parseQuery'],
-  ['URL', 'Taro 的 URL 不完整；手写拼接或 @shop/api-client/url'],
-  ['window', '小程序没有 window'],
-  ['document', '小程序没有 document'],
-  ['navigator', '小程序没有 navigator；系统信息走 src/platform'],
-  ['location', '小程序没有 location；路由走 src/platform/nav.ts'],
-  ['history', '小程序没有 history；路由走 src/platform/nav.ts'],
-  ['localStorage', '小程序没有 localStorage；存储走 src/platform'],
-  ['sessionStorage', '小程序没有 sessionStorage；存储走 src/platform'],
-  ['fetch', '小程序没有 fetch；请求走 @shop/api-client'],
-  ['XMLHttpRequest', '小程序没有 XMLHttpRequest；请求走 @shop/api-client'],
-  ['FormData', '小程序没有 FormData；上传走 src/platform'],
-  ['Blob', '小程序没有 Blob'],
-  ['File', '小程序没有 File'],
-  ['FileReader', '小程序没有 FileReader；文件走 src/platform'],
-  ['btoa', '小程序没有 btoa'],
-  ['atob', '小程序没有 atob'],
-  ['TextEncoder', '小程序没有 TextEncoder'],
-  ['TextDecoder', '小程序没有 TextDecoder'],
-  ['structuredClone', '小程序没有 structuredClone'],
-  ['requestAnimationFrame', '小程序页面里没有 requestAnimationFrame；用 setTimeout'],
-  ['cancelAnimationFrame', '小程序页面里没有 cancelAnimationFrame'],
-  ['IntersectionObserver', '用 src/platform 包装的 Taro.createIntersectionObserver'],
-  ['ResizeObserver', '小程序没有 ResizeObserver'],
-  ['MutationObserver', '小程序没有 MutationObserver'],
-  ['matchMedia', '小程序没有 matchMedia'],
-  ['getComputedStyle', '小程序没有 getComputedStyle'],
-  ['queueMicrotask', 'iOS 老版本没有 queueMicrotask；用 Promise.resolve().then'],
-  ['setImmediate', '小程序没有 setImmediate'],
-  ['crypto', '小程序没有 Web Crypto'],
-  ['globalThis', 'iOS 12.0/12.1 没有 globalThis'],
-].map(([name, message]) => ({ name, message }));
-
-/** Methods newer than the iOS 12 floor that Babel does not polyfill (`useBuiltIns: false`). */
-const MISSING_METHODS = [
-  { property: 'matchAll', message: 'iOS 12 没有 String.prototype.matchAll；用 RegExp exec 循环' },
-  { property: 'replaceAll', message: 'iOS 12 没有 replaceAll；用带 g 的正则 replace' },
-  {
-    object: 'Object',
-    property: 'hasOwn',
-    message: 'iOS 12 没有 Object.hasOwn；用 Object.prototype.hasOwnProperty.call',
-  },
-  { object: 'Promise', property: 'any', message: 'iOS 12 没有 Promise.any' },
-  {
-    object: 'Object',
-    property: 'fromEntries',
-    message: 'iOS 12.0/12.1 没有 Object.fromEntries；用 src/lib/defined.ts 的 fromPairs',
-  },
-];
 
 /** `@shop/contracts` modules with no zod import, allowed at runtime. */
 const CONTRACTS_RUNTIME = [
@@ -162,7 +104,9 @@ export default [
     files: ['src/platform/**', 'src/test/**', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
     rules: { 'no-restricted-imports': ['error', { paths: [REACT_19_ONLY] }] },
   },
-  {
+  // What runs on the phone: AGENTS.md 14 (only what WeChat and iOS 12 have), 17 (handlers
+  // return their promise) and 1 (no raw error text for the shopper); packages/config/eslint/weapp.js.
+  ...weappConfig({
     files: ['src/**/*.ts', 'src/**/*.tsx'],
     ignores: [
       // Build time, in Node: the app and page configs become app.json / page .json files.
@@ -177,23 +121,9 @@ export default [
       'src/**/*.test.ts',
       'src/**/*.test.tsx',
     ],
-    rules: {
-      'no-restricted-globals': ['error', ...MISSING_ON_WEAPP],
-      'no-restricted-properties': ['error', ...MISSING_METHODS],
-      // The preset turns this off for `.ts` outside core; keep the ban on dynamic code.
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: "NewExpression[callee.name='Function']",
-          message: 'new Function 被静态守卫禁止',
-        },
-        {
-          selector: "CallExpression[callee.property.name='at'][arguments.length=1]",
-          message: 'iOS 12 没有 Array/String.prototype.at；用 [i] 或 [length - 1]',
-        },
-      ],
-    },
-  },
+    // The layer that turns WeChat's errMsg and runtime errors into Chinese.
+    uiIgnores: ['src/platform/**', 'src/lib/error-message.ts'],
+  }),
   {
     files: ['src/**/*.tsx', 'src/**/*.ts'],
     ...reactHooks.configs.flat.recommended,

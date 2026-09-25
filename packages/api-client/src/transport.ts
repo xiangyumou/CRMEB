@@ -66,6 +66,8 @@ export type FetchLike = (
  */
 export function fetchTransport(fetchImpl?: FetchLike): Transport {
   return async (request) => {
+    // Tests and H5 only: the mini-program never calls fetchTransport (taroTransport instead).
+    // eslint-disable-next-line no-restricted-globals -- see above
     const doFetch = fetchImpl ?? (globalThis as unknown as { fetch?: FetchLike }).fetch;
     if (!doFetch) throw new Error('fetchTransport: 当前环境没有 fetch');
     const init: Parameters<FetchLike>[1] = { method: request.method, headers: request.headers };

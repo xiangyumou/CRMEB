@@ -282,12 +282,11 @@ export const fixtureProductTabs: ProductTabsProps = {
 };
 
 /** The products each tab resolves to, by slot. */
-export const fixtureProductTabsData: Record<string, ProductSummary[]> = Object.fromEntries(
-  fixtureProductTabs.tabs.map((tab, index) => [
-    productTabSlot(index),
-    resolveFixtureProducts(tab.source),
-  ]),
-);
+export const fixtureProductTabsData: Record<string, ProductSummary[]> = {};
+// Not Object.fromEntries: the demo sub-package renders these on phones, and iOS 12.0/12.1 lack it.
+fixtureProductTabs.tabs.forEach((tab, index) => {
+  fixtureProductTabsData[productTabSlot(index)] = resolveFixtureProducts(tab.source);
+});
 
 export const fixtureRichText: RichTextProps = {
   html:
