@@ -1911,6 +1911,13 @@ Releases are serialized repository-wide and never cancelled mid-publish: the mer
 
 - `guards/src/checks/pipeline.test.ts::readPipeline > REL-007 — fails when the image job may be cancelled mid-publish`
 
+### REL-008
+
+The workflow's trigger filter may skip prose, never a file a guard reads: a change to `docs/invariants.md` alone starts the workflow on push and on pull request, so the `invariants` guard resolves its citations before it merges.
+
+- `guards/src/checks/pipeline.test.ts::readPipeline > REL-008 — fails when the trigger filter skips a change to docs/invariants.md`
+- `guards/src/checks/pipeline.test.ts::readPipeline > REL-008 — passes a filter that skips prose but re-includes what the guards read`
+
 ## Deployment topology
 
 ### OPS-002

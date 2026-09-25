@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { defineCheck, fail, result, type Finding } from '../framework';
-import { rel, repoRoot, workflowFile } from '../lib/paths';
+import { invariantsDoc, rel, repoRoot, workflowFile } from '../lib/paths';
 
 /**
  * The release pipeline's safety properties, kept in the workflow (REL-006,
@@ -32,6 +32,85 @@ export function jobsOf(workflow: string): Record<string, string> {
     if (name) out[name] = chunk;
   }
   return out;
+}
+
+/**
+ * Files outside the code that a guard reads. A trigger filter that skips a
+ * change to one of them lets it merge unchecked: `docs/invariants.md` cites
+ * tests by name, and the `invariants` guard is what resolves them.
+ */
+export const GUARD_READ_FILES: readonly string[] = [rel(invariantsDoc)];
+
+/** A GitHub Actions path glob as a regular expression over a repository path. */
+export function globToRegExp(glob: string): RegExp {
+  let out = '';
+  for (let i = 0; i < glob.length; i += 1) {
+    const ch = glob[i]!;
+    if (ch === '*' && glob[i + 1] === '*') {
+      if (glob[i + 2] === '/') {
+        out += '(?:.*/)?';
+        i += 2;
+      } else {
+        out += '.*';
+        i += 1;
+      }
+    } else if (ch === '*') out += '[^/]*';
+    else if (ch === '?') out += '[^/]';
+    else out += ch.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  }
+  return new RegExp(`^${out}$`);
+}
+
+/** The `paths` / `paths-ignore` filter of one `on:` event, as written. */
+export function pathFilterOf(
+  workflow: string,
+  event: string,
+): { kind: 'paths' | 'paths-ignore' | 'none'; patterns: string[] } | null {
+  const lines = workflow.split('\n');
+  const onAt = lines.findIndex((line) => /^on:\s*$/.test(line));
+  if (onAt < 0) {
+    // `on: [push, pull_request]` or `on: push`: no filters at all.
+    const inline = lines.find((line) => /^on:\s*\S/.test(line)) ?? '';
+    return new RegExp(`\\b${event}\\b`).test(inline) ? { kind: 'none', patterns: [] } : null;
+  }
+  let at = -1;
+  for (let i = onAt + 1; i < lines.length && !/^\S/.test(lines[i]!); i += 1) {
+    if (new RegExp(`^  ${event}:`).test(lines[i]!)) {
+      at = i;
+      break;
+    }
+  }
+  if (at < 0) return null;
+  for (let i = at + 1; i < lines.length && /^( {4}| *$| *#)/.test(lines[i]!); i += 1) {
+    const key = /^ {4}(paths|paths-ignore):\s*$/.exec(lines[i]!)?.[1] as
+      'paths' | 'paths-ignore' | undefined;
+    if (!key) continue;
+    const patterns: string[] = [];
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const item = /^ {6}- ['"]?([^'"]+?)['"]?\s*(?:#.*)?$/.exec(lines[j]!);
+      if (item) patterns.push(item[1]!);
+      else if (!/^\s*(#.*)?$/.test(lines[j]!)) break;
+    }
+    return { kind: key, patterns };
+  }
+  return { kind: 'none', patterns: [] };
+}
+
+/**
+ * Does a change to `file` alone start the workflow on `event`? `paths`: the
+ * last pattern the file matches decides (`!` excludes). `paths-ignore`: the
+ * run is skipped when the file matches (a `!` pattern re-includes).
+ */
+export function triggersOn(workflow: string, event: string, file: string): boolean {
+  const filter = pathFilterOf(workflow, event);
+  if (filter === null) return false;
+  if (filter.kind === 'none') return true;
+  let matched: boolean | null = null;
+  for (const pattern of filter.patterns) {
+    const negated = pattern.startsWith('!');
+    if (globToRegExp(negated ? pattern.slice(1) : pattern).test(file)) matched = !negated;
+  }
+  return filter.kind === 'paths' ? matched === true : matched !== true;
 }
 
 /**
@@ -83,6 +162,16 @@ export function readPipeline(
       need(
         /refusing a conflicting release/.test(text),
         `${script} no longer aborts on a conflicting digest ("refusing a conflicting release", REL-003)`,
+      );
+    }
+  }
+
+  // A trigger filter written to skip prose must not skip what the guards read.
+  for (const event of ['push', 'pull_request']) {
+    for (const file of GUARD_READ_FILES) {
+      need(
+        triggersOn(workflow, event, file),
+        `a change to ${file} alone does not start the workflow on \`${event}\`, so the guard that reads it is skipped`,
       );
     }
   }

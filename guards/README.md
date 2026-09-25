@@ -53,7 +53,7 @@ to it (below). The last line is the count:
 | `secrets`       | no secret config field can leave through a response schema                                                                                                                                           |
 | `tx-pool`       | no `ctx.config.get(` / `ctx.db` / `ctx.withTx(` inside a function that takes a `tx`, `Tx` or `DbOrTx` (STAB-001)                                                                                     |
 | `migrations`    | every destructive statement in `packages/db/migrations` carries `-- destructive: approved` (OPS-007)                                                                                                 |
-| `pipeline`      | `ci.yml` publishes through `publish-release.sh`, never promotes, and keeps its guards, soak and admin e2e gates (REL-*)                                                                              |
+| `pipeline`      | `ci.yml` publishes through `publish-release.sh`, never promotes, keeps its guards, soak and admin e2e gates, and its trigger filter never skips a file a guard reads (REL-*)                         |
 | `api-compat`    | the storefront API (`/api/v1/**` in the generated OpenAPI) only grows against `baselines/storefront-api.json`, the surface the released mini-program uses; report-only until the first release       |
 | `invariants`    | every rule in `docs/invariants.md` cites a test that exists, and every rule a test title names exists                                                                                                |
 
