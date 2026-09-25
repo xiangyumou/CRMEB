@@ -2,14 +2,23 @@
 
 import { DatePicker } from 'antd';
 
-import { fromInstant, toInstant, type Dayjs } from '../instant';
+import { dayjs, fromInstant, pickerToInstant, type Dayjs } from '../instant';
 import { defined } from '../props';
 
 export interface DateFieldProps {
-  /** ISO-8601 instant with offset. */
-  value?: string | undefined;
-  onChange?: (value: string | undefined) => void;
+  /** ISO-8601 instant with offset. `null` is a cleared picker. */
+  value?: string | null | undefined;
+  /**
+   * `null` when the operator clears the picker, so a form can tell "cleared"
+   * (send `null`, the explicit clear) from "never touched".
+   */
+  onChange?: (value: string | null) => void;
   showTime?: boolean | undefined;
+  /**
+   * The end of a window (结束时间, 有效期至): a picked day means its last second,
+   * 23:59:59 — and with `showTime` that is the time offered first.
+   */
+  endOfDay?: boolean | undefined;
   disabled?: boolean | undefined;
   placeholder?: string | undefined;
   style?: React.CSSProperties | undefined;
@@ -31,19 +40,27 @@ export function DateField({
   style,
   id,
   disabledDate,
+  endOfDay = false,
 }: DateFieldProps) {
   return (
     <DatePicker
       {...defined({ id, disabled })}
       style={{ width: '100%', ...style }}
-      showTime={showTime}
+      showTime={showTime && endOfDay ? { defaultOpenValue: END_OF_DAY } : showTime}
       value={fromInstant(value)}
       placeholder={placeholder ?? (showTime ? '选择日期时间' : '选择日期')}
       {...(disabledDate ? { disabledDate } : {})}
-      onChange={(next) => onChange?.(toInstant(next))}
+      onChange={(next) =>
+        onChange?.(
+          pickerToInstant(next, showTime ? undefined : endOfDay ? 'endOfDay' : undefined) ?? null,
+        )
+      }
     />
   );
 }
+
+/** The time a picked end date starts with. Only its time of day is read. */
+const END_OF_DAY = dayjs('2000-01-01T23:59:59');
 
 export interface DateRangeFieldProps {
   /** `[startISO, endISO]`. */
@@ -88,8 +105,8 @@ export function DateRangeField({
           return;
         }
         const snap = wholeDays && !showTime;
-        const from = toInstant(snap ? next[0].startOf('day') : next[0]);
-        const to = toInstant(snap ? next[1].endOf('day') : next[1]);
+        const from = pickerToInstant(next[0], snap ? 'startOfDay' : undefined);
+        const to = pickerToInstant(next[1], snap ? 'endOfDay' : undefined);
         onChange?.(from && to ? [from, to] : undefined);
       }}
     />

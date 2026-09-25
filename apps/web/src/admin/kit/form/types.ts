@@ -84,6 +84,11 @@ export type FieldSpec<N extends string = string> =
       kind: 'date';
       showTime?: boolean | undefined;
       placeholder?: string | undefined;
+      /**
+       * The end of a window: a picked day means 23:59:59 of it. Inferred from
+       * the name when omitted (`endAt`, `validTo`, `claimTo`, `…Until`).
+       */
+      endOfDay?: boolean | undefined;
     })
   | (FieldBase<N> & {
       /** `[startISO, endISO]`. */

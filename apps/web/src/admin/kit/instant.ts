@@ -54,6 +54,44 @@ export function toInstant(value: Dayjs | Date | null | undefined): string | unde
   return d.tz(DISPLAY_TZ).format('YYYY-MM-DDTHH:mm:ssZ');
 }
 
+/**
+ * Picker value → wire value, reading the date and time the operator *saw* as
+ * Shanghai time.
+ *
+ * antd hands back a dayjs in the browser's zone: a date picked on a laptop set
+ * to UTC is that day's 00:00 UTC, which `toInstant` would turn into 08:00 in
+ * Shanghai. The shop's days are Shanghai days whatever the laptop says, so the
+ * wall clock is taken as it stands and placed in Shanghai.
+ *
+ * `snap` moves it to the first or last second of its day: an end date a person
+ * picks means the end of that day (至 9 月 30 日 includes the 30th).
+ */
+export function pickerToInstant(
+  value: Dayjs | null | undefined,
+  snap?: 'startOfDay' | 'endOfDay' | undefined,
+): string | undefined {
+  if (!value || !value.isValid()) return undefined;
+  const day = value.format('YYYY-MM-DD');
+  const time =
+    snap === 'startOfDay'
+      ? '00:00:00'
+      : snap === 'endOfDay'
+        ? '23:59:59'
+        : value.format('HH:mm:ss');
+  return dayjs.tz(`${day}T${time}`, DISPLAY_TZ).format('YYYY-MM-DDTHH:mm:ssZ');
+}
+
+/**
+ * Whether a date field is the end of a window — 结束时间, 有效期至, 领取截止 —
+ * by its contract name. Such a field defaults to 23:59:59 of the picked day.
+ */
+export function isEndOfWindow(name: string | readonly (string | number)[]): boolean {
+  const last = typeof name === 'string' ? name.split('.').at(-1) : name.at(-1);
+  return (
+    typeof last === 'string' && /^(end|expire)|(To|End|EndAt|EndsAt|Until|Deadline)$/.test(last)
+  );
+}
+
 /** Wire value → picker value. */
 export function fromInstant(value: string | null | undefined): Dayjs | null {
   return toDisplayDayjs(value);
