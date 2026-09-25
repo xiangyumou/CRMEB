@@ -18,6 +18,7 @@ import {
 } from 'antd';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
+import { ApiError } from '../../api/errors';
 import { useAssetSource } from './asset-source-context';
 import type { AssetCategory, AssetItem } from './types';
 
@@ -237,7 +238,8 @@ export function AssetPicker({
                   await list.refetch();
                   void message.success(`已上传 ${files.length} 个文件`);
                 } catch (error) {
-                  void message.error(error instanceof Error ? error.message : '上传失败');
+                  // A server refusal is written for the operator; anything else is not.
+                  void message.error(ApiError.is(error) ? error.message : '上传失败，请重试');
                 } finally {
                   setUploading(false);
                 }

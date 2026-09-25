@@ -40,7 +40,8 @@ class PageErrorBoundary extends Component<{ children: ReactNode }, BoundaryState
       <Result
         status="error"
         title="页面出错了"
-        subTitle={error.message}
+        // Only an API error's message is written for the operator.
+        subTitle={ApiError.is(error) ? error.message : '页面加载失败，请重试'}
         extra={
           <Button type="primary" onClick={() => this.setState({ error: null })}>
             重试
