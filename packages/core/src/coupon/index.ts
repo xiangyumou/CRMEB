@@ -15,6 +15,7 @@
  * | `release`         | order / refund | cancel and refund                          |
  * | `grantNewUser`    | user           | inside the registration transaction        |
  * | `grantOrderGifts` | order          | the order-paid effect handler              |
+ * | `revokeOrderGifts`| refund         | a full refund takes the unused gifts back  |
  * | `listOrderGifts`  | order          | the 订单赠券 panel, after the owner check |
  * | `productScope`    | catalog        | the 商品列表's `couponId` filter           |
  *
@@ -47,6 +48,7 @@ export {
   quote,
   redeem,
   release,
+  revokeOrderGifts,
 } from './coupon.service';
 
 export type {
