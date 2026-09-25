@@ -125,8 +125,14 @@ export async function reviewedItemIds(
 
 /**
  * Units of each product this buyer has already committed to, for a `lifetime`
- * purchase limit. Cancelled orders do not count — a shopper who abandoned a
- * checkout has not used up their allowance.
+ * purchase limit — the one definition checkout, the cart and the product page
+ * all read (`OrderFactsPort.purchasedQuantity` is this, for one product).
+ *
+ * An unpaid order counts: it holds the units until it is paid or closed, and
+ * not counting it would let a shopper open three unpaid orders under a limit of
+ * one and pay all three. A cancelled order does not count, and neither do
+ * refunded units — a shopper who abandoned a checkout or sent the goods back
+ * has not used up their allowance.
  */
 export async function purchasedQuantity(
   db: DbOrTx,
@@ -137,7 +143,7 @@ export async function purchasedQuantity(
   const rows = await db
     .select({
       productId: orderItems.productId,
-      quantity: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int`,
+      quantity: sql<number>`coalesce(sum(${orderItems.quantity} - ${orderItems.refundedQuantity}), 0)::int`,
     })
     .from(orderItems)
     .innerJoin(orders, eq(orders.id, orderItems.orderId))

@@ -417,9 +417,10 @@ The auto-review job writes its five-star default once the window has passed and 
 
 ### CAT-014
 
-A lifetime limit counts what the shopper already bought and a per-order limit ignores history; below the minimum is refused.
+A lifetime limit counts what the shopper already bought and a per-order limit ignores history; below the minimum is refused. "Already bought" has one definition, which checkout, the cart and the product page all read: units on the shopper's orders that are not cancelled (unpaid ones included), less the units refunded.
 
 - `packages/core/src/catalog/catalog.int.test.ts::purchase limits > counts what the shopper already bought against a lifetime limit`
+- `packages/core/src/order/order.int.test.ts::checkout preview > CAT-014 — counts a lifetime limit the way the cart and the product page do: unpaid in, refunded out`
 - `packages/core/src/catalog/catalog.int.test.ts::a per-order limit ignores history`
 - `packages/core/src/catalog/catalog.int.test.ts::refuses below the minimum`
 

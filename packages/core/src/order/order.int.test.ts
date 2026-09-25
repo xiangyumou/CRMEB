@@ -469,6 +469,37 @@ describe('checkout preview', () => {
       'ORDER_PURCHASE_LIMIT_REACHED',
     );
   });
+
+  it('CAT-014 — counts a lifetime limit the way the cart and the product page do: unpaid in, refunded out', async () => {
+    const userId = await makeUser();
+    const item = await makeProduct({ purchaseLimit: { mode: 'lifetime', quantity: 2 } });
+    await addToCart(userId, item, 2);
+    await makeAddress(userId);
+    const placed = await order.create(as(userId), {
+      source: 'cart',
+      cartItemIds: [],
+      kind: 'normal',
+      idempotencyKey: idempotencyKey(),
+    });
+
+    // Unpaid, it already holds the allowance, for checkout and the port alike.
+    const facts = () =>
+      harness.ctx.withTx((tx) =>
+        orderFacts.purchasedQuantity(tx, { userId, productId: item.productId }),
+      );
+    expect(await facts()).toBe(2);
+
+    // Both units sent back: the allowance is free again, everywhere.
+    await harness.ctx.db
+      .update(orderItems)
+      .set({ refundedQuantity: 2 })
+      .where(eq(orderItems.orderId, Number(placed.id)));
+    expect(await facts()).toBe(0);
+    await addToCart(userId, item, 2);
+    await expect(
+      order.preview(as(userId), { source: 'cart', cartItemIds: [], kind: 'normal' }),
+    ).resolves.toMatchObject({ totalQuantity: 2 });
+  });
 });
 
 // ---------------------------------------------------------------------------

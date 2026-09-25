@@ -3,6 +3,7 @@ import { orderItems, orders } from '@shop/db/schema/order';
 import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm';
 
 import type { OrderFactsPort, ReviewableLine } from './ports';
+import { purchasedQuantity } from './order.repo';
 
 /**
  * The order domain's answers to the catalog's questions — `OrderFactsPort` —
@@ -67,22 +68,13 @@ export const orderFacts: OrderFactsPort = {
   },
 
   async purchasedQuantity(tx, args): Promise<number> {
-    const rows = await tx
-      .select({
-        // Refunded units do not count against a lifetime limit: the shopper
-        // does not have the goods.
-        total: sql<number>`coalesce(sum(${orderItems.quantity} - ${orderItems.refundedQuantity}), 0)::int`,
-      })
-      .from(orderItems)
-      .innerJoin(orders, eq(orders.id, orderItems.orderId))
-      .where(
-        and(
-          eq(orderItems.productId, args.productId),
-          eq(orders.userId, args.userId),
-          sql`${orders.status} in ('paid', 'shipped', 'received', 'completed')`,
-        ),
-      );
-    return rows[0]?.total ?? 0;
+    // The checkout's own count, so the cart, the product page and 提交订单 can
+    // never disagree about how much of a lifetime limit is left.
+    const counted = await purchasedQuantity(tx, {
+      userId: args.userId,
+      productIds: [args.productId],
+    });
+    return counted.get(args.productId) ?? 0;
   },
 
   /**
