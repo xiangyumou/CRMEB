@@ -2325,6 +2325,12 @@ Every object-storage request has a deadline, body included, so a bucket that acc
 
 - `packages/core/src/storage/s3.test.ts::createS3Storage > STOR-014 — gives up on a bucket that stalls instead of holding the upload open`
 
+### STOR-015
+
+The 素材 keyword search matches the characters typed: `%`, `_` and `\` in a keyword are literal, not LIKE wildcards (`kernel/like.ts`).
+
+- `packages/core/src/storage/storage.int.test.ts::listing, editing and batches > STOR-015 — searches for the words typed: 100% and a_b are not wildcards`
+
 ### STORC-001
 
 Six uploads of identical bytes at once store the object once and hand every caller the same row.

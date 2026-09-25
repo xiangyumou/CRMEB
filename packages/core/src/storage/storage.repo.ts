@@ -15,6 +15,7 @@ import {
   sum,
   type SQL,
 } from 'drizzle-orm';
+import { containsPattern } from '../kernel/like';
 import { allOf, conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
 
 /**
@@ -303,7 +304,10 @@ function attachmentFilters(args: AttachmentListArgs): SQL | undefined {
         : inArray(attachments.categoryId, [...args.categoryIds]),
     args.kind === undefined ? undefined : eq(attachments.kind, args.kind),
     keyword
-      ? or(ilike(attachments.name, `%${keyword}%`), ilike(attachments.originalName, `%${keyword}%`))
+      ? or(
+          ilike(attachments.name, containsPattern(keyword)),
+          ilike(attachments.originalName, containsPattern(keyword)),
+        )
       : undefined,
   );
 }

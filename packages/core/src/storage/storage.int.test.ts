@@ -377,6 +377,23 @@ describe('listing, editing and batches', () => {
     expect(deep.total).toBe(2);
   });
 
+  it('STOR-015 — searches for the words typed: 100% and a_b are not wildcards', async () => {
+    const ctx = as(adminActor(adminId));
+    const names = ['满100%减', '满1000减', 'a_b', 'axb'];
+    for (const [index, name] of names.entries()) {
+      const uploaded = await attachmentUpload(ctx, {}, png(1, 1, 10 + index));
+      await attachmentUpdate(ctx, { id: uploaded.attachment.id }, { name });
+    }
+    const search = async (keyword: string) =>
+      (
+        await attachmentList(ctx, { page: 1, pageSize: 20, includeSubcategories: false, keyword })
+      ).items.map((row) => row.name);
+
+    expect(await search('100%')).toEqual(['满100%减']);
+    expect(await search('a_b')).toEqual(['a_b']);
+    expect(await search('%')).toEqual(['满100%减']);
+  });
+
   it('renames and re-files without touching the stored object', async () => {
     const ctx = as(adminActor(adminId));
     const folder = await categoryCreate(ctx, { name: 'a', sortOrder: 0 });
