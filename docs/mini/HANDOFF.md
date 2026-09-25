@@ -65,8 +65,8 @@
 2. **真机检查**：`device-check.md` 第 6 节，对着生产，由人做。隐私弹窗（D03）必须在真机上过。
 3. **提交审核、发布**：每步单独问用户。审核准备见 `cutover.md` 3.2 第 19 项；发布后按 3.3 做。
 4. **改了代码要再发版时：** 只改 `apps/mini` 就重新构建（`TARO_APP_API_ORIGIN=https://x-zoo.vip pnpm --filter @shop/mini build:weapp`，先在该目录跑一次 `pnpm turbo run gen --filter=@shop/mini...`），然后上传：
-   `miniprogram-ci upload --appid wx4f4b772125e155ed --pp apps/mini/dist/weapp --pkp <密钥路径> --uv <版本> --ud "<说明>" -r 1`。
-   `scripts/preview.mjs` 要求密钥在仓库外，现在的位置它会拒绝，所以直接用 miniprogram-ci。每次上传都要问用户。
+   `WX_MINI_UPLOAD_KEY_PATH=private.wx4f4b772125e155ed.key pnpm --filter @shop/mini exec node scripts/upload.mjs --confirm`（版本固定 `1.0.0`，先用 `--dry-run` 看一遍）。
+   密钥在仓库根目录且被 git 忽略，脚本接受。不要直接调用 miniprogram-ci：脚本会核对 size-report、工作区干净、产物就是 `HEAD`、`HEAD` 在 `origin/master` 上且 CI 通过（`device-check.md` 第 8 节）。每次上传都要问用户。
 5. **遗留小项（不急）：**
    - K3：连点「结算」「立即购买」会开两次页面（不会重复下单）；两处重复代码（`cart-view.ts` 的金额函数、`aftersale/apply` 的 `REFUND_READS`）。
    - K1 P4：售后凭证图可填外链，要单开售后方向的任务。

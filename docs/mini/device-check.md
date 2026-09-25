@@ -194,6 +194,11 @@ iPhone 和 Android 各过一遍。每项记「通过 / 失败 / 未测（原因�
    两个脚本发现产物和指纹对不上（之后又跑了 `dev:weapp` 或裸 `taro build`）就拒绝。开发者工具里的
    「上传」按钮不做这项检查，只对 `device-build.mjs` 刚成功构建出的 `dist/weapp` 使用；它失败时会删掉
    `dist/weapp`。
+   **只上传一个提交**：工作区必须干净（git 忽略的文件除外），size-report 通过时记下的提交必须就是
+   `HEAD`，且当时工作区也是干净的。`upload.mjs` 还要求这个提交已经在 `origin/master` 上，并且 CI
+   （`ci` 工作流）对它的 push 运行结论是 success——和 `deploy/ship.sh` 发布服务端的条件一样，用 `gh`
+   查询，所以本机要登录 `gh`。只改了文档的提交 CI 不跑，没有运行记录，脚本会拒绝：检出 CI 跑过的最新提交再构建。
+   `preview.mjs` 用来在合入前看分支，只要求前两条，不查 CI。
 2. **上传密钥**：管理员在公众平台 **开发管理 → 开发设置 → 小程序代码上传** 里生成并下载
    `private.wx4f4b772125e155ed.key`。它是凭证：
    - 放在**仓库外**，例如 `~/.config/shop/private.wx4f4b772125e155ed.key`，`chmod 600`；放在仓库里时
@@ -214,10 +219,17 @@ iPhone 和 Android 各过一遍。每项记「通过 / 失败 / 未测（原因�
    WX_MINI_UPLOAD_KEY_PATH=~/.config/shop/private.wx4f4b772125e155ed.key \
      pnpm --filter @shop/mini exec node scripts/upload.mjs --confirm [--desc "说明"]
    # 上传为开发版本，再在公众平台「版本管理」里设为体验版
+
+   WX_MINI_UPLOAD_KEY_PATH=~/.config/shop/private.wx4f4b772125e155ed.key \
+     pnpm --filter @shop/mini exec node scripts/upload.mjs --dry-run
+   # 做完上面所有检查，只打印将要执行的 miniprogram-ci 命令（密钥路径显示为 <key>），不上传，不需要 --confirm
    ```
 
+   `--desc` 不填时说明是「版本 提交前 9 位 上海时间」，例如 `1.0.0 70d708b1d 2026-09-25 23:30`。
+
    两个脚本在这些情况下拒绝运行：没设 `WX_MINI_UPLOAD_KEY_PATH`、密钥不存在或在仓库里且未被忽略、
-   `dist/weapp` 没构建或是 `touristappid`、size-report 没通过这份产物、没加 `--confirm`、找不到 `miniprogram-ci` 命令
+   `dist/weapp` 没构建或是 `touristappid`、size-report 没通过这份产物、工作区不干净或产物不是 `HEAD` 构建的、
+   （仅 `upload.mjs`）提交不在 `origin/master` 或 CI 没通过、没加 `--confirm`、找不到 `miniprogram-ci` 命令
    （也可以用 `MINIPROGRAM_CI_BIN` 指定）。它调用的是 miniprogram-ci 文档里的 `preview` 参数
    （`--pp --pkp --appid --uv -r --qrcode-format --qrcode-output-dest`），第一次用前对照你装的版本的
    `miniprogram-ci preview --help` 核对一遍。

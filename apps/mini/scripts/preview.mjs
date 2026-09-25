@@ -17,6 +17,8 @@
  *   credential, never committed, and the `mini` guard fails on a tracked `private.*.key`);
  * - `dist/weapp` exists, its AppID (`project.config.json`) is a real one, not touristappid, and
  *   size-report passed on exactly its files (`dist/weapp.gate.json`, gate-stamp.mjs);
+ * - the working tree is clean and that build was made from HEAD on a clean tree (a preview may
+ *   be of a branch, so unlike `upload.mjs` it asks no CI);
  * - a `miniprogram-ci` executable is on `PATH` or named by `MINIPROGRAM_CI_BIN`. It is not a
  *   dependency of this repository; install it yourself, outside it (`npm i -g miniprogram-ci`).
  *
@@ -29,7 +31,14 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { appRoot, gatedBuild, miniprogramCi, refuser, uploadKey } from './wx-ci.mjs';
+import {
+  appRoot,
+  committedBuildProblem,
+  gatedBuild,
+  miniprogramCi,
+  refuser,
+  uploadKey,
+} from './wx-ci.mjs';
 
 const { values: args } = parseArgs({
   options: {
@@ -43,6 +52,10 @@ const refuse = refuser('preview');
 const realKey = uploadKey(refuse);
 const { dist, appid } = gatedBuild(refuse);
 if (!/^([1-9]|[12][0-9]|30)$/.test(args.robot)) refuse('--robot is 1–30');
+// A preview may be of a branch (it is how a change is checked on a phone before it merges), so
+// it asks no CI; but it is always a commit, so what a phone showed can be found again.
+const built = committedBuildProblem(dist);
+if (built) refuse(built);
 
 // --- the user's say-so, every time --------------------------------------------------------
 if (!args.confirm) {

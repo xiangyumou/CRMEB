@@ -30,7 +30,7 @@ export default defineConfig({
           name: 'unit',
           root: fileURLToPath(new URL('.', import.meta.url)),
           environment: 'happy-dom',
-          include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+          include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'scripts/**/*.test.mjs'],
           exclude: ['**/node_modules/**', '**/dist/**'],
           setupFiles: ['src/test/setup.ts'],
           // What config/index.ts defines for every Taro build.
