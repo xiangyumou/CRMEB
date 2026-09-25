@@ -2,7 +2,7 @@ import type { FormInstance, FormRule } from 'antd';
 import { z } from 'zod';
 
 import { ApiError, parseFieldErrors } from '../../api/errors';
-import { toNamePath, type FieldName } from './types';
+import { toNamePath, type FieldName, type FieldSpec } from './types';
 
 type AnyObjectSchema = z.ZodObject<z.ZodRawShape>;
 
@@ -24,21 +24,107 @@ export function isFieldRequired(schema: AnyObjectSchema, name: FieldName): boole
   return !field.safeParse(undefined).success;
 }
 
+function isBlank(value: unknown): boolean {
+  return value === null || (typeof value === 'string' && value.trim() === '');
+}
+
+function accepts(field: z.ZodType, value: unknown): boolean {
+  return field.safeParse(value).success;
+}
+
+/**
+ * What an emptied control means to the contract.
+ *
+ * A cleared `InputNumber` or `DatePicker` gives `null`, a cleared `Input` gives
+ * `''`. Sent as they are, an optional number fails 「期望 number」 and can never
+ * be cleared, and an optional text arrives as `''`, which the conventions say
+ * is never a value. So an empty value becomes the "nothing" the field accepts:
+ * `null` when the field takes it (the explicit clear an update needs), absent
+ * when it is optional, and absent otherwise — which a required field then
+ * refuses with 请填写….
+ */
+export function emptyValueFor(field: z.ZodType | undefined, value: unknown): unknown {
+  if (!isBlank(value)) return value;
+  if (field === undefined) return value === null ? undefined : value;
+  if (accepts(field, null)) return null;
+  return undefined;
+}
+
+/** Kinds whose text is trimmed on submit. A password is taken exactly as typed. */
+const TRIMMED_KINDS = new Set(['text', 'textarea']);
+
+/**
+ * The raw form value as the contract should see it: blank fields normalised by
+ * `emptyValueFor`, and the text of text fields trimmed — 「 张三 」 is 张三 to
+ * an operator, and a trailing space in a tracking number is a support ticket.
+ */
+export function normaliseFormValues(
+  schema: AnyObjectSchema,
+  raw: unknown,
+  fields: readonly Pick<FieldSpec, 'kind' | 'name'>[] = [],
+): unknown {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return raw;
+  const trimmed = new Set(
+    fields
+      .filter((spec) => TRIMMED_KINDS.has(spec.kind) && toNamePath(spec.name).length === 1)
+      .map((spec) => String(toNamePath(spec.name)[0])),
+  );
+  const shape = schema.shape as Record<string, z.ZodType | undefined>;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const text = trimmed.has(key) && typeof value === 'string' ? value.trim() : value;
+    const normalised = emptyValueFor(shape[key], text);
+    if (normalised !== undefined) out[key] = normalised;
+  }
+  return out;
+}
+
+/** 请选择 for a control you pick from, 请上传 for an image, 请填写 for what you type. */
+function emptyMessage(spec: Pick<FieldSpec, 'kind' | 'label'> | undefined): string | null {
+  if (spec === undefined || typeof spec.label !== 'string' || spec.label === '') return null;
+  switch (spec.kind) {
+    case 'asset':
+      return `请上传${spec.label}`;
+    case 'select':
+    case 'radio':
+    case 'checkbox':
+    case 'date':
+    case 'dateRange':
+    case 'treeSelect':
+    case 'cascader':
+    case 'link':
+      return `请选择${spec.label}`;
+    default:
+      return `请填写${spec.label}`;
+  }
+}
+
 /**
  * An antd rule that runs the field's own zod schema. Cross-field refinements
  * cannot be expressed per field, so they are caught by the whole-object parse
  * in `ZodForm`'s submit handler and mapped back with `setFields`.
+ *
+ * An empty required field says 请填写<label> (请选择 for a picker), not what
+ * zod thinks of `undefined`.
  */
-export function zodFieldRule(schema: AnyObjectSchema, name: FieldName): FormRule | null {
+export function zodFieldRule(
+  schema: AnyObjectSchema,
+  name: FieldName,
+  spec?: Pick<FieldSpec, 'kind' | 'label'> | undefined,
+): FormRule | null {
   const field = fieldSchemaOf(schema, name);
   if (!field) return null;
+  const trims = spec !== undefined && TRIMMED_KINDS.has(spec.kind);
   return {
     async validator(_rule: unknown, value: unknown) {
-      // An empty control gives `''`; treat it as "absent" so the schema's own
-      // optionality decides, rather than failing a `.min(1)` on a blank string.
-      const candidate = value === '' ? undefined : value;
+      const text = trims && typeof value === 'string' ? value.trim() : value;
+      const candidate = emptyValueFor(field, text);
       const result = field.safeParse(candidate);
       if (result.success) return;
+      if (candidate === undefined || candidate === null) {
+        const message = emptyMessage(spec);
+        if (message !== null) throw new Error(message);
+      }
       throw new Error(result.error.issues[0]?.message ?? '输入有误');
     },
   };

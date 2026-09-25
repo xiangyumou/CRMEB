@@ -1,5 +1,7 @@
 'use client';
 
+// Side-effect import: zod speaks plain Chinese in the console too.
+import '@shop/contracts/locale';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 

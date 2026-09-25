@@ -80,10 +80,12 @@ export type { FieldBase, FieldName, FieldSpec, SelectOption } from './form/types
 export {
   applyFieldErrors,
   applyZodIssues,
+  emptyValueFor,
   fieldSchemaOf,
   isFieldRequired,
   matchApiError,
   matchFieldErrors,
+  normaliseFormValues,
   zodFieldRule,
 } from './form/zod-bridge';
 export type { FieldErrorMatch } from './form/zod-bridge';
