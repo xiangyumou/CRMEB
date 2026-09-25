@@ -10,16 +10,20 @@
  *   pnpm --filter @shop/guards guards --quiet          only the summary and the failures
  */
 import { adminClient } from './checks/admin-client';
+import { adminPermissions } from './checks/admin-permissions';
 import { apiCompat } from './checks/api-compat';
 import { bannedConstructs } from './checks/banned';
 import { contractsAndRoutes } from './checks/contracts';
+import { counters } from './checks/counters';
 import { domains } from './checks/domains';
 import { fixtures } from './checks/fixtures';
 import { invariants } from './checks/invariants';
+import { literals } from './checks/literals';
 import { migrations } from './checks/migrations';
 import { miniCheck } from './checks/mini';
 import { miniStyles } from './checks/mini-styles';
 import { permissions } from './checks/permissions';
+import { personalData } from './checks/personal-data';
 import { pipeline } from './checks/pipeline';
 import { retiredFeatures } from './checks/retired';
 import { routeHygiene } from './checks/route-hygiene';
@@ -33,13 +37,17 @@ const CHECKS: readonly Check[] = [
   routeHygiene,
   permissions,
   adminClient,
+  adminPermissions,
   fixtures,
   miniCheck,
   miniStyles,
   retiredFeatures,
   bannedConstructs,
   secretsNeverLeak,
+  personalData,
   txPool,
+  counters,
+  literals,
   migrations,
   pipeline,
   apiCompat,

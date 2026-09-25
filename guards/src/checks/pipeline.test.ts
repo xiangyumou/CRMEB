@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { jobsOf, readPipeline } from './pipeline';
+import { globToRegExp, jobsOf, readPipeline, triggersOn } from './pipeline';
 
 /**
  * The `pipeline` check's reading of a workflow, against a small one that keeps
@@ -11,6 +11,7 @@ const WORKFLOW = `name: shop
 on:
   push:
     branches: [master]
+  pull_request:
   schedule:
     - cron: "0 18 * * *"
 jobs:
@@ -141,5 +142,38 @@ describe('readPipeline', () => {
     expect(problems).toEqual([
       'the `static` job publishes; releases go through the image job alone',
     ]);
+  });
+
+  it('REL-008 — fails when the trigger filter skips a change to docs/invariants.md', () => {
+    const ignoring = WORKFLOW.replace(
+      '  push:\n    branches: [master]\n  pull_request:\n',
+      "  push:\n    branches: [master]\n    paths-ignore:\n      - 'docs/**'\n      - '**/*.md'\n  pull_request:\n    paths-ignore:\n      - 'docs/**'\n      - '**/*.md'\n",
+    );
+    expect(read(ignoring).problems).toEqual([
+      'a change to docs/invariants.md alone does not start the workflow on `push`, so the guard that reads it is skipped',
+      'a change to docs/invariants.md alone does not start the workflow on `pull_request`, so the guard that reads it is skipped',
+    ]);
+  });
+
+  it('REL-008 — passes a filter that skips prose but re-includes what the guards read', () => {
+    const filter =
+      "    paths:\n      - '**'\n      - '!docs/**'\n      - '!**/*.md'\n      - 'docs/invariants.md'\n";
+    const filtered = WORKFLOW.replace(
+      '  push:\n    branches: [master]\n  pull_request:\n',
+      `  push:\n    branches: [master]\n${filter}  pull_request:\n${filter}`,
+    );
+    expect(read(filtered).problems).toEqual([]);
+    expect(triggersOn(filtered, 'push', 'docs/deploy.md')).toBe(false);
+    expect(triggersOn(filtered, 'push', 'apps/web/README.md')).toBe(false);
+    expect(triggersOn(filtered, 'pull_request', 'apps/web/src/server/handle.ts')).toBe(true);
+    expect(triggersOn(filtered, 'push', '.github/workflows/ci.yml')).toBe(true);
+  });
+
+  it('reads GitHub path globs', () => {
+    expect(globToRegExp('**/*.md').test('README.md')).toBe(true);
+    expect(globToRegExp('**/*.md').test('a/b/c.md')).toBe(true);
+    expect(globToRegExp('docs/**').test('docs/mini/x.md')).toBe(true);
+    expect(globToRegExp('docs/*').test('docs/mini/x.md')).toBe(false);
+    expect(globToRegExp('docs/invariants.md').test('docs/invariantsXmd')).toBe(false);
   });
 });

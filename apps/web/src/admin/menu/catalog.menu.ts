@@ -11,8 +11,9 @@ import { defineMenu } from './types';
  * `@shop/core/catalog/permissions.ts`, which is why 商品保障 has an entry of its
  * own rather than hiding behind 商品参数.
  *
- * The editor and the card pool are `hidden`: reachable, breadcrumb-able, never
- * listed.
+ * 新建商品 is `hidden`: reachable, breadcrumb-able, never listed. The card
+ * pool under a product resolves to 商品列表 and asks for `catalog:card:read`
+ * on its own page.
  */
 export default defineMenu({
   key: 'catalog',

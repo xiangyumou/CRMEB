@@ -45,6 +45,8 @@ export interface AssetSource {
         list?: string | undefined;
         upload?: string | undefined;
         categories?: string | undefined;
+        /** No picker control deletes today; one that does checks this first. */
+        remove?: string | undefined;
       }
     | undefined;
   listCategories(): Promise<AssetCategory[]>;

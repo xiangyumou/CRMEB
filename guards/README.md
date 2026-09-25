@@ -33,29 +33,33 @@ somewhere is an entry in an allow-list inside the check, with the reason next
 to it (below). The last line is the count:
 
 ```
-16 checks, 0 failure(s)
+20 checks, 0 failure(s)
 ```
 
 ## The checks
 
-| name            | asserts                                                                                                                                                                                              |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `domains`       | every domain in `domains.gen.ts` is imported by name, so its registrations really run                                                                                                                |
-| `contracts`     | contract ⇄ route file, both ways, and the folder's `[param]` is the contract's `:param` (ROUTE-001)                                                                                                  |
-| `route-hygiene` | `dynamic = 'force-dynamic'` everywhere; `ctx.audit(target)` on every admin write                                                                                                                     |
-| `permissions`   | every route and menu atom is declared; every declared atom is used                                                                                                                                   |
-| `admin-client`  | no hand-built `/admin-api/…` URL and no raw `fetch()` outside the api seam                                                                                                                           |
-| `fixtures`      | a web test that stubs the API answers through `respondWith`, so every fixture is parsed by its contract                                                                                              |
-| `mini`          | the Taro mini-program: pages ⇄ `app.config.ts` ⇄ route catalogue, the platform seam, no NutUI, privacy, committed config, no upload key or AppSecret                                                 |
-| `mini-styles`   | the mini-program's `.scss` uses only what WXSS and the iOS 12 WebView accept: no `*`, `:is/:where/:has/:hover/:focus-visible`, `@supports`, HTML tag or attribute selectors, `aspect-ratio`, `inset` |
-| `retired`       | no feature the shop does not have comes back as an identifier or a URL token (CORE-002)                                                                                                              |
-| `banned`        | no `eval`, `new Function`, `child_process`, `dangerouslySetInnerHTML`; the core clock lint rule is still an error; `eval` / `new Function` also in the mini-program and its two shared packages      |
-| `secrets`       | no secret config field can leave through a response schema                                                                                                                                           |
-| `tx-pool`       | no `ctx.config.get(` / `ctx.db` / `ctx.withTx(` inside a function that takes a `tx`, `Tx` or `DbOrTx` (STAB-001)                                                                                     |
-| `migrations`    | every destructive statement in `packages/db/migrations` carries `-- destructive: approved` (OPS-007)                                                                                                 |
-| `pipeline`      | `ci.yml` publishes through `publish-release.sh`, never promotes, and keeps its guards, soak and admin e2e gates (REL-*)                                                                              |
-| `api-compat`    | the storefront API (`/api/v1/**` in the generated OpenAPI) only grows against `baselines/storefront-api.json`, the surface the released mini-program uses; report-only until the first release       |
-| `invariants`    | every rule in `docs/invariants.md` cites a test that exists, and every rule a test title names exists                                                                                                |
+| name                | asserts                                                                                                                                                                                                                                                                       |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `domains`           | every domain in `domains.gen.ts` is imported by name, so its registrations really run                                                                                                                                                                                         |
+| `contracts`         | contract ⇄ route file, both ways, and the folder's `[param]` is the contract's `:param` (ROUTE-001)                                                                                                                                                                           |
+| `route-hygiene`     | `dynamic = 'force-dynamic'` everywhere; `ctx.audit(target)` on every admin write                                                                                                                                                                                              |
+| `permissions`       | every route and menu atom is declared; every declared atom is used                                                                                                                                                                                                            |
+| `admin-client`      | no hand-built `/admin-api/…` URL and no raw `fetch()` outside the api seam                                                                                                                                                                                                    |
+| `admin-permissions` | from every admin page, following imports symbol by symbol: each write route used is under a `<Can>` / `can()` for its atom, each read is required by the page's menu entry, gated, or granted with a held write atom in `PERMISSION_REQUIREMENTS` (GUARD-005, AGENTS rule 11) |
+| `fixtures`          | a web test that stubs the API answers through `respondWith`, so every fixture is parsed by its contract                                                                                                                                                                       |
+| `mini`              | the Taro mini-program: pages ⇄ `app.config.ts` ⇄ route catalogue, the platform seam, no NutUI, privacy, committed config, no upload key or AppSecret                                                                                                                          |
+| `mini-styles`       | the mini-program's `.scss` uses only what WXSS and the iOS 12 WebView accept: no `*`, `:is/:where/:has/:hover/:focus-visible`, `@supports`, HTML tag or attribute selectors, `aspect-ratio`, `inset`                                                                          |
+| `retired`           | no feature the shop does not have comes back as an identifier or a URL token (CORE-002)                                                                                                                                                                                       |
+| `banned`            | no `eval`, `new Function`, `child_process`, `dangerouslySetInnerHTML`; the core clock lint rule is still an error; `eval` / `new Function` also in the mini-program and its two shared packages                                                                               |
+| `secrets`           | no secret config field can leave through a response schema                                                                                                                                                                                                                    |
+| `personal-data`     | no response carries a credential or cross-app id (password hash, `openid`, 卡密) unless masked or staff-only and listed; phone, real name, e-mail leave a non-admin route only as the shopper's own record or the shop's (GUARD-004)                                          |
+| `tx-pool`           | no `ctx.config.get(` / `ctx.db` / `ctx.withTx(` inside a function that takes a `tx`, `Tx` or `DbOrTx` (STAB-001)                                                                                                                                                              |
+| `counters`          | every counter column (`stock`, `sales`, `quota`, refunded / shipped quantities…) in a `.set({…})` moves by `sql`, is a literal reset, or sits in a compare-and-set whose `where` reads it (GUARD-001, AGENTS rule 6)                                                          |
+| `literals`          | every `pageSize` literal a client sends is within the contract's cap; no date cut out of a UTC `toISOString()` or an instant field; UI `toISOString()` only in files that put it on the wire (GUARD-002, GUARD-003)                                                           |
+| `migrations`        | every destructive statement in `packages/db/migrations` carries `-- destructive: approved` (OPS-007)                                                                                                                                                                          |
+| `pipeline`          | `ci.yml` publishes through `publish-release.sh`, never promotes, keeps its guards, soak and admin e2e gates, and its trigger filter never skips a file a guard reads (REL-*)                                                                                                  |
+| `api-compat`        | the storefront API (`/api/v1/**` in the generated OpenAPI) only grows against `baselines/storefront-api.json`, the surface the released mini-program uses; report-only until the first release                                                                                |
+| `invariants`        | every rule in `docs/invariants.md` cites a test that exists, and every rule a test title names exists                                                                                                                                                                         |
 
 ## The allow-lists
 
@@ -86,6 +90,18 @@ baseline and a hiding place.
 - `checks/banned.ts` — `FETCH_ALLOW` (one file per entry, with the host it
   builds; `fetch(` and `globalThis.fetch(` both count as a call) and the
   sanitised renderers.
+- `checks/personal-data.ts` — `NEVER_ALLOW` (a credential-named field that
+  may leave: the masked 渠道码 scan `openid`, whose masking line must still
+  exist, and the staff 卡密 pool) and `OWN_OR_SHOP` (whose personal data a
+  storefront route returns: the shopper's own, or the shop's).
+- `checks/counters.ts` — `COUNTER_ALLOW`: counter writes that cannot be stale
+  (an activity edit resolved against locked rows, a SQL recount). Keyed on the
+  trimmed `key: value` text.
+- `checks/literals.ts` — `UTC_CUT_ALLOW` (a UTC date that is meant to be UTC:
+  the Tencent Cloud signature) and `UI_ISO_FILES` (UI files whose
+  `toISOString()` only goes onto the wire).
+- `checks/admin-permissions.ts` — `UNGATED_ALLOW`: admin controls that use a
+  route without its atom, keyed on the file and route id (empty).
 - `checks/tx-pool.ts` — `TX_POOL_ALLOW`: reads proven harmless (empty). Keyed
   on the trimmed source line, so editing an excused line makes it a finding
   again.

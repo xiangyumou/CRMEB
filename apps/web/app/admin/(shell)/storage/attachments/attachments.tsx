@@ -32,6 +32,7 @@ import {
 } from '@/admin/kit/table/columns';
 import { CrudTable } from '@/admin/kit/table/crud-table';
 import { Can } from '@/admin/session/can';
+import { useCan } from '@/admin/session/session-provider';
 import { uploadFile } from '@/admin/storage/upload';
 
 import { CategoryTree } from './category-tree';
@@ -66,7 +67,11 @@ export function AttachmentsPage() {
   const invalidate = useInvalidateRoutes();
   const uploading = useRef(0);
 
-  const categories = useRouteQuery(storageCategoryTree);
+  // 分组 is its own atom: a role that may manage files but not read the
+  // folders gets the files without the tree, not a 403 toast on every open.
+  const can = useCan();
+  const canCategories = can('storage:category:read');
+  const categories = useRouteQuery(storageCategoryTree, undefined, { enabled: canCategories });
   const categoryOptions = (categories.data?.items ?? []).map((item) => ({
     value: item.id,
     label: `${'　'.repeat(item.depth)}${item.name}`,
@@ -115,11 +120,13 @@ export function AttachmentsPage() {
   return (
     <PageContainer subTitle="后台与商城用到的图片、视频和文件；相同内容只存一份">
       <Row gutter={16}>
-        <Col xs={24} md={6} lg={5}>
-          <CategoryTree selectedId={categoryId} onSelect={setCategoryId} />
-        </Col>
+        {canCategories && (
+          <Col xs={24} md={6} lg={5}>
+            <CategoryTree selectedId={categoryId} onSelect={setCategoryId} />
+          </Col>
+        )}
 
-        <Col xs={24} md={18} lg={19}>
+        <Col xs={24} md={canCategories ? 18 : 24} lg={canCategories ? 19 : 24}>
           <CrudTable
             route={storageAttachmentList}
             scrollX={1100}

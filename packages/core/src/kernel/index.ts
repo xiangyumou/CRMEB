@@ -11,6 +11,7 @@ export * from './errors';
 export * from './ids';
 export * from './logger';
 export * from './money';
+export * from './pg-errors';
 export * from './queue';
 export * from './rate-limit';
 export * from './storage';

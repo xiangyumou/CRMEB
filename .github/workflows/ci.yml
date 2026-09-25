@@ -15,16 +15,25 @@ name: ci
 # with the `deploy/ship.sh <commit>` line the images job prints
 # (deploy/README.md); ship.sh refuses a commit this workflow did not pass.
 
+# Prose alone does not need the gate, with one exception: `docs/invariants.md`
+# is not prose to the guards — the `invariants` check resolves every test it
+# cites — so an edit there runs the workflow like code does. Order matters:
+# the last pattern a file matches decides. The `pipeline` guard asserts that
+# every file a guard reads still triggers both events.
 on:
   push:
     branches: [master]
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - 'docs/invariants.md'
   pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - 'docs/invariants.md'
   # The concurrency soak below is a flake hunt, not a gate, so it runs on a
   # clock rather than on every push.
   schedule:

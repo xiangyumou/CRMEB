@@ -1911,6 +1911,13 @@ Releases are serialized repository-wide and never cancelled mid-publish: the mer
 
 - `guards/src/checks/pipeline.test.ts::readPipeline > REL-007 — fails when the image job may be cancelled mid-publish`
 
+### REL-008
+
+The workflow's trigger filter may skip prose, never a file a guard reads: a change to `docs/invariants.md` alone starts the workflow on push and on pull request, so the `invariants` guard resolves its citations before it merges.
+
+- `guards/src/checks/pipeline.test.ts::readPipeline > REL-008 — fails when the trigger filter skips a change to docs/invariants.md`
+- `guards/src/checks/pipeline.test.ts::readPipeline > REL-008 — passes a filter that skips prose but re-includes what the guards read`
+
 ## Deployment topology
 
 ### OPS-002
@@ -1964,6 +1971,14 @@ Work that stopped and waits for a person is on the admin home page. The first ti
 - `apps/web/app/admin/(shell)/dashboard.test.tsx::工作台 > OPS-020 — shows 「异常待处理」 in the danger colour while there is work, linking to it`
 - `apps/web/app/admin/(shell)/system/failed-jobs/failed-jobs.test.tsx::失败的后台任务 > OPS-020 — says so when somebody else marked the row first`
 
+### OPS-021
+
+The readiness probe's expected migration count is the number of entries in the drizzle journal `packages/db` ships, inlined into the web bundle at build time; no number is typed by hand, so adding a migration cannot leave the probe expecting the old schema.
+
+- `apps/web/src/server/health.test.ts::readiness / EXPECTED_MIGRATIONS > OPS-021 — is the number of entries in the journal packages/db ships`
+- `apps/web/src/server/health.test.ts::readiness / EXPECTED_MIGRATIONS > OPS-021 — follows the journal: one more migration is one more expected`
+- `apps/web/src/server/health.test.ts::readiness / EXPECTED_MIGRATIONS > OPS-021 — health.ts carries no hand-typed count`
+
 ## Route integrity
 
 ### ROUTE-001
@@ -1972,6 +1987,58 @@ Every contract has a route file that exports its method, and every route file is
 
 - `guards/src/checks/contracts.test.ts::contracts and route files > matches every contract to a route file that exports its method`
 - `guards/src/checks/contracts.test.ts::leaves no route file that no contract describes`
+
+### ROUTE-002
+
+A foreign-key violation that no service turned into its own code answers 409, never 500: `REFERENCE_IN_USE` (请求删除的数据仍被其他记录使用) for a delete of a row live rows point at, `REFERENCE_MISSING` for a write pointing at a row that is gone. The body carries the common Chinese message only; the constraint and table names go to the log.
+
+- `apps/web/src/server/handle.test.ts::error mapping > ROUTE-002 — a foreign-key violation on delete is a 409 REFERENCE_IN_USE that names no constraint`
+- `apps/web/src/server/handle.test.ts::error mapping > ROUTE-002 — a write pointing at a row that is gone is a 409 REFERENCE_MISSING`
+
+## Mechanical checks of the recurring bugs
+
+The AGENTS.md rules a guard can read off the source. Each guard fails `pnpm guards` in the merge gate; its allow-list is exactly compared.
+
+### GUARD-001
+
+A counter column (stock, sales, quota, refunded and shipped quantities, seats, scans) is never written back as a number read earlier: every `.set({…})` assigns it a `sql` expression, a literal reset, or sits in a compare-and-set whose `where` reads the same column; anything else carries an allow-list reason (AGENTS rule 6).
+
+- `guards/src/checks/counters.test.ts::findCounterWrites > GUARD-001 — finds a stock written back from a value read earlier`
+- `guards/src/checks/counters.test.ts::findCounterWrites > GUARD-001 — finds the shorthand and the onConflictDoUpdate form`
+- `guards/src/checks/counters.test.ts::counters over the tree > GUARD-001 — every counter write in the server is sql, compare-and-set or excused`
+
+### GUARD-002
+
+Every `pageSize` literal an API client sends (admin, mini-program, shared packages, CLI, agent ops, e2e helpers) is within the cap the contracts' `pageQuery` accepts, read from the schema (AGENTS rule 4).
+
+- `guards/src/checks/literals.test.ts::pageSize literals > GUARD-002 — reads the cap from the contract schema, not a guess`
+- `guards/src/checks/literals.test.ts::pageSize literals > GUARD-002 — finds object, JSX and constant forms`
+- `guards/src/checks/literals.test.ts::literals over the tree > GUARD-002 GUARD-003 — the tree sends only accepted page sizes and cuts no UTC dates`
+
+### GUARD-003
+
+No date is cut out of a UTC instant — `toISOString().slice/split` unless shifted to Shanghai first, or an instant field's ISO text sliced — and UI code calls `toISOString()` only in files that put it on the wire (AGENTS rule 2).
+
+- `guards/src/checks/literals.test.ts::instants cut as dates > GUARD-003 — finds a UTC date cut out of toISOString()`
+- `guards/src/checks/literals.test.ts::instants cut as dates > GUARD-003 — passes a cut from an instant shifted to Shanghai first`
+- `guards/src/checks/literals.test.ts::instants cut as dates > GUARD-003 — finds an instant field sliced as text`
+- `guards/src/checks/literals.test.ts::instants cut as dates > GUARD-003 — in UI code, reports every bare toISOString()`
+
+### GUARD-004
+
+No response carries a credential or cross-app identifier (a password or its hash, `session_key`, `openid` / `unionid`, an ID-card number, a 卡密) as text unless it is masked or staff-only and listed with the reason; a phone number, real name, e-mail or invoice bank account leaves a non-admin route only as the shopper's own record or the shop's own.
+
+- `guards/src/checks/personal-data.test.ts::personal data in responses > GUARD-004 — fails a credential in any response, admin included`
+- `guards/src/checks/personal-data.test.ts::personal data in responses > GUARD-004 — fails somebody else’s phone on a storefront route`
+- `guards/src/checks/personal-data.test.ts::personal-data over the tree > GUARD-004 — no response carries a credential or another person’s data unexplained`
+
+### GUARD-005
+
+From every admin page, following what it renders symbol by symbol: every write route a control calls sits under a `<Can>` / `can()` / `permission=` for its own atom, and every read (a picker's options, a statistics panel) is required by the page's menu entry, gated, or granted with a held write atom by `PERMISSION_REQUIREMENTS`. A role set up correctly never meets a control that answers 没有权限 (AGENTS rule 11).
+
+- `guards/src/checks/admin-permissions.test.ts::admin permission gates > GUARD-005 — fails a delete button no <Can> gates`
+- `guards/src/checks/admin-permissions.test.ts::admin permission gates > GUARD-005 — fails a picker whose read the page neither requires nor gates`
+- `guards/src/checks/admin-permissions.test.ts::admin-permissions over the tree > GUARD-005 — every admin control and picker read is gated or granted with its screen`
 
 ## Storefront share codes (小程序码)
 

@@ -25,6 +25,7 @@ import { SkuPicker, type PickedSku } from '@/admin/kit/sku-picker';
 import type { FieldSpec, SelectOption } from '@/admin/kit/form/types';
 import type { TreeOption } from '@/admin/kit/form/select-fields';
 import type { StatusMap } from '@/admin/kit/status-tag';
+import { useCan } from '@/admin/session/session-provider';
 
 /**
  * The catalog's enums, form field lists and shared pickers, in one file next to
@@ -353,7 +354,8 @@ export const reviewFields: FieldSpec<Extract<keyof AdminReviewForm, string>>[] =
  * 虚拟评价's product: 选择商品规格 opens the `<SkuPicker>`, which fills both the
  * product and the SKU, so a mistyped id cannot land the review on the wrong
  * product. The id box stays editable for a product that is off the shelf
- * (the picker lists on-shelf products only).
+ * (the picker lists on-shelf products only). The picker reads the product
+ * list, so a role that may write reviews but not read products types the id.
  */
 function ReviewProductField({
   value,
@@ -367,6 +369,7 @@ function ReviewProductField({
   const form = Form.useFormInstance();
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<PickedSku | null>(null);
+  const canPick = useCan()('catalog:product:read');
 
   return (
     <Space wrap>
@@ -381,28 +384,32 @@ function ReviewProductField({
           onChange(event.target.value);
         }}
       />
-      <Button disabled={disabled} onClick={() => setOpen(true)}>
-        选择商品规格
-      </Button>
+      {canPick ? (
+        <Button disabled={disabled} onClick={() => setOpen(true)}>
+          选择商品规格
+        </Button>
+      ) : null}
       {picked && picked.productId === value ? (
         <Typography.Text type="secondary">
           已选规格：{picked.specText || '单规格'}（¥{picked.price}）
         </Typography.Text>
       ) : null}
-      <SkuPicker
-        open={open}
-        multiple={false}
-        title="选择评价的商品规格"
-        onClose={() => setOpen(false)}
-        onSelect={(skus) => {
-          const first = skus[0];
-          setOpen(false);
-          if (first === undefined) return;
-          setPicked(first);
-          onChange(first.productId);
-          form.setFieldValue('skuId', first.skuId);
-        }}
-      />
+      {canPick ? (
+        <SkuPicker
+          open={open}
+          multiple={false}
+          title="选择评价的商品规格"
+          onClose={() => setOpen(false)}
+          onSelect={(skus) => {
+            const first = skus[0];
+            setOpen(false);
+            if (first === undefined) return;
+            setPicked(first);
+            onChange(first.productId);
+            form.setFieldValue('skuId', first.skuId);
+          }}
+        />
+      ) : null}
     </Space>
   );
 }

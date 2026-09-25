@@ -24,7 +24,7 @@ import { CrudTable } from '@/admin/kit/table/crud-table';
 import { filterKeys, type FilterSpec } from '@/admin/kit/table/filter-bar';
 import { useNextUrlState } from '@/admin/kit/table/url-state';
 import { ConfirmButton } from '@/admin/kit/confirm-button';
-import { Can } from '@/admin/session';
+import { Can, useCan } from '@/admin/session';
 
 import {
   FULFILLMENT_STATUS,
@@ -115,19 +115,25 @@ export function OrdersPage() {
     listSearch
       ? `/admin/orders/${id}?list=${encodeURIComponent(listSearch)}`
       : `/admin/orders/${id}`;
-  const stats = useRouteQuery(orderAdminStatistics, {});
+  // The work queue is 订单统计: a role that may list orders but not read the
+  // statistics sees the list without it, not four zeros and a 403 toast.
+  const can = useCan();
+  const canStats = can('order:stats:read');
+  const stats = useRouteQuery(orderAdminStatistics, {}, { enabled: canStats });
   const preset = TABS.find((entry) => entry.key === tab)?.query ?? {};
 
   return (
     <PageContainer subTitle="发货、改价、备注与导出。拆单已经取消，部分发货只是多一张发货单。">
-      <WorkQueue
-        pendingShipment={stats.data?.pendingShipment ?? 0}
-        pendingReceipt={stats.data?.pendingReceipt ?? 0}
-        refunding={stats.data?.refunding ?? 0}
-        pendingInvoice={stats.data?.pendingInvoice ?? 0}
-        paidAmount={stats.data?.paidAmount ?? null}
-        loading={stats.isPending}
-      />
+      {canStats && (
+        <WorkQueue
+          pendingShipment={stats.data?.pendingShipment ?? 0}
+          pendingReceipt={stats.data?.pendingReceipt ?? 0}
+          refunding={stats.data?.refunding ?? 0}
+          pendingInvoice={stats.data?.pendingInvoice ?? 0}
+          paidAmount={stats.data?.paidAmount ?? null}
+          loading={stats.isPending}
+        />
+      )}
 
       <Tabs
         activeKey={tab}

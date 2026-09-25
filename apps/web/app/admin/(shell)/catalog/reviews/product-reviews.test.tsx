@@ -81,7 +81,9 @@ describe('商品评价', () => {
       }),
     ]);
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderAdmin(withStubAssets(<ProductReviewsPage />), { identity: moderator });
+    renderAdmin(withStubAssets(<ProductReviewsPage />), {
+      identity: { ...moderator, permissions: [...moderator.permissions, 'catalog:product:read'] },
+    });
     await screen.findByText(row.content ?? '');
 
     await user.click(screen.getByRole('button', { name: '添加虚拟评价' }));
@@ -100,6 +102,18 @@ describe('商品评价', () => {
     await waitFor(() => expect(within(dialog).getByLabelText('商品 ID')).toHaveValue('12'));
     expect(within(dialog).getByLabelText('规格 ID')).toHaveValue('1201');
     expect(within(dialog).getByText(/深烘 \| 10 片/)).toBeInTheDocument();
+  });
+
+  it('offers no SKU picker to a moderator who may not read products; the id box stays', async () => {
+    stubApi();
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderAdmin(withStubAssets(<ProductReviewsPage />), { identity: moderator });
+    await screen.findByText(row.content ?? '');
+
+    await user.click(screen.getByRole('button', { name: '添加虚拟评价' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('商品 ID')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: '选择商品规格' })).toBeNull();
   });
 
   it('lists reviews from the contract route', async () => {
