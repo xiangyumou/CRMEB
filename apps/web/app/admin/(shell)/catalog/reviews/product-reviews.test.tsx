@@ -8,10 +8,20 @@ import {
   catalogAdminReviewReplyUpdate,
   catalogAdminReviewSetStatus,
 } from '@shop/contracts/catalog/catalog.review.contract';
-import type { AdminProductReview } from '@shop/contracts/catalog/schemas';
+import {
+  catalogAdminProductDetail,
+  catalogAdminProductList,
+} from '@shop/contracts/catalog/catalog.product.admin.contract';
+import {
+  adminProductDetailExample,
+  adminProductListItemExample,
+  productSkuExample,
+  type AdminProductReview,
+} from '@shop/contracts/catalog/schemas';
 
 import { resetApiConfig } from '@/admin/api/config';
 import { on, stubRoutes, type StubCall } from '@/test/api';
+import { withStubAssets } from '@/test/asset-source';
 import { renderAdmin, testIdentity, zhName } from '@/test/render';
 
 import { ProductReviewsPage } from './product-reviews';
@@ -59,6 +69,39 @@ const moderator = {
 };
 
 describe('商品评价', () => {
+  it('picks the product of a 虚拟评价 with the SKU picker, filling product and SKU', async () => {
+    const product = { ...adminProductListItemExample, id: '12', name: '手冲挂耳咖啡' };
+    stubRoutes([
+      on(catalogAdminReviewList, { items: [row], total: 1, page: 1, pageSize: 20 }),
+      on(catalogAdminProductList, { items: [product], total: 1, page: 1, pageSize: 10 }),
+      on(catalogAdminProductDetail, {
+        ...adminProductDetailExample,
+        ...product,
+        skus: [{ ...productSkuExample, id: '1201', specText: '深烘 | 10 片', price: '49.00' }],
+      }),
+    ]);
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderAdmin(withStubAssets(<ProductReviewsPage />), { identity: moderator });
+    await screen.findByText(row.content ?? '');
+
+    await user.click(screen.getByRole('button', { name: '添加虚拟评价' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByText(/G 流/)).toBeNull();
+    await user.click(within(dialog).getByRole('button', { name: '选择商品规格' }));
+
+    await waitFor(() => expect(screen.getByText('手冲挂耳咖啡')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /Expand row|展开行/ }));
+    await user.click(await screen.findByRole('checkbox', { name: /深烘/ }));
+    const pickers = screen.getAllByRole('dialog');
+    await user.click(
+      within(pickers[pickers.length - 1]!).getByRole('button', { name: zhName('确定') }),
+    );
+
+    await waitFor(() => expect(within(dialog).getByLabelText('商品 ID')).toHaveValue('12'));
+    expect(within(dialog).getByLabelText('规格 ID')).toHaveValue('1201');
+    expect(within(dialog).getByText(/深烘 \| 10 片/)).toBeInTheDocument();
+  });
+
   it('lists reviews from the contract route', async () => {
     const calls = stubApi();
     renderAdmin(<ProductReviewsPage />, { identity: moderator });

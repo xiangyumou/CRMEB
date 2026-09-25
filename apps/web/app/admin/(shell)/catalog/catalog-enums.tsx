@@ -17,7 +17,11 @@ import type {
   ProductVirtualCardState,
 } from '@shop/contracts/catalog/schemas';
 
+import { Button, Form, Input, Space, Typography } from 'antd';
+import { useState } from 'react';
+
 import { callRoute } from '@/admin/api/call-route';
+import { SkuPicker, type PickedSku } from '@/admin/kit/sku-picker';
 import type { FieldSpec, SelectOption } from '@/admin/kit/form/types';
 import type { TreeOption } from '@/admin/kit/form/select-fields';
 import type { StatusMap } from '@/admin/kit/status-tag';
@@ -314,12 +318,18 @@ export const protectionFields: FieldSpec<Extract<keyof ProductProtectionForm, st
  */
 export const reviewFields: FieldSpec<Extract<keyof AdminReviewForm, string>>[] = [
   {
-    kind: 'text',
+    kind: 'custom',
     name: 'productId',
-    label: '商品 ID',
-    span: 12,
-    placeholder: '1',
-    help: '在商品列表复制 ID；商品选择器待 G 流的选择器组件上线后替换',
+    label: '商品',
+    span: 24,
+    help: '选择商品规格后自动填写商品 ID 和规格 ID',
+    render: ({ value, onChange, disabled }) => (
+      <ReviewProductField
+        value={typeof value === 'string' ? value : undefined}
+        onChange={onChange}
+        disabled={disabled}
+      />
+    ),
   },
   { kind: 'text', name: 'skuId', label: '规格 ID', span: 12, placeholder: '留空表示不指定规格' },
   { kind: 'text', name: 'authorNickname', label: '昵称', span: 12, maxLength: 64 },
@@ -338,3 +348,61 @@ export const reviewFields: FieldSpec<Extract<keyof AdminReviewForm, string>>[] =
   },
   { kind: 'asset', name: 'images', label: '评价图片', span: 24, multiple: true, max: 9 },
 ];
+
+/**
+ * 虚拟评价's product: 选择商品规格 opens the `<SkuPicker>`, which fills both the
+ * product and the SKU, so a mistyped id cannot land the review on the wrong
+ * product. The id box stays editable for a product that is off the shelf
+ * (the picker lists on-shelf products only).
+ */
+function ReviewProductField({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string | undefined;
+  onChange: (value: unknown) => void;
+  disabled: boolean;
+}) {
+  const form = Form.useFormInstance();
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState<PickedSku | null>(null);
+
+  return (
+    <Space wrap>
+      <Input
+        style={{ width: 140 }}
+        value={value ?? ''}
+        disabled={disabled}
+        placeholder="商品 ID"
+        aria-label="商品 ID"
+        onChange={(event) => {
+          setPicked(null);
+          onChange(event.target.value);
+        }}
+      />
+      <Button disabled={disabled} onClick={() => setOpen(true)}>
+        选择商品规格
+      </Button>
+      {picked && picked.productId === value ? (
+        <Typography.Text type="secondary">
+          已选规格：{picked.specText || '单规格'}（¥{picked.price}）
+        </Typography.Text>
+      ) : null}
+      <SkuPicker
+        open={open}
+        multiple={false}
+        title="选择评价的商品规格"
+        onClose={() => setOpen(false)}
+        onSelect={(skus) => {
+          const first = skus[0];
+          setOpen(false);
+          if (first === undefined) return;
+          setPicked(first);
+          onChange(first.productId);
+          form.setFieldValue('skuId', first.skuId);
+        }}
+      />
+    </Space>
+  );
+}
