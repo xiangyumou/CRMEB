@@ -63,6 +63,21 @@ describe('微信素材', () => {
     expect(calls[0]?.url).toContain('/admin-api/wechat-media?');
   });
 
+  it('says until which Shanghai day a temporary item lasts, not the UTC one', async () => {
+    stubRoutes([
+      on(wechatOaMediaList, {
+        // 01:30 on the 7th in Shanghai is still the 6th in UTC.
+        items: [{ ...medium, isPermanent: false, expiresAt: '2026-01-06T17:30:00Z' }],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+      }),
+    ]);
+    renderAdmin(withStubAssets(<WechatMediaPage />), { identity: allPermissions });
+
+    expect(await screen.findByText('临时，至 2026-01-07')).toBeInTheDocument();
+  });
+
   it('reconciles with WeChat and reports both directions', async () => {
     const calls = stubApi();
     renderAdmin(withStubAssets(<WechatMediaPage />), { identity: allPermissions });
