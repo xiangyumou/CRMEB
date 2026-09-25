@@ -204,21 +204,25 @@ const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
  * browser; this is the second lock, and it is the one that does not depend on
  * the browser getting `SameSite` right.
  *
- * A request passes when `Sec-Fetch-Site` says same-origin/same-site, or when
- * `Origin` matches an allowed origin. A request with neither header is
- * refused: every browser that can run the admin SPA sends at least one.
+ * A request passes when `Sec-Fetch-Site` says same-origin, or when `Origin`
+ * matches an allowed origin. `same-site` alone is not enough: it covers every
+ * sibling subdomain (a blog, a landing page, a CDN host), and any one of them
+ * serving script would otherwise be able to post as the admin. A sibling that
+ * really is ours goes in `EXTRA_ALLOWED_ORIGINS`. A request with neither header
+ * is refused: every browser that can run the admin SPA sends at least one.
  */
 export function checkCsrf(
   request: Request,
   allowedOrigins: readonly string[],
 ): { ok: true } | { ok: false; reason: string } {
   const fetchSite = request.headers.get('sec-fetch-site');
-  if (fetchSite === 'same-origin' || fetchSite === 'same-site') return { ok: true };
+  if (fetchSite === 'same-origin') return { ok: true };
   if (fetchSite === 'cross-site') return { ok: false, reason: 'sec-fetch-site: cross-site' };
 
   const origin = request.headers.get('origin');
   if (origin && allowedOrigins.includes(origin)) return { ok: true };
   if (origin) return { ok: false, reason: `origin ${origin} not allowed` };
+  if (fetchSite === 'same-site') return { ok: false, reason: 'sec-fetch-site: same-site' };
 
   // `Sec-Fetch-Site: none` is a top-level navigation, which cannot be a
   // programmatic cross-site POST carrying our cookie.

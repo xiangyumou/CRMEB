@@ -637,7 +637,6 @@ describe('CSRF', () => {
     const req = (headers: Record<string, string>) =>
       new Request('https://shop.example/x', { method: 'POST', headers });
     expect(checkCsrf(req({ 'sec-fetch-site': 'same-origin' }), allowed).ok).toBe(true);
-    expect(checkCsrf(req({ 'sec-fetch-site': 'same-site' }), allowed).ok).toBe(true);
     expect(checkCsrf(req({ 'sec-fetch-site': 'none' }), allowed).ok).toBe(true);
     expect(checkCsrf(req({ 'sec-fetch-site': 'cross-site' }), allowed).ok).toBe(false);
     // Sec-Fetch-Site wins over a spoofable Origin.
@@ -645,6 +644,23 @@ describe('CSRF', () => {
       checkCsrf(req({ 'sec-fetch-site': 'cross-site', origin: 'https://shop.example' }), allowed)
         .ok,
     ).toBe(false);
+  });
+
+  it('AUTH-015 — a sibling subdomain is not the admin: same-site needs an allowed Origin', () => {
+    const allowed = ['https://shop.example'];
+    const req = (headers: Record<string, string>) =>
+      new Request('https://shop.example/x', { method: 'POST', headers });
+    expect(checkCsrf(req({ 'sec-fetch-site': 'same-site' }), allowed).ok).toBe(false);
+    expect(
+      checkCsrf(
+        req({ 'sec-fetch-site': 'same-site', origin: 'https://blog.shop.example' }),
+        allowed,
+      ).ok,
+    ).toBe(false);
+    // A sibling the operator listed in EXTRA_ALLOWED_ORIGINS still works.
+    expect(
+      checkCsrf(req({ 'sec-fetch-site': 'same-site', origin: 'https://shop.example' }), allowed).ok,
+    ).toBe(true);
   });
 });
 

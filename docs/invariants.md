@@ -849,6 +849,12 @@ An admin's answer on the OAuth consent screen — allow or deny — writes an op
 
 - `apps/web/src/server/api-token.int.test.ts::the OAuth flow an MCP client walks > AUTH-014 — writes allow and deny to 操作日志, naming the client and where the code went`
 
+### AUTH-015
+
+A cookie-authenticated write passes the CSRF check only from the admin's own origin: `Sec-Fetch-Site: same-origin`, or an `Origin` on the allowed list. `same-site` alone — any sibling subdomain — is refused.
+
+- `apps/web/src/server/handle.test.ts::CSRF > AUTH-015 — a sibling subdomain is not the admin: same-site needs an allowed Origin`
+
 ## Fulfilment, the order console and invoices
 
 ### FULFILL-001
