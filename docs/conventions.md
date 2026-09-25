@@ -175,6 +175,18 @@ tools enforce there:
   in `dist/weapp`.
 - The weapp package has a size budget (`pnpm --filter @shop/mini size`), and the tab bar points
   only at the main package.
+- Code that runs on the phone (`apps/mini/src`, `@shop/storefront-blocks`, the api-client's
+  runtime) is linted by one preset, `@shop/config/eslint/weapp`. It refuses what iOS 12 or the
+  WeChat runtime lacks, handler props written `() => void fn()`, and an error's own text
+  (`.message`, `errMsg`, `String(error)`) reaching a toast, a modal or JSX; use `errorMessage()`.
+  `tsconfig.weapp.json` also types `apps/mini/src` against the ES2018 library.
+- A mini test answers requests only through `serveApi` (`src/test/fake-api.ts`). A stub for a
+  route that does not exist, a request the contract refuses, a request nothing stubs, and an
+  error the route does not declare or answers at the wrong status all fail the test. Lint refuses
+  raw `taroFake.onRequest`, `fetch` and module mocks of the request layer.
+- A trial build goes up only through `scripts/upload.mjs`. The tree must be clean, the build must
+  be from HEAD, and HEAD must be on origin/master with a CI run that passed. `--dry-run` shows the
+  command without running it ([device-check.md](mini/device-check.md#8-可选用-miniprogram-ci-出预览码或上传)).
 
 ## Out of scope
 
