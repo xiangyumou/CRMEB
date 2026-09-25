@@ -17,12 +17,14 @@ import {
   count,
   desc,
   eq,
+  exists,
   gt,
   gte,
   inArray,
   isNull,
   lte,
   notInArray,
+  or,
   sql,
   type SQL,
 } from 'drizzle-orm';
@@ -306,6 +308,36 @@ export async function lockActivityStock(
     .where(eq(presaleActivitySkus.activityId, id))
     .for('update');
   return { ...activity, skus: new Map(skus.map((row) => [row.skuId, row.stock])) };
+}
+
+/**
+ * The activity SKUs an edit would delete that orders still point at: a stock-ledger row
+ * (`presale_stock_ledger.activity_sku_id`, ON DELETE RESTRICT) or units already sold. The
+ * service refuses the edit with a typed 409 instead of letting the delete hit the foreign key.
+ */
+export async function listRemovedSkusInUse(
+  tx: Tx,
+  args: { activityId: number; keep: readonly number[] },
+): Promise<number[]> {
+  const rows = await tx
+    .select({ skuId: presaleActivitySkus.skuId })
+    .from(presaleActivitySkus)
+    .where(
+      and(
+        eq(presaleActivitySkus.activityId, args.activityId),
+        args.keep.length > 0 ? notInArray(presaleActivitySkus.skuId, [...args.keep]) : undefined,
+        or(
+          gt(presaleActivitySkus.sales, 0),
+          exists(
+            tx
+              .select({ one: sql`1` })
+              .from(presaleStockLedger)
+              .where(eq(presaleStockLedger.activitySkuId, presaleActivitySkus.id)),
+          ),
+        ),
+      ),
+    );
+  return rows.map((row) => row.skuId);
 }
 
 /**

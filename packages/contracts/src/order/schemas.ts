@@ -470,15 +470,41 @@ export const storefrontOrderItemExample = {
   reviewable: false,
 } satisfies StorefrontOrderItem;
 
+/**
+ * 拼团: where the order's team stands, so 我的订单 and 订单详情 can say 拼团中 instead of
+ * 待发货 while the team is still forming (a group-buy order ships only once its team has
+ * succeeded, RISK-D-011). `role` is this order's own seat — the leader of a team the
+ * shopper joined is somebody else.
+ */
+export const orderGroupbuyTeam = z.object({
+  id,
+  /**
+   * `groupbuyGroupStatus` and `groupbuyMemberRole`, spelled out: `groupbuy/schemas` imports
+   * the storefront route catalogue, which imports this file.
+   */
+  status: z.enum(['forming', 'succeeded', 'failed', 'cancelled']),
+  role: z.enum(['leader', 'member']),
+  seatsTotal: z.number().int().min(2),
+  seatsTaken: z.number().int().min(0),
+  expiresAt: instant,
+});
+export type OrderGroupbuyTeam = z.infer<typeof orderGroupbuyTeam>;
+
 /** The shopper's list row: `orderListItem` with `storefrontOrderItem` lines. */
 export const storefrontOrderListItem = orderListItem.extend({
   items: z.array(storefrontOrderItem),
+  /** Every refund that has succeeded, added up (`orders.refunded_amount`). */
+  refundedAmount: money,
+  /** 拼团 orders only; `null` for every other kind. */
+  groupbuyTeam: orderGroupbuyTeam.nullable(),
 });
 export type StorefrontOrderListItem = z.infer<typeof storefrontOrderListItem>;
 
 export const storefrontOrderListItemExample = {
   ...orderListItemExample,
   items: [storefrontOrderItemExample],
+  refundedAmount: '0.00',
+  groupbuyTeam: null,
 } satisfies StorefrontOrderListItem;
 
 export const orderDetail = storefrontOrderListItem.extend({
@@ -498,6 +524,13 @@ export const orderDetail = storefrontOrderListItem.extend({
    * after a cancel or refund (the team page shows how it ended). `null` for any other kind.
    */
   groupbuyTeamId: id.nullable(),
+  /**
+   * 申请开票 is open: paid, not refunded in full, something left to invoice and no request
+   * already 待开票 or 已开票 — exactly what `order.invoiceRequest` accepts.
+   */
+  invoiceRequestable: z.boolean(),
+  /** What an invoice would be made out for: paid less refunded (`0.00` before payment). */
+  invoiceAmount: money,
 });
 export type OrderDetail = z.infer<typeof orderDetail>;
 
@@ -514,6 +547,8 @@ export const orderDetailExample = {
   cancelledAt: null,
   cancelReason: null,
   groupbuyTeamId: null,
+  invoiceRequestable: false,
+  invoiceAmount: '0.00',
 } satisfies OrderDetail;
 
 /**

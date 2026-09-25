@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Button, Drawer, Space, Table, Tag, Timeline, Typography } from 'antd';
+import { Alert, Button, Descriptions, Drawer, Space, Table, Tag, Timeline, Typography } from 'antd';
 import { useState } from 'react';
 import {
   refundAdminApprove,
@@ -48,7 +48,11 @@ import { REFUND_KIND, REFUND_RETURN_STAGE, REFUND_STATUS, optionsOf } from '../t
  *
  *  - **同意 / 拒绝** (`refund:request:review`) say whether the customer is owed
  *    money. Approving a 仅退款 queues the gateway call immediately; approving a
- *    退货退款 only asks the buyer to ship the goods back.
+ *    退货退款 only asks the buyer to ship the goods back. Both dialogs repeat
+ *    the amount and the buyer's reason, so nobody decides from the row alone.
+ *  - **关闭** (`refund:request:review`) is 拒绝 on a refund WeChat refused: it
+ *    still holds its lines while 重试 could pay it (REFUND-017), and closing it
+ *    — settled by hand, say — frees them.
  *  - **确认收货** (`refund:request:execute`) says the goods arrived, and *that*
  *    is what releases the money on a 退货退款.
  *  - **重试** (`refund:request:execute`) re-drives a refund that failed or came
@@ -65,11 +69,15 @@ import { REFUND_KIND, REFUND_RETURN_STAGE, REFUND_STATUS, optionsOf } from '../t
  * operator typing one is how a shop refunds more than it was paid
  * (`REFUND_EXCEEDS_PAID` exists because the database refuses it too).
  *
- * The return address shown to the buyer comes from 售后设置, not from this
- * form: `refunds` has nowhere to store a per-request address yet, and an
- * approval that recorded one in the timeline while the buyer's screen showed
- * another would be worse than one source of truth.
+ * The return address comes from 售后设置, not from this form, and is frozen on
+ * the request when a 退货退款 is approved: editing 售后设置 afterwards does not
+ * re-address a parcel already in the post.
+ *
+ * Every action refreshes the list *and* the open drawer (`REFRESHES`), so the
+ * drawer never shows the status from before the operator's own click.
  */
+const REFRESHES = [refundAdminList, refundAdminDetail] as const;
+
 export function RefundRequestsPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const approveModal = useFormModal<AdminRefundListItem>();
@@ -186,6 +194,11 @@ export function RefundRequestsPage() {
                       </Button>
                     </>
                   ) : null}
+                  {row.status === 'failed' ? (
+                    <Button type="link" size="small" danger onClick={() => rejectModal.show(row)}>
+                      关闭
+                    </Button>
+                  ) : null}
                 </Can>
                 <Can permission="refund:request:execute">
                   {row.returnStage === 'shipped_back' ? (
@@ -194,7 +207,7 @@ export function RefundRequestsPage() {
                       input={{ params: { id: row.id }, body: {} }}
                       title="确认已收到退货？"
                       description="确认后立即向微信发起退款。"
-                      invalidate={[refundAdminList]}
+                      invalidate={REFRESHES}
                       successMessage="已确认收货"
                       buttonProps={{ type: 'link', size: 'small' }}
                     >
@@ -206,8 +219,8 @@ export function RefundRequestsPage() {
                       route={refundAdminRetry}
                       input={{ params: { id: row.id } }}
                       title="重新处理这笔退款？"
-                      description="使用原有的商户退款单号，不会重复退款。"
-                      invalidate={[refundAdminList]}
+                      description="使用原有的商户退款单号，不会重复退款；商品已发出的无法重试。"
+                      invalidate={REFRESHES}
                       successMessage="已重新处理"
                       buttonProps={{ type: 'link', size: 'small' }}
                     >
@@ -245,36 +258,39 @@ export function RefundRequestsPage() {
         ]}
         route={refundAdminApprove}
         toInput={(values) => ({ params: { id: approveModal.record?.id ?? '' }, body: values })}
-        invalidate={[refundAdminList]}
+        invalidate={REFRESHES}
         successMessage="已同意"
         okText="确认同意"
         header={
           approveModal.record ? (
-            <Alert
-              type="info"
-              showIcon
-              style={{ marginBottom: 16 }}
-              message={
-                approveModal.record.kind === 'refund_only' ? (
-                  <>
-                    同意后立即退回 <MoneyText value={approveModal.record.amount} />。
-                  </>
-                ) : (
-                  <>
-                    同意后买家按「售后设置」里的退货地址寄回，确认收货时才退款
-                    <MoneyText value={approveModal.record.amount} />
-                    。退货地址未填写时无法同意。
-                  </>
-                )
-              }
-            />
+            <>
+              <RequestSummary record={approveModal.record} />
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message={
+                  approveModal.record.kind === 'refund_only' ? (
+                    <>
+                      同意后立即退回 <MoneyText value={approveModal.record.amount} />。
+                    </>
+                  ) : (
+                    <>
+                      同意后买家按「售后设置」里的退货地址寄回，确认收货时才退款
+                      <MoneyText value={approveModal.record.amount} />
+                      。退货地址未填写时无法同意。
+                    </>
+                  )
+                }
+              />
+            </>
           ) : null
         }
       />
 
       <ModalForm
         {...rejectModal.props}
-        title={`拒绝退款：${rejectModal.record?.refundNo ?? ''}`}
+        title={`${rejectModal.record?.status === 'failed' ? '关闭售后' : '拒绝退款'}：${rejectModal.record?.refundNo ?? ''}`}
         width={560}
         schema={refundRejectBody}
         fields={[
@@ -290,9 +306,24 @@ export function RefundRequestsPage() {
         ]}
         route={refundAdminReject}
         toInput={(values) => ({ params: { id: rejectModal.record?.id ?? '' }, body: values })}
-        invalidate={[refundAdminList]}
-        successMessage="已拒绝"
-        okText="确认拒绝"
+        invalidate={REFRESHES}
+        successMessage={rejectModal.record?.status === 'failed' ? '已关闭' : '已拒绝'}
+        okText={rejectModal.record?.status === 'failed' ? '确认关闭' : '确认拒绝'}
+        header={
+          rejectModal.record ? (
+            <>
+              <RequestSummary record={rejectModal.record} />
+              {rejectModal.record.status === 'failed' ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                  message="微信未退款成功。关闭后这笔售后不再重试，商品可重新发货，买家可重新申请；已线下退款的请在原因里写明。"
+                />
+              ) : null}
+            </>
+          ) : null
+        }
       />
 
       <ModalForm
@@ -317,10 +348,36 @@ export function RefundRequestsPage() {
         }
         route={refundAdminRemark}
         toInput={(values) => ({ params: { id: remarkModal.record?.id ?? '' }, body: values })}
-        invalidate={[refundAdminList]}
+        invalidate={REFRESHES}
         successMessage="已保存"
       />
     </PageContainer>
+  );
+}
+
+/**
+ * What the operator is deciding on, repeated in the dialog: the amount, what
+ * kind of request, how many units and the buyer's own reason.
+ */
+function RequestSummary({ record }: { record: AdminRefundListItem }) {
+  return (
+    <Descriptions
+      size="small"
+      column={2}
+      bordered
+      style={{ marginBottom: 16 }}
+      items={[
+        { key: 'amount', label: '申请金额', children: <MoneyText value={record.amount} /> },
+        {
+          key: 'kind',
+          label: '类型',
+          children: <StatusTag value={record.kind} map={REFUND_KIND} />,
+        },
+        { key: 'quantity', label: '件数', children: record.quantity },
+        { key: 'freight', label: '含运费', children: record.includesFreight ? '是' : '否' },
+        { key: 'reason', label: '买家原因', span: 2, children: record.reason ?? '—' },
+      ]}
+    />
   );
 }
 
@@ -414,7 +471,7 @@ function RefundDrawer({ id, onClose }: { id: string | null; onClose: () => void 
           dataSource={row?.items ?? []}
           columns={[
             { title: '商品', dataIndex: 'productName', key: 'productName', ellipsis: true },
-            { title: '规格', dataIndex: 'skuName', key: 'skuName', width: 160, ellipsis: true },
+            { title: '规格', dataIndex: 'specText', key: 'specText', width: 160, ellipsis: true },
             { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 80, align: 'right' },
             {
               title: '金额',

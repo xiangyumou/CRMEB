@@ -22,6 +22,11 @@ export const presaleErrors = defineErrors({
   },
   /** Editing an `ended` 预售 activity back to life. It is copied, not re-opened. */
   PRESALE_ACTIVITY_ENDED: { status: 409, message: '已结束的活动不能重新开启，请复制一个新活动' },
+  /**
+   * The edit removes an activity SKU that orders point at (RISK-D-012). It can be switched
+   * off (`isEnabled: false`) instead. `details: { skuIds }`.
+   */
+  PRESALE_ACTIVITY_SKU_IN_USE: { status: 409, message: '该规格已有订单，不能移除，可改为停用' },
   PRESALE_ACTIVITY_NOT_OPEN: { status: 409, message: '该预售活动当前不可购买' },
   /** The order's lines are not the activity's product, or name a SKU the activity does not sell. */
   PRESALE_SKU_NOT_IN_ACTIVITY: { status: 422, message: '所选规格不参与该预售活动' },

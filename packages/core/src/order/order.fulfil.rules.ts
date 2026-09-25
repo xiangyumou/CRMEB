@@ -136,14 +136,16 @@ export interface RepriceLine {
   orderItemId: number;
   quantity: number;
   unitPrice: Money;
-  /** The share this line already carries of `orders.coupon_discount`. */
-  discountAmount: Money;
+  /**
+   * What checkout's own rules (the coupon, an activity price) took off this line — its share
+   * of `orders.coupon_discount` without any earlier 改价. It stays on this line: a coupon
+   * scoped to one product never moves onto another.
+   */
+  checkoutDiscount: Money;
 }
 
 export interface RepriceInput {
   lines: readonly RepriceLine[];
-  /** What the coupon and the pricing contributors took off at checkout. */
-  existingDiscount: Money;
   freightAmount: Money;
   /** What the operator wants taken off on top. */
   operatorDiscount: Money;
@@ -162,31 +164,40 @@ export type RepriceOutcome =
 /**
  * 改价, as arithmetic.
  *
- * The operator names a discount; the new `orders.coupon_discount` is
- * `existingDiscount + operatorDiscount`, split across the lines with checkout's
- * own `distribute`, and `payableAmount` comes from checkout's own `payableOf`.
- * Nothing here invents a number.
+ * The operator names a discount; each line keeps what checkout took off it and
+ * only the operator's discount is spread, over what the lines still cost, with
+ * checkout's own `distribute`. The new `orders.coupon_discount` is the checkout
+ * discount plus the operator's, and `payableAmount` comes from checkout's own
+ * `payableOf`. Nothing here invents a number.
  *
- * Two properties, both asserted in `order.fulfil.rules.test.ts`:
+ * Three properties, all asserted in `order.fulfil.rules.test.ts`:
  *
  *  1. the per-line shares still sum back to `couponDiscount` exactly, so a
  *     later partial refund reads the line and is right;
- *  2. no line is discounted below zero — `distribute` clamps to each line's
- *     subtotal and pushes the excess onto lines with room, and a discount
- *     larger than the whole goods total is refused rather than clamped,
+ *  2. a line's checkout share never moves (ORDER-012): re-spreading a coupon
+ *     that applied to one product across every line would refund the wrong
+ *     amount when a line comes back;
+ *  3. no line is discounted below zero — `distribute` clamps to each line's
+ *     remaining total and pushes the excess onto lines with room, and a
+ *     discount larger than the goods left is refused rather than clamped,
  *     because an operator who typed 1000 instead of 10 should be told.
  */
 export function reprice(input: RepriceInput): RepriceOutcome {
   const subtotals = input.lines.map((line) => line.unitPrice.mul(line.quantity));
   const goodsTotal = Money.sum(subtotals);
-  const target = input.existingDiscount.add(input.operatorDiscount);
-  if (target.gt(goodsTotal)) {
-    return { kind: 'too-large', maximum: goodsTotal.sub(input.existingDiscount) };
+  const checkoutDiscount = Money.sum(input.lines.map((line) => line.checkoutDiscount));
+  const rooms = input.lines.map((line, index) =>
+    subtotals[index]!.sub(line.checkoutDiscount).clampToZero(),
+  );
+  const room = Money.sum(rooms);
+  if (input.operatorDiscount.gt(room)) {
+    return { kind: 'too-large', maximum: room };
   }
+  const target = checkoutDiscount.add(input.operatorDiscount);
 
-  const shares = distribute(target, subtotals);
+  const operatorShares = distribute(input.operatorDiscount, rooms);
   const lines = input.lines.map((line, index) => {
-    const share = shares[index] ?? Money.ZERO;
+    const share = line.checkoutDiscount.add(operatorShares[index] ?? Money.ZERO);
     return {
       orderItemId: line.orderItemId,
       discountAmount: share,

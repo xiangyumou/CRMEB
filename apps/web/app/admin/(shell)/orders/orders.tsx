@@ -1,22 +1,28 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Card, Col, Row, Space, Statistic, Tabs, Typography, message } from 'antd';
+import { App, Button, Card, Col, Row, Space, Statistic, Tabs, Tag, Typography } from 'antd';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   orderAdminDeleteMany,
   orderAdminExport,
   orderAdminList,
   orderAdminStatistics,
 } from '@shop/contracts/order/order.admin.contract';
-import type { AdminOrderListItem } from '@shop/contracts/order/order.fulfil.schemas';
+import type {
+  AdminOrderListItem,
+  OrderDeletionsResult,
+} from '@shop/contracts/order/order.fulfil.schemas';
 
-import { callRoute, useRouteQuery } from '@/admin/api';
+import { callRoute, presentApiError, presentSuccess, useRouteQuery } from '@/admin/api';
 import { MoneyText } from '@/admin/kit/money-text';
 import { PageContainer } from '@/admin/kit/page-container';
 import { StatusTag } from '@/admin/kit/status-tag';
 import { actionsColumn, enumColumn, instantColumn, moneyColumn } from '@/admin/kit/table/columns';
 import { CrudTable } from '@/admin/kit/table/crud-table';
+import { filterKeys, type FilterSpec } from '@/admin/kit/table/filter-bar';
+import { useNextUrlState } from '@/admin/kit/table/url-state';
 import { ConfirmButton } from '@/admin/kit/confirm-button';
 import { Can } from '@/admin/session';
 
@@ -50,16 +56,65 @@ const TABS: { key: TabKey; label: string; query: Record<string, unknown> }[] = [
   },
   { key: 'unreceived', label: '待收货', query: { status: 'shipped' } },
   { key: 'finished', label: '已完成', query: { status: ['received', 'completed'] } },
-  {
-    key: 'refunding',
-    label: '退款中',
-    query: { refundStatus: ['requested', 'partially_refunded'] },
-  },
+  // An open after-sales request, not the `partially_refunded` roll-up that
+  // stays on an order after its request has closed.
+  { key: 'refunding', label: '退款中', query: { refunding: true } },
   { key: 'deleted', label: '回收站', query: { deleted: true } },
 ];
 
+const isTab = (value: string | undefined): value is TabKey =>
+  TABS.some((entry) => entry.key === value);
+
+const FILTERS: FilterSpec[] = [
+  { kind: 'text', name: 'keyword', label: '关键词' },
+  {
+    kind: 'select',
+    name: 'status',
+    label: '订单状态',
+    multiple: true,
+    options: optionsOf(ORDER_STATUS),
+  },
+  {
+    kind: 'select',
+    name: 'fulfillmentStatus',
+    label: '发货状态',
+    multiple: true,
+    options: optionsOf(FULFILLMENT_STATUS),
+  },
+  {
+    kind: 'select',
+    name: 'refundStatus',
+    label: '售后状态',
+    multiple: true,
+    options: optionsOf(REFUND_STATUS),
+  },
+  { kind: 'select', name: 'kind', label: '订单类型', options: optionsOf(ORDER_KIND) },
+  { kind: 'number', name: 'userId', label: '用户 ID' },
+  { kind: 'dateRange', names: ['createdFrom', 'createdTo'], label: '下单时间' },
+  { kind: 'dateRange', names: ['paidFrom', 'paidTo'], label: '支付时间' },
+];
+
+/** 拼团 not yet 成团: paid, but not to be shipped. */
+const teamForming = (row: AdminOrderListItem): boolean =>
+  row.groupbuyTeamStatus !== null && row.groupbuyTeamStatus !== 'succeeded';
+
 export function OrdersPage() {
-  const [tab, setTab] = useState<TabKey>('all');
+  // The tab lives in the URL next to the filters and the page, so 返回列表
+  // from an order lands on the same screen.
+  const urlState = useNextUrlState();
+  const initial = urlState.read('tab');
+  const [tab, setTab] = useState<TabKey>(isTab(initial) ? initial : 'all');
+  const changeTab = (next: TabKey): void => {
+    setTab(next);
+    // Page 1: what was row 40 of 全部 is not row 40 of 退款中.
+    urlState.write({ tab: next === 'all' ? undefined : next, page: '1' });
+  };
+  // The detail's 返回 goes back to this exact list: tab, filters and page.
+  const listSearch = useSearchParams().toString();
+  const detailHref = (id: string): string =>
+    listSearch
+      ? `/admin/orders/${id}?list=${encodeURIComponent(listSearch)}`
+      : `/admin/orders/${id}`;
   const stats = useRouteQuery(orderAdminStatistics, {});
   const preset = TABS.find((entry) => entry.key === tab)?.query ?? {};
 
@@ -76,7 +131,7 @@ export function OrdersPage() {
 
       <Tabs
         activeKey={tab}
-        onChange={(key) => setTab(key as TabKey)}
+        onChange={(key) => changeTab(key as TabKey)}
         items={TABS.map((entry) => ({ key: entry.key, label: entry.label }))}
       />
 
@@ -92,44 +147,24 @@ export function OrdersPage() {
               route={orderAdminDeleteMany}
               input={{ body: { ids: selectedRowKeys.map(String) } }}
               title={`确认删除选中的 ${selectedRowKeys.length} 个订单？`}
-              description="只有已完成、已取消或已退款的订单会被删除，其余会被跳过。"
+              description="只删除已完成、已取消或已退款且没有售后在处理的订单，其余会被跳过。"
               invalidate={[orderAdminList, orderAdminStatistics]}
-              successMessage="已删除"
-              onSuccess={clear}
+              onSuccess={(result) => {
+                const { deleted, skippedIds } = result as OrderDeletionsResult;
+                presentSuccess(
+                  skippedIds.length === 0
+                    ? `已删除 ${deleted} 个订单`
+                    : `已删除 ${deleted} 个订单，跳过 ${skippedIds.length} 个未完成或有售后在处理的订单`,
+                );
+                clear();
+              }}
               buttonProps={{ danger: true }}
             >
               批量删除
             </ConfirmButton>
           </Can>
         )}
-        filters={[
-          { kind: 'text', name: 'keyword', label: '关键词' },
-          {
-            kind: 'select',
-            name: 'status',
-            label: '订单状态',
-            multiple: true,
-            options: optionsOf(ORDER_STATUS),
-          },
-          {
-            kind: 'select',
-            name: 'fulfillmentStatus',
-            label: '发货状态',
-            multiple: true,
-            options: optionsOf(FULFILLMENT_STATUS),
-          },
-          {
-            kind: 'select',
-            name: 'refundStatus',
-            label: '售后状态',
-            multiple: true,
-            options: optionsOf(REFUND_STATUS),
-          },
-          { kind: 'select', name: 'kind', label: '订单类型', options: optionsOf(ORDER_KIND) },
-          { kind: 'number', name: 'userId', label: '用户 ID' },
-          { kind: 'dateRange', names: ['createdFrom', 'createdTo'], label: '下单时间' },
-          { kind: 'dateRange', names: ['paidFrom', 'paidTo'], label: '支付时间' },
-        ]}
+        filters={FILTERS}
         columns={[
           {
             title: '订单号',
@@ -137,7 +172,7 @@ export function OrdersPage() {
             key: 'orderNo',
             width: 210,
             render: (_value: unknown, row: AdminOrderListItem) => (
-              <Link href={`/admin/orders/${row.id}`}>{row.orderNo}</Link>
+              <Link href={detailHref(row.id)}>{row.orderNo}</Link>
             ),
           },
           {
@@ -190,6 +225,11 @@ export function OrdersPage() {
             width: 170,
             render: (_value: unknown, row: AdminOrderListItem) => (
               <Space size={4}>
+                {teamForming(row) ? (
+                  <Tag color="orange">
+                    {row.groupbuyTeamStatus === 'forming' ? '拼团中' : '未成团'}
+                  </Tag>
+                ) : null}
                 <StatusTag value={row.fulfillmentStatus} map={FULFILLMENT_STATUS} />
                 {row.refundStatus === 'none' ? null : (
                   <StatusTag value={row.refundStatus} map={REFUND_STATUS} />
@@ -204,9 +244,11 @@ export function OrdersPage() {
           }),
           actionsColumn<AdminOrderListItem>({
             render: (row) => (
-              <Link href={`/admin/orders/${row.id}`}>
+              <Link href={detailHref(row.id)}>
                 <Button type="link" size="small">
-                  {row.status === 'paid' && row.fulfillmentStatus !== 'fulfilled'
+                  {row.status === 'paid' &&
+                  row.fulfillmentStatus !== 'fulfilled' &&
+                  !teamForming(row)
                     ? '去发货'
                     : '详情'}
                 </Button>
@@ -263,14 +305,30 @@ function WorkQueue(props: {
  */
 function ExportButton({ preset }: { preset: Record<string, unknown> }) {
   const [busy, setBusy] = useState(false);
+  const { message } = App.useApp();
+  const { read } = useNextUrlState();
+
+  /** The tab's preset plus whatever the filter bar holds — what the table shows. */
+  const exportQuery = (): Record<string, unknown> => {
+    const query: Record<string, unknown> = { ...preset };
+    for (const spec of FILTERS) {
+      for (const name of filterKeys(spec)) {
+        const value = read(name);
+        if (value === undefined || value === '') continue;
+        query[name] =
+          spec.kind === 'select' && spec.multiple ? value.split(',').filter(Boolean) : value;
+      }
+    }
+    return query;
+  };
 
   const download = async () => {
     setBusy(true);
     try {
       const result = await callRoute(orderAdminExport, {
-        query: { ...preset, kindOfExport: 'orders' } as never,
+        query: { ...exportQuery(), kindOfExport: 'orders' } as never,
       });
-      const blob = new Blob(['﻿', result.content], { type: 'text/csv;charset=utf-8' });
+      const blob = new Blob(['\uFEFF', result.content], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -278,8 +336,10 @@ function ExportButton({ preset }: { preset: Record<string, unknown> }) {
       anchor.click();
       URL.revokeObjectURL(url);
       if (result.truncated) {
-        message.warning(`导出已截断到 ${result.rowCount} 行，请缩小筛选范围`);
+        void message.warning(`导出已截断到 ${result.rowCount} 行，请缩小筛选范围`);
       }
+    } catch (error) {
+      presentApiError(error);
     } finally {
       setBusy(false);
     }

@@ -143,9 +143,34 @@ const asDate = (value: string | undefined): Date | undefined =>
  * arrived is a different one.
  */
 /** Paid, less every refund that has succeeded. */
-function invoiceableAmount(order: { paidAmount: string | null; refundedAmount: string }): Money {
+export function invoiceableAmount(order: {
+  paidAmount: string | null;
+  refundedAmount: string;
+}): Money {
   if (order.paidAmount === null) return Money.ZERO;
   return Money.parse(order.paidAmount).sub(Money.parse(order.refundedAmount)).clampToZero();
+}
+
+/**
+ * INVOICE-004: whether 申请开票 would be accepted for this order — paid, not refunded in
+ * full, something left to invoice, and no request already 待开票 or 已开票. `request` refuses
+ * exactly what this says no to, so 订单详情 can hide the button instead of learning it from a
+ * refusal.
+ */
+export function isInvoiceRequestable(
+  order: {
+    status: string;
+    refundStatus: string;
+    paidAt: Date | null;
+    paidAmount: string | null;
+    refundedAmount: string;
+  },
+  hasOpenInvoice: boolean,
+): boolean {
+  if (hasOpenInvoice) return false;
+  if (order.paidAt === null || order.paidAmount === null) return false;
+  if (order.status === 'refunded' || order.refundStatus === 'refunded') return false;
+  return invoiceableAmount(order).isPositive();
 }
 
 export async function request(
@@ -167,22 +192,13 @@ export async function request(
   const invoiceId = await ctx.withTx(async (tx): Promise<number> => {
     const order = await repo.findOrderForUser(tx, { id: orderId, userId });
     if (!order) throw new DomainError('ORDER_NOT_FOUND');
-    if (
-      order.paidAt === null ||
-      order.paidAmount === null ||
-      order.status === 'refunded' ||
-      order.refundStatus === 'refunded'
-    ) {
+    // An open request is not asked about here: the partial unique index below is that check.
+    if (!isInvoiceRequestable(order, false)) {
       throw new DomainError('ORDER_INVOICE_NOT_REQUESTABLE', {
         details: { status: order.status, refundStatus: order.refundStatus },
       });
     }
     const amount = invoiceableAmount(order);
-    if (!amount.isPositive()) {
-      throw new DomainError('ORDER_INVOICE_NOT_REQUESTABLE', {
-        details: { status: order.status, refundStatus: order.refundStatus },
-      });
-    }
 
     try {
       const invoice = await fulfilRepo.insertInvoice(tx, {

@@ -33,8 +33,10 @@ import {
   wechatConfig,
 } from '../wechat';
 import {
+  adminListEffects,
   MINI_TRADE_MANAGED_EVENT,
   MSG_JUMP_PATH,
+  SHIPPING_BLOCKED_EVENT,
   SHIPPING_OVERDUE_EVENT,
   miniTradeConfig,
   miniTradeStatus,
@@ -272,6 +274,13 @@ const expressBody = (
   lines,
 });
 
+const courierBody = (lines: { orderItemId: string; quantity: number }[]) => ({
+  deliveryMode: 'merchant_delivery' as const,
+  courierName: '李师傅',
+  courierPhone: '13900000000',
+  lines,
+});
+
 const uploads = () => oa.callsTo('/wxa/sec/order/upload_shipping_info');
 const uploadBodies = () => uploads().map((call) => call.body as Record<string, unknown>);
 const tradeRow = async (orderId: number) =>
@@ -481,6 +490,99 @@ describe('reporting a shipment of a mini-program payment', () => {
     await drain();
     expect(uploads()).toHaveLength(1);
     expect((await uploadEffect(shipment.id))?.status).toBe('done');
+  });
+
+  it('reports a split delivery with no express part once, as 统一发货, when the last part leaves — WXSHIP-009', async () => {
+    const a = await makeProduct();
+    const b = await makeProduct();
+    const placed = await paidOrder([a, b]);
+    const adminId = await makeAdmin();
+
+    await order.adminShip(
+      asAdmin(adminId),
+      { id: String(placed.orderId) },
+      courierBody([{ orderItemId: String(placed.itemIds[0]), quantity: 1 }]),
+    );
+    await drain();
+    expect(uploads()).toHaveLength(0);
+
+    const last = await order.adminShip(
+      asAdmin(adminId),
+      { id: String(placed.orderId) },
+      courierBody([{ orderItemId: String(placed.itemIds[1]), quantity: 1 }]),
+    );
+    await drain();
+
+    const bodies = uploadBodies();
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({ logistics_type: 2, delivery_mode: 1 });
+    // One package describing both parts.
+    const [pkg] = bodies[0]!['shipping_list'] as Array<{ item_desc: string }>;
+    expect(pkg!.item_desc.split('；')).toHaveLength(2);
+    expect((await uploadEffect(last.id))?.status).toBe('done');
+    expect(oa.tradeOrder(placed.transactionId)?.orderState).toBe(2);
+    expect((await tradeRow(placed.orderId))!.allDeliveredAt).not.toBeNull();
+    expect(await notificationRows(SHIPPING_BLOCKED_EVENT)).toEqual([]);
+  });
+
+  it('tells staff at dispatch when the last part cannot follow express parts — WXSHIP-009', async () => {
+    const a = await makeProduct();
+    const b = await makeProduct();
+    const yto = await makeExpressCompany('圆通速递', 'YTO');
+    const placed = await paidOrder([a, b]);
+    const adminId = await makeAdmin();
+
+    await order.adminShip(
+      asAdmin(adminId),
+      { id: String(placed.orderId) },
+      expressBody(yto, 'PART1', [{ orderItemId: String(placed.itemIds[0]), quantity: 1 }]),
+    );
+    await drain();
+    const last = await order.adminShip(
+      asAdmin(adminId),
+      { id: String(placed.orderId) },
+      courierBody([{ orderItemId: String(placed.itemIds[1]), quantity: 1 }]),
+    );
+    await drain();
+
+    // WeChat got the express part and nothing it would refuse.
+    expect(uploadBodies().map((body) => [body['delivery_mode'], body['is_all_delivered']])).toEqual(
+      [[2, false]],
+    );
+    expect(await notificationRows(SHIPPING_BLOCKED_EVENT)).toEqual([
+      { scopeId: `${SHIPPING_BLOCKED_EVENT}:shipment:${last.id}` },
+    ]);
+  });
+
+  it('tells staff once when an upload waits on a carrier code, however often it retries — WXSHIP-009', async () => {
+    const product = await makeProduct();
+    const nameless = await makeExpressCompany('某快递', null);
+    const placed = await paidOrder([product]);
+    const adminId = await makeAdmin();
+    const shipment = await order.adminShip(
+      asAdmin(adminId),
+      { id: String(placed.orderId) },
+      expressBody(nameless, 'X0002'),
+    );
+    await drain();
+    harness.clock.advance(3_600_000);
+    await drain();
+
+    expect(uploads()).toHaveLength(0);
+    expect(await notificationRows(SHIPPING_BLOCKED_EVENT)).toEqual([
+      { scopeId: `${SHIPPING_BLOCKED_EVENT}:shipment:${shipment.id}` },
+    ]);
+    // …and the waiting upload is on the 待处理任务 console, not only in a log.
+    const listed = await adminListEffects(asAdmin(adminId), {
+      page: 1,
+      pageSize: 20,
+      status: 'pending',
+      scope: 'shipment',
+    });
+    expect(listed.items.map((item) => [item.scopeId, item.eventType])).toContainEqual([
+      shipment.id,
+      'wechat.uploadShipping',
+    ]);
   });
 
   it('retries a WeChat refusal, and finishes on “already shipped” — WXSHIP-002', async () => {

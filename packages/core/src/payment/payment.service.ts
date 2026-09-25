@@ -399,8 +399,19 @@ export async function paymentStatus(ctx: Ctx, outTradeNo: string): Promise<Payme
 
 export interface SettlementFacts {
   transactionId: string;
-  /** What the gateway says it collected, in 分. */
-  paidFen: number;
+  /**
+   * The order total the gateway reports (`amount.total`), in 分: what we asked
+   * it to collect, and what it compares a refund's `amount.total` against.
+   * This, never `payer_total`, is what gets compared and stored (PAY-013).
+   */
+  totalFen: number;
+  /**
+   * What the shopper's own money covered (`amount.payer_total`), in 分, when
+   * the gateway said. Less than `totalFen` when a WeChat-side 立减 or 代金券 paid
+   * part of it. Information only: written into the attempt's `last_result`
+   * and the capital flow's note, never compared.
+   */
+  payerTotalFen: number | null;
   payerOpenid: string | null;
   successTime: Date;
   mchId: string;
@@ -459,7 +470,15 @@ export async function settlePayment(
     });
   }
 
-  if (Money.parse(attempt.amount).fen !== facts.paidFen) {
+  if (Money.parse(attempt.amount).fen !== facts.totalFen) {
+    // The gateway's trade is SUCCESS, which is final: nothing more can arrive
+    // under this number, and what did arrive goes back through the exception.
+    // Closing the attempt is what lets the order be cancelled instead of
+    // waiting on it forever (the sweep would find the same SUCCESS every time).
+    await repo.markAttemptClosed(tx, attempt.id, {
+      confirmedAt: ctx.clock.now(),
+      lastResult: `closed: ${facts.source} amount ${facts.totalFen} ≠ ${Money.parse(attempt.amount).fen}; refunded as an exception`,
+    });
     return exception(tx, ctx, {
       orderId: attempt.orderId,
       paymentAttemptId: attempt.id,
@@ -485,11 +504,31 @@ export async function settlePayment(
   // The attempt collected money whatever the order thinks. Recording that is
   // not optional: `ensureNoOpenAttempts` must never answer `closed` for an
   // order whose money arrived.
-  await repo.markAttemptPaid(tx, attempt.id, {
+  const attemptPaid = await repo.markAttemptPaid(tx, attempt.id, {
     transactionId: facts.transactionId,
     paidAt: facts.successTime,
-    lastResult: `${facts.source}: SUCCESS`,
+    lastResult: `${facts.source}: SUCCESS${discountNote(facts, 'log')}`,
   });
+
+  if (!attemptPaid.won) {
+    // The attempt is locked and was not `paid`, so it is `closed` or `failed`:
+    // we already told the order no money could arrive under this number. It
+    // did anyway, so it is money the shop cannot book — never a second path
+    // to a paid order.
+    return exception(tx, ctx, {
+      orderId: order.id,
+      paymentAttemptId: attempt.id,
+      outTradeNo: attempt.outTradeNo,
+      reason:
+        order.status === 'cancelled'
+          ? 'cancelled_order_payment'
+          : order.status === 'pending_payment'
+            ? 'unmatched_payment'
+            : 'duplicate_payment',
+      facts,
+      context: attempt.context,
+    });
+  }
 
   if (order.status === 'cancelled') {
     return exception(tx, ctx, {
@@ -529,7 +568,7 @@ export async function settlePayment(
     userId: order.userId,
     mchId: facts.mchId,
     transactionId: facts.transactionId,
-    note: `订单支付 ${order.orderNo}`,
+    note: `订单支付 ${order.orderNo}${discountNote(facts, 'note')}`,
     occurredAt: facts.successTime,
   });
 
@@ -562,6 +601,20 @@ export async function settlePayment(
   });
 
   return { kind: 'paid', orderId: order.id };
+}
+
+/**
+ * The WeChat-side discount, as a suffix for the attempt's `last_result`
+ * (`log`) or the capital flow's note (`note`); empty when the shopper paid the
+ * whole total.
+ */
+function discountNote(facts: SettlementFacts, kind: 'log' | 'note'): string {
+  if (facts.payerTotalFen === null || facts.payerTotalFen >= facts.totalFen) return '';
+  const payer = Money.fromFen(facts.payerTotalFen).toString();
+  const discount = Money.fromFen(facts.totalFen - facts.payerTotalFen).toString();
+  return kind === 'log'
+    ? ` (payer_total ${facts.payerTotalFen} of ${facts.totalFen})`
+    : `（用户实付 ${payer}，微信优惠 ${discount}）`;
 }
 
 /**
@@ -644,7 +697,9 @@ async function exception(
     transactionId: input.facts.transactionId,
     outTradeNo: input.outTradeNo,
     reason: input.reason,
-    paidAmount: Money.fromFen(input.facts.paidFen).toString(),
+    // The transaction total, not `payer_total`: a refund must send the total
+    // the gateway holds, and refunding it gives back the WeChat discount too.
+    paidAmount: Money.fromFen(input.facts.totalFen).toString(),
     context: input.context,
   });
 
@@ -783,7 +838,10 @@ export async function handleTransactionNotify(
   // notification is visible as exactly that. Absent, it is filed under ours.
   const mchId = namedMchId ?? runtime.mchId;
   const amount = (resource.amount ?? {}) as { total?: unknown; payer_total?: unknown };
-  const paidFen = positiveFen(amount.payer_total) ?? positiveFen(amount.total);
+  // `total` is what we asked for; `payer_total` is smaller whenever a WeChat
+  // 立减 or 代金券 covered part of it, and is never what we compare (PAY-013).
+  const totalFen = positiveFen(amount.total);
+  const payerTotalFen = wholeFen(amount.payer_total);
 
   try {
     return await ctx.withTx(async (tx) => {
@@ -814,7 +872,7 @@ export async function handleTransactionNotify(
         });
         return ACK;
       }
-      if (paidFen === null) {
+      if (totalFen === null) {
         // A genuine WeChat signature over a body that does not say how much
         // money moved. There is nothing to book and nothing to refund — an
         // amount is what a refund is made of — so the row stays on the
@@ -865,7 +923,8 @@ export async function handleTransactionNotify(
 
       const outcome = await settlePayment(tx, ctx, attempt, {
         transactionId,
-        paidFen,
+        totalFen,
+        payerTotalFen,
         payerOpenid: stringOrNull((resource.payer as { openid?: string } | undefined)?.openid),
         successTime: parseInstant(stringOrNull(resource.success_time), ctx.clock.now()),
         mchId,
@@ -900,6 +959,11 @@ function stringOrNull(value: unknown): string | null {
 /** 分 as WeChat states them: a positive whole number, or nothing at all. */
 function positiveFen(value: unknown): number | null {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
+/** Like `positiveFen`, but 0 is a real answer: a discount may cover everything. */
+function wholeFen(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
 function parseInstant(value: string | null, fallback: Date): Date {
@@ -977,8 +1041,9 @@ async function closeAttempt(ctx: Ctx, attempt: repo.AttemptRow): Promise<Payment
   } catch (error) {
     if (error instanceof DomainError && error.code === 'PAYMENT_GATEWAY_REFUSED') {
       // The usual refusal is ORDERPAID: the shopper paid while we were closing.
-      // Ask what actually happened rather than deciding here.
-      return reconcileAttempt(ctx, attempt.id);
+      // Ask what actually happened rather than deciding here — without closing
+      // again, or a PAYERROR the gateway will not close would loop.
+      return reconcileAttempt(ctx, attempt.id, { closeOnPayError: false });
     }
     await ctx.withTx((tx) =>
       repo.markAttemptUnknown(tx, attempt.id, `close unknown: ${messageOf(error)}`),
@@ -1035,7 +1100,11 @@ function sameMerchant(ctx: Ctx, attempt: repo.AttemptRow, runtime: PaymentRuntim
  * frozen `out_trade_no` (PAYC-002): no guessing from elapsed time, no
  * "probably closed", no re-creating the order under a new number.
  */
-export async function reconcileAttempt(ctx: Ctx, attemptId: number): Promise<PaymentState> {
+export async function reconcileAttempt(
+  ctx: Ctx,
+  attemptId: number,
+  options: { closeOnPayError?: boolean } = {},
+): Promise<PaymentState> {
   const attempt = await repo.findAttempt(ctx.db, attemptId);
   if (!attempt) throw new DomainError('PAYMENT_ATTEMPT_NOT_FOUND');
   if (attempt.status === 'paid') return 'paid';
@@ -1071,25 +1140,52 @@ export async function reconcileAttempt(ctx: Ctx, attemptId: number): Promise<Pay
   }
 
   if (remote.tradeState === 'SUCCESS' || remote.tradeState === 'REFUND') {
-    const outcome = await ctx.withTx(async (tx) => {
+    const totalFen = positiveFen(remote.totalFen);
+    if (totalFen === null) {
+      // A verified answer that does not say how much: nothing to book and
+      // nothing to refund, so the attempt stays open for the next pass.
+      await ctx.withTx((tx) =>
+        repo.markAttemptUnknown(tx, attempt.id, 'query unknown: no usable amount.total'),
+      );
+      return 'unknown';
+    }
+    const settled = await ctx.withTx(async (tx) => {
       const locked = await repo.lockAttemptByOutTradeNo(tx, attempt.outTradeNo);
-      return settlePayment(tx, ctx, locked, {
+      const outcome = await settlePayment(tx, ctx, locked, {
         transactionId: remote.transactionId ?? attempt.outTradeNo,
-        paidFen: remote.payerTotalFen || remote.totalFen,
+        totalFen,
+        payerTotalFen: wholeFen(remote.payerTotalFen),
         payerOpenid: remote.openid,
         successTime: parseInstant(remote.successTime, ctx.clock.now()),
         mchId: remote.mchId || runtime.mchId,
         source: 'query',
       });
+      const after = await repo.findAttempt(tx, attempt.id);
+      return { outcome, state: settledState(after) };
     });
     ctx.logger.info(
-      { attemptId: attempt.id, outcome: describeOutcome(outcome) },
-      'payment reconciled as paid',
+      { attemptId: attempt.id, outcome: describeOutcome(settled.outcome), state: settled.state },
+      'payment reconciled after a successful trade',
     );
-    return 'paid';
+    return settled.state;
   }
 
-  if (remote.tradeState === 'CLOSED' || remote.tradeState === 'PAYERROR') {
+  if (remote.tradeState === 'PAYERROR' && options.closeOnPayError !== false) {
+    // 支付失败 is not final at the gateway until the order is closed: the
+    // shopper can still retry it. So it goes through close like any other
+    // close — `closed` only on the gateway's confirmation (PAY-010).
+    return closeAttempt(ctx, attempt);
+  }
+
+  if (remote.tradeState === 'PAYERROR') {
+    // Reached from `closeAttempt` after the gateway refused to close it.
+    await ctx.withTx((tx) =>
+      repo.markAttemptUnknown(tx, attempt.id, 'query: PAYERROR, and the close was refused'),
+    );
+    return 'unknown';
+  }
+
+  if (remote.tradeState === 'CLOSED') {
     await ctx.withTx((tx) =>
       repo.markAttemptClosed(tx, attempt.id, {
         confirmedAt: ctx.clock.now(),
@@ -1099,13 +1195,26 @@ export async function reconcileAttempt(ctx: Ctx, attemptId: number): Promise<Pay
     return 'closed';
   }
 
-  // NOTPAY / USERPAYING: still collectible. Nothing may be released.
+  // NOTPAY / USERPAYING, or a PAYERROR whose close was just refused: still
+  // collectible. Nothing may be released.
   await ctx.withTx((tx) =>
     repo.markAttemptSubmitted(tx, attempt.id, {
       prepayId: attempt.prepayId,
       lastResult: `query: ${remote.tradeState}`,
     }),
   );
+  return 'unknown';
+}
+
+/**
+ * What the attempt row says after a successful trade was settled — not what
+ * the gateway said. An exception is not a payment: an amount that disagreed
+ * closed the attempt and its money goes back, so the order may be cancelled
+ * (`closed`); only an attempt that really booked money answers `paid`.
+ */
+function settledState(attempt: repo.AttemptRow | null): PaymentState {
+  if (attempt?.status === 'paid') return 'paid';
+  if (attempt?.status === 'closed' || attempt?.status === 'failed') return 'closed';
   return 'unknown';
 }
 

@@ -34,6 +34,8 @@ import {
 import { CrudTable } from '@/admin/kit/table/crud-table';
 import { Can } from '@/admin/session/can';
 
+import { ActivityStatusTag } from '../activity-window';
+
 import {
   GROUPBUY_ACTIVITY_STATUS,
   GROUPBUY_GROUP_STATUS,
@@ -144,11 +146,14 @@ export function GroupbuyActivitiesPage() {
                 </Link>
               ),
           },
-          enumColumn<GroupbuyActivityListItem, GroupbuyActivityListItem['status']>({
+          {
             title: '状态',
-            dataIndex: 'status',
-            map: GROUPBUY_ACTIVITY_STATUS,
-          }),
+            key: 'status',
+            width: 100,
+            render: (_value: unknown, row: GroupbuyActivityListItem) => (
+              <ActivityStatusTag row={row} map={GROUPBUY_ACTIVITY_STATUS} />
+            ),
+          },
           instantColumn<GroupbuyActivityListItem>({
             title: '开始',
             dataIndex: 'startAt',

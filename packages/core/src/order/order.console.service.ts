@@ -22,13 +22,16 @@ import { requireAdminId, type Ctx } from '../kernel/context';
 import { DomainError } from '../kernel/errors';
 import { fromId, toId, toIdOrNull } from '../kernel/ids';
 import { Money } from '../kernel/money';
+import { SHOP_DAY_MS, shopDateTime, shopDay, shopDayStart } from '../kernel/shop-time';
 import { notify } from '../notification';
+import { maskPhone } from '../user';
 import { closeOrderPayments, openPaymentState } from './order.cancel.service';
-import type { PaymentState } from './ports';
+import { kindStatesFor, type OrderKindState, type PaymentState } from './ports';
 import { orderFulfilConfig } from './order.fulfil.config';
 import { orderPermissions } from './permissions';
 import * as fulfilRepo from './order.fulfil.repo';
 import * as rules from './order.fulfil.rules';
+import { distribute } from './order.pricing';
 import { receiveOrder, shipmentContextFor, toWireShipment } from './order.fulfil.service';
 import * as repo from './order.repo';
 
@@ -91,6 +94,8 @@ export interface ConsoleSideData {
   users: Map<number, fulfilRepo.UserBriefRow>;
   /** The newest invoice request per order; the console shows its status as a column. */
   invoices: Map<number, 'requested' | 'issued' | 'rejected' | 'cancelled'>;
+  /** Each kind's own state (the 拼团 team), from the kind's domain through the port. */
+  kindStates: Map<number, OrderKindState>;
 }
 
 async function sideDataFor(
@@ -98,19 +103,24 @@ async function sideDataFor(
   rows: readonly fulfilRepo.OrderRow[],
 ): Promise<ConsoleSideData> {
   const orderIds = rows.map((row) => row.id);
-  const [users, invoices] = await Promise.all([
+  const [users, invoices, kindStates] = await Promise.all([
     fulfilRepo.listUserBriefs(
       db,
       rows.map((row) => row.userId),
     ),
     fulfilRepo.listOpenInvoiceStatuses(db, orderIds),
+    kindStatesFor(db, rows),
   ]);
   const invoiceByOrder = new Map<number, 'requested' | 'issued' | 'rejected' | 'cancelled'>();
   // Ordered newest first by the repo, so the first one wins.
   for (const row of invoices) {
     if (!invoiceByOrder.has(row.orderId)) invoiceByOrder.set(row.orderId, row.status);
   }
-  return { users: new Map(users.map((user) => [user.id, user])), invoices: invoiceByOrder };
+  return {
+    users: new Map(users.map((user) => [user.id, user])),
+    invoices: invoiceByOrder,
+    kindStates,
+  };
 }
 
 export function toAdminListItem(
@@ -157,6 +167,7 @@ export function toAdminListItem(
     buyerRemark: row.buyerRemark,
     adminRemark: row.adminRemark,
     invoiceStatus: side.invoices.get(row.id) ?? null,
+    groupbuyTeamStatus: side.kindStates.get(row.id)?.groupbuyTeam?.status ?? null,
     paidAt: iso(row.paidAt),
     shippedAt: iso(row.shippedAt),
     receivedAt: iso(row.receivedAt),
@@ -181,6 +192,7 @@ export function filterOf(query: AdminOrderListQuery): fulfilRepo.AdminOrderFilte
     status: asArray(query.status),
     fulfillmentStatus: asArray(query.fulfillmentStatus),
     refundStatus: asArray(query.refundStatus),
+    refunding: query.refunding,
     kind: query.kind,
     platform: query.platform === undefined ? undefined : PLATFORM_TO_DB[query.platform],
     keyword: query.keyword,
@@ -225,7 +237,12 @@ export async function adminList(
   const side = await sideDataFor(ctx.db, rows);
 
   return {
-    items: rows.map((row) => toAdminListItem(row, byOrder.get(row.id) ?? [], side)),
+    // The account phone is masked in a list, as the customer list is: a screenshot of a table
+    // should not leak it. The order detail's 客户信息 shows it whole.
+    items: rows.map((row) => {
+      const item = toAdminListItem(row, byOrder.get(row.id) ?? [], side);
+      return { ...item, user: { ...item.user, phone: maskPhone(item.user.phone) } };
+    }),
     total,
     page: query.page,
     pageSize: query.pageSize,
@@ -382,6 +399,33 @@ export async function adminRemark(
  * `orders.operator_discount`), so the form means what it says and 0.00 undoes.
  */
 /** `paid`: the money is in, so the price is final. `unknown`: it still might be. */
+/**
+ * What checkout took off each line, without the last 改价.
+ *
+ * Before any 改价 that is the line's `discount_amount`. After one, it is the line's own
+ * checkout adjustments (the snapshot keeps them per line since the adjustments release). An
+ * order written before that, repriced once and still unpaid, has no per-line record: its
+ * checkout discount is spread by line subtotal, as 改价 always used to.
+ */
+export function checkoutShares(
+  items: readonly repo.OrderItemRow[],
+  operatorDiscount: string,
+): Money[] {
+  const current = items.map((item) => Money.parse(item.discountAmount));
+  const previous = Money.parse(operatorDiscount);
+  if (previous.isZero()) return current;
+  if (items.every((item) => item.snapshot.adjustments !== undefined)) {
+    return items.map((item) =>
+      Money.sum((item.snapshot.adjustments ?? []).map((a) => Money.parse(a.amount).abs())),
+    );
+  }
+  const checkoutTotal = Money.sum(current).sub(previous).clampToZero();
+  return distribute(
+    checkoutTotal,
+    items.map((item) => Money.parse(item.unitPrice).mul(item.quantity)),
+  );
+}
+
 function refuseRepriceOn(state: PaymentState): void {
   if (state === 'paid') throw new DomainError('ORDER_PRICE_NOT_ADJUSTABLE');
   if (state === 'unknown') throw new DomainError('ORDER_PAYMENT_STATE_UNKNOWN');
@@ -407,19 +451,16 @@ export async function adminAdjustPrice(
     refuseRepriceOn(await openPaymentState(ctx, tx, orderId));
 
     const items = await repo.listItems(tx, [orderId]);
-    // Checkout's goods-level discounts stay; only the last 改价 is taken out
-    // before the new one goes on.
-    const existing = Money.sum(items.map((item) => Money.parse(item.discountAmount))).sub(
-      Money.parse(order.operatorDiscount),
-    );
+    // Checkout's goods-level discounts stay on their lines (ORDER-012); only the
+    // last 改价 is taken out before the new one goes on.
+    const shares = checkoutShares(items, order.operatorDiscount);
     const outcome = rules.reprice({
-      lines: items.map((item) => ({
+      lines: items.map((item, index) => ({
         orderItemId: item.id,
         quantity: item.quantity,
         unitPrice: Money.parse(item.unitPrice),
-        discountAmount: Money.parse(item.discountAmount),
+        checkoutDiscount: shares[index] ?? Money.ZERO,
       })),
-      existingDiscount: existing,
       freightAmount: Money.parse(body.freightAmount ?? order.freightAmount),
       operatorDiscount: Money.parse(body.operatorDiscount),
     });
@@ -549,13 +590,16 @@ export async function adminConfirmReceipt(
   return adminDetail(ctx, params);
 }
 
+export const OPEN_REFUND_BLOCKS_DELETE = '订单还有售后在处理，处理完后才能删除';
+
 /**
  * 删除订单 — a soft delete, and only of a finished order.
  *
  * Removing a `paid` order from every list would leave its stock, its coupon and
  * its money committed with nobody looking at them. So the WHERE says
  * `cancelled | completed | refunded`, and an order in flight cannot be made to
- * disappear.
+ * disappear. Nor can a 已完成 order whose after-sales request is still open:
+ * the refund would go on with the order gone from every list.
  */
 export async function adminDelete(ctx: Ctx, params: { id: string }): Promise<{ deleted: boolean }> {
   const adminId = requireAdminId(ctx);
@@ -565,8 +609,15 @@ export async function adminDelete(ctx: Ctx, params: { id: string }): Promise<{ d
     const order = await repo.findOrder(tx, orderId);
     if (!order) throw new DomainError('ORDER_NOT_FOUND');
     const deleted = await fulfilRepo.softDeleteOrder(tx, { orderId, at: ctx.clock.now() });
-    if (!deleted.won)
+    if (!deleted.won) {
+      if (order.deletedAt === null && (await repo.orderHasOpenRefund(tx, orderId))) {
+        throw new DomainError('ORDER_NOT_DELETABLE', {
+          message: OPEN_REFUND_BLOCKS_DELETE,
+          details: { status: order.status, openRefund: true },
+        });
+      }
       throw new DomainError('ORDER_NOT_DELETABLE', { details: { status: order.status } });
+    }
     await repo.insertStatusLog(tx, {
       orderId,
       changeType: 'deleted_by_admin',
@@ -617,11 +668,19 @@ export async function adminDeleteMany(
 // statistics
 // ---------------------------------------------------------------------------
 
-/** Default window: the last 30 days, which is what the console opens on. */
-function windowOf(ctx: Ctx, query: OrderStatisticsQuery): { from: Date; to: Date } {
-  const to = query.to === undefined ? ctx.clock.now() : new Date(query.to);
+/**
+ * The window in whole Shanghai days, as 交易统计 draws it: `to` is exclusive
+ * and opens the day after the last one, and the default is today and the 29
+ * days before — so 近 30 天实付 here and 支付金额 there are the same number.
+ */
+export function windowOf(now: Date, query: OrderStatisticsQuery): { from: Date; to: Date } {
+  const to = new Date(
+    shopDayStart(query.to === undefined ? now : new Date(query.to)).getTime() + SHOP_DAY_MS,
+  );
   const from =
-    query.from === undefined ? new Date(to.getTime() - 30 * 86_400_000) : new Date(query.from);
+    query.from === undefined
+      ? new Date(to.getTime() - 30 * SHOP_DAY_MS)
+      : shopDayStart(new Date(query.from));
   return { from, to };
 }
 
@@ -629,7 +688,7 @@ export async function adminStatistics(
   ctx: Ctx,
   query: OrderStatisticsQuery,
 ): Promise<OrderStatistics> {
-  const range = windowOf(ctx, query);
+  const range = windowOf(ctx.clock.now(), query);
   const [queue, totals] = await Promise.all([
     fulfilRepo.workQueueCounts(ctx.db),
     fulfilRepo.rangeTotals(ctx.db, range),
@@ -713,7 +772,7 @@ export async function adminExport(ctx: Ctx, query: OrderExportQuery): Promise<Or
     filter,
     limit: exportMaxRows,
   });
-  const stamp = ctx.clock.now().toISOString().slice(0, 10);
+  const stamp = shopDay(ctx.clock.now());
 
   if (query.kindOfExport === 'shipments') {
     const shipments = await fulfilRepo.listShipments(
@@ -748,12 +807,12 @@ export async function adminExport(ctx: Ctx, query: OrderExportQuery): Promise<Or
           item?.snapshot.productName ?? '',
           item?.snapshot.specText ?? '',
           line.quantity,
-          shipment.dispatchedAt.toISOString(),
+          shopDateTime(shipment.dispatchedAt),
         ]);
       }
     }
     return {
-      filename: `shipments-${stamp}.csv`,
+      filename: `发货单-${stamp}.csv`,
       contentType: 'text/csv',
       rowCount: body.length,
       truncated: total > rows.length,
@@ -764,7 +823,7 @@ export async function adminExport(ctx: Ctx, query: OrderExportQuery): Promise<Or
   const side = await sideDataFor(ctx.db, rows);
   const body = rows.map((row) => [
     row.orderNo,
-    row.createdAt.toISOString(),
+    shopDateTime(row.createdAt),
     ORDER_STATUS[row.status] ?? row.status,
     FULFILLMENT_STATUS[row.fulfillmentStatus] ?? row.fulfillmentStatus,
     REFUND_STATUS[row.refundStatus] ?? row.refundStatus,
@@ -779,14 +838,14 @@ export async function adminExport(ctx: Ctx, query: OrderExportQuery): Promise<Or
     row.payableAmount,
     row.paidAmount ?? '',
     row.refundedAmount,
-    iso(row.paidAt) ?? '',
-    iso(row.shippedAt) ?? '',
+    row.paidAt === null ? '' : shopDateTime(row.paidAt),
+    row.shippedAt === null ? '' : shopDateTime(row.shippedAt),
     row.buyerRemark ?? '',
     row.adminRemark ?? '',
   ]);
 
   return {
-    filename: `orders-${stamp}.csv`,
+    filename: `订单-${stamp}.csv`,
     contentType: 'text/csv',
     rowCount: body.length,
     truncated: total > rows.length,

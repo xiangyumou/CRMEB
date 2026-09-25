@@ -79,7 +79,7 @@ function SkuIdField({
   onChange: (skuId: string) => void;
 }) {
   const form = Form.useFormInstance();
-  const productId = Form.useWatch<string | number | undefined>('productId', form);
+  const productId = Form.useWatch<string | undefined>('productId', form);
   const [open, setOpen] = useState(false);
 
   return (
@@ -100,7 +100,7 @@ function SkuIdField({
       <SkuPicker
         open={open}
         multiple={false}
-        productId={productId === undefined ? undefined : String(productId)}
+        productId={productId === undefined || productId === '' ? undefined : productId}
         onClose={() => setOpen(false)}
         onSelect={(picked) => {
           const first = picked[0];
@@ -181,12 +181,15 @@ function SkuRow(item: never, helpers: SortableItemHelpers<never>) {
  * had a chance to multiply it. The help text carries the arithmetic instead.
  */
 export const groupbuyActivityFields: FieldSpec<Extract<keyof GroupbuyActivityForm, string>>[] = [
+  // Ids cross the wire as decimal strings (CONVENTIONS), so they are typed in
+  // as text; a numeric control hands the contract a `number` and every new
+  // 拼团 was refused.
   {
-    kind: 'number',
+    kind: 'text',
     name: 'productId',
     label: '商品 ID',
     span: 6,
-    min: 1,
+    placeholder: '12',
     help: '拼团挂在已有商品上；填好后用下面每行的「选择」挑规格',
   },
   { kind: 'text', name: 'title', label: '活动标题', span: 12, placeholder: '三人成团 · 坚果礼盒' },
@@ -244,11 +247,10 @@ export const groupbuyActivityFields: FieldSpec<Extract<keyof GroupbuyActivityFor
   { kind: 'date', name: 'startAt', label: '开始时间', span: 6, showTime: true },
   { kind: 'date', name: 'endAt', label: '结束时间', span: 6, showTime: true },
   {
-    kind: 'number',
+    kind: 'text',
     name: 'shippingTemplateId',
     label: '运费模板 ID',
     span: 6,
-    min: 1,
     help: '留空则跟随商品',
   },
 

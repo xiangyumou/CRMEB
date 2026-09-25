@@ -2,9 +2,10 @@ import type { Tx } from '@shop/db';
 import type { Ctx } from '../kernel/context';
 import { registerEffectHandler, type Effect } from '../effects/index';
 import { formatShopTime, notify } from '../notification';
+import { autoDeliver } from '../order';
 import { refundSystemInitiated } from '../refund';
 import { settleGroup } from './groupbuy.jobs';
-import { GROUPBUY_EVENTS } from './groupbuy.notifications';
+import { GROUPBUY_EVENTS, refundNoteOf } from './groupbuy.notifications';
 import * as repo from './groupbuy.repo';
 
 /**
@@ -184,6 +185,11 @@ async function handleJoinEffect(ctx: Ctx, effect: Effect): Promise<void> {
  * member's notice is its own effect keyed on their order, so a retried settle
  * records nothing new and nobody is told twice.
  *
+ * It is also where a member's card keys and coupon goods go out (RISK-D-011): auto-delivery
+ * on payment held back while the team was forming, and runs again here. `autoDeliver` is
+ * idempotent per order, so a retried settle hands nothing over twice; one member's order
+ * short of card keys fails this effect for a retry without holding back the others.
+ *
  * A failed team sends nothing from here. Each paid member of it has a
  * `groupbuy.refund` effect, and that is where they hear about it — with the
  * refund already open.
@@ -214,6 +220,22 @@ async function handleSettleEffect(ctx: Ctx, effect: Effect): Promise<void> {
       });
     }
   });
+
+  const undelivered: number[] = [];
+  for (const member of members) {
+    try {
+      await autoDeliver(ctx, member.orderId);
+    } catch (error) {
+      ctx.logger.warn(
+        { err: error, orderId: member.orderId, groupId },
+        'groupbuy: delivery failed',
+      );
+      undelivered.push(member.orderId);
+    }
+  }
+  if (undelivered.length > 0) {
+    throw new Error(`拼团 ${groupId} 成团后自动发货失败：订单 ${undelivered.join(', ')}`);
+  }
 }
 
 /**
@@ -239,6 +261,7 @@ async function notifyFailed(
       groupId: notice.groupId,
       activityTitle: notice.activityTitle,
       amount: notice.paidAmount ?? '',
+      refundNote: refundNoteOf(notice.paidAmount),
       reason: FAILURE_REASONS[args.reason] ?? FAILURE_REASONS['group_failed'],
       refundId: args.refundId,
     },

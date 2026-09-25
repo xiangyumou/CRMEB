@@ -69,6 +69,28 @@ describe('classifyAddress', () => {
     }
   });
 
+  it('STOR-004 — judges the IPv4 inside an IPv6 spelling, however it is written', () => {
+    const blocked = [
+      '::ffff:7f00:1', // what `new URL` makes of [::ffff:127.0.0.1]
+      '::ffff:a9fe:a9fe', // 169.254.169.254, hex
+      '::ffff:ac11:1', // 172.17.0.1, the docker gateway
+      '0:0:0:0:0:ffff:7f00:1',
+      '0:0:0:0:0:ffff:127.0.0.1',
+      '::7f00:1', // IPv4-compatible (::/96)
+      '::127.0.0.1',
+      '::a9fe:a9fe',
+      'fe90::1', // link-local is fe80::/10, not just fe80:
+      'febf::1',
+      'fec0::1', // site-local
+    ];
+    for (const address of blocked) {
+      expect(classifyAddress(address), address).toMatchObject({ blocked: true });
+    }
+    // A public address stays public in either spelling.
+    expect(classifyAddress('::ffff:808:808')).toEqual({ blocked: false });
+    expect(classifyAddress('::ffff:8.8.8.8')).toEqual({ blocked: false });
+  });
+
   it('allows ordinary public addresses', () => {
     for (const address of [PUBLIC_IP, '8.8.8.8', '1.1.1.1', '2606:4700::1111']) {
       expect(classifyAddress(address), address).toEqual({ blocked: false });
@@ -141,6 +163,9 @@ describe('safeFetch — refusals', () => {
     );
     expect((await refusal(safeFetch('https://127.0.0.1:80/'))).kind).toBe('refused');
     expect((await refusal(safeFetch('https://[::1]/'))).kind).toBe('refused');
+    // `new URL` hands these over as `::ffff:7f00:1` and `::ffff:ac11:1`.
+    expect((await refusal(safeFetch('https://[::ffff:127.0.0.1]/'))).kind).toBe('refused');
+    expect((await refusal(safeFetch('https://[::ffff:172.17.0.1]/'))).kind).toBe('refused');
   });
 
   it('refuses hostnames that exist to be loopback', async () => {

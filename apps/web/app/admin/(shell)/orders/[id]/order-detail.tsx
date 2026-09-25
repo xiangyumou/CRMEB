@@ -29,6 +29,7 @@ import {
   type AdminOrderDetail,
 } from '@shop/contracts/order/order.fulfil.schemas';
 import type { OrderItem } from '@shop/contracts/order/schemas';
+import { useSearchParams } from 'next/navigation';
 
 import { useRouteQuery } from '@/admin/api';
 import { ConfirmButton } from '@/admin/kit/confirm-button';
@@ -51,6 +52,15 @@ import {
 import { ShipPanel } from './ship-panel';
 
 /**
+ * The list the operator came from, rebuilt from its query string only — never a
+ * path taken from the URL, so `?list=` cannot send anyone off the console.
+ */
+export function listHrefOf(list: string | null): string {
+  const query = list ? new URLSearchParams(list).toString() : '';
+  return query ? `/admin/orders?${query}` : '/admin/orders';
+}
+
+/**
  * 订单详情 — the screen an operator spends their day on.
  *
  * Laid out as the questions they actually ask, in order: *what state is this
@@ -65,13 +75,36 @@ export function OrderDetailPage({ id }: { id: string }) {
   const priceModal = useFormModal<AdminOrderDetail>();
   const addressModal = useFormModal<AdminOrderDetail>();
 
+  const listHref = listHrefOf(useSearchParams().get('list'));
+
   const data = order.data;
   const invalidate = [orderAdminDetail, orderAdminTimeline, orderAdminList];
+
+  if (order.isError) {
+    return (
+      <PageContainer
+        title="订单详情"
+        breadcrumb={[{ label: '订单', href: listHref }, { label: '详情' }]}
+      >
+        <Alert
+          type="error"
+          showIcon
+          message="订单加载失败"
+          description={order.error.message}
+          action={
+            <Button size="small" onClick={() => void order.refetch()}>
+              重试
+            </Button>
+          }
+        />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer
       title={data ? `订单 ${data.orderNo}` : '订单详情'}
-      breadcrumb={[{ label: '订单', href: '/admin/orders' }, { label: data?.orderNo ?? '详情' }]}
+      breadcrumb={[{ label: '订单', href: listHref }, { label: data?.orderNo ?? '详情' }]}
       extra={
         data ? (
           <Space>

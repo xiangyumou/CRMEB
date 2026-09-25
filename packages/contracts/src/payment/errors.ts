@@ -12,8 +12,9 @@ import { defineErrors } from '../_conventions/errors';
  *  - **`PAYMENT_STATE_UNKNOWN` is never a guess.** When the gateway did not
  *    answer, the only honest reply is "we do not know yet, nothing was
  *    released" (PAYC-002 / QUEUE-004). Turning an unknown into a `closed` is
- *    the defect this whole domain exists to prevent, so it has its own code and
- *    its own Chinese message telling the operator to check by hand.
+ *    the defect this whole domain exists to prevent, so it has its own code.
+ *    Shoppers read its message at the cashier, so it says what to do (look
+ *    again shortly) rather than 「人工核对」; the operator's detail is in logs.
  */
 export const paymentErrors = defineErrors({
   /** The order does not exist, is soft-deleted, or belongs to somebody else. Same message either way. */
@@ -31,7 +32,10 @@ export const paymentErrors = defineErrors({
    * is untouched and a human decides. An *identical* replay is not an error —
    * it returns the same intent.
    */
-  PAYMENT_ATTEMPT_CONFLICT: { status: 409, message: '该订单已有进行中的支付，请人工核对后处理' },
+  PAYMENT_ATTEMPT_CONFLICT: {
+    status: 409,
+    message: '该订单已有一笔支付正在进行，请稍后刷新订单查看',
+  },
   /** The merchant order number is unknown, or belongs to another shopper. */
   PAYMENT_ATTEMPT_NOT_FOUND: { status: 404, message: '支付记录不存在' },
 
@@ -63,7 +67,7 @@ export const paymentErrors = defineErrors({
    * The gateway did not answer, or answered something we refuse to trust
    * (bad signature, unfetchable platform certificate). Nothing is released.
    */
-  PAYMENT_STATE_UNKNOWN: { status: 409, message: '支付结果未知，请人工核对后处理' },
+  PAYMENT_STATE_UNKNOWN: { status: 409, message: '支付结果确认中，请稍后刷新查看' },
 
   /** The stored merchant identity no longer matches the configuration (PAYC-005). */
   PAYMENT_MERCHANT_MISMATCH: { status: 409, message: '支付商户信息不一致，请人工核对后处理' },

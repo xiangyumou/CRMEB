@@ -202,7 +202,13 @@ export const refundAdminRetry = defineRoute({
   params: refundIdParams,
   body: z.object({}).default({}),
   response: adminRefundDetail,
-  errors: ['REFUND_NOT_FOUND', 'REFUND_NOT_ACTIONABLE', 'REFUND_STATE_UNKNOWN'],
+  errors: [
+    'REFUND_NOT_FOUND',
+    'REFUND_NOT_ACTIONABLE',
+    'REFUND_STATE_UNKNOWN',
+    // 复核 of a refused 仅退款 whose units have shipped since (REFUND-015).
+    'REFUND_LINE_ALREADY_SHIPPED',
+  ],
   examples: [
     {
       name: 'resolved-to-succeeded',

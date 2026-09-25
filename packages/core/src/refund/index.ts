@@ -76,6 +76,9 @@ export {
 } from './refund.jobs';
 
 export { refundConfig, returnAddress, type RefundConfig } from './refund.config';
+// Which refunds hold a line's units (REFUND-015): the rule `refunded_quantity`
+// is derived by, for readers that check it (the SEQ-001 sequence).
+export { countsUnits } from './refund.rules';
 export { refundPermissions } from './permissions';
 export { registerRefundEffects } from './refund.effects';
 export { REFUND_EXCEPTION_EVENT, registerRefundNotificationEvents } from './refund.notifications';

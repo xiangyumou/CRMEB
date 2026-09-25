@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { admins } from '@shop/db/schema/auth';
 import { products, productSkus } from '@shop/db/schema/catalog';
 import { orderItems, orders, type OrderItemSnapshot } from '@shop/db/schema/order';
+import { couponTemplates, userCoupons } from '@shop/db/schema/coupon';
 import { capitalFlows } from '@shop/db/schema/payment';
 import { refunds } from '@shop/db/schema/refund';
 import { attachments } from '@shop/db/schema/storage';
@@ -844,5 +845,238 @@ describe('the review routes refuse what the console hides', () => {
     await expect(
       service.apply(racer(userActor(order.userId)), applyBody(order, 2)),
     ).resolves.toMatchObject({ status: 'applied' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// REFUND-015 / REFUND-017 — units and lines follow the status
+// ---------------------------------------------------------------------------
+
+const lineUnits = async (order: PaidOrder) =>
+  (
+    await harness.ctx.db
+      .select({
+        refunded: orderItems.refundedQuantity,
+        shipped: orderItems.shippedQuantity,
+      })
+      .from(orderItems)
+      .where(eq(orderItems.id, order.itemIds[0]!))
+  )[0]!;
+
+/** An approved 仅退款 WeChat refused (the merchant account is short). */
+async function failedRefund(order: PaidOrder, quantity = 1): Promise<number> {
+  const id = await approvedRefund(order, quantity);
+  gateway.behaviour.refundBalanceFen = 1;
+  expect((await service.executeRefund(racer(), id)).status).toBe('failed');
+  gateway.behaviour.refundBalanceFen = null;
+  return id;
+}
+
+describe('REFUND-015 — the units a request holds follow its status', () => {
+  it('REFUND-015 — a shopper withdrawing an approved 仅退款 hands its units back to the warehouse', async () => {
+    const order = await paidOrder();
+    const id = await approvedRefund(order, 2);
+    expect((await lineUnits(order)).refunded).toBe(2);
+
+    await service.cancel(racer(userActor(order.userId)), { id: String(id) });
+
+    expect((await refundRow(id)).status).toBe('cancelled');
+    expect((await lineUnits(order)).refunded).toBe(0);
+    expect((await orderRow(order.orderId)).refundStatus).toBe('none');
+  });
+});
+
+describe('REFUND-017 — a refused refund is still in flight', () => {
+  it('REFUND-017 — keeps its lines and units, so the same units cannot be asked for twice', async () => {
+    const order = await paidOrder();
+    const id = await failedRefund(order, 2);
+
+    expect((await lineUnits(order)).refunded).toBe(2);
+    await expect(
+      service.apply(racer(userActor(order.userId)), applyBody(order, 1)),
+    ).rejects.toMatchObject({ code: 'REFUND_LINE_INVALID' });
+    // Still in 进行中, and not something the shopper can delete.
+    const open = await service.myList(racer(userActor(order.userId)), {
+      state: 'open',
+      page: 1,
+      pageSize: 20,
+    });
+    expect(open.items.map((item) => item.id)).toEqual([String(id)]);
+    await expect(
+      service.hide(racer(userActor(order.userId)), { id: String(id) }),
+    ).rejects.toMatchObject({ code: 'REFUND_NOT_ACTIONABLE' });
+  });
+
+  it('REFUND-017 — 复核 pays it under the same number', async () => {
+    const order = await paidOrder();
+    const id = await failedRefund(order);
+    const { outRefundNo } = await refundRow(id);
+
+    gateway.behaviour.refundStatus = 'SUCCESS';
+    await admin.adminRetry(racer(adminActor(order.adminId)), { id: String(id) });
+
+    const row = await refundRow(id);
+    expect(row.status).toBe('succeeded');
+    expect(row.outRefundNo).toBe(outRefundNo);
+    expect((await lineUnits(order)).refunded).toBe(1);
+  });
+
+  it('REFUND-017 — the shopper may withdraw it, and the merchant may close it', async () => {
+    const order = await paidOrder();
+    const withdrawn = await failedRefund(order);
+    await service.cancel(racer(userActor(order.userId)), { id: String(withdrawn) });
+    expect((await lineUnits(order)).refunded).toBe(0);
+
+    const closed = await failedRefund(order);
+    await admin.adminReject(racer(adminActor(order.adminId)), {
+      id: String(closed),
+      rejectReason: '已线下退款',
+    });
+    expect((await refundRow(closed)).status).toBe('rejected');
+    expect((await lineUnits(order)).refunded).toBe(0);
+    // Closed, the lines are free for a new request.
+    await expect(
+      service.apply(racer(userActor(order.userId)), applyBody(order, 1)),
+    ).resolves.toMatchObject({ status: 'applied' });
+  });
+
+  it('REFUND-015 — 复核 refuses a refund whose units shipped since it failed', async () => {
+    const order = await paidOrder();
+    const id = await failedRefund(order, 2);
+    // A request that failed before failed ones kept their units: the units
+    // went back to the warehouse, and the warehouse shipped them.
+    await harness.ctx.db
+      .update(orderItems)
+      .set({ refundedQuantity: 0, shippedQuantity: 2 })
+      .where(eq(orderItems.id, order.itemIds[0]!));
+
+    gateway.behaviour.refundStatus = 'SUCCESS';
+    await expect(
+      admin.adminRetry(racer(adminActor(order.adminId)), { id: String(id) }),
+    ).rejects.toMatchObject({ code: 'REFUND_LINE_ALREADY_SHIPPED' });
+    expect((await refundRow(id)).status).toBe('failed');
+    expect(gateway.refunds.size).toBe(0);
+    expect(await lineUnits(order)).toEqual({ refunded: 0, shipped: 2 });
+  });
+});
+
+describe('REFUND-019 — the shopper reads fixed lines, never what the gateway said', () => {
+  it('REFUND-019 — shows a refused refund as 退款未完成 and keeps the gateway text for staff', async () => {
+    const order = await paidOrder();
+    const id = await failedRefund(order);
+    const row = await refundRow(id);
+    expect(row.lastError).not.toBeNull();
+
+    const seen = await service.myDetail(racer(userActor(order.userId)), { id: String(id) });
+    expect(seen.logs.at(-1)?.message).toBe('退款未完成，商家处理中');
+    for (const log of seen.logs) {
+      expect(log.message ?? '').not.toContain(row.lastError!);
+      expect(log.message ?? '').not.toContain(gateway.keys.mchId);
+    }
+
+    const staff = await admin.adminDetail(racer(adminActor(order.adminId)), { id: String(id) });
+    expect(staff.lastError).toBe(row.lastError);
+  });
+});
+
+describe('REFUND-020 — a full refund takes back the gift coupons the order earned', () => {
+  it('REFUND-020 — revokes the unused gifts and returns them to the supply, leaving other coupons alone', async () => {
+    const order = await paidOrder();
+    const db = harness.ctx.db;
+    const [template] = await db
+      .insert(couponTemplates)
+      .values({
+        name: '下单赠券',
+        status: 'active',
+        claimMode: 'manual',
+        discountAmount: '10.00',
+        minSpend: '0.00',
+        validityMode: 'days_after_claim',
+        validDays: 30,
+        isUnlimitedSupply: false,
+        totalCount: 5,
+        remainingCount: 3,
+        perUserLimit: null,
+      })
+      .returning({ id: couponTemplates.id });
+    const wallet = (claimSlot: number, gift: boolean) => ({
+      templateId: template!.id,
+      userId: order.userId,
+      claimSlot,
+      sourceKind: gift ? ('gift_order' as const) : ('claim' as const),
+      ...(gift ? { sourceOrderId: order.orderId } : {}),
+      title: '下单赠券',
+      discountAmount: '10.00',
+      minSpend: '0.00',
+      status: 'unused' as const,
+      validFrom: new Date('2026-01-01T00:00:00.000Z'),
+      validTo: new Date('2026-12-31T00:00:00.000Z'),
+    });
+    const [gift] = await db
+      .insert(userCoupons)
+      .values(wallet(1, true))
+      .returning({ id: userCoupons.id });
+    const [claimed] = await db
+      .insert(userCoupons)
+      .values(wallet(2, false))
+      .returning({ id: userCoupons.id });
+
+    const id = await approvedRefund(order, 2);
+    gateway.behaviour.refundStatus = 'SUCCESS';
+    await service.executeRefund(racer(), id);
+    expect((await orderRow(order.orderId)).refundStatus).toBe('refunded');
+
+    const status = async (couponId: number) =>
+      (await db.select().from(userCoupons).where(eq(userCoupons.id, couponId)))[0]!.status;
+    expect(await status(gift!.id)).toBe('revoked');
+    expect(await status(claimed!.id)).toBe('unused');
+    const [after] = await db
+      .select()
+      .from(couponTemplates)
+      .where(eq(couponTemplates.id, template!.id));
+    expect(after!.remainingCount).toBe(4);
+  });
+
+  it('REFUND-020 — a partial refund leaves the gifts where they are', async () => {
+    const order = await paidOrder();
+    const db = harness.ctx.db;
+    const [template] = await db
+      .insert(couponTemplates)
+      .values({
+        name: '下单赠券',
+        status: 'active',
+        claimMode: 'manual',
+        discountAmount: '10.00',
+        minSpend: '0.00',
+        validityMode: 'days_after_claim',
+        validDays: 30,
+        isUnlimitedSupply: true,
+        perUserLimit: null,
+      })
+      .returning({ id: couponTemplates.id });
+    const [gift] = await db
+      .insert(userCoupons)
+      .values({
+        templateId: template!.id,
+        userId: order.userId,
+        claimSlot: 1,
+        sourceKind: 'gift_order',
+        sourceOrderId: order.orderId,
+        title: '下单赠券',
+        discountAmount: '10.00',
+        minSpend: '0.00',
+        status: 'unused',
+        validFrom: new Date('2026-01-01T00:00:00.000Z'),
+        validTo: new Date('2026-12-31T00:00:00.000Z'),
+      })
+      .returning({ id: userCoupons.id });
+
+    const id = await approvedRefund(order, 1);
+    gateway.behaviour.refundStatus = 'SUCCESS';
+    await service.executeRefund(racer(), id);
+    expect((await orderRow(order.orderId)).refundStatus).toBe('partially_refunded');
+
+    const [row] = await db.select().from(userCoupons).where(eq(userCoupons.id, gift!.id));
+    expect(row!.status).toBe('unused');
   });
 });
