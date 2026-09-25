@@ -36,7 +36,12 @@ export function ReviewItem({ review, clamp = false }: { review: Review; clamp?: 
     <View className="shop-review">
       <View className="shop-review__head">
         <View className="shop-review__avatar">
-          <Image src={assetUrl(review.authorAvatarUrl)} radius="none" size="small" />
+          <Image
+            src={assetUrl(review.authorAvatarUrl)}
+            radius="none"
+            size="small"
+            placeholder="user"
+          />
         </View>
         <View className="shop-review__who">
           <Text className="shop-review__name">{review.authorNickname || '匿名用户'}</Text>

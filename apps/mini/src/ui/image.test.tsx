@@ -30,6 +30,11 @@ describe('Image', () => {
     expect(container.querySelector('.shop-image__fallback')).toBeTruthy();
     rerender(<Image src={null} />);
     expect(container.querySelector('.shop-image__fallback')).toBeTruthy();
+    // A plain picture, not 「添加图片」: there is nothing to add here.
+    expect(container.querySelector('.shop-icon--image')).toBeTruthy();
+    expect(container.querySelector('.shop-icon--image-plus')).toBeNull();
+    rerender(<Image src={null} placeholder="user" />);
+    expect(container.querySelector('.shop-icon--user')).toBeTruthy();
   });
 
   it('tries again when the source changes after a failure', () => {

@@ -44,6 +44,7 @@ export const ICON_NAMES = [
   'arrow-up',
   'gift',
   'order',
+  'image',
   'image-plus',
   'list',
   'grid',

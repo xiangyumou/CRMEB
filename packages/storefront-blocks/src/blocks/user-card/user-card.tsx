@@ -53,7 +53,18 @@ export function UserCard({
         />
       ) : null}
       <View className={styles.identity} {...tapProps(tapIdentity || undefined)}>
-        <Image className={styles.avatar} src={user?.avatarUrl || ICONS.avatar} mode="aspectFill" />
+        {user?.avatarUrl ? (
+          // A stored `/uploads/…` avatar loads only through the host (the shop's origin).
+          <BlockImage
+            className={styles.avatar}
+            src={user.avatarUrl}
+            width={480}
+            resolve={host?.resolveImage}
+            mode="aspectFill"
+          />
+        ) : (
+          <Image className={styles.avatar} src={ICONS.avatar} mode="aspectFill" />
+        )}
         <View className={styles.names}>
           <Text className={styles.name}>{user ? user.nickname || '微信用户' : '登录 / 注册'}</Text>
           {user ? null : <Text className={styles.hint}>登录后查看订单和优惠券</Text>}

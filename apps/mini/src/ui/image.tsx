@@ -23,11 +23,16 @@ export interface ImageProps {
    * `original` (default) where the picture is the point. A missing copy falls back to the original.
    */
   size?: ImageSize | undefined;
+  /**
+   * What stands in when there is no picture or it fails: a plain picture outline (default), or
+   * a person for an avatar. Never a 「添加图片」 sign: the shopper cannot add one here.
+   */
+  placeholder?: 'image' | 'user' | undefined;
   className?: string | undefined;
 }
 
 /**
- * A picture in a fixed-ratio box (design.md §4.1): grey while it loads, an icon if it fails.
+ * A picture in a fixed-ratio box (design.md §4.1): grey while it loads, a neutral icon if it fails.
  * The box is sized by CSS, not by the image, so a list does not jump as pictures arrive. Its
  * height is a padding share of the *parent's* width: give a fixed-width picture a wrapper of
  * that width rather than a width on the Image itself.
@@ -40,6 +45,7 @@ export function Image({
   radius = 'none',
   lazy = true,
   size = 'original',
+  placeholder = 'image',
   className,
 }: ImageProps) {
   const original = assetUrl(src ?? null);
@@ -68,7 +74,7 @@ export function Image({
     >
       {failed ? (
         <View className="shop-image__fallback">
-          <Icon name="image-plus" />
+          <Icon name={placeholder} />
         </View>
       ) : (
         <TaroImage

@@ -47,6 +47,24 @@ describe('UserCard', () => {
     expect(onLink).toHaveBeenLastCalledWith(route('history'));
   });
 
+  it('loads a stored avatar through the host', () => {
+    const personal = {
+      kind: 'userSummary' as const,
+      user: { nickname: '小林', avatarUrl: '/uploads/avatar/1.png', stats: null },
+    };
+    const { container } = render(
+      <UserCard
+        props={fixtureUserCard}
+        personal={{ user: personal }}
+        host={{ resolveImage: (src) => `https://shop.example${src}` }}
+      />,
+    );
+    const srcs = Array.from(container.querySelectorAll('img')).map((img) =>
+      img.getAttribute('src'),
+    );
+    expect(srcs).toContain('https://shop.example/uploads/avatar/1.png');
+  });
+
   it('asks a guest to sign in, through the login intent, with no numbers', () => {
     const onIntent = vi.fn();
     const onLink = vi.fn();

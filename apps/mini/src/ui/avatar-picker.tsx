@@ -58,7 +58,7 @@ export function AvatarPicker({ src, onChange, size = 'lg' }: AvatarPickerProps) 
     >
       <View className="shop-avatar__frame">
         {(preview ?? src) ? (
-          <Image src={preview ?? src} radius="none" lazy={false} />
+          <Image src={preview ?? src} radius="none" lazy={false} placeholder="user" />
         ) : (
           <View className="shop-avatar__default">
             <Icon name="user" />
