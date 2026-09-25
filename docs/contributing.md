@@ -53,9 +53,9 @@ Depending on what the change touches, also run:
   covers them (above); `pnpm --filter @shop/mini build` on its own is the quick way to see the
   package sizes. Anything that changes what runs on a phone (the platform seam, a page's first
   render, the tab bar, sign-in, payment) also gets a pass in 微信开发者工具 and on a real device,
-  per [mini/device-check.md](mini/device-check.md); report what you could not check. A
-  mini-program release bumps `version` in `apps/mini/package.json` first: it is the
-  `X-Client-Version` every request sends and the upload version
+  per [mini/device-check.md](mini/device-check.md); report what you could not check. The
+  version in `apps/mini/package.json` is the `X-Client-Version` every request sends and the
+  upload version; it changes only when the shop owner names a new one
   ([device-check.md §9](mini/device-check.md#9-版本号)).
 - `deploy/**` or `docker/**`: shellcheck, as the `shell` job in `ci.yml` runs it, and the drill,
   `deploy/rehearsal/drill.sh` (it builds the three images; allow about half an hour). Commit first:

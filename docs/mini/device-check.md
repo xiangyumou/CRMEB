@@ -243,8 +243,9 @@ iPhone 和 Android 各过一遍。每项记「通过 / 失败 / 未测（原因�
 上传图片也一样）；`scripts/preview.mjs` 和 `scripts/upload.mjs` 也用它作为上传版本。服务端据此区分新旧客户端：装修块的
 `minClient` 高于这个版本时，这个客户端就不会收到那一块。
 
-- **每次发版前先改版本号**，和要提交审核的版本一致：修复 `1.0.1`，新功能 `1.1.0`，与旧客户端不兼容的
-  改动 `2.0.0`。改完照常构建（`pnpm --filter @shop/mini build` 或 `device-build.mjs`），提交这次改动。
+- **版本号由店主在公众平台决定，上传时不自己改。** 体验版一律按 `package.json` 现有的版本（目前
+  `1.0.0`）上传；只有店主给出新的版本号时，才改 `package.json` 的 `version`，然后照常构建
+  （`pnpm --filter @shop/mini build` 或 `device-build.mjs`）并提交这次改动。
 - CI 或临时构建可以用环境变量 `TARO_APP_VERSION=1.2.0-rc.1` 覆盖，不改文件；`turbo` 的 `build`
   已声明这个变量。
 - 格式必须符合服务端的 `clientVersion`（`1`–`3` 段数字，可带 `-后缀`，最长 32 个字符），否则构建直接失败
