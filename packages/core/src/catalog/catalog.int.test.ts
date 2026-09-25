@@ -1045,6 +1045,27 @@ describe('favourites', () => {
     expect((await storefront.favoriteList(ctx, { page: 1, pageSize: 20 })).total).toBe(0);
   });
 
+  it('keeps a favourite taken off the shelf on the list, sold out and removable, as counted', async () => {
+    const kept = await makeProduct(asAdmin());
+    const gone = await makeProduct(asAdmin());
+    const ctx = asUser(await makeUser(harness));
+    await storefront.favoriteAdd(ctx, { productId: kept.id });
+    harness.clock.set('2026-06-01T01:00:00.000Z');
+    await storefront.favoriteAdd(ctx, { productId: gone.id });
+    await service.adminProductSetStatus(asAdmin(), { id: gone.id }, { status: 'off_shelf' });
+
+    // Newest first: the off-shelf one is page 1 on its own, not an empty page.
+    const first = await storefront.favoriteList(ctx, { page: 1, pageSize: 1 });
+    expect(first.total).toBe(2);
+    expect(first.items.map((i) => i.product.id)).toEqual([gone.id]);
+    expect(first.items[0]?.product).toMatchObject({ stock: 0, canAddToCart: false });
+
+    await storefront.favoriteRemoveBatch(ctx, { productIds: [gone.id] });
+    const after = await storefront.favoriteList(ctx, { page: 1, pageSize: 20 });
+    expect(after.total).toBe(1);
+    expect(after.items.map((i) => i.product.id)).toEqual([kept.id]);
+  });
+
   it('refuses to favourite something that is not on sale', async () => {
     const product = await makeProduct(asAdmin(), { status: 'off_shelf' });
     const ctx = asUser(await makeUser(harness));
@@ -1070,6 +1091,19 @@ describe('browse history', () => {
     const history = await storefront.historyList(ctx, { page: 1, pageSize: 20 });
     expect(history.total).toBe(2);
     expect(history.items.map((i) => i.product.id)).toEqual([first.id, second.id]);
+  });
+
+  it('lists a viewed product taken off the shelf as sold out, so it can be removed', async () => {
+    const product = await makeProduct(asAdmin());
+    const ctx = asUser(await makeUser(harness));
+    await storefront.productDetail(ctx, { id: product.id });
+    await service.adminProductSetStatus(asAdmin(), { id: product.id }, { status: 'off_shelf' });
+
+    const history = await storefront.historyList(ctx, { page: 1, pageSize: 20 });
+    expect(history.total).toBe(1);
+    expect(history.items[0]?.product).toMatchObject({ id: product.id, stock: 0 });
+    await storefront.historyRemove(ctx, { productIds: [product.id] });
+    expect((await storefront.historyList(ctx, { page: 1, pageSize: 20 })).total).toBe(0);
   });
 
   it('prunes what falls outside the retention window', async () => {

@@ -310,33 +310,45 @@ export async function clearSearchHistory(ctx: Ctx): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * A product the shopper favourited but which has since been taken off the
- * shelf simply disappears from the list, and `total` counts the rows. The two
- * can therefore disagree, and that is the right trade: the alternative is a
- * join that makes the count query as expensive as the page, for a list nobody
- * paginates deeply.
+ * The cards of the products a shopper favourited or viewed, **whether or not
+ * they are still for sale**. Dropping the off-shelf ones left `total` (and
+ * 我的's count) counting rows nobody could see, opened a list on an empty page
+ * (「还没有收藏」 over a full list) and gave the shopper no way to remove them.
+ * One no longer for sale is drawn sold out — no stock, no 加入购物车 — and its
+ * product page says 已下架.
  */
+async function listedCards(
+  db: Ctx['db'],
+  productIds: readonly number[],
+): Promise<Map<number, ProductCard>> {
+  const products = await repo.productsByIds(db, productIds);
+  const labels = await repo.labelsFor(db, [...products.keys()]);
+  const cards = new Map<number, ProductCard>();
+  for (const product of products.values()) {
+    const card = toProductCard(product, labels.get(product.id) ?? []);
+    const forSale = product.status === 'on_shelf' && product.deletedAt === null;
+    cards.set(product.id, forSale ? card : { ...card, stock: 0, canAddToCart: false });
+  }
+  return cards;
+}
+
+/** 我的收藏, newest first; every row counted in `total` is on its page (see `listedCards`). */
 export async function favoriteList(
   ctx: Ctx,
   query: PageQuery,
 ): Promise<{ items: FavoriteItem[]; total: number; page: number; pageSize: number }> {
   const userId = requireUserId(ctx);
   const { rows, total } = await repo.listFavorites(ctx.db, { userId, ...pageBounds(query) });
-
-  const products = await repo.findSellableProducts(
+  const cards = await listedCards(
     ctx.db,
     rows.map((r) => r.productId),
   );
-  const labels = await repo.labelsFor(ctx.db, [...products.keys()]);
 
   const items: FavoriteItem[] = [];
   for (const row of rows) {
-    const product = products.get(row.productId);
+    const product = cards.get(row.productId);
     if (!product) continue;
-    items.push({
-      product: toProductCard(product, labels.get(product.id) ?? []),
-      createdAt: row.createdAt.toISOString(),
-    });
+    items.push({ product, createdAt: row.createdAt.toISOString() });
   }
   return { items, total, page: query.page, pageSize: query.pageSize };
 }
@@ -465,20 +477,16 @@ export async function historyList(
     ...pageBounds(query),
   });
 
-  const products = await repo.findSellableProducts(
+  const cards = await listedCards(
     ctx.db,
     rows.map((r) => r.productId),
   );
-  const labels = await repo.labelsFor(ctx.db, [...products.keys()]);
 
   const items: HistoryItem[] = [];
   for (const row of rows) {
-    const product = products.get(row.productId);
+    const product = cards.get(row.productId);
     if (!product) continue;
-    items.push({
-      product: toProductCard(product, labels.get(product.id) ?? []),
-      viewedAt: row.viewedAt.toISOString(),
-    });
+    items.push({ product, viewedAt: row.viewedAt.toISOString() });
   }
   return { items, total, page: query.page, pageSize: query.pageSize };
 }
