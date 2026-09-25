@@ -1,6 +1,8 @@
-import { oauth } from '@shop/core/auth';
+import { randomUUID } from 'node:crypto';
+import { insertAudit, oauth } from '@shop/core/auth';
 import { ADMIN_COOKIE, checkCsrf, readCookie } from '../../../../src/server';
-import { getContainer } from '../../../../src/server/container';
+import { getContainer, type Container } from '../../../../src/server/container';
+import { clientIp } from '../../../../src/server/request-meta';
 import { asAuthorizeRequest, authorizeParams, errorRedirect } from '../params';
 
 /**
@@ -18,6 +20,42 @@ function refuse(message: string, status = 400): Response {
     status,
     headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' },
   });
+}
+
+/**
+ * 「允许」 hands an outside client a token that acts as this admin, so the
+ * answer goes to 操作日志 like any other console write — allow and deny both,
+ * with the client's name and where the code was sent. This route is not behind
+ * `handle()`, which is what writes that log for everything else.
+ */
+async function auditDecision(
+  container: Container,
+  request: Request,
+  session: { adminId: number; account: string },
+  entry: { clientId: string; clientName: string; redirectUri: string; allowed: boolean },
+): Promise<void> {
+  try {
+    await insertAudit(container.db, {
+      adminId: session.adminId,
+      adminAccount: session.account,
+      routeId: 'oauth.authorizeDecision',
+      method: 'POST',
+      path: new URL(request.url).pathname,
+      target: `oauth-client:${entry.clientId}`.slice(0, 128),
+      status: 303,
+      payload: {
+        decision: entry.allowed ? 'allow' : 'deny',
+        clientName: entry.clientName,
+        redirectUri: entry.redirectUri,
+      },
+      requestId: request.headers.get('x-request-id') ?? randomUUID(),
+      ip: clientIp(request),
+      now: container.clock.now(),
+    });
+  } catch (error) {
+    // As in handle(): a failed log line never turns the answer into a 500.
+    container.logger.error({ err: error }, 'oauth: failed to write the audit log');
+  }
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -40,7 +78,14 @@ export async function POST(request: Request): Promise<Response> {
   const session = await container.adminAuth.peek(readCookie(request, ADMIN_COOKIE) ?? '');
   if (!session) return refuse('登录已过期，请返回重新授权', 401);
 
-  if (form.get('decision') !== 'allow') {
+  const allowed = form.get('decision') === 'allow';
+  await auditDecision(container, request, session, {
+    clientId: params.client_id,
+    clientName: checked.clientName,
+    redirectUri: params.redirect_uri,
+    allowed,
+  });
+  if (!allowed) {
     return seeOther(errorRedirect(params, 'access_denied', '管理员拒绝了授权'));
   }
 

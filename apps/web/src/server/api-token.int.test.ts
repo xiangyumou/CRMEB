@@ -493,6 +493,26 @@ describe('the OAuth flow an MCP client walks', () => {
     expect(redirect.searchParams.get('code')).toBeNull();
   });
 
+  it('AUTH-014 — writes allow and deny to 操作日志, naming the client and where the code went', async () => {
+    await seedAdmin();
+    const clientId = await register();
+    await authorize(clientId, pkce().challenge, 'allow');
+    await authorize(clientId, pkce().challenge, 'deny');
+
+    const rows = (await harness.ctx.db.select().from(auditLogs))
+      .filter((row) => row.routeId === 'oauth.authorizeDecision')
+      .sort((a, b) => a.id - b.id);
+    expect(rows.map((row) => JSON.parse(row.payload ?? '{}').decision)).toEqual(['allow', 'deny']);
+    for (const row of rows) {
+      expect(row.target).toBe(`oauth-client:${clientId}`);
+      expect(row.adminId).not.toBeNull();
+      expect(JSON.parse(row.payload ?? '{}')).toMatchObject({
+        clientName: 'Test Client',
+        redirectUri: REDIRECT,
+      });
+    }
+  });
+
   it('refuses to register a client that would redirect somewhere unsafe', async () => {
     const { POST } = await import('../../app/oauth/register/route');
     const response = await POST(

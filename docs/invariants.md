@@ -843,6 +843,12 @@ Every export an admin takes — orders, products, 交易统计, 商品统计 —
 
 - `apps/web/src/server/handle.test.ts::audit log > AUTH-013: records a GET the handler named with ctx.audit (an export), with its filters`
 
+### AUTH-014
+
+An admin's answer on the OAuth consent screen — allow or deny — writes an operation-log row naming the admin, the client, and the address the code was sent to. That route is outside `handle()`, so it writes the row itself.
+
+- `apps/web/src/server/api-token.int.test.ts::the OAuth flow an MCP client walks > AUTH-014 — writes allow and deny to 操作日志, naming the client and where the code went`
+
 ## Fulfilment, the order console and invoices
 
 ### FULFILL-001
