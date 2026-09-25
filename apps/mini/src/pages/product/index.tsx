@@ -269,7 +269,7 @@ function Detail({ product }: { product: Product }) {
               label={`${activity.kind === 'groupbuy' ? '拼团' : '预售'} ¥${activity.price}，${activity.note}`}
               className="product__activity"
               onClick={() =>
-                void navigate({ route: activity.kind, params: { id: activity.activityId } })
+                navigate({ route: activity.kind, params: { id: activity.activityId } })
               }
             >
               <Text className="product__activity-kind">

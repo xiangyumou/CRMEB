@@ -101,10 +101,7 @@ export default function ProductList() {
         <SearchBar
           placeholder={keyword || '搜索商品'}
           onOpen={() =>
-            void navigate(
-              { route: 'search', params: keyword ? { keyword } : {} },
-              { replace: true },
-            )
+            navigate({ route: 'search', params: keyword ? { keyword } : {} }, { replace: true })
           }
         />
         <View className="goods-list__sorts" ariaRole="toolbar" ariaLabel="排序和筛选">

@@ -154,9 +154,7 @@ function OrderBody({ id }: { id: string }) {
             <Cell
               title="发票"
               value="申请开票"
-              onClick={() =>
-                void navigate({ route: 'invoiceApply', params: { orderId: order.id } })
-              }
+              onClick={() => navigate({ route: 'invoiceApply', params: { orderId: order.id } })}
             />
           </CellGroup>
         ) : null}

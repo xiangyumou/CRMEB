@@ -160,9 +160,7 @@ function Pane({ top, showSub }: { top: TopCategory; showSub: boolean }) {
               role="link"
               label={child.name}
               className="category__sub"
-              onClick={() =>
-                void navigate({ route: 'productList', params: { categoryId: child.id } })
-              }
+              onClick={() => navigate({ route: 'productList', params: { categoryId: child.id } })}
             >
               <View className="category__sub-icon">
                 <Image src={assetUrl(child.iconUrl)} radius="sm" />

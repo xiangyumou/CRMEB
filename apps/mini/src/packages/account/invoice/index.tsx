@@ -147,7 +147,7 @@ function Invoice({ id }: { id: string }) {
             // In place of this 发票详情: 申请开票 then puts the new request in its own place, so
             // going back does not land on the withdrawn or refused one.
             onClick={() =>
-              void navigate(
+              navigate(
                 { route: 'invoiceApply', params: { orderId: invoice.orderId } },
                 { replace: true },
               )

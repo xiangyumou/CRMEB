@@ -149,7 +149,7 @@ function PaymentStatus({ orderId, outTradeNo }: { orderId: string; outTradeNo: s
             {id ? (
               <Button
                 onClick={() =>
-                  void navigate({ route: 'cashier', params: { orderId: id } }, { replace: true })
+                  navigate({ route: 'cashier', params: { orderId: id } }, { replace: true })
                 }
               >
                 重新支付

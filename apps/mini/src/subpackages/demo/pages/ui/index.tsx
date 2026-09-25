@@ -424,7 +424,7 @@ function FeedbackTab() {
               size="sm"
               variant="outline"
               onClick={() =>
-                void confirm({
+                confirm({
                   title: '删除订单',
                   content: '删除后将无法恢复',
                   confirmText: '删除',

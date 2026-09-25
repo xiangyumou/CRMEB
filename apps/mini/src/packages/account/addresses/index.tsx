@@ -145,9 +145,7 @@ function AddressBook() {
                   variant="text"
                   size="sm"
                   label={`编辑 ${address.receiverName} 的地址`}
-                  onClick={() =>
-                    void navigate({ route: 'addressEdit', params: { id: address.id } })
-                  }
+                  onClick={() => navigate({ route: 'addressEdit', params: { id: address.id } })}
                 >
                   编辑
                 </Button>
