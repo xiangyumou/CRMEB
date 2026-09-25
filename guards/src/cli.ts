@@ -13,9 +13,11 @@ import { adminClient } from './checks/admin-client';
 import { apiCompat } from './checks/api-compat';
 import { bannedConstructs } from './checks/banned';
 import { contractsAndRoutes } from './checks/contracts';
+import { counters } from './checks/counters';
 import { domains } from './checks/domains';
 import { fixtures } from './checks/fixtures';
 import { invariants } from './checks/invariants';
+import { literals } from './checks/literals';
 import { migrations } from './checks/migrations';
 import { miniCheck } from './checks/mini';
 import { miniStyles } from './checks/mini-styles';
@@ -40,6 +42,8 @@ const CHECKS: readonly Check[] = [
   bannedConstructs,
   secretsNeverLeak,
   txPool,
+  counters,
+  literals,
   migrations,
   pipeline,
   apiCompat,

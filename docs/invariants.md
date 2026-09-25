@@ -1995,6 +1995,35 @@ A foreign-key violation that no service turned into its own code answers 409, ne
 - `apps/web/src/server/handle.test.ts::error mapping > ROUTE-002 — a foreign-key violation on delete is a 409 REFERENCE_IN_USE that names no constraint`
 - `apps/web/src/server/handle.test.ts::error mapping > ROUTE-002 — a write pointing at a row that is gone is a 409 REFERENCE_MISSING`
 
+## Mechanical checks of the recurring bugs
+
+The AGENTS.md rules a guard can read off the source. Each guard fails `pnpm guards` in the merge gate; its allow-list is exactly compared.
+
+### GUARD-001
+
+A counter column (stock, sales, quota, refunded and shipped quantities, seats, scans) is never written back as a number read earlier: every `.set({…})` assigns it a `sql` expression, a literal reset, or sits in a compare-and-set whose `where` reads the same column; anything else carries an allow-list reason (AGENTS rule 6).
+
+- `guards/src/checks/counters.test.ts::findCounterWrites > GUARD-001 — finds a stock written back from a value read earlier`
+- `guards/src/checks/counters.test.ts::findCounterWrites > GUARD-001 — finds the shorthand and the onConflictDoUpdate form`
+- `guards/src/checks/counters.test.ts::counters over the tree > GUARD-001 — every counter write in the server is sql, compare-and-set or excused`
+
+### GUARD-002
+
+Every `pageSize` literal an API client sends (admin, mini-program, shared packages, CLI, agent ops, e2e helpers) is within the cap the contracts' `pageQuery` accepts, read from the schema (AGENTS rule 4).
+
+- `guards/src/checks/literals.test.ts::pageSize literals > GUARD-002 — reads the cap from the contract schema, not a guess`
+- `guards/src/checks/literals.test.ts::pageSize literals > GUARD-002 — finds object, JSX and constant forms`
+- `guards/src/checks/literals.test.ts::literals over the tree > GUARD-002 GUARD-003 — the tree sends only accepted page sizes and cuts no UTC dates`
+
+### GUARD-003
+
+No date is cut out of a UTC instant — `toISOString().slice/split` unless shifted to Shanghai first, or an instant field's ISO text sliced — and UI code calls `toISOString()` only in files that put it on the wire (AGENTS rule 2).
+
+- `guards/src/checks/literals.test.ts::instants cut as dates > GUARD-003 — finds a UTC date cut out of toISOString()`
+- `guards/src/checks/literals.test.ts::instants cut as dates > GUARD-003 — passes a cut from an instant shifted to Shanghai first`
+- `guards/src/checks/literals.test.ts::instants cut as dates > GUARD-003 — finds an instant field sliced as text`
+- `guards/src/checks/literals.test.ts::instants cut as dates > GUARD-003 — in UI code, reports every bare toISOString()`
+
 ## Storefront share codes (小程序码)
 
 ### SHARE-001
