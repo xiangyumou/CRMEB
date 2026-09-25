@@ -2,10 +2,10 @@ import { useRef, useState } from 'react';
 import { Button as TaroButton, Swiper, SwiperItem, Text, View } from '@tarojs/components';
 import { isApiError, type ResponseOf } from '@shop/api-client';
 import { useRouteMutation, useRouteQuery } from '@shop/api-client/react';
-import { RichText as RichTextBlock, type RichTextProps } from '@shop/storefront-blocks';
 import { useDisplay } from '@/app-config';
 import { useCartCount } from '@/data/cart';
 import { useRecordVisit } from '@/data/visits';
+import { RichContent } from '@/features/content/rich-content';
 import { useCheckoutDraft } from '@/features/checkout/draft';
 import { useProductActivities } from '@/features/product/activities';
 import { ProductCoupons } from '@/features/product/product-coupons';
@@ -45,12 +45,6 @@ import { strikePrice } from '@/lib/money';
 type Product = ResponseOf<'catalog.productDetail'>;
 
 /** The description through the 富文本 block: the same allow-list, parser and look as DIY. */
-const descriptionProps = (html: string): RichTextProps => ({
-  html,
-  style: { marginY: 'none', paddingX: 'none', radius: 'none' },
-  visibility: { audience: 'all', platforms: [] },
-});
-
 /**
  * 商品详情 (`product { id }`, pages.md §2.1): a fixed design (no longer decorated). Gallery,
  * price and sales, 拼团 / 预售 entry bars, 领券, 已选 (the SkuSheet), 服务 and 参数, the review
@@ -326,7 +320,7 @@ function Detail({ product }: { product: Product }) {
 
       <Card title="商品详情" className="product__description" id="product-description">
         {product.descriptionHtml.trim() ? (
-          <RichTextBlock props={descriptionProps(product.descriptionHtml)} />
+          <RichContent html={product.descriptionHtml} />
         ) : (
           <Text className="product__muted">暂无图文详情</Text>
         )}

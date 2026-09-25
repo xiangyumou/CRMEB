@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import type { RichTextProps as RichTextBlockProps } from '@shop/contracts/decor/all-blocks';
 import { parseRichText, type RichTextNode } from '@shop/contracts/decor/rich-text';
 import { BlockFrame } from '../shared/frame';
-import type { BlockProps } from '../shared/types';
+import type { BlockProps, ImageResolver } from '../shared/types';
 import styles from './rich-text.module.scss';
 
 /**
@@ -34,19 +34,43 @@ const BASE_STYLE: Readonly<Record<string, string>> = {
   img: 'margin:0 0 0.6em;',
 };
 
-function styled(nodes: readonly RichTextNode[]): RichTextNode[] {
+/**
+ * Styles each node, and loads each picture through the host's resolver: the admin editor
+ * stores a site-relative `/uploads/…` path, which loads nothing in the mini-program until it
+ * is put against the shop's origin. The original, never a smaller copy: `<rich-text>` has no
+ * fallback when a copy is missing.
+ */
+function styled(nodes: readonly RichTextNode[], resolve?: ImageResolver): RichTextNode[] {
   return nodes.map((node) => {
     if ('type' in node) return node;
     const base = BASE_STYLE[node.name] ?? '';
     const own = node.attrs?.style ?? '';
     const attrs = { ...node.attrs };
     if (base || own) attrs.style = base + own;
+    if (node.name === 'img' && attrs.src && resolve) attrs.src = resolve(attrs.src);
     return {
       name: node.name,
       attrs,
-      ...(node.children ? { children: styled(node.children) } : {}),
+      ...(node.children ? { children: styled(node.children, resolve) } : {}),
     };
   });
+}
+
+/** A paragraph with nothing to read in it: blank text, `<br>`, or empty paragraphs. */
+function blank(node: RichTextNode): boolean {
+  if ('type' in node) return node.text.replace(/&nbsp;|\s/g, '') === '';
+  if (node.name === 'br') return true;
+  if (node.name !== 'p' && node.name !== 'div') return false;
+  return (node.children ?? []).every(blank);
+}
+
+/** Without the empty paragraphs an editor leaves at the start and the end (blank space). */
+function trimBlank(nodes: readonly RichTextNode[]): RichTextNode[] {
+  let start = 0;
+  let end = nodes.length;
+  while (start < end && blank(nodes[start] as RichTextNode)) start += 1;
+  while (end > start && blank(nodes[end - 1] as RichTextNode)) end -= 1;
+  return nodes.slice(start, end);
 }
 
 /**
@@ -55,8 +79,12 @@ function styled(nodes: readonly RichTextNode[]): RichTextNode[] {
  * a third time and yields the node list `<rich-text>` draws — no HTML string
  * ever reaches the renderer.
  */
-export function RichText({ props }: BlockProps<RichTextBlockProps>) {
-  const nodes = useMemo(() => styled(parseRichText(props.html)), [props.html]);
+export function RichText({ props, host }: BlockProps<RichTextBlockProps>) {
+  const resolve = host?.resolveImage;
+  const nodes = useMemo(
+    () => styled(trimBlank(parseRichText(props.html)), resolve),
+    [props.html, resolve],
+  );
   return (
     <BlockFrame type="richText" frame={props.style} className={styles.body}>
       <NativeRichText className={styles.content} nodes={nodes} />

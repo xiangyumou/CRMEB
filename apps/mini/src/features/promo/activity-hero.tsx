@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Swiper, SwiperItem, Text, View } from '@tarojs/components';
-import { RichText as RichTextBlock, type RichTextProps } from '@shop/storefront-blocks';
+import { RichContent } from '@/features/content/rich-content';
 import { assetUrl } from '@/lib/asset-url';
 import { strikePrice } from '@/lib/money';
 import { previewImages } from '@/platform';
@@ -123,18 +123,12 @@ export function ActivityHero({
   );
 }
 
-const descriptionProps = (html: string): RichTextProps => ({
-  html,
-  style: { marginY: 'none', paddingX: 'none', radius: 'none' },
-  visibility: { audience: 'all', platforms: [] },
-});
-
 /** 商品详情 under an activity: the description through the 富文本 block, as on 商品详情. */
 export function ActivityDescription({ html }: { html: string | null }) {
   return (
     <Card title="商品详情" className="activity-hero__description" id="activity-description">
       {html?.trim() ? (
-        <RichTextBlock props={descriptionProps(html)} />
+        <RichContent html={html} />
       ) : (
         <Text className="activity-hero__muted">暂无图文详情</Text>
       )}

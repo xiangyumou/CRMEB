@@ -216,6 +216,27 @@ describe('RichText', () => {
     expect(p.style.color).toMatch(/#e1251b|rgb\(225, 37, 27\)/);
     expect(root.textContent).toBe('oklink');
   });
+
+  it('loads a site-relative picture through the host, and drops blank paragraphs at the ends', () => {
+    const { container } = render(
+      <RichText
+        props={{
+          ...fixtureRichText,
+          html:
+            '<p></p><p>&nbsp;<br></p><p>正文</p><p><img src="/uploads/a/1.jpg"></p>' +
+            '<p></p><p>结尾</p><p><br></p><p> </p>',
+        }}
+        host={{ resolveImage: (src) => `https://shop.example${src}` }}
+      />,
+    );
+    const root = container.querySelector('.sbd-rich-text') as HTMLElement;
+    expect(root.querySelector('img')?.getAttribute('src')).toBe(
+      'https://shop.example/uploads/a/1.jpg',
+    );
+    const paragraphs = Array.from(root.querySelectorAll('p'));
+    // The blank one between 图 and 结尾 is the operator's spacing and stays.
+    expect(paragraphs.map((p) => p.textContent)).toEqual(['正文', '', '', '结尾']);
+  });
 });
 
 describe('ProductGrid layouts', () => {
