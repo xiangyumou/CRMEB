@@ -105,8 +105,10 @@ function Detail({ activity, onStale }: { activity: Activity; onStale: () => void
   const phase = activityPhase(activity, serverNow());
   const deadline = activityDeadline(activity, phase);
   const myTeam = activity.myOpenGroupId;
+  // The shopper's open team may be one they joined, not one they started (L8).
+  const joined = activity.myOpenGroupRole === 'member';
   const openTeam = (groupId: string) =>
-    void navigate({ route: 'groupbuyTeam', params: { id: groupId } });
+    navigate({ route: 'groupbuyTeam', params: { id: groupId } });
 
   const start = async () => {
     if (!(await requireLogin(route))) return;
@@ -133,8 +135,8 @@ function Detail({ activity, onStale }: { activity: Activity; onStale: () => void
       {myTeam ? (
         <View className="groupbuy-detail__mine">
           <Cell
-            title="你发起的团正在拼"
-            label="查看我发起的团"
+            title={joined ? '你参加的团正在拼' : '你发起的团正在拼'}
+            label={joined ? '查看我参加的团' : '查看我发起的团'}
             value="查看进度"
             icon="group"
             onClick={() => openTeam(myTeam)}

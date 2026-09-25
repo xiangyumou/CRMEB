@@ -74,6 +74,10 @@ export const paidOrderFixture: ResponseOf<'order.detail'> = {
   paidAmount: '118.00',
   payExpiresAt: null,
   createdAt: '2026-09-20T10:00:00+08:00',
+  refundedAmount: '0.00',
+  groupbuyTeam: null,
+  invoiceRequestable: true,
+  invoiceAmount: '118.00',
   items: [
     {
       id: '8001',

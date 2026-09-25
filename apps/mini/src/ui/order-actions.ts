@@ -1,4 +1,8 @@
-import type { OrderListItem, StorefrontOrderItem } from '@shop/contracts/order/schemas';
+import type {
+  OrderGroupbuyTeam,
+  OrderListItem,
+  StorefrontOrderItem,
+} from '@shop/contracts/order/schemas';
 import type { ButtonVariant } from './button';
 
 /**
@@ -26,6 +30,8 @@ const LABEL: Record<OrderActionKey, string> = {
 };
 
 type OrderShape = Pick<OrderListItem, 'status' | 'refundStatus' | 'fulfillmentStatus' | 'kind'> & {
+  /** A 拼团 order's team (`storefrontOrderListItem.groupbuyTeam`): 拼团中 while it forms. */
+  groupbuyTeam?: Pick<OrderGroupbuyTeam, 'status'> | null | undefined;
   /**
    * The lines' review state (`storefrontOrderItem.reviewable`, ORDER-010): 去评价 and 待评价
    * only while some line can still be reviewed.
@@ -86,6 +92,12 @@ export function orderStatusText(order: OrderShape): string {
     case 'pending_payment':
       return '待付款';
     case 'paid':
+      // A 拼团 order ships only once its team is complete (RISK-D-011): 待发货 would promise a
+      // parcel that is not coming yet, or at all.
+      if (order.groupbuyTeam?.status === 'forming') return '拼团中';
+      if (order.groupbuyTeam?.status === 'failed' || order.groupbuyTeam?.status === 'cancelled') {
+        return '未成团';
+      }
       return order.fulfillmentStatus === 'partially_fulfilled' ? '部分发货' : '待发货';
     case 'shipped':
       return '待收货';

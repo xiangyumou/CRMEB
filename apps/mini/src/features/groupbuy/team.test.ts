@@ -69,6 +69,14 @@ describe('teamHeadline', () => {
   it('tells a paid member of a failed team that the refund is on its way', () => {
     expect(teamHeadline(view({ me: paidLeader }), 'failed').note).toContain('退款处理中');
     expect(teamHeadline(view(), 'refunded').title).toBe('拼团未成功，已退款');
+    // A ¥0 team charged nothing: no refund to promise.
+    expect(teamHeadline(view({ price: '0.00', me: paidLeader }), 'failed').note).toBe(
+      '到时间未凑齐 2 人，订单已关闭，没有产生扣款',
+    );
+    expect(teamHeadline(view({ price: '0.00' }), 'refunded')).toMatchObject({
+      title: '拼团未成功，订单已关闭',
+      note: '没有产生扣款',
+    });
   });
 });
 

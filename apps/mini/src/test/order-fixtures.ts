@@ -63,11 +63,16 @@ export function orderListItem(
     payExpiresAt: null,
     createdAt: '2026-02-01T10:00:00+08:00',
     items: [orderItem('7001')],
+    refundedAmount: '0.00',
+    groupbuyTeam: null,
     ...overrides,
   };
 }
 
 export function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
+  // What the server says (INVOICE-004): open once paid, until refunded or cancelled.
+  const status = overrides.status ?? 'paid';
+  const invoiceRequestable = !['pending_payment', 'cancelled', 'refunded'].includes(status);
   return {
     ...orderListItem(),
     receiver: {
@@ -90,6 +95,8 @@ export function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
     cancelledAt: null,
     cancelReason: null,
     groupbuyTeamId: null,
+    invoiceRequestable,
+    invoiceAmount: invoiceRequestable ? '60.00' : '0.00',
     ...overrides,
   };
 }

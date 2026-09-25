@@ -43,6 +43,8 @@ const order: StorefrontOrderListItem = {
   paidAmount: '240.00',
   payExpiresAt: null,
   createdAt: '2026-02-01T10:00:00+08:00',
+  refundedAmount: '0.00',
+  groupbuyTeam: null,
   items: [item('1'), item('2'), item('3'), item('4')],
 };
 
@@ -90,6 +92,22 @@ describe('orderActions', () => {
     expect(orderStatusText({ ...order, status: 'received', items: toReview })).toBe('待评价');
     expect(orderStatusText({ ...order, status: 'completed', items: toReview })).toBe('待评价');
     expect(orderStatusText({ ...order, status: 'received', items: reviewed })).toBe('已完成');
+  });
+
+  it('says 拼团中, not 待发货, while a 拼团 order waits for its team, and 未成团 once it failed', () => {
+    const paid = { ...order, kind: 'groupbuy' as const, status: 'paid' as const };
+    const team = (status: 'forming' | 'succeeded' | 'failed' | 'cancelled') => ({
+      id: '5',
+      status,
+      role: 'member' as const,
+      seatsTotal: 3,
+      seatsTaken: 2,
+      expiresAt: '2099-01-01T00:00:00+08:00',
+    });
+    expect(orderStatusText({ ...paid, groupbuyTeam: team('forming') })).toBe('拼团中');
+    expect(orderStatusText({ ...paid, groupbuyTeam: team('failed') })).toBe('未成团');
+    expect(orderStatusText({ ...paid, groupbuyTeam: team('cancelled') })).toBe('未成团');
+    expect(orderStatusText({ ...paid, groupbuyTeam: team('succeeded') })).toBe('待发货');
   });
 });
 

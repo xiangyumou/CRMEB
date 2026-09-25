@@ -43,10 +43,12 @@ export interface TeamHeadline {
 
 /** The words at the top of the team page. */
 export function teamHeadline(
-  view: Pick<TeamView, 'seatsTotal' | 'seatsLeft' | 'me'>,
+  view: Pick<TeamView, 'seatsTotal' | 'seatsLeft' | 'me' | 'price'>,
   phase: TeamPhase,
 ): TeamHeadline {
   const paidMember = view.me?.paid === true;
+  // A ¥0 team (a free trial): nothing was charged, so nothing is refunded either.
+  const free = Number(view.price) <= 0;
   switch (phase) {
     case 'open':
       return {
@@ -71,13 +73,17 @@ export function teamHeadline(
     case 'failed':
       return {
         title: '拼团未成功',
-        note: paidMember
-          ? `到时间未凑齐 ${view.seatsTotal} 人，退款处理中，将原路退回`
-          : `到时间未凑齐 ${view.seatsTotal} 人，已付款项原路退回`,
+        note: free
+          ? `到时间未凑齐 ${view.seatsTotal} 人，订单已关闭，没有产生扣款`
+          : paidMember
+            ? `到时间未凑齐 ${view.seatsTotal} 人，退款处理中，将原路退回`
+            : `到时间未凑齐 ${view.seatsTotal} 人，已付款项原路退回`,
         tone: 'muted',
       };
     case 'refunded':
-      return { title: '拼团未成功，已退款', note: '款项已原路退回，请留意到账', tone: 'muted' };
+      return free
+        ? { title: '拼团未成功，订单已关闭', note: '没有产生扣款', tone: 'muted' }
+        : { title: '拼团未成功，已退款', note: '款项已原路退回，请留意到账', tone: 'muted' };
     case 'cancelled':
       return { title: '拼团已取消', note: '团长已取消这个团', tone: 'muted' };
   }

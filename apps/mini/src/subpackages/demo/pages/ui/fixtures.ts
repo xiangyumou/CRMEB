@@ -171,6 +171,8 @@ export const orders: StorefrontOrderListItem[] = [
     paidAmount: null,
     payExpiresAt: inMinutes(14.5),
     createdAt: new Date().toISOString(),
+    refundedAmount: '0.00',
+    groupbuyTeam: null,
     items: [
       item('1', '每日坚果礼盒 30 袋装', art(28, 'gift'), '79.90', '混合装 | 750g'),
       item('2', '冷萃咖啡液 精品挂耳 12 杯', art(200, 'cup'), '45.00', '中度烘焙'),
@@ -191,6 +193,8 @@ export const orders: StorefrontOrderListItem[] = [
     paidAmount: '119.70',
     payExpiresAt: null,
     createdAt: new Date().toISOString(),
+    refundedAmount: '0.00',
+    groupbuyTeam: null,
     items: [item('3', '手工蜂蜜 百花蜜 500g 玻璃瓶装', art(45, 'jar'), '39.90', '500g', 3)],
   },
 ];

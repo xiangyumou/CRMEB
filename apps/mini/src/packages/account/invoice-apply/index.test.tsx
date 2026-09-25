@@ -76,4 +76,34 @@ describe('申请开票', () => {
     );
     await waitFor(() => expect(taroFake.calls.map((c) => c.api)).toContain('showModal'));
   });
+
+  it('makes the invoice out for what was paid less what was refunded', async () => {
+    serveApi({
+      ...routes,
+      'GET /api/v1/orders/9001': () => ({
+        body: { ...paidOrderFixture, refundedAmount: '18.00', invoiceAmount: '100.00' },
+      }),
+    });
+    const { container } = await renderPage(<InvoiceApplyPage />);
+    await screen.findByRole('radio', { name: /^深圳某某科技有限公司/ });
+    expect(screen.getByLabelText('开票金额 100 元')).toBeTruthy();
+    expect(container.textContent).not.toContain('118');
+  });
+
+  it('says the order cannot be invoiced instead of a form the server refuses', async () => {
+    serveApi({
+      ...routes,
+      'GET /api/v1/orders/9001': () => ({
+        body: { ...paidOrderFixture, invoiceRequestable: false, invoiceAmount: '0.00' },
+      }),
+    });
+    await renderPage(<InvoiceApplyPage />);
+    await screen.findByText('这个订单暂不能申请开票');
+    expect(screen.queryByRole('button', { name: '提交申请' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '开票记录' }));
+    expect(taroFake.calls).toContainEqual({
+      api: 'redirectTo',
+      args: { url: '/packages/account/invoices/index?tab=records' },
+    });
+  });
 });

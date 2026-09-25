@@ -149,7 +149,9 @@ function OrderBody({ id }: { id: string }) {
           </View>
         </Card>
         <OrderFacts order={order} />
-        {order.status !== 'pending_payment' && order.status !== 'cancelled' ? (
+        {/* Only while the server would take the request (INVOICE-004): not unpaid, not fully
+            refunded, not ¥0, not already requested. */}
+        {order.invoiceRequestable ? (
           <CellGroup>
             <Cell
               title="发票"

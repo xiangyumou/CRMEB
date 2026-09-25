@@ -42,6 +42,7 @@ const activity = (patch: Partial<Activity> = {}): Activity => ({
   description: null,
   skus: [sku('21'), sku('22', 0)],
   myOpenGroupId: null,
+  myOpenGroupRole: null,
   ...patch,
 });
 
@@ -132,6 +133,15 @@ describe('拼团商品', () => {
     serve(activity({ myOpenGroupId: '777' }));
     await renderPage(<GroupbuyDetailPage />);
     fireEvent.click(await screen.findByRole('button', { name: '查看我的团' }));
+    expect(navigatedTo().at(-1)).toBe('/packages/promo/groupbuy-team/index?id=777');
+  });
+
+  it('tells a member the open team is one they joined, not one they started', async () => {
+    serve(activity({ myOpenGroupId: '777', myOpenGroupRole: 'member' }));
+    await renderPage(<GroupbuyDetailPage />);
+    await screen.findByText('你参加的团正在拼');
+    expect(screen.queryByText('你发起的团正在拼')).toBeNull();
+    fireEvent.click(screen.getByText('你参加的团正在拼'));
     expect(navigatedTo().at(-1)).toBe('/packages/promo/groupbuy-team/index?id=777');
   });
 

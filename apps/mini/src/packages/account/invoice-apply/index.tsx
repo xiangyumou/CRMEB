@@ -81,6 +81,29 @@ function Apply({ orderId }: { orderId: string }) {
   const chosen = items.find((t) => t.id === chosenId) ?? null;
   const first = order.data.items[0];
 
+  // Opened from an old link or a stale page: say why instead of offering a request the server
+  // refuses (INVOICE-004).
+  if (!order.data.invoiceRequestable) {
+    return (
+      <Empty
+        image="order"
+        title="这个订单暂不能申请开票"
+        description="已申请过的可在「开票记录」查看；已全额退款或实付为 0 的订单不能开票"
+        actions={
+          <Button
+            variant="outline-primary"
+            size="md"
+            onClick={() =>
+              navigate({ route: 'invoices', params: { tab: 'records' } }, { replace: true })
+            }
+          >
+            开票记录
+          </Button>
+        }
+      />
+    );
+  }
+
   function addTitle() {
     setPicked(null);
     void navigate({ route: 'invoiceTitleEdit', params: {} });
@@ -115,7 +138,8 @@ function Apply({ orderId }: { orderId: string }) {
           description={`订单号 ${order.data.orderNo}`}
           value={
             <Price
-              value={order.data.paidAmount ?? order.data.payableAmount}
+              // Paid less refunded: what the invoice is made out for.
+              value={order.data.invoiceAmount}
               size="sm"
               tone="text"
               prefix="开票金额"

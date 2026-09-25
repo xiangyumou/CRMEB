@@ -58,6 +58,7 @@ const activity: ResponseOf<'groupbuy.detail'> = {
     },
   ],
   myOpenGroupId: null,
+  myOpenGroupRole: null,
 };
 
 function serve(team: TeamView | { reply: FakeReply }, after?: TeamView) {

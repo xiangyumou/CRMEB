@@ -180,6 +180,44 @@ describe('订单详情', () => {
     });
   });
 
+  it('says 拼团中 with the seats left while the team forms, and offers 申请开票 only when the server takes it', async () => {
+    taroFake.routerParams = { id: '9001' };
+    serveApi({
+      'GET /api/v1/orders/9001': () => ({
+        body: orderDetail({
+          kind: 'groupbuy',
+          groupbuyTeamId: '501',
+          groupbuyTeam: {
+            id: '501',
+            status: 'forming',
+            role: 'leader',
+            seatsTotal: 3,
+            seatsTaken: 1,
+            expiresAt: '2099-01-01T00:00:00+08:00',
+          },
+          // Already asked for, say: the server no longer takes a request.
+          invoiceRequestable: false,
+        }),
+      }),
+    });
+    await renderPage(<OrderDetailPage />);
+    await screen.findByText('拼团中');
+    expect(screen.getByText('还差 2 人成团，成团后发货')).toBeTruthy();
+    expect(screen.queryByText('等待发货')).toBeNull();
+    expect(screen.queryByText('申请开票')).toBeNull();
+  });
+
+  it('offers 申请开票 on a paid order the server would invoice', async () => {
+    taroFake.routerParams = { id: '9001' };
+    serveApi({ 'GET /api/v1/orders/9001': () => ({ body: orderDetail() }) });
+    await renderPage(<OrderDetailPage />);
+    fireEvent.click(await screen.findByText('申请开票'));
+    expect(taroFake.calls).toContainEqual({
+      api: 'navigateTo',
+      args: { url: '/packages/account/invoice-apply/index?orderId=9001' },
+    });
+  });
+
   it('has no team link for any other order', async () => {
     taroFake.routerParams = { id: '9001' };
     serveApi({ 'GET /api/v1/orders/9001': () => ({ body: orderDetail() }) });
