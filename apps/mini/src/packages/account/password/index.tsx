@@ -58,7 +58,19 @@ function PasswordForm({ hasPassword, phone }: { hasPassword: boolean; phone: str
   if (useSms && !phone) {
     return (
       <View className="account-page">
-        <Text className="account-note">设置密码需要先绑定手机号，用来接收验证码。</Text>
+        <Text className="account-note">
+          {hasPassword
+            ? '用短信验证码修改需要先绑定手机号。'
+            : '设置密码需要先绑定手机号，用来接收验证码。'}
+        </Text>
+        {hasPassword ? (
+          // The way back: a shopper who still knows the old password is not stuck here.
+          <View className="password__switch">
+            <Button variant="text" size="sm" onClick={() => setUseSms(false)}>
+              用原密码修改
+            </Button>
+          </View>
+        ) : null}
         <SubmitBar>
           <Button size="lg" block onClick={() => navigate({ route: 'phone', params: {} })}>
             去绑定手机号

@@ -42,6 +42,18 @@ describe('修改密码', () => {
     });
   });
 
+  it('without a bound phone, 忘记原密码 is a way back to the old password, not a dead end', async () => {
+    signIn();
+    serveApi({ 'GET /api/v1/profile': () => ({ body: { ...profileFixture, phone: null } }) });
+    await renderPage(<PasswordPage />);
+    await screen.findByLabelText('原密码');
+
+    fireEvent.click(screen.getByRole('button', { name: '忘记原密码？用短信验证码' }));
+    expect(await screen.findByText('用短信验证码修改需要先绑定手机号。')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '用原密码修改' }));
+    expect(await screen.findByLabelText('原密码')).toBeTruthy();
+  });
+
   it('says a wrong old password on its field', async () => {
     signIn();
     serveApi({
