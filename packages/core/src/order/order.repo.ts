@@ -13,6 +13,7 @@ import {
 } from '../kernel/tx';
 import type { OrderListTab } from '@shop/contracts/order/schemas';
 import type { OrderStatus } from './ports';
+import { containsPattern } from '../kernel/like';
 
 /**
  * The only file in the order domain that touches Drizzle tables.
@@ -269,8 +270,8 @@ export async function listOrders(
     filter.where,
     keyword
       ? or(
-          sql`${orders.orderNo} like ${`%${keyword}%`}`,
-          sql`exists (select 1 from order_items oi where oi.order_id = ${orders.id} and oi.snapshot->>'productName' ilike ${`%${keyword}%`})`,
+          sql`${orders.orderNo} like ${containsPattern(keyword)}`,
+          sql`exists (select 1 from order_items oi where oi.order_id = ${orders.id} and oi.snapshot->>'productName' ilike ${containsPattern(keyword)})`,
         )
       : undefined,
   );

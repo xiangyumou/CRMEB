@@ -586,7 +586,7 @@ export const orderListQuery = pageQuery
   .extend({
     tab: orderListTab.default('all'),
     /** Order number or product name substring. */
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
   })
   .extend(sortQuery(['createdAt', 'payableAmount']).shape);
 export type OrderListQuery = z.infer<typeof orderListQuery>;

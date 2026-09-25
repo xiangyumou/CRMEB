@@ -30,6 +30,7 @@ import {
 import { allOf, conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
 import { hasOpenRefund } from './order.repo';
 import type { OrderStatus } from './ports';
+import { containsPattern } from '../kernel/like';
 
 /**
  * Every Drizzle statement fulfilment owns. `order.repo.ts` keeps the checkout
@@ -475,10 +476,10 @@ function adminWhere(filter: AdminOrderFilter): SQL | undefined {
     filter.paidTo ? lte(orders.paidAt, filter.paidTo) : undefined,
     keyword
       ? or(
-          sql`${orders.orderNo} like ${`%${keyword}%`}`,
-          sql`${orders.receiverName} ilike ${`%${keyword}%`}`,
-          sql`${orders.receiverPhone} like ${`%${keyword}%`}`,
-          sql`exists (select 1 from order_items oi where oi.order_id = ${orders.id} and oi.snapshot->>'productName' ilike ${`%${keyword}%`})`,
+          sql`${orders.orderNo} like ${containsPattern(keyword)}`,
+          sql`${orders.receiverName} ilike ${containsPattern(keyword)}`,
+          sql`${orders.receiverPhone} like ${containsPattern(keyword)}`,
+          sql`exists (select 1 from order_items oi where oi.order_id = ${orders.id} and oi.snapshot->>'productName' ilike ${containsPattern(keyword)})`,
         )
       : undefined,
   );
@@ -892,9 +893,9 @@ export async function listInvoices(
     args.filter.createdTo ? lte(orderInvoices.createdAt, args.filter.createdTo) : undefined,
     keyword
       ? or(
-          sql`${orderInvoices.name} ilike ${`%${keyword}%`}`,
-          sql`${orderInvoices.dutyNumber} like ${`%${keyword}%`}`,
-          sql`${orders.orderNo} like ${`%${keyword}%`}`,
+          sql`${orderInvoices.name} ilike ${containsPattern(keyword)}`,
+          sql`${orderInvoices.dutyNumber} like ${containsPattern(keyword)}`,
+          sql`${orders.orderNo} like ${containsPattern(keyword)}`,
         )
       : undefined,
   );

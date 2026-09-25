@@ -19,6 +19,7 @@ import {
   sql,
   type SQL,
 } from 'drizzle-orm';
+import { containsPattern } from '../kernel/like';
 
 /** The only file that touches `decor_documents` and `decor_revisions`. */
 
@@ -44,10 +45,6 @@ const revisionSummaryColumns = {
   restoredFrom: decorRevisions.restoredFrom,
   createdAt: decorRevisions.createdAt,
 };
-
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
-}
 
 async function withLive(
   db: DbOrTx,
@@ -80,7 +77,7 @@ export async function listDocuments(
   const parts: (SQL | undefined)[] = [live];
   if (options.kind) parts.push(eq(decorDocuments.kind, options.kind));
   if (options.keyword) {
-    const pattern = `%${escapeLike(options.keyword)}%`;
+    const pattern = containsPattern(options.keyword);
     parts.push(or(ilike(decorDocuments.name, pattern), ilike(decorDocuments.title, pattern)));
   }
   const where = and(...parts);

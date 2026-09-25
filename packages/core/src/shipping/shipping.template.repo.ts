@@ -11,6 +11,7 @@ import {
   shippingTemplates,
 } from '@shop/db/schema/shipping';
 import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, sql, type SQL } from 'drizzle-orm';
+import { containsPattern } from '../kernel/like';
 
 /**
  * The 运费模板 aggregate's statements.
@@ -62,7 +63,7 @@ export async function listTemplates(
   const liveOnly = live();
   if (liveOnly) filters.push(liveOnly);
   if (args.keyword !== undefined && args.keyword !== '') {
-    filters.push(ilike(shippingTemplates.name, `%${args.keyword}%`));
+    filters.push(ilike(shippingTemplates.name, containsPattern(args.keyword)));
   }
   if (args.chargeMode !== undefined) {
     filters.push(eq(shippingTemplates.chargeMode, args.chargeMode));

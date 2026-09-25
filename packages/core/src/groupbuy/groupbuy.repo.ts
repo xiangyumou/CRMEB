@@ -31,6 +31,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
+import { containsPattern } from '../kernel/like';
 
 /**
  * Every statement the group-buy domain runs. Statements, not decisions: no
@@ -92,7 +93,7 @@ const activitySort = {
 function activityWhere(filters: ActivityListFilters): SQL | undefined {
   const parts: (SQL | undefined)[] = [isNull(groupbuyActivities.deletedAt)];
   if (filters.keyword) {
-    parts.push(sql`${groupbuyActivities.title} ilike ${`%${filters.keyword}%`}`);
+    parts.push(sql`${groupbuyActivities.title} ilike ${containsPattern(filters.keyword)}`);
   }
   if (filters.statuses && filters.statuses.length > 0) {
     parts.push(inArray(groupbuyActivities.status, [...filters.statuses]));

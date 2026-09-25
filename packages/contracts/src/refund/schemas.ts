@@ -269,7 +269,7 @@ export const adminRefundListQuery = pageQuery
     orderId: id.optional(),
     userId: id.optional(),
     /** Matches the after-sales number, the order number or the merchant refund number. */
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     createdFrom: instant.optional(),
     createdTo: instant.optional(),
   })

@@ -24,6 +24,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { allOf, conditionalUpdate, type ConditionalUpdateResult } from '../kernel/tx';
+import { containsPattern } from '../kernel/like';
 
 /**
  * The only file in the coupon domain that touches Drizzle tables
@@ -115,7 +116,9 @@ const TEMPLATE_SORT = {
 function templateFilter(filter: TemplateListFilter): SQL | undefined {
   return allOf(
     liveTemplate(),
-    filter.keyword ? sql`${couponTemplates.name} ilike ${`%${filter.keyword}%`}` : undefined,
+    filter.keyword
+      ? sql`${couponTemplates.name} ilike ${containsPattern(filter.keyword)}`
+      : undefined,
     filter.status && filter.status.length > 0
       ? inArray(couponTemplates.status, [...filter.status])
       : undefined,

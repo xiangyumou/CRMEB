@@ -1157,6 +1157,18 @@ describe('my orders', () => {
       sortOrder: 'desc',
     });
     expect(byName.total).toBe(1);
+
+    // `%` and `_` are what the shopper typed, not wildcards that list everything.
+    for (const keyword of ['%', '_']) {
+      const literal = await order.list(as(userId), {
+        page: 1,
+        pageSize: 20,
+        tab: 'all',
+        keyword,
+        sortOrder: 'desc',
+      });
+      expect(literal.total).toBe(0);
+    }
   });
 
   it('answers a stranger’s detail request with the same 404 as an unknown id', async () => {

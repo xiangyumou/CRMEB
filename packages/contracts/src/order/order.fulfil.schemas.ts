@@ -428,7 +428,7 @@ export const adminOrderListQuery = pageQuery
     kind: orderKind.optional(),
     platform: clientPlatform.optional(),
     /** Order number, receiver name, receiver phone or a product name in the order. */
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     userId: id.optional(),
     createdFrom: instant.optional(),
     createdTo: instant.optional(),
@@ -757,7 +757,7 @@ export const adminInvoiceListQuery = pageQuery
     headerType: invoiceHeaderType.optional(),
     invoiceType: invoiceType.optional(),
     /** Invoice header, duty number or order number. */
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     userId: id.optional(),
     createdFrom: instant.optional(),
     createdTo: instant.optional(),

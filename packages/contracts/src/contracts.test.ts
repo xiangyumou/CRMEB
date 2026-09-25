@@ -40,6 +40,19 @@ describe('the aggregated contract surface', () => {
     }
   });
 
+  it('trims every list query’s keyword, so 「 白T 」 searches for 白T', () => {
+    let checked = 0;
+    for (const r of allRoutes) {
+      if (!(r.query instanceof z.ZodType)) continue;
+      const parsed = r.query.safeParse({ keyword: '  白T  ' });
+      if (!parsed.success || !parsed.data || typeof parsed.data !== 'object') continue;
+      if (!('keyword' in parsed.data)) continue;
+      expect((parsed.data as { keyword: unknown }).keyword, r.id).toBe('白T');
+      checked += 1;
+    }
+    expect(checked).toBeGreaterThan(10);
+  });
+
   it('merges the common error codes into the registry', () => {
     expect(errorRegistry.VALIDATION_FAILED).toEqual({ status: 422, message: '提交的数据有误' });
     expect(errorRegistry.AUTH_INVALID_CREDENTIALS?.status).toBe(401);

@@ -262,6 +262,12 @@ describe('the list', () => {
     );
     expect(found.total).toBe(1);
     expect(found.items[0]!.orderNo).toBe(row.orderNo);
+
+    // `%` and `_` are literal: a lone one matches nothing rather than every order.
+    for (const keyword of ['%', '_']) {
+      const literal = await order.orderConsole.adminList(asAdmin(adminId), listQuery({ keyword }));
+      expect(literal.total).toBe(0);
+    }
   });
 
   it('masks the buyer’s account phone in the list and shows it whole in the detail', async () => {

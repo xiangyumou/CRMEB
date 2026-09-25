@@ -241,7 +241,7 @@ export const paymentExceptionListQuery = pageQuery
   .extend({
     status: z.union([paymentExceptionStatus, z.array(paymentExceptionStatus)]).optional(),
     reason: paymentExceptionReason.optional(),
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     createdFrom: instant.optional(),
     createdTo: instant.optional(),
   })
@@ -289,7 +289,7 @@ export const capitalFlowListQuery = pageQuery
     direction: capitalFlowDirection.optional(),
     orderId: id.optional(),
     userId: id.optional(),
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     occurredFrom: instant.optional(),
     occurredTo: instant.optional(),
   })

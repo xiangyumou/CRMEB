@@ -184,7 +184,7 @@ export type CouponTemplateForm = z.infer<typeof couponTemplateForm>;
 
 export const couponTemplateListQuery = pageQuery
   .extend({
-    keyword: z.string().max(64).optional(),
+    keyword: z.string().trim().max(64).optional(),
     status: z.union([couponTemplateStatus, z.array(couponTemplateStatus)]).optional(),
     scope: couponScope.optional(),
     claimMode: couponClaimMode.optional(),
