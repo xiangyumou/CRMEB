@@ -18,8 +18,10 @@ export const GET = handle(storageAttachmentList, (ctx, { query }) =>
 );
 
 export const POST = handle(storageAttachmentUpload, async (ctx, { query }) => {
-  const file = await storage.readFilePart(ctx.request);
-  const result = await storage.attachmentUpload(ctx, query, file);
+  // A reader, so a body over the ceiling is refused before it is buffered.
+  const result = await storage.attachmentUpload(ctx, query, (maxBytes) =>
+    storage.readFilePart(ctx.request, { maxBytes }),
+  );
   ctx.audit(`attachment:${result.attachment.id}`);
   return result;
 });

@@ -51,6 +51,7 @@ export {
   SCAN_UPLOADS_PER_IP_PER_HOUR,
   SCAN_UPLOADS_PER_TOKEN,
   userUpload,
+  type FileSource,
   type IncomingFile,
   type ResolvedStorage,
 } from './storage.service';
@@ -69,7 +70,7 @@ export {
 export { storagePermissions } from './permissions';
 export { storageConfig } from './storage.config';
 export { storageDashboardContributor } from './dashboard-tiles';
-export { readFilePart } from './multipart';
+export { MULTIPART_OVERHEAD_BYTES, readFilePart } from './multipart';
 
 export {
   isRejected,

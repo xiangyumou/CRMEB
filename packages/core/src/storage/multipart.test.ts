@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DomainError } from '../kernel/errors';
-import { readFilePart } from './multipart';
+import { MULTIPART_OVERHEAD_BYTES, readFilePart } from './multipart';
 
 /**
  * The multipart field name is part of the contract.
@@ -79,5 +79,87 @@ describe('readFilePart', () => {
       },
     };
     expect(await codeOf(readFilePart(request))).toBe('STORAGE_NO_FILE');
+  });
+});
+
+describe('STOR-013 — a body over the ceiling is refused before it is buffered', () => {
+  const MAX = 1024;
+
+  /** A real multipart request, so the reader parses what a client sends. */
+  function multipart(
+    content: string,
+    { chunked = false, length }: { chunked?: boolean; length?: string } = {},
+  ) {
+    const form = new FormData();
+    form.set('file', blob(content));
+    const encoded = new Request('http://shop.test/', { method: 'POST', body: form });
+    const contentType = encoded.headers.get('content-type') ?? '';
+    return encoded.arrayBuffer().then((buffer) => {
+      const bytes = new Uint8Array(buffer);
+      const headers = new Headers({ 'content-type': contentType });
+      if (!chunked) headers.set('content-length', length ?? String(bytes.byteLength));
+      let formDataCalls = 0;
+      let pulled = 0;
+      const body = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            if (pulled >= bytes.byteLength) return controller.close();
+            const chunk = bytes.subarray(pulled, pulled + 256);
+            pulled += chunk.byteLength;
+            controller.enqueue(chunk);
+          },
+        },
+        // Pull only when read, so `pulled` counts what the reader asked for.
+        { highWaterMark: 0 },
+      );
+      return {
+        request: {
+          headers,
+          body,
+          formData: () => {
+            formDataCalls += 1;
+            return new Response(bytes, { headers: { 'content-type': contentType } }).formData();
+          },
+        },
+        formDataCalls: () => formDataCalls,
+        pulled: () => pulled,
+      };
+    });
+  }
+
+  it('refuses a Content-Length over the ceiling without reading the body', async () => {
+    const big = await multipart('x', { length: String(MAX + MULTIPART_OVERHEAD_BYTES + 1) });
+    const error = await readFilePart(big.request, { maxBytes: MAX }).then(
+      () => null,
+      (caught: unknown) => caught as DomainError,
+    );
+    expect(error?.code).toBe('STORAGE_FILE_TOO_LARGE');
+    expect(big.formDataCalls()).toBe(0);
+    expect(big.pulled()).toBe(0);
+  });
+
+  it('stops reading a body with no length once it passes the ceiling', async () => {
+    const big = await multipart('x'.repeat(MAX + MULTIPART_OVERHEAD_BYTES + 4096), {
+      chunked: true,
+    });
+    expect(await codeOf(readFilePart(big.request, { maxBytes: MAX }))).toBe(
+      'STORAGE_FILE_TOO_LARGE',
+    );
+    expect(big.formDataCalls()).toBe(0);
+    expect(big.pulled()).toBeLessThanOrEqual(MAX + MULTIPART_OVERHEAD_BYTES + 512);
+  });
+
+  it('reads a file within the ceiling, with or without a length', async () => {
+    for (const chunked of [false, true]) {
+      const small = await multipart('png-bytes', { chunked });
+      const part = await readFilePart(small.request, { maxBytes: MAX });
+      expect(new TextDecoder().decode(part.bytes)).toBe('png-bytes');
+      expect(part.filename).toBe('photo.png');
+    }
+  });
+
+  it('treats a Content-Length that is not a number as a bad request', async () => {
+    const odd = await multipart('png-bytes', { length: 'abc' });
+    expect(await codeOf(readFilePart(odd.request, { maxBytes: MAX }))).toBe('STORAGE_NO_FILE');
   });
 });

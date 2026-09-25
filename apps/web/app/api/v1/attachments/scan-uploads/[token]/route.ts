@@ -16,7 +16,7 @@ import { clientIp } from '../../../../../../src/server/request-meta';
  * cannot make the server parse multipart bodies as fast as it can send them.
  */
 export const POST = handle(storageScanUpload, async (ctx, { params }) =>
-  storage.scanUpload(ctx, params, () => storage.readFilePart(ctx.request), {
+  storage.scanUpload(ctx, params, (maxBytes) => storage.readFilePart(ctx.request, { maxBytes }), {
     ip: clientIp(ctx.request),
   }),
 );

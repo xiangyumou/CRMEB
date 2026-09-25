@@ -2239,6 +2239,13 @@ The orphan sweep leaves a tombstone alone until retention has passed, then purge
 - `packages/core/src/storage/storage.int.test.ts::cleanOrphans > leaves a tombstone alone until the retention window has passed`
 - `packages/core/src/storage/storage.int.test.ts::cleanOrphans > purges the row and the object once it is old enough`
 
+### STOR-013
+
+Every multipart upload route refuses a body over the ceiling that applies to its caller before buffering it: a `Content-Length` over the ceiling is refused unread, and a body with no length is abandoned once it passes the ceiling.
+
+- `packages/core/src/storage/multipart.test.ts::STOR-013 — a body over the ceiling is refused before it is buffered > refuses a Content-Length over the ceiling without reading the body`
+- `packages/core/src/storage/multipart.test.ts::STOR-013 — a body over the ceiling is refused before it is buffered > stops reading a body with no length once it passes the ceiling`
+
 ### STORC-001
 
 Six uploads of identical bytes at once store the object once and hand every caller the same row.

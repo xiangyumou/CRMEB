@@ -450,6 +450,16 @@ export interface IncomingFile {
   declaredMime: string | undefined;
 }
 
+/**
+ * The file itself, or a reader handed the ceiling that applies, so the route
+ * can refuse an oversized body before buffering it (`readFilePart`) and the
+ * service reads it only after its own checks and budgets.
+ */
+export type FileSource = IncomingFile | ((maxBytes: number) => Promise<IncomingFile>);
+
+const readSource = (file: FileSource, maxBytes: number): Promise<IncomingFile> =>
+  typeof file === 'function' ? file(maxBytes) : Promise.resolve(file);
+
 interface StoreArgs {
   file: IncomingFile;
   maxBytes: number;
@@ -615,7 +625,7 @@ function sha256Hex(bytes: Uint8Array): string {
 export async function attachmentUpload(
   ctx: Ctx,
   query: UploadQuery,
-  file: IncomingFile,
+  file: FileSource,
 ): Promise<UploadResult> {
   const adminId = requireAdminId(ctx);
   const settings = await ctx.config.get(storageConfig);
@@ -623,7 +633,7 @@ export async function attachmentUpload(
   if (categoryId !== null) await requireCategory(ctx, categoryId);
 
   return storeFile(ctx, {
-    file,
+    file: await readSource(file, settings.maxUploadBytes),
     maxBytes: settings.maxUploadBytes,
     directory: query.directory ?? 'attachment',
     categoryId,
@@ -720,7 +730,7 @@ function filenameFromUrl(raw: string): string | undefined {
 export async function userUpload(
   ctx: Ctx,
   query: { purpose: UserUploadPurpose },
-  file: IncomingFile,
+  file: FileSource,
 ): Promise<UserUploadResult> {
   const userId = requireUserId(ctx);
   const settings = await ctx.config.get(storageConfig);
@@ -736,7 +746,7 @@ export async function userUpload(
   );
 
   const result = await storeFile(ctx, {
-    file,
+    file: await readSource(file, settings.maxUserUploadBytes),
     maxBytes: settings.maxUserUploadBytes,
     directory: query.purpose,
     // A shopper's picture never lands in an admin's folder tree.
@@ -848,7 +858,7 @@ export const SCAN_UPLOADS_PER_TOKEN = 10;
 export async function scanUpload(
   ctx: Ctx,
   params: { token: string },
-  file: IncomingFile | (() => Promise<IncomingFile>),
+  file: FileSource,
   meta: { ip?: string | null } = {},
 ): Promise<UploadResult> {
   const nowMs = ctx.clock.now().getTime();
@@ -878,9 +888,8 @@ export async function scanUpload(
   // atomic claim below is still what decides.
   const seen = await store.read(params.token);
   if (!seen || seen.state !== 'pending') throw new DomainError('STORAGE_SCAN_TOKEN_INVALID');
-  const incoming = typeof file === 'function' ? await file() : file;
-
   const settings = await ctx.config.get(storageConfig);
+  const incoming = await readSource(file, settings.maxUploadBytes);
   const claimed = await store.claim(params.token);
   if (!claimed) throw new DomainError('STORAGE_SCAN_TOKEN_INVALID');
 
