@@ -25,6 +25,7 @@ import {
   type ProductSpecInput,
 } from '@shop/contracts/catalog/schemas';
 
+import { errorMessage } from '@/admin/api/errors';
 import { useRouteMutation, useRouteQuery } from '@/admin/api/hooks';
 import { useCan } from '@/admin/session/session-provider';
 import type { FieldSpec, SelectOption } from '@/admin/kit/form/types';
@@ -210,7 +211,7 @@ export function ProductEditorPage({ productId }: { productId?: string | undefine
   if (productId !== undefined && detail.isError) {
     return (
       <PageContainer title="编辑商品">
-        <Alert type="error" showIcon message={detail.error.message} />
+        <Alert type="error" showIcon message={errorMessage(detail.error, '商品加载失败，请重试')} />
       </PageContainer>
     );
   }

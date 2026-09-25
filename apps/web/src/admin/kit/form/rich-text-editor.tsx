@@ -161,7 +161,7 @@ export default function RichTextEditor({
               type="text"
               icon={<PictureOutlined />}
               disabled={disabled}
-              onClick={() => void insertImage()}
+              onClick={() => insertImage()}
             />
           </Tooltip>
           <Divider type="vertical" />

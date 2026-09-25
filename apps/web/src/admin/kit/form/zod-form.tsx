@@ -137,7 +137,7 @@ export function ZodForm<S extends AnyObjectSchema>({
       layout={layout}
       disabled={disabled}
       {...defined({ initialValues: initialValues as Record<string, unknown> | undefined })}
-      onFinish={(raw) => void handleFinish(raw)}
+      onFinish={(raw) => handleFinish(raw)}
       onFinishFailed={() => setClientUnmatched([])}
       requiredMark
       scrollToFirstError

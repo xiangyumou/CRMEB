@@ -7,6 +7,7 @@ import { createContext, use, useCallback, useEffect, useMemo, type ReactNode } f
 
 import { isSessionExpiry, loginUrl } from '../api/config';
 import { adminLogout, adminMe, type AdminIdentity } from '../api/contracts';
+import { errorMessage } from '../api/errors';
 import { useRouteMutation, useRouteQuery } from '../api/hooks';
 import { hasPermission, type PermissionInput } from './permissions';
 
@@ -117,9 +118,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       <Result
         status="error"
         title="无法加载登录信息"
-        subTitle={me.error?.message ?? '请稍后重试'}
+        subTitle={errorMessage(me.error, '请稍后重试')}
         extra={
-          <Button type="primary" onClick={() => void me.refetch()}>
+          <Button type="primary" onClick={() => me.refetch()}>
             重试
           </Button>
         }

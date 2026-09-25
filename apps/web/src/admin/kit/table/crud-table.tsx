@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 
 import type { ParamsInputOf } from '../../api/call-route';
 import type { AnyRouteDef, ResponseOf } from '../../api/contracts';
+import { errorMessage } from '../../api/errors';
 import { useRouteQuery } from '../../api/hooks';
 import { stableInput } from '../../api/query-keys';
 import { FilterBar, filterKeys, type FilterSpec } from './filter-bar';
@@ -265,7 +266,7 @@ function CrudTableInner<R extends AnyRouteDef, T>({
         <Space>
           <Button
             icon={<ReloadOutlined />}
-            onClick={() => void result.refetch()}
+            onClick={() => result.refetch()}
             loading={result.isFetching}
             aria-label="刷新"
           >
@@ -301,7 +302,7 @@ function CrudTableInner<R extends AnyRouteDef, T>({
         onChange={handleTableChange}
         locale={{
           emptyText: result.isError ? (
-            <Empty description={result.error.message} />
+            <Empty description={errorMessage(result.error, '加载失败，请重试')} />
           ) : (
             <Empty description={emptyText ?? '暂无数据'} />
           ),

@@ -27,6 +27,18 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * What to tell the operator about a failure: the server's words (every `ApiError`
+ * is Chinese, transport failures included), or `fallback` for anything else — a
+ * `TypeError` from a render or a hand-written queryFn is English, and goes to the
+ * console instead. The admin twin of the mini's `errorMessage`.
+ */
+export function errorMessage(error: unknown, fallback = '操作失败，请稍后再试'): string {
+  if (ApiError.is(error)) return error.message || fallback;
+  if (error) console.warn(fallback, error);
+  return fallback;
+}
+
 /** Transport-level codes that never come from the server. */
 export const CLIENT_ERROR_CODES = {
   network: 'NETWORK_ERROR',

@@ -172,7 +172,7 @@ export function CreateDecorDocumentModal({
       okText="创建并装修"
       confirmLoading={create.isPending}
       onCancel={onClose}
-      onOk={() => void submit().catch(() => undefined)}
+      onOk={() => submit().catch(() => undefined)}
       afterClose={() => {
         form.resetFields();
         setTemplateKey(BLANK_TEMPLATE_KEY);

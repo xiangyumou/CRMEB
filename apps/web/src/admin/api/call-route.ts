@@ -134,8 +134,8 @@ export async function callRoute<R extends AnyRouteDef>(
       throw new ApiError({
         status: response.status,
         code: CLIENT_ERROR_CODES.schema,
-        message: `接口 ${route.id} 返回的数据与契约不符`,
-        details: parsed.error.issues,
+        message: '服务器返回的数据格式有误，请刷新后重试',
+        details: { route: route.id, issues: parsed.error.issues },
       });
     }
   }

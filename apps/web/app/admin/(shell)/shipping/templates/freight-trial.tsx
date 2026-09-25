@@ -20,6 +20,7 @@ import {
   type ShippingTemplateTrialResult,
 } from '@shop/contracts/shipping/schemas';
 
+import { errorMessage } from '@/admin/api/errors';
 import { useRouteMutation } from '@/admin/api/hooks';
 import { MoneyInput } from '@/admin/kit/form/money-input';
 import { TreeSelectField } from '@/admin/kit/form/select-fields';
@@ -91,7 +92,7 @@ export function FreightTrialButton({ form }: { form: FormInstance }) {
         footer={
           <Space>
             <Button onClick={() => setOpen(false)}>关闭</Button>
-            <Button type="primary" loading={trial.isPending} onClick={() => void run()}>
+            <Button type="primary" loading={trial.isPending} onClick={() => run()}>
               试算
             </Button>
           </Space>
@@ -135,7 +136,9 @@ export function FreightTrialButton({ form }: { form: FormInstance }) {
           </Form>
 
           {invalid ? <Alert type="warning" showIcon message={invalid} /> : null}
-          {trial.error ? <Alert type="error" showIcon message={trial.error.message} /> : null}
+          {trial.error ? (
+            <Alert type="error" showIcon message={errorMessage(trial.error, '试算失败，请重试')} />
+          ) : null}
 
           {result ? (
             <div data-testid="freight-trial-result">

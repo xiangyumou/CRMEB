@@ -31,6 +31,7 @@ import {
   type NotificationTestChannel,
 } from '@shop/contracts/notification/schemas';
 
+import { errorMessage } from '@/admin/api/errors';
 import { useRouteMutation } from '@/admin/api/hooks';
 import { useCan } from '@/admin/session/session-provider';
 
@@ -163,7 +164,13 @@ export function NotificationPreviewButton({
           </Button>
 
           {invalid ? <Alert type="warning" showIcon message={invalid} /> : null}
-          {preview.error ? <Alert type="error" showIcon message={preview.error.message} /> : null}
+          {preview.error ? (
+            <Alert
+              type="error"
+              showIcon
+              message={errorMessage(preview.error, '预览失败，请重试')}
+            />
+          ) : null}
           {result ? <PreviewResult result={result} /> : null}
 
           {template.audience === 'user' ? (
@@ -362,7 +369,9 @@ function TestSend({
           </Button>
         </Popconfirm>
       </Space>
-      {send.error ? <Alert type="error" showIcon message={send.error.message} /> : null}
+      {send.error ? (
+        <Alert type="error" showIcon message={errorMessage(send.error, '发送失败，请重试')} />
+      ) : null}
       {result ? (
         <Alert
           type={

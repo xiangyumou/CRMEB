@@ -9,6 +9,7 @@ import {
 } from '@shop/contracts/catalog/catalog.product.admin.contract';
 
 import { callRoute } from '@/admin/api/call-route';
+import { errorMessage } from '@/admin/api/errors';
 
 const PAGE_SIZE = 10;
 
@@ -225,7 +226,13 @@ export function SkuPicker({
           <Alert type="info" showIcon message="只能选择当前商品的规格" />
         )}
 
-        {products.isError ? <Alert type="error" showIcon message={products.error.message} /> : null}
+        {products.isError ? (
+          <Alert
+            type="error"
+            showIcon
+            message={errorMessage(products.error, '商品加载失败，请重试')}
+          />
+        ) : null}
 
         <Table<ProductRow>
           rowKey="id"

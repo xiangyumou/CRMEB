@@ -124,6 +124,11 @@ Every endpoint is a `defineRoute({...})` (see `packages/contracts/src/_conventio
   hand-written `fetch`.
 - Forms are typed from the contract's zod body schema.
 - All user-facing text is Simplified Chinese. There is no i18n layer.
+- The admin UI also runs the mini's two people-facing rules, from `@shop/config/eslint/ui`
+  (`ui/no-void-handler`, `ui/no-raw-error-text`). A handler returns its promise so a Popconfirm or
+  Modal `onOk` shows loading; `void message.success(…)` is fine, since antd's toast only settles
+  when it closes. An error reaches the operator through `errorMessage(error, '…加载失败')` from
+  `src/admin/api` (or under an `ApiError.is(error)` check), never as `error.message`.
 - Read `apps/web/src/admin/kit/README.md` before building a page; `/admin/dev/kit` shows every
   component live.
 - `exactOptionalPropertyTypes` is on: declare optional props as `?: T | undefined`, and spread

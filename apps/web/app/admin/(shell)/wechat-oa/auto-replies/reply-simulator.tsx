@@ -9,6 +9,7 @@ import type {
   WechatReplySimulateResult,
 } from '@shop/contracts/wechat-oa/schemas';
 
+import { errorMessage } from '@/admin/api/errors';
 import { useRouteMutation } from '@/admin/api/hooks';
 import { StatusTag } from '@/admin/kit/status-tag';
 
@@ -80,7 +81,13 @@ export function ReplySimulator() {
             />
           )}
 
-          {simulate.error ? <Alert type="error" showIcon message={simulate.error.message} /> : null}
+          {simulate.error ? (
+            <Alert
+              type="error"
+              showIcon
+              message={errorMessage(simulate.error, '模拟失败，请重试')}
+            />
+          ) : null}
 
           {result ? (
             <Space

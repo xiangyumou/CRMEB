@@ -472,7 +472,7 @@ export function ConfigGroupForm<R extends AnyRouteDef, T extends AnyRouteDef = A
           running={testMutation.isPending}
           outcome={outcome}
           error={testError}
-          onRun={(input) => void runTest(input)}
+          onRun={(input) => runTest(input)}
           renderControl={(field) => renderConfigControl(field, false)}
         />
       ) : null}

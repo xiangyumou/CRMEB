@@ -167,7 +167,7 @@ export function AssetField({
       {canAdd && access.list ? (
         <button
           type="button"
-          onClick={() => void openPicker()}
+          onClick={() => openPicker()}
           data-testid="asset-field-add"
           style={{
             width: size,

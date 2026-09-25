@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import { uiConfig } from '@shop/config/eslint/ui';
 import next from 'eslint-config-next';
 
 // `app/oauth` and `app/mcp` are the AI-assistant sign-in and endpoint: route
@@ -115,6 +116,15 @@ export default [
     files: ['**/*.test.ts', '**/*.test.tsx', 'src/test/**'],
     rules: { 'no-restricted-globals': 'off' },
   },
+  // AGENTS.md 17 and 1 in the admin UI: handlers return their promise (a Popconfirm or Modal
+  // `onOk` shows loading and holds off a second click), and no error's own text reaches the
+  // operator — `errorMessage(error, '…')` from @/admin/api. `src/admin/api` is the layer that
+  // turns failures into Chinese; the dev spike is not an operator screen.
+  ...uiConfig({
+    files: ['app/**/*.tsx', 'src/**/*.tsx'],
+    ignores: ['**/*.test.tsx', 'src/test/**', 'app/admin/(shell)/dev/**'],
+    uiIgnores: ['src/admin/api/**'],
+  }),
   {
     // Tests assert on rows, so server tests may read tables directly.
     files: SERVER.map((glob) => `${glob}/*.test.ts`),

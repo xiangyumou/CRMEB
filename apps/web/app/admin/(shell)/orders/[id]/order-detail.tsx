@@ -31,7 +31,7 @@ import {
 import type { OrderItem } from '@shop/contracts/order/schemas';
 import { useSearchParams } from 'next/navigation';
 
-import { useRouteQuery } from '@/admin/api';
+import { errorMessage, useRouteQuery } from '@/admin/api';
 import { ConfirmButton } from '@/admin/kit/confirm-button';
 import { DescriptionsCard } from '@/admin/kit/descriptions-card';
 import { InstantText } from '@/admin/kit/instant-text';
@@ -90,9 +90,9 @@ export function OrderDetailPage({ id }: { id: string }) {
           type="error"
           showIcon
           message="订单加载失败"
-          description={order.error.message}
+          description={errorMessage(order.error, '订单加载失败，请重试')}
           action={
-            <Button size="small" onClick={() => void order.refetch()}>
+            <Button size="small" onClick={() => order.refetch()}>
               重试
             </Button>
           }

@@ -45,7 +45,7 @@ export function contractValidator(): ResponseValidator {
       throw new ApiError({
         status,
         code: CLIENT_ERROR_CODES.schema,
-        message: `接口 ${meta.id} 返回的数据与契约不符`,
+        message: '服务器返回的数据格式有误，请刷新后重试',
         details: parsed.error.issues,
         routeId: meta.id,
       });

@@ -14,8 +14,10 @@
  *   `errMsg`, `String(error)` — reaching something a shopper reads: JSX, a toast or modal, a
  *   form's error setter, or a `title` / `message` / `content`… field. A runtime's `TypeError` and
  *   WeChat's `requestPayment:fail …` are English. Pass the error through the app's
- *   `errorMessage(error, fallback)` instead. Text read under an `isApiError(x)` (or
- *   `x instanceof ApiError`) check is the server's Chinese and is allowed.
+ *   `errorMessage(error, fallback)` instead. Text read under an `isApiError(x)`,
+ *   `ApiError.is(x)` or `x instanceof ApiError` check is the server's Chinese and is allowed.
+ *
+ * The last two also run in the admin (apps/web), under the plugin name `ui`: see ./ui.js.
  *
  * Not type-aware, like the rest of the preset: it goes by names. An "error" is a variable called
  * `e`, `err`, `error`, `ex`, `exception` or `cause`, or ending in `Error` / `Err` / `Exception`,
@@ -134,6 +136,15 @@ const noVoidHandler = {
   },
   create(context) {
     const source = context.sourceCode ?? context.getSourceCode();
+    /**
+     * `void message.success(…)`: antd's toast returns a thenable that settles when the toast
+     * closes, seconds later. Dropping it is right; returning it would hold up whoever awaits the
+     * handler (a form's `onSuccess`) until the toast is gone.
+     */
+    const isToast = (expression) =>
+      expression.type === 'CallExpression' &&
+      expression.callee.type === 'MemberExpression' &&
+      /^(message|notification)$/.test(nameOf(expression.callee.object) ?? '');
     /** `pay(…)` for the message, however long the call. */
     const shortly = (expression) =>
       expression.type === 'CallExpression'
@@ -148,7 +159,11 @@ const noVoidHandler = {
           return;
         }
         const body = fn.body;
-        if (body.type === 'UnaryExpression' && body.operator === 'void') {
+        if (
+          body.type === 'UnaryExpression' &&
+          body.operator === 'void' &&
+          !isToast(body.argument)
+        ) {
           context.report({
             node: body,
             messageId: 'void',
@@ -163,7 +178,8 @@ const noVoidHandler = {
           if (
             statement.type !== 'ExpressionStatement' ||
             statement.expression.type !== 'UnaryExpression' ||
-            statement.expression.operator !== 'void'
+            statement.expression.operator !== 'void' ||
+            isToast(statement.expression.argument)
           ) {
             return;
           }
@@ -284,13 +300,15 @@ function asserts(test, subject, source) {
   if (test.type === 'LogicalExpression' && test.operator === '&&') {
     return asserts(test.left, subject, source) || asserts(test.right, subject, source);
   }
-  if (
-    test.type === 'CallExpression' &&
-    test.callee.type === 'Identifier' &&
-    test.callee.name === 'isApiError' &&
-    test.arguments[0] &&
-    source.getText(test.arguments[0]) === subject
-  ) {
+  // `isApiError(x)` (the mini) or `ApiError.is(x)` (the admin).
+  const callee = test.type === 'CallExpression' ? test.callee : null;
+  const isGuard =
+    (callee?.type === 'Identifier' && callee.name === 'isApiError') ||
+    (callee?.type === 'MemberExpression' &&
+      !callee.computed &&
+      nameOf(callee.object) === 'ApiError' &&
+      callee.property.name === 'is');
+  if (isGuard && test.arguments[0] && source.getText(test.arguments[0]) === subject) {
     return true;
   }
   return (
@@ -332,8 +350,8 @@ function guarded(node, subject, source) {
   for (let parent = node.parent; parent; child = parent, parent = parent.parent) {
     if (
       (parent.type === 'IfStatement' || parent.type === 'ConditionalExpression') &&
-      within(node, parent.consequent) &&
-      asserts(parent.test, subject, source)
+      ((within(node, parent.consequent) && asserts(parent.test, subject, source)) ||
+        (within(node, parent.alternate) && refutes(parent.test, subject, source)))
     ) {
       return true;
     }
@@ -424,7 +442,7 @@ const noRawErrorText = {
     },
     schema: [],
     messages: {
-      raw: '不要把错误原文（{{what}}）给顾客看：运行时和微信的报错是英文。用 errorMessage(error, "…") 给中文提示，原文进日志（AGENTS.md 1）',
+      raw: '不要把错误原文（{{what}}）显示给人看：运行时、浏览器和微信的报错是英文。用 errorMessage(error, "…") 给中文提示，原文进日志（AGENTS.md 1）',
     },
   },
   create(context) {

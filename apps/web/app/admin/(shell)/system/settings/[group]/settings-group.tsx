@@ -9,6 +9,7 @@ import {
   systemConfigTest,
 } from '@shop/contracts/system/system.settings.contract';
 
+import { errorMessage } from '@/admin/api/errors';
 import { useRouteQuery } from '@/admin/api/hooks';
 import { ConfigGroupForm } from '@/admin/kit/config/config-group-form';
 import type { ConfigFieldDescriptor, ConfigValues } from '@/admin/kit/config/types';
@@ -68,7 +69,7 @@ export function SettingsGroupPage({ group }: { group: string }) {
           type="error"
           showIcon
           message="打不开这个配置分组"
-          description={error?.message ?? '配置分组不存在'}
+          description={errorMessage(error, '配置分组不存在')}
         />
       </PageContainer>
     );

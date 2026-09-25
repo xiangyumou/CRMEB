@@ -81,7 +81,7 @@ export function ConfigTestModal({
       footer={
         <Space>
           <Button onClick={close}>关闭</Button>
-          <Button type="primary" danger={confirming} loading={running} onClick={() => void start()}>
+          <Button type="primary" danger={confirming} loading={running} onClick={() => start()}>
             {confirming ? '确定，开始测试' : outcome ? '再测一次' : '开始测试'}
           </Button>
         </Space>

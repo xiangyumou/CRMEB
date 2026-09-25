@@ -464,11 +464,7 @@ function EditorSession({
       <Button icon={<HistoryOutlined />} onClick={() => setRevisionsOpen(true)}>
         发布记录
       </Button>
-      <Button
-        icon={<EyeOutlined />}
-        loading={saveDraft.isPending}
-        onClick={() => void openPreview()}
-      >
+      <Button icon={<EyeOutlined />} loading={saveDraft.isPending} onClick={() => openPreview()}>
         预览
       </Button>
       {canWrite ? (
@@ -476,7 +472,7 @@ function EditorSession({
           icon={<SaveOutlined />}
           loading={saveDraft.isPending}
           disabled={publishDraft.isPending || (!dirty && !staleElsewhere)}
-          onClick={() => void save()}
+          onClick={() => save()}
         >
           保存草稿
         </Button>
@@ -543,7 +539,7 @@ function EditorSession({
         onClose={() => setRevisionsOpen(false)}
         liveNumber={liveNumber}
         viewing={viewing?.revision.number}
-        onView={(revision) => void view(revision)}
+        onView={(revision) => view(revision)}
         onRolledBack={rolledBack}
       />
       <PreviewDrawer
@@ -559,7 +555,7 @@ function EditorSession({
         title="发布页面"
         okText={dirty ? '保存并发布' : '发布'}
         confirmLoading={busy}
-        onOk={() => void publish(note.trim())}
+        onOk={() => publish(note.trim())}
         onCancel={() => setPublishing(false)}
         zIndex={1100}
       >
@@ -601,12 +597,12 @@ function EditorSession({
             key="reload"
             onClick={() => {
               setConflict(null);
-              void onReload();
+              return onReload();
             }}
           >
             载入对方的版本
           </Button>,
-          <Button key="overwrite" type="primary" danger onClick={() => void overwrite()}>
+          <Button key="overwrite" type="primary" danger onClick={() => overwrite()}>
             用我的覆盖
           </Button>,
         ]}

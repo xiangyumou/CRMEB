@@ -117,7 +117,7 @@ export function LoginForm() {
           form={form}
           layout="vertical"
           requiredMark={false}
-          onFinish={(values) => void onFinish(values)}
+          onFinish={(values) => onFinish(values)}
           // Off by default: seven days signed in is a choice for one's own
           // computer, not what a shared counter PC should get unasked.
           initialValues={{ remember: false }}

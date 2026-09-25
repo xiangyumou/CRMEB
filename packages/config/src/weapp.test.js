@@ -1,6 +1,7 @@
 import { Linter, RuleTester } from 'eslint';
 import tseslint from 'typescript-eslint';
 import { describe, expect, it } from 'vitest';
+import { uiConfig } from '../eslint/ui.js';
 import { weappConfig } from '../eslint/weapp.js';
 import { hasLookbehind, weappPlugin } from '../eslint/weapp-rules.js';
 
@@ -78,6 +79,12 @@ describe('weapp/no-void-handler (AGENTS 17)', () => {
         { code: '<List render={() => void 0} />', filename: FILE },
         // Outside JSX, `void` is how a fire-and-forget effect says so.
         { code: 'useEffect(() => { void refetch(); }, []);', filename: FILE },
+        // antd's toast settles when it closes: dropping it is right.
+        { code: '<Form onSuccess={() => void message.success("已保存")} />', filename: FILE },
+        {
+          code: '<Form onSuccess={() => { void notification.info({ message: "x" }); close(); }} />',
+          filename: FILE,
+        },
       ],
       invalid: [
         {
@@ -133,6 +140,19 @@ describe('weapp/no-raw-error-text (AGENTS 1)', () => {
           filename: FILE,
         },
         { code: 'toast.text(error instanceof ApiError ? error.message : "失败");', filename: FILE },
+        // The admin's guard, and the negated form.
+        {
+          code: '<Result subTitle={ApiError.is(error) ? error.message : "加载失败"} />',
+          filename: FILE,
+        },
+        {
+          code: 'const banner = !ApiError.is(error) ? null : ok ? null : { message: error.message };',
+          filename: FILE,
+        },
+        {
+          code: 'if (!isApiError(error)) { toast.text("失败"); } else { toast.text(error.message); }',
+          filename: FILE,
+        },
         // A log line built from it.
         { code: 'const line = `${error}`; log(line);', filename: FILE },
       ],
@@ -179,6 +199,16 @@ describe('weapp/no-raw-error-text (AGENTS 1)', () => {
           errors: [{ messageId: 'raw' }],
         },
         { code: 'toast.text("失败：" + error);', filename: FILE, errors: [{ messageId: 'raw' }] },
+        {
+          code: '<Result subTitle={ApiError.is(other) ? error.message : "加载失败"} />',
+          filename: FILE,
+          errors: [{ messageId: 'raw' }],
+        },
+        {
+          code: '<Result subTitle={!ApiError.is(error) ? error.message : "加载失败"} />',
+          filename: FILE,
+          errors: [{ messageId: 'raw' }],
+        },
         {
           code: '<Result description={JSON.stringify(loadError)} />',
           filename: FILE,
@@ -241,5 +271,40 @@ describe('weappConfig', () => {
     expect(lint('rows.flatMap((r) => r.items).includes(x);')).toEqual([]);
     expect(lint("Object.entries(o).map(([k, v]) => `${k}=${v}`).join('&');")).toEqual([]);
     expect(lint('rows[rows.length - 1];')).toEqual([]);
+  });
+});
+
+describe('uiConfig (the admin)', () => {
+  const linter = new Linter({ configType: 'flat' });
+  const config = [
+    {
+      files: ['**/*.ts', '**/*.tsx'],
+      languageOptions: {
+        parser: tseslint.parser,
+        parserOptions: { ecmaFeatures: { jsx: true } },
+      },
+    },
+    ...uiConfig({
+      files: ['app/**/*.tsx', 'src/**/*.tsx'],
+      ignores: ['**/*.test.tsx'],
+      uiIgnores: ['src/admin/api/**'],
+    }),
+  ];
+  const lint = (code, filename = 'app/admin/a.tsx') =>
+    linter.verify(code, config, filename).map((m) => m.ruleId);
+
+  it('bans void handlers and raw error text under ui/, and nothing about iOS 12', () => {
+    expect(lint('<Button onClick={() => void run()} />')).toEqual(['ui/no-void-handler']);
+    expect(lint('<Alert message={query.error.message} />')).toEqual(['ui/no-raw-error-text']);
+    expect(lint('<Alert message={errorMessage(query.error, "加载失败")} />')).toEqual([]);
+    expect(lint('Object.fromEntries(pairs);')).toEqual([]);
+  });
+
+  it('leaves out tests and the error-translating layer', () => {
+    expect(lint('<Alert message={error.message} />', 'app/admin/a.test.tsx')).toEqual([]);
+    expect(lint('<Alert message={error.message} />', 'src/admin/api/a.tsx')).toEqual([]);
+    expect(lint('<B onClick={() => void run()} />', 'src/admin/api/a.tsx')).toEqual([
+      'ui/no-void-handler',
+    ]);
   });
 });

@@ -239,7 +239,7 @@ export function AttachmentsPage() {
                       type="link"
                       size="small"
                       onClick={() => {
-                        void navigator.clipboard
+                        return navigator.clipboard
                           .writeText(absoluteUrl(row.url))
                           .then(() => message.success('已复制链接'));
                       }}

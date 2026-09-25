@@ -8,7 +8,7 @@ export type {
 } from './call-route';
 export { configureApi, getApiConfig, resetApiConfig } from './config';
 export type { ApiConfig } from './config';
-export { ApiError, CLIENT_ERROR_CODES, parseFieldErrors, toApiError } from './errors';
+export { ApiError, CLIENT_ERROR_CODES, errorMessage, parseFieldErrors, toApiError } from './errors';
 export {
   ApiFeedbackBridge,
   presentApiError,

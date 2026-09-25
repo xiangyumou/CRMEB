@@ -226,7 +226,7 @@ export function AssetPicker({
                 setPage(1);
               }}
             />
-            <Button icon={<ReloadOutlined />} onClick={() => void list.refetch()}>
+            <Button icon={<ReloadOutlined />} onClick={() => list.refetch()}>
               刷新
             </Button>
             {access.upload ? (

@@ -220,7 +220,9 @@ describe('callRoute', () => {
       { validateResponse: true },
     ).catch((cause: unknown) => cause)) as ApiError;
     expect(error.code).toBe(CLIENT_ERROR_CODES.schema);
-    expect(error.message).toContain('test.list');
+    // The route id is for the log, not the operator (AGENTS.md 1).
+    expect(error.message).toBe('服务器返回的数据格式有误，请刷新后重试');
+    expect(error.details).toMatchObject({ route: 'test.list' });
   });
 
   it('returns undefined for a 204', async () => {
