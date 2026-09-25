@@ -138,16 +138,28 @@ function useLoadedRecord<S extends AnyObjectSchema, D extends AnyRouteDef>(
     load.params === undefined ? undefined : ({ params: load.params } as never),
     // The dialog shows the failure itself, with the retry next to it; a toast
     // as well would be the same sentence twice.
-    { enabled: open, presentError: false },
+    //
+    // `refetchOnMount: 'always'`: the loader is remounted on every open (see
+    // `useOpenGeneration`), and a cached detail is never good enough. It was
+    // fetched before the last save — or before a 下架/停用 toggle on the list —
+    // and a form mounted on it quietly saves the old record back.
+    { enabled: open, presentError: false, refetchOnMount: 'always' },
   );
 
-  const { data, error, refetch } = query;
+  const { data, error, refetch, isFetchedAfterMount, isError } = query;
   const retry = useCallback(() => {
     void refetch();
   }, [refetch]);
 
-  if (data === undefined) {
-    return { ready: false, values: undefined, error: error ?? null, retry };
+  // Ready only on an answer fetched for this opening: the cache may hold the
+  // record as it was, and an error leaves the last good data in place.
+  if (data === undefined || !isFetchedAfterMount || isError) {
+    return {
+      ready: false,
+      values: undefined,
+      error: isFetchedAfterMount ? (error ?? null) : null,
+      retry,
+    };
   }
   const selected = (load.select ? load.select(data) : data) as Partial<z.input<S>>;
   return { ready: true, values: { ...initialValues, ...selected }, error: null, retry };
@@ -170,17 +182,34 @@ function LoadFailure({ error, onRetry }: { error: unknown; onRetry: () => void }
   );
 }
 
+/**
+ * Counts openings, so the loader can be keyed on it: each opening mounts a
+ * fresh query observer, whose `isFetchedAfterMount` then means "fetched for
+ * this opening". Closing keeps the key, so the close animation plays out.
+ */
+function useOpenGeneration(open: boolean): number {
+  const [state, setState] = useState({ open, generation: 0 });
+  if (state.open !== open) {
+    setState({ open, generation: open ? state.generation + 1 : state.generation });
+  }
+  return state.generation;
+}
+
 function useEntityForm<S extends AnyObjectSchema, R extends AnyRouteDef>(
   props: EntityFormProps<S, R, AnyRouteDef>,
 ) {
-  const { open, onClose, route, toInput, invalidate, successMessage, onSuccess } = props;
+  const { open, onClose, route, toInput, invalidate, successMessage, onSuccess, load } = props;
   const [form] = Form.useForm();
+
+  // A save makes the record's detail stale as well as the list: anything else
+  // on the page showing it (a drawer, the next opening) must read it again.
+  const targets = [...(invalidate ?? []), ...(load ? [load.route] : [])];
 
   const mutation = useRouteMutation(route, {
     // The form shows 422 field errors and the error banner itself; a toast on
     // top of that is noise.
     presentError: false,
-    ...(invalidate ? { invalidate } : {}),
+    ...(targets.length > 0 ? { invalidate: targets } : {}),
     ...(successMessage ? { successMessage } : {}),
     onSuccess(data) {
       onSuccess?.(data);
@@ -237,7 +266,8 @@ export function ModalForm<
   // Two components rather than a conditional hook: `load` is present on the
   // edit dialog and absent on the create dialog, and the same `CrudTable`
   // splits for the same reason.
-  if (props.load) return <ModalFormLoading {...props} load={props.load} />;
+  const generation = useOpenGeneration(props.open);
+  if (props.load) return <ModalFormLoading key={generation} {...props} load={props.load} />;
   return (
     <ModalFormChrome
       {...props}
@@ -329,7 +359,8 @@ export function DrawerForm<
   R extends AnyRouteDef,
   D extends AnyRouteDef = AnyRouteDef,
 >(props: DrawerFormProps<S, R, D>) {
-  if (props.load) return <DrawerFormLoading {...props} load={props.load} />;
+  const generation = useOpenGeneration(props.open);
+  if (props.load) return <DrawerFormLoading key={generation} {...props} load={props.load} />;
   return (
     <DrawerFormChrome
       {...props}
