@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Text, View } from '@tarojs/components';
 import { isApiError } from '@shop/api-client';
-import { useApiClient, useRouteQuery } from '@shop/api-client/react';
+import { routeQueryKey, useApiClient, useRouteQuery } from '@shop/api-client/react';
+import { useRefetchOnShow } from '@/data/use-refetch-on-show';
 import { leaveFor, navigate, platform, useRouteParams } from '@/platform';
 import { LoginCard } from '@/session/login-card';
 import { useSignedIn } from '@/session/session';
@@ -16,8 +17,8 @@ import { Price } from '@/ui/price';
 import { Pressable } from '@/ui/pressable';
 import { Result } from '@/ui/result';
 import { CellSkeleton } from '@/ui/skeleton';
-import './index.scss';
 import { errorMessage } from '@/lib/error-message';
+import './index.scss';
 
 /**
  * 收银台 (`cashier { orderId }`): the amount, the time left to pay (`payExpiresAt`), 微信支付.
@@ -44,13 +45,16 @@ function Cashier({ orderId }: { orderId: string }) {
   const api = useApiClient();
   const signedIn = useSignedIn();
   const order = useRouteQuery('order.detail', { params: { id: orderId } }, { enabled: signedIn });
+  // Back from elsewhere (订单详情, the chat with the shop, WeChat's sheet): the merchant may
+  // have changed the price (改价) or the order may have closed meanwhile.
+  useRefetchOnShow(routeQueryKey('order.detail', { params: { id: orderId } }), { when: 'always' });
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [expired, setExpired] = useState(false);
   // Back to 订单详情 when that is where 去支付 was tapped, rather than a second copy of it.
-  const toOrder = () => void leaveFor({ route: 'order', params: { id: orderId } });
+  const toOrder = () => leaveFor({ route: 'order', params: { id: orderId } });
 
   if (order.isPending) return <CellSkeleton rows={3} />;
-  if (order.isError) return <ErrorBlock error={order.error} onRetry={() => void order.refetch()} />;
+  if (order.isError) return <ErrorBlock error={order.error} onRetry={() => order.refetch()} />;
 
   const detail = order.data;
   if (detail.status !== 'pending_payment' || expired) {
@@ -114,6 +118,17 @@ function Cashier({ orderId }: { orderId: string }) {
       if (isApiError(error) && error.code === 'PAYMENT_ORDER_ALREADY_PAID') {
         void order.refetch();
         setPhase({ kind: 'idle' });
+        return;
+      }
+      if (isApiError(error) && error.code === 'PAYMENT_ORDER_NOT_PAYABLE') {
+        // Closed, paid or changed on the server: the order as it is now decides what this page
+        // shows (订单已关闭 / 已支付), not a 重新支付 that can only meet the same answer.
+        const fresh = await order.refetch();
+        setPhase(
+          fresh.data?.status === 'pending_payment'
+            ? { kind: 'notice', text: error.message, retry: false }
+            : { kind: 'idle' },
+        );
         return;
       }
       setPhase({

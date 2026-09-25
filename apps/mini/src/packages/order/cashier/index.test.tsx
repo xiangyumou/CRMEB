@@ -141,6 +141,43 @@ describe('收银台', () => {
     });
   });
 
+  it('shows the order as it now is when the server says it cannot be paid, not 重新支付', async () => {
+    let status: 'pending_payment' | 'cancelled' = 'pending_payment';
+    await renderCashier(false, {
+      'GET /api/v1/orders/9': () => ({
+        body: orderFixture({
+          status,
+          payExpiresAt: status === 'cancelled' ? null : '2099-01-01T00:00:00+08:00',
+          userCouponId: null,
+        }),
+      }),
+      'POST /api/v1/orders/9/payments': () => {
+        status = 'cancelled';
+        return {
+          status: 409,
+          body: { code: 'PAYMENT_ORDER_NOT_PAYABLE', message: '该订单当前无法支付' },
+        };
+      },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: '微信支付' }));
+    expect(await screen.findByText('订单已关闭')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '重新支付' })).toBeNull();
+  });
+
+  it('shows the new amount when the shopper comes back after the merchant changed the price', async () => {
+    let payable = '116.00';
+    await renderCashier(false, {
+      'GET /api/v1/orders/9': () => ({
+        body: orderFixture({ payableAmount: payable, userCouponId: null }),
+      }),
+    });
+    expect(await screen.findByLabelText('价格 116 元')).toBeTruthy();
+    payable = '99.00';
+    taroFake.hidePage();
+    taroFake.showPage();
+    expect(await screen.findByLabelText('价格 99 元')).toBeTruthy();
+  });
+
   it('closes itself when the order expired at the gateway', async () => {
     await renderCashier(false, {
       'POST /api/v1/orders/9/payments': () => ({
