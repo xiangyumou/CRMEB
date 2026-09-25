@@ -263,6 +263,22 @@ describe('the list', () => {
     expect(found.items[0]!.orderNo).toBe(row.orderNo);
   });
 
+  it('masks the buyer’s account phone in the list and shows it whole in the detail', async () => {
+    const adminId = await makeAdmin();
+    const placed = await placeOrder();
+    await harness.ctx.db
+      .update(users)
+      .set({ phone: '13912345678' })
+      .where(eq(users.id, placed.userId));
+
+    const listed = await order.orderConsole.adminList(asAdmin(adminId), listQuery());
+    expect(listed.items[0]!.user.phone).toBe('139****5678');
+    const detail = await order.orderConsole.adminDetail(asAdmin(adminId), {
+      id: String(placed.orderId),
+    });
+    expect(detail.user.phone).toBe('13912345678');
+  });
+
   it('hides a deleted order unless the operator asks for the deleted ones', async () => {
     const adminId = await makeAdmin();
     const placed = await placeOrder();

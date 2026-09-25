@@ -7,7 +7,7 @@ import { orderFulfilConfig } from './order.fulfil.config';
 import * as fulfilRepo from './order.fulfil.repo';
 import * as rules from './order.fulfil.rules';
 import { resolveFulfilmentNotifier, type FulfilmentNoticeShipment } from './order.fulfil.ports';
-import { scheduleAutoReceive } from './order.fulfil.service';
+import { readyToShip, scheduleAutoReceive } from './order.fulfil.service';
 import * as repo from './order.repo';
 import { onOrderPaid, onShipmentDispatched } from './ports';
 import { orderStateMachine } from './order.state-machine';
@@ -113,6 +113,8 @@ export async function autoDeliver(ctx: Ctx, orderId: number): Promise<AutoDelive
     if (!order) return empty;
     // A refund can beat delivery to the order. Nothing to hand over then.
     if (order.status !== 'paid') return empty;
+    // RISK-D-011: a 拼团 order waits for its team; the team's success calls this again.
+    if (!(await readyToShip(tx, order))) return empty;
 
     // The idempotence gate. The ledger replays, and the two writes below
     // (shipped_quantity, claimed cards) are not things to do twice.

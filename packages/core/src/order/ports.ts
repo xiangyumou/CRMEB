@@ -438,6 +438,12 @@ export interface OrderKindHandler {
    */
   orderStates?(db: DbOrTx, orderIds: readonly number[]): Promise<Map<number, OrderKindState>>;
   /**
+   * Read-only, inside the dispatch transaction: whether this order may ship yet. A 拼团 order
+   * waits for its team to succeed (RISK-D-011) — shipping to a team that then fails would
+   * refund goods already on the road. Optional; a kind without it ships once paid.
+   */
+  readyToShip?(db: DbOrTx, orderId: number): Promise<boolean>;
+  /**
    * Read-only, for 确认订单: what this kind promises before the order exists (the presale
    * ship time). Optional — a kind without it adds nothing. `selections` are the checkout
    * body's `kindMeta`, unvalidated: answer nothing for an activity it cannot find rather
@@ -590,6 +596,25 @@ export function registerOrderKindHandler(handler: OrderKindHandler): void {
 
 export function getOrderKindHandler(kind: string): OrderKindHandler | undefined {
   return kindHandlers.get(kind);
+}
+
+/** One batched `orderStates` read per kind on the page. */
+export async function kindStatesFor(
+  db: DbOrTx,
+  rows: readonly { id: number; kind: string }[],
+): Promise<Map<number, OrderKindState>> {
+  const out = new Map<number, OrderKindState>();
+  const byKind = new Map<string, number[]>();
+  for (const row of rows) {
+    const ids = byKind.get(row.kind);
+    if (ids) ids.push(row.id);
+    else byKind.set(row.kind, [row.id]);
+  }
+  for (const [kind, ids] of byKind) {
+    const states = await getOrderKindHandler(kind)?.orderStates?.(db, ids);
+    for (const [orderId, state] of states ?? []) out.set(orderId, state);
+  }
+  return out;
 }
 
 export function allOrderKinds(): string[] {

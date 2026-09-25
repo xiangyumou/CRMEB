@@ -734,7 +734,45 @@ describe('paying', () => {
     expect(group).toMatchObject({ status: 'succeeded', seatsTaken: 2 });
     expect(group.succeededAt).not.toBeNull();
   });
+
+  it('RISK-D-011 — a paid order does not ship while its team is forming, and ships once it succeeded', async () => {
+    const fixture = await makeActivity({ seatsRequired: 2, stock: 10 });
+    const leader = await makeUser();
+    const joiner = await makeUser();
+    const opened = await placeOrder({ userId: leader, fixture });
+    await pay(opened.orderId);
+    const admin = asAdmin(['order:shipment:write']);
+    const ship = () =>
+      checkout.shipOrder(admin, {
+        orderId: opened.orderId,
+        body: {
+          deliveryMode: 'merchant_delivery',
+          lines: [],
+          courierName: '王五',
+          courierPhone: '13900000000',
+        },
+        operatorAdminId: 1,
+      });
+
+    await expect(ship()).rejects.toMatchObject({ code: 'ORDER_GROUPBUY_NOT_READY' });
+    const listed = await checkout.orderConsole.adminList(admin, adminListQuery());
+    expect(listed.items[0]?.groupbuyTeamStatus).toBe('forming');
+
+    const joined = await placeOrder({ userId: joiner, fixture, groupId: opened.groupId });
+    await pay(joined.orderId);
+    expect(await readGroup(opened.groupId)).toMatchObject({ status: 'succeeded' });
+    await expect(ship()).resolves.toMatchObject({ deliveryMode: 'merchant_delivery' });
+  });
 });
+
+function adminListQuery() {
+  return {
+    page: 1,
+    pageSize: 20,
+    sortOrder: 'desc' as const,
+    deleted: false,
+  } as Parameters<typeof checkout.orderConsole.adminList>[1];
+}
 
 describe('cancelling an unpaid order', () => {
   it('gives the activity stock back and leaves no seat behind', async () => {

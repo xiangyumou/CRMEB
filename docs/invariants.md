@@ -1426,6 +1426,14 @@ A team shows strangers only a masked nickname and never an account id (decided 2
 - `packages/core/src/groupbuy/groupbuy.rules.test.ts::RISK-D-010 — a team shows strangers a masked nickname > answers null for no name at all`
 - `packages/core/src/groupbuy/groupbuy.int.test.ts::the storefront surface > RISK-D-010 — shows a team to anybody with masked names, no account ids, and isMe from the session`
 
+### RISK-D-011
+
+A 拼团 order ships only once its team has succeeded: manual 发货 is refused with `ORDER_GROUPBUY_NOT_READY` while the team is forming (or failed), auto-delivery of card keys and coupon goods holds back on payment and runs when the team succeeds (the `groupbuy.settle` effect), and the console shows the team's state (`groupbuyTeamStatus`) instead of offering 发货.
+
+- `packages/core/src/order/order.ship-ready.test.ts::RISK-D-011 — an order ships only when its kind says it may > holds a 拼团 order whose team is still forming`
+- `packages/core/src/order/order.ship-ready.test.ts::RISK-D-011 — an order ships only when its kind says it may > lets it go once the team succeeded`
+- `packages/core/src/groupbuy/groupbuy.int.test.ts::paying > RISK-D-011 — a paid order does not ship while its team is forming, and ships once it succeeded`
+
 ## Storefront end to end
 
 ### SMOKE-002

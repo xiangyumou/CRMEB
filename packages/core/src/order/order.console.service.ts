@@ -23,8 +23,9 @@ import { DomainError } from '../kernel/errors';
 import { fromId, toId, toIdOrNull } from '../kernel/ids';
 import { Money } from '../kernel/money';
 import { notify } from '../notification';
+import { maskPhone } from '../user';
 import { closeOrderPayments, openPaymentState } from './order.cancel.service';
-import type { PaymentState } from './ports';
+import { kindStatesFor, type OrderKindState, type PaymentState } from './ports';
 import { orderFulfilConfig } from './order.fulfil.config';
 import { orderPermissions } from './permissions';
 import * as fulfilRepo from './order.fulfil.repo';
@@ -91,6 +92,8 @@ export interface ConsoleSideData {
   users: Map<number, fulfilRepo.UserBriefRow>;
   /** The newest invoice request per order; the console shows its status as a column. */
   invoices: Map<number, 'requested' | 'issued' | 'rejected' | 'cancelled'>;
+  /** Each kind's own state (the 拼团 team), from the kind's domain through the port. */
+  kindStates: Map<number, OrderKindState>;
 }
 
 async function sideDataFor(
@@ -98,19 +101,24 @@ async function sideDataFor(
   rows: readonly fulfilRepo.OrderRow[],
 ): Promise<ConsoleSideData> {
   const orderIds = rows.map((row) => row.id);
-  const [users, invoices] = await Promise.all([
+  const [users, invoices, kindStates] = await Promise.all([
     fulfilRepo.listUserBriefs(
       db,
       rows.map((row) => row.userId),
     ),
     fulfilRepo.listOpenInvoiceStatuses(db, orderIds),
+    kindStatesFor(db, rows),
   ]);
   const invoiceByOrder = new Map<number, 'requested' | 'issued' | 'rejected' | 'cancelled'>();
   // Ordered newest first by the repo, so the first one wins.
   for (const row of invoices) {
     if (!invoiceByOrder.has(row.orderId)) invoiceByOrder.set(row.orderId, row.status);
   }
-  return { users: new Map(users.map((user) => [user.id, user])), invoices: invoiceByOrder };
+  return {
+    users: new Map(users.map((user) => [user.id, user])),
+    invoices: invoiceByOrder,
+    kindStates,
+  };
 }
 
 export function toAdminListItem(
@@ -157,6 +165,7 @@ export function toAdminListItem(
     buyerRemark: row.buyerRemark,
     adminRemark: row.adminRemark,
     invoiceStatus: side.invoices.get(row.id) ?? null,
+    groupbuyTeamStatus: side.kindStates.get(row.id)?.groupbuyTeam?.status ?? null,
     paidAt: iso(row.paidAt),
     shippedAt: iso(row.shippedAt),
     receivedAt: iso(row.receivedAt),
@@ -225,7 +234,12 @@ export async function adminList(
   const side = await sideDataFor(ctx.db, rows);
 
   return {
-    items: rows.map((row) => toAdminListItem(row, byOrder.get(row.id) ?? [], side)),
+    // The account phone is masked in a list, as the customer list is: a screenshot of a table
+    // should not leak it. The order detail's 客户信息 shows it whole.
+    items: rows.map((row) => {
+      const item = toAdminListItem(row, byOrder.get(row.id) ?? [], side);
+      return { ...item, user: { ...item.user, phone: maskPhone(item.user.phone) } };
+    }),
     total,
     page: query.page,
     pageSize: query.pageSize,

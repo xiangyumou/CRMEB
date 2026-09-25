@@ -256,6 +256,15 @@ export const groupbuyKindHandler: OrderKindHandler = {
     return { groupbuyTeamId: member?.groupId ?? null };
   },
 
+  /**
+   * RISK-D-011: nothing ships — by hand or by auto-delivery — until the team succeeded. A
+   * team that fails refunds every member, and goods already on the road would be lost.
+   */
+  async readyToShip(db, orderId) {
+    const [row] = await repo.listTeamsByOrders(db, [orderId]);
+    return row === undefined || row.group.status === 'succeeded';
+  },
+
   /** 拼团中 / 拼团成功 / 拼团失败 on 我的订单: the team of each order's seat. */
   async orderStates(db, orderIds) {
     const rows = await repo.listTeamsByOrders(db, orderIds);

@@ -15,7 +15,7 @@ import { listOpenInvoiceStatuses } from './order.fulfil.repo';
 import { invoiceableAmount, isInvoiceRequestable } from './order.invoice.service';
 import { requireOrderRef } from './order.ref';
 import * as repo from './order.repo';
-import { getOrderKindHandler, type OrderKindState } from './ports';
+import { getOrderKindHandler, kindStatesFor, type OrderKindState } from './ports';
 
 /**
  * The buyer's own orders: the list, the tab badges and one order's detail.
@@ -58,7 +58,7 @@ export async function list(
     else byOrder.set(item.orderId, [mapped]);
   }
 
-  const states = await kindStates(ctx, rows);
+  const states = await kindStatesFor(ctx.db, rows);
 
   return {
     items: rows.map((row) => toListItem(row, byOrder.get(row.id) ?? [], states.get(row.id))),
@@ -142,7 +142,7 @@ export async function detailOf(
   // The kind's own links (the 拼团 team) come from the kind's domain through the port: this
   // domain never reads a `groupbuy_*` table.
   const links = (await getOrderKindHandler(row.kind)?.detailLinks?.(ctx.db, row.id)) ?? {};
-  const states = await kindStates(ctx, [row]);
+  const states = await kindStatesFor(ctx.db, [row]);
   const invoices = await listOpenInvoiceStatuses(ctx.db, [row.id]);
   const hasOpenInvoice = invoices.some((i) => i.status === 'requested' || i.status === 'issued');
   return {
@@ -155,25 +155,6 @@ export async function detailOf(
     invoiceRequestable: isInvoiceRequestable(row, hasOpenInvoice),
     invoiceAmount: invoiceableAmount(row).toString(),
   };
-}
-
-/** Each kind's own state for its orders on this page, one batched read per kind. */
-async function kindStates(
-  ctx: Ctx,
-  rows: readonly { id: number; kind: string }[],
-): Promise<Map<number, OrderKindState>> {
-  const out = new Map<number, OrderKindState>();
-  const byKind = new Map<string, number[]>();
-  for (const row of rows) {
-    const ids = byKind.get(row.kind);
-    if (ids) ids.push(row.id);
-    else byKind.set(row.kind, [row.id]);
-  }
-  for (const [kind, ids] of byKind) {
-    const states = await getOrderKindHandler(kind)?.orderStates?.(ctx.db, ids);
-    for (const [orderId, state] of states ?? []) out.set(orderId, state);
-  }
-  return out;
 }
 
 /**
