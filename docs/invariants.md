@@ -735,6 +735,12 @@ The storefront's coupon-to-product links agree with the checkout's scope rule (`
 - `packages/core/src/coupon/coupon.int.test.ts::listClaimable > COUPON-009 — narrowed to a product, lists exactly the coupons the checkout would apply to it`
 - `packages/core/src/coupon/coupon.int.test.ts::listClaimable > COUPON-009 — the 商品列表 for a coupon lists exactly the products the checkout would apply it to`
 
+### COUPON-010
+
+The storefront coupon lists give each template the caller's own claimed count, read for the whole page in one grouped query rather than one query per template.
+
+- `packages/core/src/coupon/coupon.int.test.ts::listClaimable > COUPON-010 — gives each template its own claimed count, read in one query for the page`
+
 ### AUTH-005
 
 A stranger gets `订单不存在` (never the after-sale detail) from the storefront refund surface — the refund service answers `REFUND_NOT_FOUND` for another user's row — and the admin refund route refuses an unauthenticated call without completing the after-sale.

@@ -577,6 +577,28 @@ export async function nextClaimSlot(
   return (rows[0]?.held ?? 0) + 1;
 }
 
+/**
+ * How many coupons this user holds from each of these templates, in one query.
+ * For the storefront lists, which used to ask once per template.
+ */
+export async function claimedCounts(
+  db: DbOrTx,
+  args: { templateIds: readonly number[]; userId: number },
+): Promise<Map<number, number>> {
+  if (args.templateIds.length === 0) return new Map();
+  const rows = await db
+    .select({ templateId: userCoupons.templateId, total: sql<number>`count(*)::int` })
+    .from(userCoupons)
+    .where(
+      and(
+        eq(userCoupons.userId, args.userId),
+        inArray(userCoupons.templateId, [...args.templateIds]),
+      ),
+    )
+    .groupBy(userCoupons.templateId);
+  return new Map(rows.map((row) => [row.templateId, row.total]));
+}
+
 /** How many coupons each of these users holds from this template. For the admin grant screen. */
 export async function heldCounts(
   db: DbOrTx,

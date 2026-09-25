@@ -842,12 +842,11 @@ async function withCallerState(
   rows: readonly repo.TemplateRow[],
 ): Promise<ClaimableCoupon[]> {
   const userId = ctx.actor.kind === 'user' ? ctx.actor.id : null;
-  const held = new Map<number, number>();
-  if (userId !== null) {
-    for (const row of rows) {
-      held.set(row.id, (await repo.nextClaimSlot(ctx.db, { templateId: row.id, userId })) - 1);
-    }
-  }
+  // One query for the page, not one per template.
+  const held =
+    userId === null
+      ? new Map<number, number>()
+      : await repo.claimedCounts(ctx.db, { templateIds: rows.map((row) => row.id), userId });
   return rows.map((row) => {
     const claimedCount = userId === null ? null : (held.get(row.id) ?? 0);
     return {

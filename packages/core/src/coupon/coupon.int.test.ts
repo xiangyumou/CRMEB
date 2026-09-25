@@ -588,6 +588,24 @@ describe('listClaimable', () => {
     expect(after.items[0]).toMatchObject({ claimedCount: 1, canClaim: false });
   });
 
+  it('COUPON-010 — gives each template its own claimed count, read in one query for the page', async () => {
+    const [once, twice, none] = [
+      await makeTemplate({ name: '一张', perUserLimit: 3 }),
+      await makeTemplate({ name: '两张', perUserLimit: 3 }),
+      await makeTemplate({ name: '没领', perUserLimit: 3 }),
+    ];
+    const userId = await makeUser();
+    await service.claim(asUser(userId), { id: String(once) });
+    await service.claim(asUser(userId), { id: String(twice) });
+    await service.claim(asUser(userId), { id: String(twice) });
+
+    const list = await service.listClaimable(asUser(userId), { page: 1, pageSize: 20 } as never);
+    const counts = new Map(list.items.map((item) => [item.templateId, item.claimedCount]));
+    expect(counts.get(String(once))).toBe(1);
+    expect(counts.get(String(twice))).toBe(2);
+    expect(counts.get(String(none))).toBe(0);
+  });
+
   it('COUPON-009 — narrowed to a product, lists exactly the coupons the checkout would apply to it', async () => {
     const [product, other] = [await makeProduct(), await makeProduct()];
     const [itsCategory, otherCategory] = [
