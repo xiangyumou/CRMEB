@@ -243,6 +243,25 @@ describe('用户列表', () => {
     });
   });
 
+  it('clears 真实姓名 and 管理员备注 by sending null, the clear the service applies', async () => {
+    const calls = stubApi();
+    renderAdmin(<CustomersPage />, { identity: allPermissions });
+    await screen.findByText('小明');
+
+    await userEvent.click(screen.getByRole('button', { name: '编辑' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByDisplayValue('王小明');
+
+    await userEvent.clear(within(dialog).getByLabelText('真实姓名'));
+    await userEvent.clear(within(dialog).getByDisplayValue('老客户，走加急'));
+    await userEvent.click(within(dialog).getByRole('button', { name: '保 存' }));
+
+    await waitFor(() => {
+      const save = calls.find((call) => call.method === 'PUT');
+      expect(save?.body).toMatchObject({ realName: null, adminRemark: null });
+    });
+  });
+
   it('fetches the unmasked number only when the detail drawer is opened', async () => {
     const calls = stubApi();
     renderAdmin(<CustomersPage />, { identity: allPermissions });

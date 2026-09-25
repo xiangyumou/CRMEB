@@ -426,9 +426,11 @@ export type AdminUserDetail = z.infer<typeof adminUserDetail>;
  */
 export const adminUserForm = z.object({
   nickname: z.string().min(1).max(64).optional(),
-  realName: z.string().max(32).optional(),
+  /** `null` clears it; absent leaves it as it is. */
+  realName: z.string().max(32).nullish(),
   birthday: instant.nullish(),
-  adminRemark: z.string().max(255).optional(),
+  /** `null` clears it; absent leaves it as it is. */
+  adminRemark: z.string().max(255).nullish(),
   groupIds: z.array(id).max(50).default([]),
   labelIds: z.array(id).max(50).default([]),
 });

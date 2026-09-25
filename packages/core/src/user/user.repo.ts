@@ -288,9 +288,9 @@ export async function updateProfile(
     id: number;
     nickname?: string | undefined;
     avatarUrl?: string | null | undefined;
-    realName?: string | undefined;
+    realName?: string | null | undefined;
     birthday?: Date | null | undefined;
-    adminRemark?: string | undefined;
+    adminRemark?: string | null | undefined;
     now: Date;
   },
 ): Promise<ConditionalUpdateResult> {
