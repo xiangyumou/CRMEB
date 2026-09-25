@@ -118,7 +118,7 @@ export default function CouponCenterPage() {
                   busy={claiming === coupon.templateId}
                   onAction={
                     state === 'claimable' || state === 'claimed'
-                      ? () => void take(coupon)
+                      ? () => take(coupon)
                       : state === 'limit'
                         ? () => use(coupon)
                         : undefined
@@ -152,10 +152,7 @@ export default function CouponCenterPage() {
               title="暂时没有可领的券"
               description="过段时间再来看看"
               actions={
-                <Button
-                  variant="outline"
-                  onClick={() => void navigate({ route: 'home', params: {} })}
-                >
+                <Button variant="outline" onClick={() => navigate({ route: 'home', params: {} })}>
                   回到首页
                 </Button>
               }

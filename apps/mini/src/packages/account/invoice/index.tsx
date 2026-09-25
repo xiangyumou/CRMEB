@@ -123,7 +123,7 @@ function Invoice({ id }: { id: string }) {
           description={`订单号 ${invoice.orderNo}`}
           label="查看订单"
           // Back to 订单详情 when 查看发票 was opened from it, rather than a second copy of it.
-          onClick={() => void leaveFor({ route: 'order', params: { id: invoice.orderId } })}
+          onClick={() => leaveFor({ route: 'order', params: { id: invoice.orderId } })}
         />
       </CellGroup>
       {invoice.status === 'requested' ? (
@@ -133,7 +133,7 @@ function Invoice({ id }: { id: string }) {
             variant="outline"
             block
             loading={cancel.isPending}
-            onClick={() => void withdraw()}
+            onClick={() => withdraw()}
           >
             撤回申请
           </Button>

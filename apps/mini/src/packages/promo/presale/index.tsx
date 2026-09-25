@@ -43,7 +43,7 @@ export default function PresaleListPage() {
                 layout="list"
                 activity={phase === 'upcoming' ? '即将开始' : '预售'}
                 activityPrice={activityPrice}
-                onClick={() => void navigate({ route: 'presale', params: { id: card.activityId } })}
+                onClick={() => navigate({ route: 'presale', params: { id: card.activityId } })}
               />
             );
           }}
@@ -55,10 +55,7 @@ export default function PresaleListPage() {
               image="cart"
               title="暂时没有预售活动"
               actions={
-                <Button
-                  variant="outline"
-                  onClick={() => void navigate({ route: 'home', params: {} })}
-                >
+                <Button variant="outline" onClick={() => navigate({ route: 'home', params: {} })}>
                   回到首页
                 </Button>
               }

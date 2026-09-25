@@ -17,6 +17,7 @@ import { Pressable } from '@/ui/pressable';
 import { Result } from '@/ui/result';
 import { CellSkeleton } from '@/ui/skeleton';
 import './index.scss';
+import { errorMessage } from '@/lib/error-message';
 
 /**
  * 收银台 (`cashier { orderId }`): the amount, the time left to pay (`payExpiresAt`), 微信支付.
@@ -65,7 +66,7 @@ function Cashier({ orderId }: { orderId: string }) {
             <Button variant="outline" onClick={toOrder}>
               查看订单
             </Button>
-            <Button onClick={() => void navigate({ route: 'home', params: {} })}>继续购物</Button>
+            <Button onClick={() => navigate({ route: 'home', params: {} })}>继续购物</Button>
           </>
         }
       />
@@ -117,7 +118,7 @@ function Cashier({ orderId }: { orderId: string }) {
       }
       setPhase({
         kind: 'notice',
-        text: error instanceof Error ? error.message : String(error),
+        text: errorMessage(error, '暂时无法发起支付，请稍后再试'),
         retry: true,
       });
     }
@@ -168,7 +169,7 @@ function Cashier({ orderId }: { orderId: string }) {
         </Text>
       ) : null}
       <View className="cashier__bar">
-        <Button size="lg" block loading={phase.kind === 'paying'} onClick={() => void pay()}>
+        <Button size="lg" block loading={phase.kind === 'paying'} onClick={() => pay()}>
           {retry ? '重新支付' : '微信支付'}
         </Button>
       </View>

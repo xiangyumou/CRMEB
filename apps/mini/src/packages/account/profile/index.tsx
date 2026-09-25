@@ -104,12 +104,12 @@ function ProfileForm() {
         <Cell
           title="手机号"
           value={phone ? maskPhone(phone) : '未绑定'}
-          onClick={() => void navigate({ route: 'phone', params: {} })}
+          onClick={() => navigate({ route: 'phone', params: {} })}
         />
         <Cell
           title="登录密码"
           value={profile.data.hasPassword ? '修改' : '未设置'}
-          onClick={() => void navigate({ route: 'password', params: {} })}
+          onClick={() => navigate({ route: 'password', params: {} })}
         />
       </CellGroup>
       <SubmitBar>

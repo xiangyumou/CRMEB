@@ -73,7 +73,7 @@ function History() {
     <View className="account-page">
       {all.length > 0 ? (
         <View className="manage-head">
-          <Button variant="text" size="sm" onClick={() => void clear()}>
+          <Button variant="text" size="sm" onClick={() => clear()}>
             清空
           </Button>
           <Button variant="text" size="sm" onClick={selection.toggleManaging}>

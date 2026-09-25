@@ -38,7 +38,7 @@ export interface ProductCardProps {
   /** 已下架: the whole card greys out and does nothing. */
   unavailable?: boolean | undefined;
   /** Opens the product by default. */
-  onClick?: (() => void) | undefined;
+  onClick?: (() => void | Promise<unknown>) | undefined;
   /** Shows the round 加购 button (grid and list) when the product can go in a cart. */
   onAddToCart?: (() => void) | undefined;
   className?: string | undefined;
@@ -69,7 +69,7 @@ export function ProductCard({
   const strike = activityPrice ? product.price : product.originalPrice;
   const showCart =
     Boolean(onAddToCart) && product.canAddToCart && !soldOut && !unavailable && layout !== 'mini';
-  const open = onClick ?? (() => void navigate({ route: 'product', params: { id: product.id } }));
+  const open = onClick ?? (() => navigate({ route: 'product', params: { id: product.id } }));
   const state = unavailable ? '，已下架' : soldOut ? '，已售罄' : '';
 
   return (

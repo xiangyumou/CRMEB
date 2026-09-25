@@ -39,6 +39,7 @@ import { ProductCard, formatSales } from '@/ui/product-card';
 import { Sheet } from '@/ui/sheet';
 import { ProductCardSkeleton, Skeleton } from '@/ui/skeleton';
 import './index.scss';
+import { errorMessage } from '@/lib/error-message';
 
 type Product = ResponseOf<'catalog.productDetail'>;
 
@@ -95,9 +96,7 @@ export default function ProductPage() {
               title="商品已下架"
               description="这件商品已经下架或不存在，去看看别的吧"
               actions={
-                <Button onClick={() => void navigate({ route: 'home', params: {} })}>
-                  回到首页
-                </Button>
+                <Button onClick={() => navigate({ route: 'home', params: {} })}>回到首页</Button>
               }
             />
           </View>
@@ -169,7 +168,7 @@ function Detail({ product }: { product: Product }) {
         toast.text(next ? '已收藏' : '已取消收藏');
       } catch (error) {
         setFavorited(!next);
-        toast.text(error instanceof Error ? error.message : '操作失败，请稍后重试');
+        toast.text(errorMessage(error, '操作失败，请稍后重试'));
       }
     } finally {
       favoriteInFlight.current = false;
@@ -208,7 +207,7 @@ function Detail({ product }: { product: Product }) {
       icon: isFavorite ? 'heart-fill' : 'heart',
       label: isFavorite ? '已收藏' : '收藏',
       active: isFavorite,
-      onClick: () => void toggleFavorite(),
+      onClick: () => toggleFavorite(),
     },
   ];
 
@@ -290,7 +289,7 @@ function Detail({ product }: { product: Product }) {
           title="已选"
           label={`选择规格，${chosenText}`}
           value={chosenText}
-          onClick={() => void openSku(canCart ? ['cart', 'buy'] : ['buy'])}
+          onClick={() => openSku(canCart ? ['cart', 'buy'] : ['buy'])}
           disabled={soldOut}
         />
         {display.productServiceTags && product.protections.length > 0 ? (
@@ -334,11 +333,11 @@ function Detail({ product }: { product: Product }) {
         ) : (
           <>
             {canCart ? (
-              <Button size="lg" variant="secondary" block onClick={() => void openSku(['cart'])}>
+              <Button size="lg" variant="secondary" block onClick={() => openSku(['cart'])}>
                 加入购物车
               </Button>
             ) : null}
-            <Button size="lg" block onClick={() => void openSku(['buy'])}>
+            <Button size="lg" block onClick={() => openSku(['buy'])}>
               立即购买
             </Button>
           </>

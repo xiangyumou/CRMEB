@@ -32,7 +32,7 @@ function NotAllowed({ url }: { url: string }) {
         title="该链接需在浏览器中打开"
         footer={
           url ? (
-            <Button size="lg" block onClick={() => void copyText(url)}>
+            <Button size="lg" block onClick={() => copyText(url)}>
               复制链接
             </Button>
           ) : (

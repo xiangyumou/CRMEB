@@ -154,7 +154,7 @@ export function ImageUploader({
         <Pressable
           label={`${label}，还可以添加 ${room} 张`}
           className={cx('shop-uploader__tile', 'shop-uploader__add')}
-          onClick={() => void add()}
+          onClick={() => add()}
         >
           <Icon name="camera" className="shop-uploader__add-icon" />
           <Text className="shop-uploader__count">

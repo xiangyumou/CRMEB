@@ -21,6 +21,7 @@ import { Result } from '@/ui/result';
 import { CellSkeleton } from '@/ui/skeleton';
 import { ORDER_READS } from '../shared/actions';
 import './index.scss';
+import { errorMessage } from '@/lib/error-message';
 
 /** What the server said of a line's review. `already`: written before (this page or another). */
 export type LineOutcome = 'published' | 'pending' | 'already';
@@ -99,7 +100,7 @@ function ReviewForm({ orderId, only }: { orderId: string; only?: string | undefi
         title="暂时不能评价"
         description="确认收货后可以评价已购买的商品"
         actions={
-          <Button variant="outline" size="md" onClick={() => void goBack()}>
+          <Button variant="outline" size="md" onClick={() => goBack()}>
             返回
           </Button>
         }
@@ -129,7 +130,7 @@ function ReviewForm({ orderId, only }: { orderId: string; only?: string | undefi
             size="lg"
             block
             // Back to 订单详情 when 去评价 was tapped there, rather than a second copy of it.
-            onClick={() => void leaveFor({ route: 'order', params: { id: orderId } })}
+            onClick={() => leaveFor({ route: 'order', params: { id: orderId } })}
           >
             返回订单
           </Button>
@@ -170,7 +171,7 @@ function ReviewForm({ orderId, only }: { orderId: string; only?: string | undefi
             done[line.id] = 'already';
             continue;
           }
-          toast.text(error instanceof Error ? error.message : '提交失败，请稍后重试');
+          toast.text(errorMessage(error, '提交失败，请稍后重试'));
           break;
         }
       }
@@ -239,7 +240,7 @@ function ReviewForm({ orderId, only }: { orderId: string; only?: string | undefi
           size="lg"
           block
           loading={submitting}
-          onClick={() => void submit()}
+          onClick={() => submit()}
         >
           提交评价
         </Button>

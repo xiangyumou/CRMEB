@@ -71,11 +71,11 @@ function Message({ id }: { id: string }) {
       <Text className="message__content">{message.data.content}</Text>
       <View className="message__actions">
         {route ? (
-          <Button variant="primary" block onClick={() => void navigate(route)}>
+          <Button variant="primary" block onClick={() => navigate(route)}>
             查看详情
           </Button>
         ) : null}
-        <Button variant="text" block onClick={() => void removeIt()}>
+        <Button variant="text" block onClick={() => removeIt()}>
           删除消息
         </Button>
       </View>

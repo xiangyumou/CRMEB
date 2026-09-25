@@ -153,7 +153,7 @@ function ExpressTrail({ parcel }: { parcel: Shipment }) {
                 <Pressable
                   label="复制运单号"
                   className="logistics__link"
-                  onClick={() => void copyText(trackingNo)}
+                  onClick={() => copyText(trackingNo)}
                 >
                   复制
                 </Pressable>

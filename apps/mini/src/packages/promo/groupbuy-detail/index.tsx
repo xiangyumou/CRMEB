@@ -78,7 +78,7 @@ export default function GroupbuyDetailPage() {
               title="拼团活动已结束"
               description="这个拼团活动已经结束或下架了"
               actions={
-                <Button onClick={() => void navigate({ route: 'groupbuyList', params: {} })}>
+                <Button onClick={() => navigate({ route: 'groupbuyList', params: {} })}>
                   看看其他拼团
                 </Button>
               }
@@ -169,7 +169,7 @@ function Detail({ activity, onStale }: { activity: Activity; onStale: () => void
           variant="secondary"
           block
           // Back to 商品详情 when this activity was opened from its banner, not a second copy.
-          onClick={() => void leaveFor({ route: 'product', params: { id: activity.productId } })}
+          onClick={() => leaveFor({ route: 'product', params: { id: activity.productId } })}
         >
           单独购买
         </Button>
@@ -182,7 +182,7 @@ function Detail({ activity, onStale }: { activity: Activity; onStale: () => void
             查看我的团
           </Button>
         ) : (
-          <Button block onClick={() => void start()}>
+          <Button block onClick={() => start()}>
             发起拼团
           </Button>
         )}

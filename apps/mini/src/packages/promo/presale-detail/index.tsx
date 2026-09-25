@@ -73,7 +73,7 @@ export default function PresaleDetailPage() {
               title="预售活动已结束"
               description="这个预售活动已经结束或下架了"
               actions={
-                <Button onClick={() => void navigate({ route: 'presaleList', params: {} })}>
+                <Button onClick={() => navigate({ route: 'presaleList', params: {} })}>
                   看看其他预售
                 </Button>
               }
@@ -144,12 +144,12 @@ function Detail({ activity, onStale }: { activity: Activity; onStale: () => void
           variant="secondary"
           block
           // Back to 商品详情 when this activity was opened from its banner, not a second copy.
-          onClick={() => void leaveFor({ route: 'product', params: { id: activity.productId } })}
+          onClick={() => leaveFor({ route: 'product', params: { id: activity.productId } })}
         >
           查看商品
         </Button>
         {phase === 'on' ? (
-          <Button block onClick={() => void start()}>
+          <Button block onClick={() => start()}>
             立即预订
           </Button>
         ) : (

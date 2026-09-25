@@ -43,7 +43,7 @@ export function ErrorBlock({ error, onRetry, onLogin, compact }: ErrorBlockProps
   let action = null;
   if (kind === 'not-found') {
     action = (
-      <Button variant="outline" size="sm" onClick={() => void navigate({ route: 'home' })}>
+      <Button variant="outline" size="sm" onClick={() => navigate({ route: 'home' })}>
         回到首页
       </Button>
     );

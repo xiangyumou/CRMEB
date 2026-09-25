@@ -100,7 +100,7 @@ function Wallet({ tab }: { tab: WalletTab }) {
               tab === 'unused' ? (
                 <Button
                   variant="outline"
-                  onClick={() => void navigate({ route: 'couponCenter', params: {} })}
+                  onClick={() => navigate({ route: 'couponCenter', params: {} })}
                 >
                   去领券中心
                 </Button>

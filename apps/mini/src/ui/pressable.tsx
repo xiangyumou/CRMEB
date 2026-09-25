@@ -1,11 +1,12 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { View } from '@tarojs/components';
 import { cx } from '@/lib/cx';
 
 export interface PressableProps {
   /** What a screen reader announces. Required: a tappable thing always has a name (§7). */
   label: string;
-  onClick?: (() => void) | undefined;
+  /** Return the promise of an async action: taps are ignored until it settles (no double submit). */
+  onClick?: (() => void | Promise<unknown>) | undefined;
   disabled?: boolean | undefined;
   /** `button` by default; `link` for navigation rows, `tab`, `checkbox`, `radio`… */
   role?: 'button' | 'link' | 'tab' | 'checkbox' | 'radio' | 'switch' | undefined;
@@ -45,6 +46,23 @@ export function Pressable({
   id,
   children,
 }: PressableProps) {
+  const running = useRef(false);
+  const tap = () => {
+    if (!onClick || running.current) return;
+    const result = onClick();
+    if (!(result instanceof Promise)) return;
+    running.current = true;
+    // The caller shows its own error; one it did not catch still reaches the console.
+    result.then(
+      () => {
+        running.current = false;
+      },
+      (error: unknown) => {
+        running.current = false;
+        console.error(error);
+      },
+    );
+  };
   return (
     <View
       {...(id ? { id } : {})}
@@ -62,7 +80,7 @@ export function Pressable({
         : {
             onClick: (event: { stopPropagation: () => void }) => {
               if (stopPropagation) event.stopPropagation();
-              onClick();
+              tap();
             },
           })}
     >

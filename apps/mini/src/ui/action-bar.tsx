@@ -10,7 +10,7 @@ import './action-bar.scss';
 export interface ActionBarIcon {
   icon: IconName;
   label: string;
-  onClick?: (() => void) | undefined;
+  onClick?: (() => void | Promise<unknown>) | undefined;
   badge?: number | undefined;
   /** Filled / coloured (收藏 on). */
   active?: boolean | undefined;

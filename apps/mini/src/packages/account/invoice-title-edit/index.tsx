@@ -146,7 +146,7 @@ function TitleForm({ id, initial }: { id?: string; initial: InvoiceDraft }) {
             </View>
           }
           label="从微信导入"
-          onClick={() => void importWechat()}
+          onClick={() => importWechat()}
         />
       </CellGroup>
       <CellGroup>

@@ -36,7 +36,7 @@ function AvatarButton({ children, className, onResult }: AvatarButtonProps) {
     <Button
       {...BUTTON_ROLE}
       className={className ?? ''}
-      onClick={() => void generatedAvatar().then(onResult)}
+      onClick={() => generatedAvatar().then(onResult)}
     >
       {children}
     </Button>

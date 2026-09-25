@@ -30,7 +30,7 @@ export interface CouponCardProps {
   /** `unusable`: why (the server's reason, already in words). */
   reason?: string | undefined;
   /** The button on the right (领取 / 去使用); the picker makes the whole card the control. */
-  onAction?: (() => void) | undefined;
+  onAction?: (() => void | Promise<unknown>) | undefined;
   /** The action is in flight (领取中). */
   busy?: boolean | undefined;
   className?: string | undefined;

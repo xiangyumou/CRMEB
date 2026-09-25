@@ -133,7 +133,7 @@ function AddressForm({ id, initial }: { id?: string; initial: AddressDraft | nul
             </View>
           }
           label="导入微信地址"
-          onClick={() => void importWechat()}
+          onClick={() => importWechat()}
         />
       </CellGroup>
       <CellGroup>

@@ -107,7 +107,7 @@ export function InfiniteList<T>({
           <Pressable
             label="加载失败，点击重试"
             className="shop-list__retry"
-            onClick={() => void query.fetchNextPage()}
+            onClick={() => query.fetchNextPage()}
           >
             加载失败，点击重试
           </Pressable>

@@ -92,7 +92,7 @@ export default function PasswordResetPage() {
           />
         </CellGroup>
         <SubmitBar>
-          <Button size="lg" block loading={reset.isPending} onClick={() => void submit()}>
+          <Button size="lg" block loading={reset.isPending} onClick={() => submit()}>
             重置密码
           </Button>
         </SubmitBar>

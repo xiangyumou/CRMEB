@@ -50,10 +50,10 @@ export default function SettingsPage() {
         </CellGroup>
         {signedIn ? (
           <View className="settings__actions">
-            <Button variant="outline" size="lg" block onClick={() => void signOut(false)}>
+            <Button variant="outline" size="lg" block onClick={() => signOut(false)}>
               退出登录
             </Button>
-            <Button variant="text" size="md" block onClick={() => void signOut(true)}>
+            <Button variant="text" size="md" block onClick={() => signOut(true)}>
               退出全部设备
             </Button>
           </View>

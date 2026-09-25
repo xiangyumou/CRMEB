@@ -74,7 +74,7 @@ function Teams({ tab }: { tab: Tab }) {
             actions={
               <Button
                 variant="outline"
-                onClick={() => void navigate({ route: 'groupbuyList', params: {} })}
+                onClick={() => navigate({ route: 'groupbuyList', params: {} })}
               >
                 去看看拼团
               </Button>
@@ -95,7 +95,7 @@ function TeamCard({ item }: { item: MyTeam }) {
         label={`${item.title}，${status.text}`}
         role="link"
         className="my-groupbuys__main"
-        onClick={() => void navigate(team)}
+        onClick={() => navigate(team)}
       >
         <View className="my-groupbuys__image">
           <Image src={item.imageUrl} label={item.title} radius="sm" lazy size="small" />
@@ -114,11 +114,11 @@ function TeamCard({ item }: { item: MyTeam }) {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => void navigate({ route: 'order', params: { id: item.orderId } })}
+          onClick={() => navigate({ route: 'order', params: { id: item.orderId } })}
         >
           查看订单
         </Button>
-        <Button variant="outline-primary" size="sm" onClick={() => void navigate(team)}>
+        <Button variant="outline-primary" size="sm" onClick={() => navigate(team)}>
           {item.status === 'forming' ? '查看进度' : '拼团详情'}
         </Button>
       </View>

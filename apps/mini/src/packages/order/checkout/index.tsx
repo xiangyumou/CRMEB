@@ -67,7 +67,7 @@ export default function CheckoutPage() {
             <Button
               size="md"
               variant="outline"
-              onClick={() => void navigate({ route: 'home', params: {} })}
+              onClick={() => navigate({ route: 'home', params: {} })}
             >
               回到首页
             </Button>

@@ -207,7 +207,7 @@ function TeamCell({ teamId }: { teamId: string }) {
         title="拼团"
         value="查看拼团"
         label="查看拼团"
-        onClick={() => void navigate({ route: 'groupbuyTeam', params: { id: teamId } })}
+        onClick={() => navigate({ route: 'groupbuyTeam', params: { id: teamId } })}
       />
     </CellGroup>
   );
@@ -229,7 +229,7 @@ function ParcelCard({ orderId, parcels }: { orderId: string; parcels: Shipment[]
         title={parcels.length > 1 ? `已拆分为 ${parcels.length} 个包裹` : '物流信息'}
         description={summary}
         label="查看物流"
-        onClick={() => void navigate({ route: 'logistics', params: { orderId } })}
+        onClick={() => navigate({ route: 'logistics', params: { orderId } })}
       />
     </CellGroup>
   );
@@ -284,7 +284,7 @@ function OrderFacts({ order }: { order: OrderDetail }) {
         <Pressable
           label="复制订单编号"
           className="order-detail__copy"
-          onClick={() => void copyText(order.orderNo)}
+          onClick={() => copyText(order.orderNo)}
         >
           复制
         </Pressable>

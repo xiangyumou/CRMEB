@@ -40,6 +40,8 @@ describe('注销账号', () => {
     await waitFor(() => expect(submit.getAttribute('aria-disabled')).not.toBe('true'));
     fireEvent.click(submit);
     expect(seen.map((r) => r.key)).not.toContain('POST /api/v1/account-cancellations');
+    // The refused tap's handler settles before the button takes another.
+    await waitFor(() => expect(submit.className).not.toContain('shop-btn--loading'));
 
     fireEvent.click(screen.getByRole('checkbox', { name: '我已阅读并同意《注销协议》' }));
     fireEvent.change(screen.getByLabelText('注销原因'), { target: { value: '不再使用了' } });

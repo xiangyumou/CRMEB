@@ -115,7 +115,7 @@ export function ProductCoupons({
                 validity={couponValidity(coupon)}
                 state={state}
                 busy={claiming === coupon.templateId}
-                onAction={state === 'claimable' ? () => void take(coupon) : undefined}
+                onAction={state === 'claimable' ? () => take(coupon) : undefined}
               />
             );
           })}

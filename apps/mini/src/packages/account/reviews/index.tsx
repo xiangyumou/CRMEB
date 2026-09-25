@@ -85,7 +85,7 @@ function ReviewCard({ review }: { review: MyReview }) {
         label={review.productName}
         role="link"
         className="my-review__product"
-        onClick={() => void navigate({ route: 'product', params: { id: review.productId } })}
+        onClick={() => navigate({ route: 'product', params: { id: review.productId } })}
       >
         <View className="my-review__thumb">
           <Image src={assetUrl(review.productImageUrl)} ratio={1} radius="sm" size="small" />

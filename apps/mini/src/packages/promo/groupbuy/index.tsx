@@ -54,7 +54,7 @@ export default function GroupbuyListPage() {
               return (
                 <SwiperItem key={index}>
                   {route ? (
-                    <Pressable label={`拼团活动 ${index + 1}`} onClick={() => void navigate(route)}>
+                    <Pressable label={`拼团活动 ${index + 1}`} onClick={() => navigate(route)}>
                       <Image src={slide.imageUrl} ratio={750 / 320} radius="md" lazy={false} />
                     </Pressable>
                   ) : (
@@ -100,10 +100,7 @@ export default function GroupbuyListPage() {
               image="cart"
               title="暂时没有拼团活动"
               actions={
-                <Button
-                  variant="outline"
-                  onClick={() => void navigate({ route: 'home', params: {} })}
-                >
+                <Button variant="outline" onClick={() => navigate({ route: 'home', params: {} })}>
                   回到首页
                 </Button>
               }

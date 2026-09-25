@@ -18,7 +18,7 @@ export function BuildingPage({ title, home = true }: { title: string; home?: boo
           home ? (
             <Button
               variant="outline-primary"
-              onClick={() => void navigate({ route: 'home', params: {} })}
+              onClick={() => navigate({ route: 'home', params: {} })}
             >
               回到首页
             </Button>

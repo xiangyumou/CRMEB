@@ -82,7 +82,7 @@ export default function GroupbuyTeamPage() {
               title="这个团不存在"
               description="它可能已经被取消了"
               actions={
-                <Button onClick={() => void navigate({ route: 'groupbuyList', params: {} })}>
+                <Button onClick={() => navigate({ route: 'groupbuyList', params: {} })}>
                   去看看拼团
                 </Button>
               }
@@ -189,7 +189,7 @@ function Team({ view, onStale }: { view: TeamView; onStale: () => void }) {
             role="link"
             label={`${view.title}，查看拼团商品`}
             className="groupbuy-team__product-row"
-            onClick={() => void leaveFor({ route: 'groupbuy', params: { id: view.activityId } })}
+            onClick={() => leaveFor({ route: 'groupbuy', params: { id: view.activityId } })}
           >
             <View className="groupbuy-team__image">
               <Image src={view.imageUrl} label={view.title} radius="sm" lazy={false} size="small" />
@@ -256,7 +256,7 @@ function Team({ view, onStale }: { view: TeamView; onStale: () => void }) {
                 variant={index === 0 ? 'primary' : 'outline'}
                 loading={action.kind === 'withdraw' && withdraw.isPending}
                 disabled={action.kind === 'join' && !activity.data}
-                onClick={() => void run(action)}
+                onClick={() => run(action)}
               >
                 {ACTION_TEXT[action.kind]}
               </Button>

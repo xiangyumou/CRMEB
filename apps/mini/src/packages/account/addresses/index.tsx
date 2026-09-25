@@ -99,7 +99,7 @@ function AddressBook() {
         label="导入微信地址"
         className="addresses__import"
         disabled={importing}
-        onClick={() => void importWechat()}
+        onClick={() => importWechat()}
       >
         <Icon name="download" />
         <Text className="addresses__import-text">导入微信地址</Text>
@@ -117,7 +117,7 @@ function AddressBook() {
             <Pressable
               label={`${address.receiverName}，${regionText(address)}${address.detail}，编辑`}
               className="address-item__main"
-              onClick={() => void navigate({ route: 'addressEdit', params: { id: address.id } })}
+              onClick={() => navigate({ route: 'addressEdit', params: { id: address.id } })}
             >
               <View className="address-item__who">
                 <Text className="address-item__name">{address.receiverName}</Text>
@@ -155,7 +155,7 @@ function AddressBook() {
                   variant="text"
                   size="sm"
                   label={`删除 ${address.receiverName} 的地址`}
-                  onClick={() => void del(address)}
+                  onClick={() => del(address)}
                 >
                   删除
                 </Button>
@@ -165,7 +165,7 @@ function AddressBook() {
         )}
       />
       <SubmitBar>
-        <Button size="lg" block onClick={() => void navigate({ route: 'addressEdit', params: {} })}>
+        <Button size="lg" block onClick={() => navigate({ route: 'addressEdit', params: {} })}>
           新增收货地址
         </Button>
       </SubmitBar>

@@ -47,7 +47,7 @@ export default function CancellationPage() {
           title="已提交注销申请"
           description="已为你退出登录。审核通过前，重新登录后可在「设置 - 注销账号」撤回申请。"
           actions={
-            <Button variant="outline" onClick={() => void navigate({ route: 'home', params: {} })}>
+            <Button variant="outline" onClick={() => navigate({ route: 'home', params: {} })}>
               回到首页
             </Button>
           }
@@ -100,7 +100,7 @@ function Pending({ request }: { request: CancellationRequest }) {
       title="注销申请审核中"
       description={`提交于 ${formatDateTime(request.createdAt)}，审核通过前可以撤回。`}
       actions={
-        <Button variant="outline" loading={withdraw.isPending} onClick={() => void withdrawIt()}>
+        <Button variant="outline" loading={withdraw.isPending} onClick={() => withdrawIt()}>
           撤回申请
         </Button>
       }
@@ -196,7 +196,7 @@ function Apply({
           block
           loading={busy}
           disabled={!agreement.isSuccess}
-          onClick={() => void submit()}
+          onClick={() => submit()}
         >
           申请注销
         </Button>

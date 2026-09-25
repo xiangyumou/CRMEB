@@ -89,7 +89,7 @@ function ArticleRow({ article }: { article: Article }) {
       label={article.title}
       role="link"
       className="article-row"
-      onClick={() => void navigate({ route: 'article', params: { id: article.id } })}
+      onClick={() => navigate({ route: 'article', params: { id: article.id } })}
     >
       <View className="article-row__text">
         <Text className="article-row__title">{article.title}</Text>

@@ -86,10 +86,7 @@ function Body({ query }: { query: ReturnType<typeof useRouteQuery<'decor.pageHom
             title="店铺首页正在布置"
             description="先去看看全部商品吧"
             actions={
-              <Button
-                variant="outline"
-                onClick={() => void navigate({ route: 'category', params: {} })}
-              >
+              <Button variant="outline" onClick={() => navigate({ route: 'category', params: {} })}>
                 去逛逛
               </Button>
             }

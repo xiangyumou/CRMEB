@@ -69,11 +69,11 @@ function ArticleBody({ article }: { article: Article }) {
               key={link.href}
               title={link.text}
               label={`打开链接：${link.text}`}
-              onClick={() => void openExternalLink(link.href)}
+              onClick={() => openExternalLink(link.href)}
             />
           ))}
           {article.sourceUrl ? (
-            <Cell title="阅读原文" onClick={() => void openExternalLink(article.sourceUrl ?? '')} />
+            <Cell title="阅读原文" onClick={() => openExternalLink(article.sourceUrl ?? '')} />
           ) : null}
         </CellGroup>
       ) : null}
@@ -87,7 +87,7 @@ function LinkedProduct({ product }: { product: NonNullable<Article['product']> }
       label={product.name}
       role="link"
       className="article-product"
-      onClick={() => void navigate({ route: 'product', params: { id: product.id } })}
+      onClick={() => navigate({ route: 'product', params: { id: product.id } })}
     >
       <View className="article-product__image">
         <Image src={assetUrl(product.imageUrl)} ratio={1} radius="sm" size="small" />

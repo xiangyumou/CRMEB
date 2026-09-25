@@ -15,7 +15,7 @@ export interface CellProps {
   /** The red star before the title (a required form row). */
   required?: boolean | undefined;
   /** Shows the chevron and makes the row tappable. */
-  onClick?: (() => void) | undefined;
+  onClick?: (() => void | Promise<unknown>) | undefined;
   /** Chevron without a tap handler of our own (the row wraps a native picker). */
   arrow?: boolean | undefined;
   disabled?: boolean | undefined;

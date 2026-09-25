@@ -65,7 +65,7 @@ export default function Search() {
               <Pressable
                 label="清空搜索历史"
                 className="goods-search__clear"
-                onClick={() => void clearHistory()}
+                onClick={() => clearHistory()}
               >
                 <Icon name="trash" />
               </Pressable>

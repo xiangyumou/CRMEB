@@ -83,12 +83,7 @@ function Messages() {
       {unreadCount > 0 ? (
         <View className="messages__head">
           <Text>{unreadCount} 条未读</Text>
-          <Button
-            variant="text"
-            size="sm"
-            loading={markAll.isPending}
-            onClick={() => void readAll()}
-          >
+          <Button variant="text" size="sm" loading={markAll.isPending} onClick={() => readAll()}>
             全部已读
           </Button>
         </View>
@@ -104,7 +99,7 @@ function Messages() {
               label={`${message.readAt ? '' : '未读，'}${message.title}`}
               role="link"
               className="message-row__main"
-              onClick={() => void open(message)}
+              onClick={() => open(message)}
             >
               <View className="message-row__title-line">
                 {message.readAt ? null : <View className="message-row__dot" />}
@@ -118,7 +113,7 @@ function Messages() {
               size="sm"
               label={`删除「${message.title}」`}
               className="message-row__delete"
-              onClick={() => void removeOne(message)}
+              onClick={() => removeOne(message)}
             >
               删除
             </Button>

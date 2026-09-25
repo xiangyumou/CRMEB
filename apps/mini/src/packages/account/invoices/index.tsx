@@ -109,7 +109,7 @@ function Titles() {
             <Pressable
               label={`${title.name}，编辑`}
               className="invoice-title__main"
-              onClick={() => void navigate({ route: 'invoiceTitleEdit', params: { id: title.id } })}
+              onClick={() => navigate({ route: 'invoiceTitleEdit', params: { id: title.id } })}
             >
               <View className="invoice-title__head">
                 <Text className="invoice-title__name">{title.name}</Text>
@@ -140,7 +140,7 @@ function Titles() {
                 variant="text"
                 size="sm"
                 label={`删除「${title.name}」`}
-                onClick={() => void del(title)}
+                onClick={() => del(title)}
               >
                 删除
               </Button>
@@ -154,7 +154,7 @@ function Titles() {
           size="lg"
           block
           disabled={full}
-          onClick={() => void navigate({ route: 'invoiceTitleEdit', params: {} })}
+          onClick={() => navigate({ route: 'invoiceTitleEdit', params: {} })}
         >
           新增发票抬头
         </Button>
@@ -195,7 +195,7 @@ function RecordRow({ invoice }: { invoice: OrderInvoice }) {
       label={`${invoice.name}，${state.text}，查看详情`}
       role="link"
       className="invoice-record"
-      onClick={() => void navigate({ route: 'invoice', params: { id: invoice.id } })}
+      onClick={() => navigate({ route: 'invoice', params: { id: invoice.id } })}
     >
       <View className="invoice-record__head">
         <Text className="invoice-record__name">{invoice.name}</Text>

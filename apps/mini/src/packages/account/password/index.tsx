@@ -60,7 +60,7 @@ function PasswordForm({ hasPassword, phone }: { hasPassword: boolean; phone: str
       <View className="account-page">
         <Text className="account-note">设置密码需要先绑定手机号，用来接收验证码。</Text>
         <SubmitBar>
-          <Button size="lg" block onClick={() => void navigate({ route: 'phone', params: {} })}>
+          <Button size="lg" block onClick={() => navigate({ route: 'phone', params: {} })}>
             去绑定手机号
           </Button>
         </SubmitBar>
@@ -160,7 +160,7 @@ function PasswordForm({ hasPassword, phone }: { hasPassword: boolean; phone: str
         </View>
       ) : null}
       <SubmitBar>
-        <Button size="lg" block loading={change.isPending} onClick={() => void submit()}>
+        <Button size="lg" block loading={change.isPending} onClick={() => submit()}>
           {hasPassword ? '确认修改' : '设置密码'}
         </Button>
       </SubmitBar>

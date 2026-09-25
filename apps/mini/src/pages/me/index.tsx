@@ -61,7 +61,7 @@ export default function Me() {
             label={`${unreadCount} 条未读消息`}
             role="link"
             className="me__unread"
-            onClick={() => void navigate({ route: 'messages', params: {} })}
+            onClick={() => navigate({ route: 'messages', params: {} })}
           >
             <Icon name="bell" />
             <Text className="me__unread-text">{unreadCount} 条未读消息</Text>

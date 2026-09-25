@@ -29,7 +29,7 @@ export function AgreementCheck({ checked, onChange, shake = 0 }: AgreementCheckP
         label="用户协议"
         pressedTint={false}
         className="shop-agreement__link"
-        onClick={() => void navigate({ route: 'agreement', params: { key: 'user' } })}
+        onClick={() => navigate({ route: 'agreement', params: { key: 'user' } })}
       >
         《用户协议》
       </Pressable>
@@ -38,7 +38,7 @@ export function AgreementCheck({ checked, onChange, shake = 0 }: AgreementCheckP
         label="隐私政策"
         pressedTint={false}
         className="shop-agreement__link"
-        onClick={() => void navigate({ route: 'agreement', params: { key: 'privacy' } })}
+        onClick={() => navigate({ route: 'agreement', params: { key: 'privacy' } })}
       >
         《隐私政策》
       </Pressable>

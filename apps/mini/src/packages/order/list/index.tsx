@@ -99,7 +99,7 @@ function OrderList({ tab }: { tab: ShownTab }) {
               <Button
                 variant="outline-primary"
                 size="md"
-                onClick={() => void navigate({ route: 'home', params: {} })}
+                onClick={() => navigate({ route: 'home', params: {} })}
               >
                 回到首页
               </Button>

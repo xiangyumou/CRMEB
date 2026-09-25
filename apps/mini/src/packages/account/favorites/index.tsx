@@ -75,10 +75,7 @@ function Favorites() {
             title="还没有收藏"
             description="看到喜欢的商品，点「收藏」留着慢慢看"
             actions={
-              <Button
-                variant="outline"
-                onClick={() => void navigate({ route: 'home', params: {} })}
-              >
+              <Button variant="outline" onClick={() => navigate({ route: 'home', params: {} })}>
                 回到首页
               </Button>
             }

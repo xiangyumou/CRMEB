@@ -41,6 +41,7 @@ import { Pressable } from '@/ui/pressable';
 import { ProductCard } from '@/ui/product-card';
 import { ProductCardSkeleton } from '@/ui/skeleton';
 import './index.scss';
+import { errorMessage } from '@/lib/error-message';
 
 const CART_KEY = routeQueryKey('cart.list', CART_QUERY);
 const HOME = { route: 'home', params: {} } as const;
@@ -144,7 +145,7 @@ export default function Cart() {
       setEditing({ item, matrix });
     } catch (error) {
       setEditing(null);
-      toast.text(error instanceof Error ? error.message : '规格加载失败');
+      toast.text(errorMessage(error, '规格加载失败'));
     }
   };
 
@@ -225,7 +226,7 @@ export default function Cart() {
       title="登录后查看购物车"
       description="登录后，加入购物车的商品会一直为你保留"
       actions={
-        <Button size="md" onClick={() => void requireLogin(HERE)}>
+        <Button size="md" onClick={() => requireLogin(HERE)}>
           去登录
         </Button>
       }
@@ -243,7 +244,7 @@ export default function Cart() {
       title="购物车还是空的"
       description="挑几件喜欢的放进来吧"
       actions={
-        <Button size="md" variant="outline" onClick={() => void navigate(HOME)}>
+        <Button size="md" variant="outline" onClick={() => navigate(HOME)}>
           回到首页
         </Button>
       }
@@ -293,7 +294,7 @@ export default function Cart() {
             <Pressable
               label="清空失效商品"
               className="cart__clear"
-              onClick={() => void clearUnavailable()}
+              onClick={() => clearUnavailable()}
             >
               清空失效商品
             </Pressable>
@@ -354,7 +355,7 @@ export default function Cart() {
                 size="md"
                 variant="danger"
                 loading={remove.isPending}
-                onClick={() => void removeSelected()}
+                onClick={() => removeSelected()}
               >
                 删除
               </Button>

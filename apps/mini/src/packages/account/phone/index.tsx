@@ -141,7 +141,7 @@ function PhoneForm({ current }: { current: string | null }) {
               size="lg"
               block
               loading={bindSms.isPending || change.isPending}
-              onClick={() => void submit()}
+              onClick={() => submit()}
             >
               {changing ? '确认更换' : '绑定'}
             </Button>
